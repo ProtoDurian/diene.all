@@ -59,6 +59,16 @@ nix develop .#<shell> -c <command>
 the job, CI and your laptop run the same tools, and every job can reuse the shared
 Nix store cache.
 
+## Named checks
+
+The `named-checks` job in `ci.yaml` runs `scripts/ci/named-checks.sh` on the exact commit.
+It resolves the node ref (`GITHUB_HEAD_REF`, else `GITHUB_REF_NAME`) and runs every
+executable `*.sh` in `.github/named-checks/<ref>/`, printing `PASS`/`FAIL` per check; a ref
+like `lib/bun/result` maps to nested directories. With no such directory the job passes as
+"no named checks declared", and it skips outside `diene.all`. A descendant adds its own
+directory and never edits another node's. Set `NAMED_CHECKS_NODE` to run a node's checks
+locally.
+
 ## Runners and cache labels
 
 These are plain workflow configuration. Nothing validates them, so read the
