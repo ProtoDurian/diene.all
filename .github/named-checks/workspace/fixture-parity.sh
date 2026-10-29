@@ -7,7 +7,7 @@ set -euo pipefail
 
 dir="$(dirname "${BASH_SOURCE[0]}")"
 surface="${dir}/fixture-surface.txt"
-tracked="$(git ls-files)"
+tracked="$(git -c core.quotePath=false ls-files)"
 bad=0
 
 has() { grep -qxF -- "$1" <<<"${tracked}"; }

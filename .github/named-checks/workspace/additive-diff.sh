@@ -17,7 +17,7 @@ if ! git merge-base --is-ancestor "${main_ref}" HEAD; then
 fi
 
 # index tree == HEAD in CI; keeps local staged mutations visible
-deleted="$(git diff --no-renames --diff-filter=D --name-only "${main_ref}" "$(git write-tree)")"
+deleted="$(git -c core.quotePath=false diff --no-renames --diff-filter=D --name-only "${main_ref}" "$(git write-tree)")"
 if [[ -n ${deleted} ]]; then
   echo "❌ paths tracked at ${main_ref} are deleted at HEAD (diff must be additive):" >&2
   while IFS= read -r path; do echo "   ${path}" >&2; done <<<"${deleted}"

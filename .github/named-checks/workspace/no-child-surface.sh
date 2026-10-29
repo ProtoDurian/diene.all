@@ -40,7 +40,7 @@ observability_paths=(
   probes/observability-standards-present.ts
 )
 
-tracked="$(git ls-files)"
+tracked="$(git -c core.quotePath=false ls-files)"
 found=()
 
 while IFS= read -r path; do
