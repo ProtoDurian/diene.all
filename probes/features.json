@@ -71,11 +71,6 @@
   },
   {
     "template": "diene/workspace",
-    "name": "skills-sync",
-    "class": "gate"
-  },
-  {
-    "template": "diene/workspace",
     "name": "hook-shellcheck",
     "class": "gate"
   },

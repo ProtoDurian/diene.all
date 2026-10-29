@@ -59,9 +59,9 @@ frozen lockfile, bundles the sample, and runs as the unprivileged `bun` user.
 The sample prints a composed key by default; `REDIS_HOST` plus `REDIS_PORT`
 enable a Redis round trip.
 
-Application descendants use pino JSON logging with trace-context injection
-from `@atomicloud/diene.otel`. That application logging layer is intentionally
-not duplicated in this toolchain sample before the shared library is consumed.
+The sample logs pino JSON only. Trace-context injection belongs to the
+observability payload, which descendants add; this node declares no
+`@atomicloud/diene.*` dependency.
 
 ## TypeScript standards
 

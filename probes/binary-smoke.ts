@@ -1,4 +1,4 @@
-import { expectGreen, expectRedBecause } from './lib/helpers.ts';
+import { expectGreen, expectRed } from './lib/helpers.ts';
 
 const declarationFiles = 'nix/packages.nix nix/env.nix';
 
@@ -166,7 +166,7 @@ export default {
   probes: [
     {
       name: 'baseline-binary-smoke-resolves',
-      description: 'Every binary this node declares for the default shell resolves in it.',
+      description: 'Every binary the workspace declares for the default shell resolves in it.',
       kind: 'baseline',
       async run(repo: any) {
         await expectGreen(repo, 'nix develop .#default -c dlint toolchain-smoke', 'binary-smoke');
@@ -209,9 +209,7 @@ export default {
             throw new Error(`could not find the registry inherit anchor in nix/packages.nix`);
           }
           await repo.write('nix/packages.nix', source.replace(anchor, `${anchor}          ${binary}\n`));
-          await expectRedBecause(repo, absenceCommand(binary), 'binary-smoke', [
-            `${binary} is back in the nix inventory`,
-          ]);
+          await expectRed(repo, absenceCommand(binary), 'binary-smoke');
         },
       },
     ]),

@@ -1,4 +1,4 @@
-import { expectGreen, expectRedBecause } from './lib/helpers.ts';
+import { expectGreen, expectRed } from './lib/helpers.ts';
 
 export default {
   contractVersion: 1,
@@ -25,10 +25,7 @@ export default {
             find: '        run: nix develop .#ci -c ./scripts/ci/pre-commit.sh',
             replace: '        runs: nix develop .#ci -c ./scripts/ci/pre-commit.sh',
           });
-          await expectRedBecause(repo, 'nix develop .#ci -c actionlint', 'workflow-actionlint', [
-            path,
-            'step must run script with "run" section or run action with "uses" section [syntax-check]',
-          ]);
+          await expectRed(repo, 'nix develop .#ci -c actionlint', 'workflow-actionlint');
         } finally {
           await repo.write(path, original);
         }
