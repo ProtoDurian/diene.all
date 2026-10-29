@@ -18,6 +18,7 @@ jobs:
   release:
     name: Semantic Release
     runs-on: ${{ fromJSON(inputs.runs_on != '' && inputs.runs_on || format('["nscloud-ubuntu-26.04-amd64-4x8-with-cache","nscloud-cache-size-20gb","nscloud-cache-tag-{0}"]', inputs.nix_cache_tag)) }}
+    timeout-minutes: 20
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
         with:
