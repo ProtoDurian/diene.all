@@ -165,13 +165,18 @@ release:
     assets:
       - Changelog.md
       - docs/developer/CommitConventions.md
+      - package.json
   github:
     enabled: true
     successComment: 'Released in ${version}.'
     releasedLabels:
       - released
   hooks:
-    # Hook point a downstream node fills; a version file enters commit.assets in
-    # the same edit as the command that writes it.
-    prepare: []
+    # ### bun-base-release
+    # #### source: bun-base
+    # Filled here: this node versions `package.json`, which the command below
+    # stamps and `commit.assets` lists.
+    prepare:
+      - phase: afterWrite
+        command: './scripts/release/bump.sh ${version}'
     success: []

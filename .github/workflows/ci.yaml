@@ -20,6 +20,8 @@ jobs:
       contents: read
     uses: ./.github/workflows/⚡reusable-precommit.yaml
     secrets: inherit
+    with:
+      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
 
   named-checks:
     name: named-checks
@@ -27,6 +29,39 @@ jobs:
       contents: read
     uses: ./.github/workflows/⚡reusable-named-checks.yaml
     secrets: inherit
+    with:
+      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
+
+  # ### bun-base-ci
+  # #### source: bun-base
+  unit:
+    name: Unit Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-test.yaml
+    secrets: inherit
+    with:
+      mode: unit
+      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
+
+  int:
+    name: Integration Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-test.yaml
+    secrets: inherit
+    with:
+      mode: int
+      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
+
+  build:
+    name: Build Validation
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-build.yaml
+    secrets: inherit
+    with:
+      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
 
   docker:
     name: Docker Image
@@ -40,6 +75,7 @@ jobs:
       image_name: diene-workspace
       dockerfile: ./infra/Dockerfile
       platform: linux/amd64
+      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
 
   helm:
     name: Helm Chart
@@ -51,3 +87,4 @@ jobs:
     secrets: inherit
     with:
       chart_path: ./infra/root_chart
+      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64

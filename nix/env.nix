@@ -19,6 +19,12 @@ with packages;
   ];
 
   main = [
+    # ### bun-base-main
+    # #### source: bun-base
+    bun
+    nodejs
+    # setup.sh runs `releaser conventions`; the probes run setup in .#ci
+    releaser
     cyanprint
     git
     go-task

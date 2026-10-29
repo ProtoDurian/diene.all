@@ -25,6 +25,10 @@ let
       {
         inherit
           actionlint
+          # ### bun-base-packages
+          # #### source: bun-base
+          bun
+          nodejs
           git
           go-task
           infisical
