@@ -22,10 +22,9 @@ their trigger block:
   block to see when.
 - **Reusable workflows** — `on.workflow_call` only, named with a `⚡` prefix.
   Each owns runner selection and setup and ends in a `run:` line of the form
-  `nix develop .#<shell> -c ./scripts/ci/<script>.sh`. The pre-commit workflow
-  additionally runs `skills-sync sync --tier ci` as an explicit step before its
-  script: the hook uses the warning tier, so running the hook in CI cannot stand
-  in for the guarantee tier.
+  `nix develop .#<shell> -c ./scripts/ci/<script>.sh`. The pre-commit script runs
+  every hook, including `a-skills-sync` (`skills-sync sync --frozen`), so CI
+  enforces the vendored skills without a separate step.
 
 Callers grant permissions, pass only repository-specific values, and use
 `secrets: inherit`. The `a-workflows` gate enforces that every orchestrator job
@@ -65,15 +64,24 @@ Nix store cache.
 These are plain workflow configuration. Nothing validates them, so read the
 existing `runs-on:` blocks and copy the shape.
 
-Selection is 26.04-first: GitHub-hosted jobs take `ubuntu-26.04`, Namespace jobs
-take `nscloud-ubuntu-26.04-amd64-16x32-with-cache` plus `nscloud-cache-size-50gb`
-and the shared store-cache tag `nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64`.
+Selection is 26.04-first. Every reusable workflow takes two optional inputs:
+
+- `runs_on` — a JSON `runs-on` value. Leave it empty for the default:
+  `nscloud-ubuntu-26.04-amd64-4x8-with-cache` plus `nscloud-cache-size-20gb` and
+  `nscloud-cache-tag-<nix_cache_tag>`. Pass a JSON label list (or a
+  `namespace-profile-*` label) to override it; a heavier stack takes
+  `nscloud-ubuntu-26.04-amd64-8x16-with-cache` with the same cache labels.
+- `nix_cache_tag` — the Nix store cache volume tag, default
+  `nix-store-cache-ubuntu-26.04-amd64`. Give each stack (language toolchain) its
+  own tag so its closure stays warm, and keep the number of tags small: storage is
+  billed on the requested size.
+
 The 24.04 equivalents are the fallbacks. A lane that must **not** share the store
-uses the bare `nscloud-ubuntu-26.04-amd64-16x32` with no cache labels at all — a
-bare label cannot attach a cache volume, which is the point of using it. The cache
-is shared per OS and architecture, carries no organization, platform or service
-name, and changing the OS rotates the tag and costs one cold build before warm
-reuse resumes.
+passes a bare `nscloud-ubuntu-26.04-amd64-4x8` (or `-8x16`) with no cache labels at
+all — a bare label cannot attach a cache volume, which is the point of using it. The
+cache tag carries no organization, platform or service name, and changing the OS
+rotates the tag and costs one cold build before warm reuse resumes. The merge
+gatekeeper is a poller with no Nix, so it stays on GitHub-hosted `ubuntu-26.04`.
 
 ## Dependency materialisation
 
@@ -91,13 +99,11 @@ Run the same entry point the lane runs. Take the `run:` line from the reusable
 workflow you want to reproduce and run it verbatim, for example:
 
 ```bash
-nix develop .#ci -c skills-sync sync --tier ci
 nix develop .#ci -c ./scripts/ci/pre-commit.sh
 ```
 
-Run both lines, in that order, to reproduce the pre-commit workflow. A downstream
-runtime restores its dependencies before the skills step; workspace declares
-`runtime: none`, so the generic call is deliberately inert here.
+That line reproduces the pre-commit workflow. Workspace names no runtime, so its
+`a-skills-sync` hook is deliberately inert here.
 
 The Docker and Helm scripts build locally by default. Their reusable workflows set
 the documented environment contract to enable publishing.
