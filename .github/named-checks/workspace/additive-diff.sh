@@ -23,7 +23,8 @@ if ! git merge-base --is-ancestor "${main_ref}" HEAD; then
   exit 1
 fi
 
-deleted="$(git diff --no-renames --diff-filter=D --name-only "${main_ref}" HEAD)"
+# index tree == HEAD in CI; keeps local staged mutations visible
+deleted="$(git diff --no-renames --diff-filter=D --name-only "${main_ref}" "$(git write-tree)")"
 unsanctioned=()
 while IFS= read -r path; do
   [[ -z ${path} ]] && continue
