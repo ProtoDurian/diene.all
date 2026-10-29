@@ -30,6 +30,7 @@ jobs:
     with:
       image_name: diene-workspace
       dockerfile: ./infra/Dockerfile
+      platform: linux/amd64
 
   helm:
     name: Helm Chart

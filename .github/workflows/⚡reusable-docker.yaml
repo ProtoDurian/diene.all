@@ -50,7 +50,7 @@ jobs:
           CI_DOCKER_CONTEXT: ${{ inputs.context }}
           CI_DOCKER_IMAGE: ${{ inputs.image_name }}
           CI_DOCKER_PLATFORM: ${{ inputs.platform }}
-          CI_DOCKER_PUSH: 'true'
+          CI_DOCKER_PUSH: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
           CI_DOCKERFILE: ${{ inputs.dockerfile }}
           DOMAIN: ghcr.io
           DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
