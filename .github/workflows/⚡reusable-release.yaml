@@ -2,17 +2,26 @@ name: ⚡ Reusable Release
 
 on:
   workflow_call:
+    inputs:
+      runs_on:
+        description: 'JSON runs-on value. Empty (default): Namespace 4x8 with a 20 GB cache volume. Pass a JSON label list or a namespace-profile-* label to override.'
+        required: false
+        type: string
+        default: ''
+      nix_cache_tag:
+        description: 'Namespace cache volume tag for the Nix store. Give each stack (language toolchain) its own tag so its closure stays warm; keep the number of tags small.'
+        required: false
+        type: string
+        default: 'nix-store-cache-ubuntu-26.04-amd64'
 
 jobs:
   release:
     name: Semantic Release
-    runs-on:
-      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
-      - nscloud-cache-size-50gb
-      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    runs-on: ${{ fromJSON(inputs.runs_on != '' && inputs.runs_on || format('["nscloud-ubuntu-26.04-amd64-4x8-with-cache","nscloud-cache-size-20gb","nscloud-cache-tag-{0}"]', inputs.nix_cache_tag)) }}
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
         with:
+          namespacelabs: ${{ (inputs.runs_on == '' || contains(inputs.runs_on, 'nscloud') || contains(inputs.runs_on, 'namespace-profile')) && 'true' || 'false' }}
           auth-bot-app-id: ${{ vars.AUTH_BOT_APP_ID }}
           auth-bot-secret-key: ${{ secrets.AUTH_BOT_SECRET_KEY }}
       - name: Release
