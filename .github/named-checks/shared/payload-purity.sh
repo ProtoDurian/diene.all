@@ -16,4 +16,4 @@ if [[ ${#offending[@]} -gt 0 ]]; then
   exit 1
 fi
 
-echo "payload-purity: no language variants, no observability, no legacy standard path"
+echo "✅ payload-purity: no language variants, no observability, no legacy standard path"

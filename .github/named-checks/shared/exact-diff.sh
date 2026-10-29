@@ -6,9 +6,10 @@ set -euo pipefail
 # that register them. Nothing tracked by workspace is deleted, renamed or
 # rewritten.
 
-# shellcheck source=.github/named-checks/shared/parent.bash
-source "$(dirname "$0")/parent.bash"
-require_parent
+# The graph ancestor: workspace at its recorded .3 commit (parent.sha).
+parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
+git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
+git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ workspace .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 
 # The ten agnostic standards this node owns (owner rulings S1/S3 removed
 # authorization and contributor-docs).
@@ -53,4 +54,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "exact-diff: payload additions and insertion-only registrations against workspace .3 ${parent_sha}"
+echo "✅ exact-diff: payload additions and insertion-only registrations against workspace .3 ${parent_sha}"

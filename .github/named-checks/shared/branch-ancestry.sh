@@ -3,13 +3,14 @@ set -euo pipefail
 
 # shared is cut from workspace: HEAD contains workspace's recorded .3 commit.
 
-# shellcheck source=.github/named-checks/shared/parent.bash
-source "$(dirname "$0")/parent.bash"
-require_parent
+# The graph ancestor: workspace at its recorded .3 commit (parent.sha).
+parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
+git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
+git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ workspace .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 
 if ! git merge-base --is-ancestor "${parent_sha}" HEAD; then
   echo "❌ HEAD does not contain workspace .3 ${parent_sha}; the branch is not cut from workspace" >&2
   exit 1
 fi
 
-echo "branch-ancestry: HEAD contains workspace .3 ${parent_sha}"
+echo "✅ branch-ancestry: HEAD contains workspace .3 ${parent_sha}"
