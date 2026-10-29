@@ -21,6 +21,13 @@ jobs:
     uses: ./.github/workflows/⚡reusable-precommit.yaml
     secrets: inherit
 
+  named-checks:
+    name: named-checks
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-named-checks.yaml
+    secrets: inherit
+
   docker:
     name: Docker Image
     permissions:
