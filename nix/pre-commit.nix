@@ -32,6 +32,14 @@ pre-commit-lib.run {
       language = "system";
     };
 
+    a-release-policy = {
+      enable = true;
+      name = "Release workflow policy";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH ${packages.atomiutils}/bin/bash scripts/validate/release-policy.sh'";
+      pass_filenames = false;
+      language = "system";
+    };
+
     a-helm-lint = {
       enable = true;
       name = "Helm lint";

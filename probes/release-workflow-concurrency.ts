@@ -18,7 +18,11 @@ export default {
       description: 'Release uses the single release concurrency group.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, 'nix develop .#ci -c dlint workflow-policy', 'release-workflow-concurrency');
+        await expectGreen(
+          repo,
+          'nix develop .#ci -c pre-commit run a-release-policy --all-files',
+          'release-workflow-concurrency',
+        );
       },
     },
     {
@@ -31,7 +35,7 @@ export default {
         await repo.patch(releaseWorkflow, { find: '  group: release', replace: '  group: broken' });
         await expectRedBecause(
           repo,
-          'nix develop .#ci -c dlint workflow-policy',
+          'nix develop .#ci -c pre-commit run a-release-policy --all-files',
           'release-workflow-concurrency',
           ['release concurrency group must be release'],
           { forbidden: ['does not exist', 'Release trigger conforms', 'Release concurrency conforms', 'DISAGREEMENT'] },
