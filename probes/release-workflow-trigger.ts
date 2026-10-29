@@ -1,4 +1,13 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause } from './lib/helpers.ts';
+
+const releaseWorkflow = '.github/workflows/release.yaml';
+
+async function assertTrackedReleaseWorkflow(repo: any): Promise<void> {
+  const subject = await repo.exec(`test -f ${releaseWorkflow} && git ls-files --error-unmatch -- ${releaseWorkflow}`);
+  if (subject.exitCode !== 0) {
+    throw new Error(`release-workflow-trigger: required tracked subject '${releaseWorkflow}' is missing`);
+  }
+}
 
 export default {
   contractVersion: 1,
@@ -11,7 +20,7 @@ export default {
       async run(repo: any) {
         await expectGreen(
           repo,
-          'nix develop .#ci -c ./scripts/validate/workflows.sh release-trigger',
+          'nix develop .#ci -c pre-commit run a-release-policy --all-files',
           'release-workflow-trigger',
         );
       },
@@ -20,16 +29,19 @@ export default {
       name: 'mutation-release-workflow-trigger-caught',
       description: 'A focused sabotage must turn the release-workflow-trigger mechanism red.',
       kind: 'mutation',
-      expectedImpact: [],
+      expectedImpact: ['release-workflow-concurrency'],
       async run(repo: any) {
-        await repo.patch('.github/workflows/release.yaml', {
+        await assertTrackedReleaseWorkflow(repo);
+        await repo.patch(releaseWorkflow, {
           find: "workflows: ['CI']",
           replace: "workflows: ['Broken']",
         });
-        await expectRed(
+        await expectRedBecause(
           repo,
-          'nix develop .#ci -c ./scripts/validate/workflows.sh release-trigger',
+          'nix develop .#ci -c pre-commit run a-release-policy --all-files',
           'release-workflow-trigger',
+          ['release must trigger from CI'],
+          { forbidden: ['does not exist', 'Release trigger conforms', 'Release concurrency conforms', 'DISAGREEMENT'] },
         );
       },
     },
