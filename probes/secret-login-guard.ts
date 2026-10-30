@@ -13,18 +13,19 @@ export default {
       // reaches the `infisical` binary, so entering a shell would only add a dependency
       // the assertion does not have.
       name: 'baseline-secret-login-guard-refuses-actions',
-      description: 'The secrets helper refuses the removed fetch/scan actions and names the reason.',
+      description: 'The secrets helper refuses the removed fetch/scan actions: exit 1 with a ❌ reason.',
       kind: 'baseline',
       async run(repo: any) {
         for (const stale of ['fetch', 'scan']) {
           const result = await repo.exec(`./scripts/local/secrets.sh ${stale}`);
-          if (result.exitCode === 0) {
-            throw new Error(`secrets.sh accepted the removed '${stale}' action`);
+          if (result.exitCode !== 1) {
+            throw new Error(`secrets.sh exited ${result.exitCode} on the removed '${stale}' action, expected 1`);
           }
           const output = `${result.stdout}${result.stderr}`;
-          // The exit code alone would also be produced by a script that simply failed to
-          // start, so the refusal has to name both itself and the argument it rejected.
-          if (!output.includes('secrets.sh takes no arguments') || !output.includes(`'${stale}' is not an action`)) {
+          // The goal's guard contract is "exits 1 with ❌". The exit code alone would also
+          // be produced by a script that simply failed to start, so the refusal must carry
+          // the ❌ marker and name the guard that fired.
+          if (!output.includes('❌') || !output.includes('secrets.sh takes no arguments')) {
             throw new Error(`secrets.sh refused '${stale}' without saying why: ${output}`);
           }
         }

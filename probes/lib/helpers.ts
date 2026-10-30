@@ -84,11 +84,6 @@ function shellArgument(value: string): string {
   return "'" + value.replaceAll("'", "'\\''") + "'";
 }
 
-// Restore the sandbox to HEAD and drop the probe's own fixtures. `git clean` is
-// scoped to the caller's targets so a probe never removes work it does not own.
-// Fixtures are made writable first: a probe that proves read-only package content
-// is vendored leaves read-only trees behind, and both `git clean` and a later
-// `rm -rf` fail on those unless the permission is restored.
 export async function restoreProbeState(repo: any, cleanTargets: readonly string[]): Promise<void> {
   if (cleanTargets.length === 0) {
     throw new Error('probe cleanup requires at least one owned target');
@@ -123,9 +118,6 @@ export async function restoreProbeState(repo: any, cleanTargets: readonly string
   }
 }
 
-// Run `body` between two restores: the leading one so a previous probe's residue
-// cannot decide this outcome, the trailing one so a failure still hands the next
-// probe a clean sandbox.
 export async function withCleanProbeState(
   repo: any,
   cleanTargets: readonly string[],
