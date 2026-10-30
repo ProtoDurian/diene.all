@@ -6,17 +6,18 @@
         "fenix": "fenix",
         "flake-utils": "flake-utils",
         "nixpkgs-2605": "nixpkgs-2605",
+        "nixpkgs-dotnet": "nixpkgs-dotnet",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "pre-commit-hooks": "pre-commit-hooks",
         "treefmt-nix": "treefmt-nix",
         "worktrunkpkgs": "worktrunkpkgs"
       },
       "locked": {
-        "lastModified": 1786088707,
-        "narHash": "sha256-4eCqwAfGxQpEwEKZ1CWCa1ulYxLsav3fAEx5IQCaJ3U=",
+        "lastModified": 1793362325,
+        "narHash": "sha256-QHUr8g1dX4MK3InuXtYCNVSokeUonivI9RQe3AKBnw4=",
         "owner": "AtomiCloud",
         "repo": "nix-registry",
-        "rev": "bbf8c713502e895acc1d6d2c24d8bb38c78fbefb",
+        "rev": "1885fa7a2f2ecadde7f6e2e29f7a50dfa3a905a9",
         "type": "github"
       },
       "original": {
@@ -299,6 +300,22 @@
       }
     },
     "nixpkgs-2605_2": {
+      "locked": {
+        "lastModified": 1785989512,
+        "narHash": "sha256-HFQhkQcl5D1hUNoen3SGHCSFCt2Bg6uP+HgbrnA3InQ=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "445d861c6d31b4af0c79d8d4be2331f762a361d7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "445d861c6d31b4af0c79d8d4be2331f762a361d7",
+        "type": "github"
+      }
+    },
+    "nixpkgs-dotnet": {
       "locked": {
         "lastModified": 1785989512,
         "narHash": "sha256-HFQhkQcl5D1hUNoen3SGHCSFCt2Bg6uP+HgbrnA3InQ=",
