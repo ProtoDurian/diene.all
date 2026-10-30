@@ -36,17 +36,25 @@ const definition: ProbeDefinition = {
       timeoutMs: 240000,
       async run(repo) {
         await repo.write("probe-shfmt.sh", shellFixture);
-        const staged = await repo.exec("git add probe-shfmt.sh");
-        if (staged.exitCode !== 0) {
-          throw new Error(
-            `failed to stage shfmt fixture: ${staged.stderr || staged.stdout}`,
-          );
-        }
-        const result = await repo.exec(gate, { timeoutMs: 240000 });
-        if (result.exitCode === 0) {
-          throw new Error(
-            "treefmt shfmt stayed green after an unformatted shell script",
-          );
+        // The fixture is removed once the red is asserted: the other features run
+        // as controls against this sandbox, and a child that adds checks over
+        // staged scripts (for example an exec-bit hook) must not see it.
+        try {
+          const staged = await repo.exec("git add probe-shfmt.sh");
+          if (staged.exitCode !== 0) {
+            throw new Error(
+              `failed to stage shfmt fixture: ${staged.stderr || staged.stdout}`,
+            );
+          }
+          const result = await repo.exec(gate, { timeoutMs: 240000 });
+          if (result.exitCode === 0) {
+            throw new Error(
+              "treefmt shfmt stayed green after an unformatted shell script",
+            );
+          }
+        } finally {
+          await repo.exec("git reset -- probe-shfmt.sh");
+          await repo.remove("probe-shfmt.sh");
         }
       },
     },
