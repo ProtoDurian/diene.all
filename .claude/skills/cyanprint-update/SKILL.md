@@ -56,14 +56,11 @@ decision. `cyanprint update` uses it to pull template changes into this repo.
 
 ## Rules
 
-- **Never edit `.cyan_state.yaml` by hand.** It is the merge base for every later update. A hand
-  edit makes the next update merge against a template output that never existed.
-- **Never delete `.cyan_state.yaml`.** Without it, `update` cannot run at all.
+- **Managed files and `.cyan_state.yaml`:** follow the "CyanPrint-managed files" section of
+  `CLAUDE.md`. It says which files are managed, how each was merged, and how to edit them.
 - **Do not commit with conflict markers in files.**
 - **Do not hand-copy template changes.** If a fix is missing, the template above this repo needs
   republishing. Tell its owner.
-- **Template-owned files:** prefer changing them in the template rather than here. Every local edit
-  to a template-owned line is a future conflict.
 - **Installed from a local path?** If `.cyan_state.yaml` shows a local `source:` (a filesystem path,
   `version: local`), `update` re-reads that same path as its base. It never sees changes. Re-install
   from the registry to receive updates.
