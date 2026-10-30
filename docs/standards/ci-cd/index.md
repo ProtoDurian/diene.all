@@ -59,39 +59,32 @@ nix develop .#<shell> -c <command>
 the job, CI and your laptop run the same tools, and every job can reuse the shared
 Nix store cache.
 
-## Named checks
-
-The `named-checks` job in `ci.yaml` runs `scripts/ci/named-checks.sh` on the exact commit.
-It resolves the node ref (`GITHUB_HEAD_REF`, else `GITHUB_REF_NAME`) and runs every
-executable `*.sh` in `.github/named-checks/<ref>/`, printing `PASS`/`FAIL` per check; a ref
-like `lib/bun/result` maps to nested directories. With no such directory the job passes as
-"no named checks declared", and it skips outside `diene.all`. A descendant adds its own
-directory and never edits another node's. Set `NAMED_CHECKS_NODE` to run a node's checks
-locally.
-
 ## Runners and cache labels
 
-These are plain workflow configuration. Nothing validates them, so read the
-existing `runs-on:` blocks and copy the shape.
+Every job that runs a script uses the same runner labels, written as the same
+literal in every reusable workflow:
 
-Selection is 26.04-first. Every reusable workflow takes two optional inputs:
+```yaml
+runs-on:
+  - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+  - nscloud-cache-size-20gb
+  - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+```
 
-- `runs_on` — a JSON `runs-on` value. Leave it empty for the default:
-  `nscloud-ubuntu-26.04-amd64-4x8-with-cache` plus `nscloud-cache-size-20gb` and
-  `nscloud-cache-tag-<nix_cache_tag>`. Pass a JSON label list (or a
-  `namespace-profile-*` label) to override it; a heavier stack takes
-  `nscloud-ubuntu-26.04-amd64-8x16-with-cache` with the same cache labels.
-- `nix_cache_tag` — the Nix store cache volume tag, default
-  `nix-store-cache-ubuntu-26.04-amd64`. Give each stack (language toolchain) its
-  own tag so its closure stays warm, and keep the number of tags small: storage is
-  billed on the requested size.
+This is one template value with a default. The runner and the Nix store cache
+tag are chosen once, when a repository is generated from the template, and the
+answer is written into every workflow identically. Reusable workflows take no
+runner or cache inputs and callers never pass them, so there is one value to
+change, and every workflow changes with it.
 
-The 24.04 equivalents are the fallbacks. A lane that must **not** share the store
-passes a bare `nscloud-ubuntu-26.04-amd64-4x8` (or `-8x16`) with no cache labels at
-all — a bare label cannot attach a cache volume, which is the point of using it. The
-cache tag carries no organization, platform or service name, and changing the OS
-rotates the tag and costs one cold build before warm reuse resumes. The merge
-gatekeeper is a poller with no Nix, so it stays on GitHub-hosted `ubuntu-26.04`.
+Selection is 26.04-first; the 24.04 equivalents are the fallbacks. A lane that
+must **not** share the store uses the bare `nscloud-ubuntu-26.04-amd64-4x8` with
+no cache labels at all — a bare label cannot attach a cache volume, which is the
+point of using it. The cache tag
+is shared per OS and architecture: it carries no organization, platform or
+service name, and changing the OS rotates the tag and costs one cold build before
+warm reuse resumes. The merge gatekeeper is a poller with no Nix, so it stays on
+GitHub-hosted `ubuntu-26.04`.
 
 ## Dependency materialisation
 
