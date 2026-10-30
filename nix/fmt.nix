@@ -7,7 +7,11 @@ let
     programs = {
       actionlint.enable = true;
       nixfmt.enable = true;
-      prettier.enable = true;
+      prettier = {
+        enable = true;
+        excludes = [
+        ];
+      };
       shfmt.enable = true;
     };
 
