@@ -19,7 +19,7 @@ let
           ;
       }
     );
-    nix-unstable = (with pkgs-unstable; { });
+
     nix-2605 = (
       with pkgs-2605;
       {
@@ -35,7 +35,13 @@ let
           ;
       }
     );
+
+    nix-unstable = (
+      with pkgs-unstable;
+      {
+      }
+    );
   };
 in
 with all;
-nix-2605 // nix-unstable // atomipkgs
+atomipkgs // nix-2605 // nix-unstable
