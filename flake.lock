@@ -13,11 +13,11 @@
         "worktrunkpkgs": "worktrunkpkgs"
       },
       "locked": {
-        "lastModified": 1793362325,
-        "narHash": "sha256-QHUr8g1dX4MK3InuXtYCNVSokeUonivI9RQe3AKBnw4=",
+        "lastModified": 1793424690,
+        "narHash": "sha256-X0USZprzR6D4EgZiz3TPtwov5KexsiT1dw91VzUCeC4=",
         "owner": "AtomiCloud",
         "repo": "nix-registry",
-        "rev": "1885fa7a2f2ecadde7f6e2e29f7a50dfa3a905a9",
+        "rev": "116ef25a551c574da774880bcdcd4a7cc22583c4",
         "type": "github"
       },
       "original": {
