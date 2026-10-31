@@ -5,6 +5,9 @@
   pre-commit-lib,
   env,
 }:
+let
+  envPath = pkgs.lib.makeBinPath (env.system ++ env.main ++ env.lint ++ env.dev);
+in
 pre-commit-lib.run {
   src = ../.;
 
