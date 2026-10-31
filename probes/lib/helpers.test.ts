@@ -7,13 +7,10 @@ import { capturedEnvCommand, expectRedBecause } from './helpers';
 
 const ENV_DIR = '/captures';
 
-// A four-shell chain: several entries in one command, each rewritten on its own.
 const CHAINED =
   'nix develop --no-write-lock-file .#default -c true && nix develop --no-write-lock-file .#ci -c true && ' +
   'nix develop --no-write-lock-file .#cd -c true && nix develop --no-write-lock-file .#releaser -c true';
 
-// A real corpus command whose payload is a single-quoted bash script containing its own
-// escaped single quotes — the shape the rewrite is most likely to corrupt.
 const EMBEDDED_QUOTES =
   `nix develop .#ci -c bash -c 'set -euo pipefail; first="$(mktemp -d)"; ` +
   `trap "rm -rf \\"$first\\"" EXIT; test "$(cat skill)" = '"'"'committed skill'"'"''`;
@@ -95,9 +92,6 @@ describe('captured-env rewrite — flag on', () => {
   });
 });
 
-// The byte assertions above cannot show that the rewritten string still *runs* the same
-// argv. These do, against a hand-written capture, with no nix anywhere: `sh -c` is exactly
-// how cyanprint's probe sandbox executes a probe command (packages/core/src/probe/spawn.ts).
 describe('captured-env rewrite — the rewritten command actually runs', () => {
   const dir = mkdtempSync(join(tmpdir(), 'captured-env-test-'));
   writeFileSync(join(dir, 'ci.sh'), 'export PROBE_TEST_MARKER=from-capture\n');
@@ -146,8 +140,6 @@ describe('captured-env rewrite — the rewritten command actually runs', () => {
 
 type Recorded = { command: string; options?: { timeoutMs?: number } };
 
-// None of these commands contain a `nix develop .#<shell> -c ` entry, so the captured-env
-// rewrite is a no-op on them whatever PROBE_CAPTURED_ENV holds.
 function fakeRepo(result: { exitCode: number; stdout?: string; stderr?: string }) {
   const calls: Recorded[] = [];
   return {
@@ -159,7 +151,6 @@ function fakeRepo(result: { exitCode: number; stdout?: string; stderr?: string }
   };
 }
 
-// Assert-the-asserter: every arm is driven on a known-bad case as well as a known-good one.
 describe('expectRedBecause', () => {
   test('accepts a red whose output names every declared reason', async () => {
     const repo = fakeRepo({ exitCode: 1, stdout: 'error TS2322: Type mismatch\n' });

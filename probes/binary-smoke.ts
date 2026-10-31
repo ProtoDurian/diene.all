@@ -74,9 +74,7 @@ const definition: ProbeDefinition = {
       kind: "baseline",
       timeoutMs: 240000,
       async run(repo) {
-        // This is a JS template literal, not raw shell. String.raw suppresses ESCAPE
-        // processing only; it does not suppress interpolation, so shell variables are
-        // written bare ($var). probes/lib/probe-modules.test.ts imports this module.
+        // String.raw still interpolates: write shell variables as $var, never ${var}.
         const invocations = String.raw`
 set -euo pipefail
 tmp="$(mktemp -d)"
@@ -160,7 +158,6 @@ fi
 rg --version >/dev/null
 printf '%s\n' 'alpha' 'ripgrep smoke needle' 'omega' >"$tmp/rg-fixture.txt"
 rg -q 'ripgrep smoke needle' "$tmp/rg-fixture.txt"
-# rg exits 1 for no-match and 2 for error, so only the exact code proves the fixture was read.
 rc=0
 rg -q 'no-such-needle-should-ever-match' "$tmp/rg-fixture.txt" || rc=$?
 [ "$rc" = "1" ] || { echo "rg: expected exit 1 (no match), got $rc" >&2; exit 1; }
@@ -168,10 +165,6 @@ rg -q 'no-such-needle-should-ever-match' "$tmp/rg-fixture.txt" || rc=$?
 shellcheck --version >/dev/null
 printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'echo "shellcheck smoke"' >"$tmp/shellcheck-clean.sh"
 shellcheck "$tmp/shellcheck-clean.sh"
-# A clean file exits 0 and so does a shellcheck that inspected nothing, so the green above
-# carries no evidence on its own. shellcheck exits 1 for a finding and 2 for a file it could
-# not read: only the exact code, plus the code of the finding itself, proves the fixture was
-# read. Same reasoning as the rg fixture above.
 printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'echo $UNQUOTED' >"$tmp/shellcheck-finding.sh"
 rc=0
 shellcheck "$tmp/shellcheck-finding.sh" >"$tmp/shellcheck-out.txt" 2>&1 || rc=$?

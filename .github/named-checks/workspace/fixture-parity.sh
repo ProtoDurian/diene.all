@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The all-yes fixture surface is reproduced, re-answered with diene values.
-# Compared only against the pinned snapshot in fixture-surface.txt, never a
-# live cross-repo read (rules/PROBES.md §2.10).
+# Pinned snapshot only, never a live cross-repo read (rules/PROBES.md §2.10).
 
 dir="$(dirname "${BASH_SOURCE[0]}")"
 surface="${dir}/fixture-surface.txt"

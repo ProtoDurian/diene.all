@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Runs every executable *.sh in .github/named-checks/<node-ref>/. A ref may
-# contain "/" (e.g. lib/bun/result); it maps to nested directories.
-
 cd "$(git rev-parse --show-toplevel)"
 
 if [[ -n ${GITHUB_REPOSITORY:-} && ${GITHUB_REPOSITORY} != */diene.all ]]; then

@@ -171,7 +171,6 @@ release:
     releasedLabels:
       - released
   hooks:
-    # Hook point a downstream node fills; a version file enters commit.assets in
-    # the same edit as the command that writes it.
+    # A file a hook writes joins commit.assets in the same edit.
     prepare: []
     success: []

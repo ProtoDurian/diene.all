@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Binaries the owner retired stay out of the nix inventory (goals/workspace.md,
-# binary smoke: `pls` is gone, go-task is the one task runner; the releaser
-# replaced `sg`). A text check on the declaration, not `command -v`, because the
-# dev shell inherits the caller's PATH. An absence search is a named check, not
-# a probe (rules/PROBES.md §2 item 10).
+# A text check on the declaration, not `command -v`: the dev shell inherits the caller's PATH.
 
 declaration_files=(nix/packages.nix nix/env.nix)
 retired=(pls sg)

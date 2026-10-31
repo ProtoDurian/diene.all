@@ -1,17 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# No child-owned surface is tracked: language manifests/lockfiles, languages/,
-# or the observability payload file-set (CHAIN-REFERENCES §1: language is not an
-# axis; O is additive). Each base/payload node adds these, never workspace.
-
 manifest_globs=(
   'package.json' 'bun.lock' 'bun.lockb' 'tsconfig*.json'
   '*.csproj' '*.sln' '*.fsproj' 'Directory.Build.props' 'global.json'
   'go.mod' 'go.sum' 'pubspec.yaml' 'Cargo.toml' 'pyproject.toml'
 )
 
-# Observability payload (authoritative/observability minus shared), explicit.
 observability_paths=(
   .claude/skills/grafana-alert-set/SKILL.md
   .claude/skills/grafana-alert-set/templates/alert-template.yaml

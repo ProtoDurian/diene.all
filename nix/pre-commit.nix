@@ -76,8 +76,6 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    # -x + SCRIPTDIR: staged-file batching splits scripts from their sources,
-    # so ShellCheck must follow source= directives itself.
     a-shellcheck = {
       enable = true;
       name = "Shellcheck";

@@ -1,11 +1,5 @@
-# Pinned snapshot of the all-features fixture surface (cyan/fixtures/expected/all_features/)
-# repo: AtomiCloud/ketone.workspace-template
-# sha:  def4ba7913b2632266cee833b7bf32b33465f865
-# Never refreshed from the live repo (rules/PROBES.md §2.10).
-# Line forms:
-#   <path>                    must exist at HEAD
-#   <path> -> <path>          re-answered with a diene value / renamed; old path absent, target present
-#   <path> !retired <reason>  must be ABSENT at HEAD
+# Pinned: AtomiCloud/ketone.workspace-template@def4ba7913b2632266cee833b7bf32b33465f865 cyan/fixtures/expected/all_features/
+# Lines: <path> | <path> -> <new path> | <path> !retired <reason>
 .claude/skills/ci-cd-workflows/SKILL.md
 .claude/skills/conventional-commits/SKILL.md
 .claude/skills/docker-push/SKILL.md

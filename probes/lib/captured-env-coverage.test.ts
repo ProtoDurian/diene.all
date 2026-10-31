@@ -3,15 +3,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
-// Stage-2 claims that every command which enters a development shell now goes through
-// capturedEnvCommand. That claim is only worth anything if it cannot silently rot, so it
-// is asserted against the source rather than trusted: a new probe that calls repo.exec
-// with a `nix develop` command and forgets the wrapper fails here instead of quietly
-// paying the entry cost the pilot exists to remove.
 const probesDir = fileURLToPath(new URL('../', import.meta.url));
-// The probe files the nix layer (main) owns. workspace inherits them byte-identical or
-// append-only (rules/PROBES.md §5; the named check probe-inheritance enforces it), so
-// their shell entries are main's to speed up, not this census's to wrap.
+// Main's probe files (rules/PROBES.md §5): never wrap their shell entries here.
 const INHERITED = new Set([
   'binary-smoke.ts',
   'dev-shell.ts',
@@ -65,21 +58,13 @@ describe('captured-env coverage of direct repo.exec shell entries', () => {
     expect(unwrapped).toEqual([]);
   });
 
-  // The count is a tripwire, not a target: it exists so that ADDING a shell-entering
-  // call site is a decision somebody makes on purpose. The population it names is every
-  // `repo.exec` in `probes/*.ts` whose command enters a development shell, so deleting a
-  // probe lowers it and a new direct site raises it. Move it only together with the sites
-  // that justify it — a number left one too high is an assertion that fails silently.
-  // The two `hook-` files hold a direct site each so their mutation arms can assert the
-  // gate's refusal TEXT and not merely its exit code.
+  // A tripwire: change this count only together with the call sites it counts.
   test('the wrapped set is the 2 known shell-entering call sites, across 2 files', () => {
     const wrapped = allSites.filter(site => site.wrapped);
     expect(wrapped).toHaveLength(2);
     expect([...new Set(wrapped.map(site => site.file))].sort()).toEqual(['hook-enforce-exec.ts', 'hook-shellcheck.ts']);
   });
 
-  // The inherited files stay parent-shaped: no import of this lib, so a child edit that
-  // would turn one into a hidden override (wrapping its entries, say) shows up here too.
   test('the inherited probe files stay parent-shaped and the dev-shell label stays exempt', () => {
     expect(INHERITED.size).toBe(7);
     for (const file of INHERITED) {
