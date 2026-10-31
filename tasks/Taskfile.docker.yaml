@@ -1,0 +1,24 @@
+version: '3'
+
+# One task set and vars block per Dockerfile; never re-point a shared image variable.
+tasks:
+  build:main:
+    desc: Build the infra/Dockerfile image locally
+    vars:
+      IMAGE: diene-workspace:local
+    cmds:
+      - docker build -f infra/Dockerfile -t {{.IMAGE}}{{if .CLI_ARGS}}-{{.CLI_ARGS}}{{end}} .
+
+  run:main:
+    desc: Run the locally built infra/Dockerfile image
+    vars:
+      IMAGE: diene-workspace:local
+    cmds:
+      - docker run --rm {{.IMAGE}}{{if .CLI_ARGS}}-{{.CLI_ARGS}}{{end}}
+
+  clean:main:
+    desc: Remove the locally built infra/Dockerfile image
+    vars:
+      IMAGE: diene-workspace:local
+    cmds:
+      - docker image rm {{.IMAGE}}{{if .CLI_ARGS}}-{{.CLI_ARGS}}{{end}} || true
