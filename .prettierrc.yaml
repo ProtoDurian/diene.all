@@ -6,16 +6,3 @@ singleAttributePerLine: false
 singleQuote: true
 tabWidth: 2
 trailingComma: all
-overrides:
-  - files:
-      - probes/binary-smoke.ts
-      - probes/dev-shell.ts
-      - probes/direnv.ts
-      - probes/precommit-treefmt-actionlint.ts
-      - probes/precommit-treefmt-nixfmt.ts
-      - probes/precommit-treefmt-prettier.ts
-      - probes/precommit-treefmt-shfmt.ts
-    options:
-      arrowParens: always
-      printWidth: 80
-      singleQuote: false
