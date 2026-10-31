@@ -1,9 +1,6 @@
 version: '3'
 
-# One task set per Dockerfile under infra/. The task key is the Dockerfile's own
-# name: bare `infra/Dockerfile` is `main`, `infra/<name>.Dockerfile` is
-# `<name>`. A new Dockerfile gets its own tasks and its own vars block; never
-# re-point a shared image variable.
+# One task set and vars block per Dockerfile; never re-point a shared image variable.
 tasks:
   build:main:
     desc: Build the infra/Dockerfile image locally
