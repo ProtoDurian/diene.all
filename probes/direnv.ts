@@ -1,14 +1,13 @@
-import type { ProbeDefinition } from "@cyanprint/contracts";
+import type { ProbeDefinition } from '@cyanprint/contracts';
 
 const definition: ProbeDefinition = {
   contractVersion: 1,
-  sandbox: { snapshot: "git" },
+  sandbox: { snapshot: 'git' },
   probes: [
     {
-      name: "direnv-loads-repo-environment",
-      description:
-        "The committed .envrc loads the repository environment in an isolated direnv config.",
-      kind: "baseline",
+      name: 'direnv-loads-repo-environment',
+      description: 'The committed .envrc loads the repository environment in an isolated direnv config.',
+      kind: 'baseline',
       timeoutMs: 240000,
       async run(repo) {
         const result = await repo.exec(
@@ -16,9 +15,7 @@ const definition: ProbeDefinition = {
           { timeoutMs: 240000 },
         );
         if (result.exitCode !== 0) {
-          throw new Error(
-            `direnv failed to load .envrc: ${result.stderr || result.stdout}`,
-          );
+          throw new Error(`direnv failed to load .envrc: ${result.stderr || result.stdout}`);
         }
       },
     },
