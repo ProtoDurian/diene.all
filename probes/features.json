@@ -126,37 +126,12 @@
   },
   {
     "template": "diene/workspace",
-    "name": "skills-sync",
-    "class": "gate"
-  },
-  {
-    "template": "diene/workspace",
-    "name": "release-config-schema",
-    "class": "gate"
-  },
-  {
-    "template": "diene/workspace",
-    "name": "release-type-vocabulary",
-    "class": "gate"
-  },
-  {
-    "template": "diene/workspace",
     "name": "release-workflow-trigger",
     "class": "gate"
   },
   {
     "template": "diene/workspace",
     "name": "release-workflow-concurrency",
-    "class": "gate"
-  },
-  {
-    "template": "diene/workspace",
-    "name": "workflow-names",
-    "class": "gate"
-  },
-  {
-    "template": "diene/workspace",
-    "name": "nixpkgs-pin",
     "class": "gate"
   },
   {
@@ -171,8 +146,8 @@
   },
   {
     "template": "diene/workspace",
-    "name": "many-owner-schema",
-    "class": "gate"
+    "name": "probe-artifacts",
+    "class": "presence"
   },
   {
     "template": "diene/workspace",
@@ -181,12 +156,17 @@
   },
   {
     "template": "diene/workspace",
-    "name": "probe-artifacts",
-    "class": "presence"
+    "name": "hook-releaser-commit",
+    "class": "gate"
   },
   {
     "template": "diene/shared",
-    "name": "claude-link-integrity",
+    "name": "docs-markdownlint",
+    "class": "gate"
+  },
+  {
+    "template": "diene/shared",
+    "name": "docs-prettier",
     "class": "gate"
   },
   {
@@ -198,16 +178,6 @@
     "template": "diene/shared",
     "name": "thin-skills",
     "class": "presence"
-  },
-  {
-    "template": "diene/shared",
-    "name": "docs-markdownlint",
-    "class": "gate"
-  },
-  {
-    "template": "diene/shared",
-    "name": "docs-prettier",
-    "class": "gate"
   },
   {
     "template": "diene/dotnet-base",
@@ -291,12 +261,7 @@
   },
   {
     "template": "diene/dotnet-base",
-    "name": "hook-dotnet-release-types",
-    "class": "gate"
-  },
-  {
-    "template": "diene/dotnet-base",
-    "name": "hook-releaser-commit",
-    "class": "gate"
+    "name": "dotnet-binary-smoke",
+    "class": "smoke"
   }
 ]

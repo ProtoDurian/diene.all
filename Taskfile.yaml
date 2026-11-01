@@ -3,7 +3,6 @@ version: '3'
 includes:
   docker: tasks/Taskfile.docker.yaml
   helm: tasks/Taskfile.helm.yaml
-
   # ### dotnet-base-test-includes
   # #### source: dotnet-base
   test:unit:
@@ -25,12 +24,6 @@ tasks:
     desc: Run all repository gates
     cmds:
       - pre-commit run --all-files
-
-  skills:sync:
-    desc: Verify the repository's explicit no-runtime skills contract
-    cmds:
-      - skills-sync sync
-
   # ### dotnet-base-tasks
   # #### source: dotnet-base
   clean:

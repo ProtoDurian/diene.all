@@ -1,5 +1,4 @@
-import { runWithRedis } from './lib/dotnet.ts';
-import { expectGreen } from './lib/helpers.ts';
+import { runWithRedis, expectGreen } from './lib/dotnet.ts';
 
 export default {
   contractVersion: 1,

@@ -5,9 +5,6 @@
   shellHook,
 }:
 with env;
-
-# ### workspace-shells
-# #### source: workspace
 {
   cd = pkgs.mkShell {
     buildInputs = main ++ system;

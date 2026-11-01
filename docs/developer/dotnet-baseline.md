@@ -74,11 +74,22 @@ The command exposes `buildDotnetModule.passthru.fetch-deps`; its output replaces
 
 ## Docker, Helm, and release
 
-The Dockerfile is a minimal non-root stub, and the Helm chart keeps an empty
-template directory for descendants to replace. The Helm axis is complete:
-lint/docs hooks, local tasks, OCI packaging, CI/CD jobs, and dependabot coverage
-are all active. Releaser stamps the version in `App/App.csproj`; its canonical
+The Dockerfile and the Helm chart are the parent template's stubs, unchanged, for
+descendants to replace; the Helm surface (chart, lint hook, tasks, OCI packaging,
+CI/CD jobs, dependabot entry) is identical to `bun-base`'s. Releaser stamps the version in `App/App.csproj`; its canonical
 `release.yaml` is the single commit-type vocabulary.
+
+## C# standards
+
+C# variants accompany the shared standards:
+[date/time](../standards/datetime/languages/csharp.md),
+[domain-driven design](../standards/domain-driven-design/languages/csharp.md),
+[functional practices](../standards/functional-practices/languages/csharp.md),
+[SOLID](../standards/solid-principles/languages/csharp.md),
+[stateless OOP/DI](../standards/stateless-oop-di/languages/csharp.md),
+[testing](../standards/testing/languages/csharp.md),
+[utilities](../standards/utilities/languages/csharp.md), and
+[validation](../standards/validation/languages/csharp.md).
 
 ## Template-maintenance boundary
 

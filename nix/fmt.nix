@@ -1,7 +1,4 @@
 { treefmt-nix, pkgs, ... }:
-
-# ### workspace-formatters
-# #### source: workspace
 let
   fmt = {
     projectRootFile = "flake.nix";

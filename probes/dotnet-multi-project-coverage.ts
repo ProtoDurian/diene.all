@@ -1,5 +1,4 @@
-import { addSecondUnitProject } from './lib/dotnet.ts';
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { addSecondUnitProject, expectGreen, expectRed } from './lib/dotnet.ts';
 
 export default {
   contractVersion: 1,
