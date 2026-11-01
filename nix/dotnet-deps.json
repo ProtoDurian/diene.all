@@ -1,8 +1,8 @@
 [
   {
     "pname": "BouncyCastle.Cryptography",
-    "version": "2.6.2",
-    "hash": "sha256-Yjk2+x/RcVeccGOQOQcRKCiYzyx1mlFnhS5auCII+Ms="
+    "version": "2.7.0",
+    "hash": "sha256-8JH/zKtNA5k+Zgus4ndlmnne4JcvVNfx9L1G1oCWYkE="
   },
   {
     "pname": "coverlet.msbuild",
@@ -11,38 +11,38 @@
   },
   {
     "pname": "Docker.DotNet.Enhanced",
-    "version": "4.2.0",
-    "hash": "sha256-e+poxFu+FJwPWuZ1JiiDJjZK+3inIDlIl7obZNGYcB8="
+    "version": "4.3.3",
+    "hash": "sha256-exj6aYIWg9cjCetZGCaDodsJrcXkWm5Y6iSGxhNqzPY="
   },
   {
     "pname": "Docker.DotNet.Enhanced.Handler.Abstractions",
-    "version": "4.2.0",
-    "hash": "sha256-EsFRWrwvnv8JOK9N3W/kDjzrO1Jh8St8wn2W9UDvh0Y="
+    "version": "4.3.3",
+    "hash": "sha256-KGdihyrr9RaORtvQftpoQGwO8YNJ1IQG5xTP3DhuqlY="
   },
   {
     "pname": "Docker.DotNet.Enhanced.LegacyHttp",
-    "version": "4.2.0",
-    "hash": "sha256-MptmUR15Soy74NWJC+ZCWTqJxZP/BEHjfZPYTUq5IeE="
+    "version": "4.3.3",
+    "hash": "sha256-01WmNaZnqELBNiPkmUyyr1q0WR6H4MLp03hVB8JXeKU="
   },
   {
     "pname": "Docker.DotNet.Enhanced.NativeHttp",
-    "version": "4.2.0",
-    "hash": "sha256-9wMMHwBcSI+pJuB9R1QrtQ1VZOGbASeC1Ouu6nxXum8="
+    "version": "4.3.3",
+    "hash": "sha256-aF284t6SxYukJV6nZv1cf8xN8MU3dJwsqEihMquGspY="
   },
   {
     "pname": "Docker.DotNet.Enhanced.NPipe",
-    "version": "4.2.0",
-    "hash": "sha256-MOzo8ySnMneRV+KaeqUC2Hq8NuY2oDqginK6DeI7Zf4="
+    "version": "4.3.3",
+    "hash": "sha256-Iul+k7gx7gc3IpER7XNcluHAF6c5rqIrxNuTTLGW+lE="
   },
   {
     "pname": "Docker.DotNet.Enhanced.Unix",
-    "version": "4.2.0",
-    "hash": "sha256-zT4wLE8ZtandcwDZcq/VHhwxKAIPKF02EnigW+h/80U="
+    "version": "4.3.3",
+    "hash": "sha256-tepnue4RacnpGEQ0jgQi2RZdTCXLTspOejykv7GClGI="
   },
   {
     "pname": "Docker.DotNet.Enhanced.X509",
-    "version": "4.2.0",
-    "hash": "sha256-zqimuvpFBmLh1TUUyVvZmjgCHIQbyb6T1suYArQMaFE="
+    "version": "4.3.3",
+    "hash": "sha256-NUUG9kPWWlasZoLdTwj4edvFhp/o4qVjHqiMOmxXuVs="
   },
   {
     "pname": "FluentAssertions",
@@ -161,8 +161,8 @@
   },
   {
     "pname": "SSH.NET",
-    "version": "2025.1.0",
-    "hash": "sha256-vtpvE5B+IxoMkq9CQMehoR5ZRtihaHQ4VyhmkkIjL98="
+    "version": "2026.0.0",
+    "hash": "sha256-slFd5haCEZj1z1Uw9eoZiRJzC741BO9Mau4ApmH+ysI="
   },
   {
     "pname": "StackExchange.Redis",
@@ -201,13 +201,13 @@
   },
   {
     "pname": "Testcontainers",
-    "version": "4.12.0",
-    "hash": "sha256-NM+zFlgQIo0BP5V/WW8gLJ/tcSTZelbbklOZ3llzZ4g="
+    "version": "4.16.0",
+    "hash": "sha256-yrjNsyWoIpZGyvoy8jDetO84ExJuJoOhA6r9epahzko="
   },
   {
     "pname": "Testcontainers.Redis",
-    "version": "4.12.0",
-    "hash": "sha256-ECfgQGtObREpw9y3Lks3Ex9m27vHR5cf/0GMk8EnKXg="
+    "version": "4.16.0",
+    "hash": "sha256-xwmfhr3/inFKwxKvLGK45BQWGT74Q6VKC8/5GEWSKQ0="
   },
   {
     "pname": "xunit.analyzers",
