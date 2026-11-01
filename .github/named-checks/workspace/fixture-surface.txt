@@ -1,0 +1,66 @@
+# Pinned snapshot of the all-features fixture surface (cyan/fixtures/expected/all_features/)
+# repo: AtomiCloud/ketone.workspace-template
+# sha:  def4ba7913b2632266cee833b7bf32b33465f865
+# Never refreshed from the live repo (rules/PROBES.md §2.10).
+# Line forms:
+#   <path>                    must exist at HEAD
+#   <path> -> <path>          re-answered with a diene value / renamed; old path absent, target present
+#   <path> !retired <reason>  must be ABSENT at HEAD
+.claude/skills/ci-cd-workflows/SKILL.md
+.claude/skills/conventional-commits/SKILL.md
+.claude/skills/docker-push/SKILL.md
+.claude/skills/helm-push/SKILL.md
+.claude/skills/infisical/SKILL.md
+.claude/skills/linting/SKILL.md
+.claude/skills/semantic-release/SKILL.md
+.claude/skills/service-tree/SKILL.md
+.claude/skills/shell-conventions/SKILL.md
+.claude/skills/taskfile-conventions/SKILL.md
+.coderabbit.yaml
+.dockerignore
+.envrc
+.github/actionlint.yaml
+.github/dependabot.yml
+.github/workflows/cd.yaml
+.github/workflows/ci.yaml
+.github/workflows/release.yaml
+.github/workflows/⚡reusable-docker.yaml
+.github/workflows/⚡reusable-helm.yaml
+.github/workflows/⚡reusable-precommit.yaml
+.github/workflows/⚡reusable-release.yaml
+.github/workflows/🛡️merge-gatekeeper.yml
+.gitignore
+.gitlint !retired absorbed by the registry releaser: release.yaml types == D3 vocabulary (goals/workspace.md release commit-type vocabulary)
+.prettierrc.yaml
+CLAUDE.md
+Taskfile.yaml
+atomi_release.yaml -> release.yaml
+docs/developer/CommitConventions.md
+docs/developer/standard/ci-cd.md -> docs/standards/ci-cd/index.md
+docs/developer/standard/conventional-commits.md -> docs/standards/conventional-commits/index.md
+docs/developer/standard/docker.md -> docs/standards/docker/index.md
+docs/developer/standard/helm.md -> docs/standards/helm/index.md
+docs/developer/standard/infisical.md -> docs/standards/infisical/index.md
+docs/developer/standard/linting.md -> docs/standards/linting/index.md
+docs/developer/standard/semantic-release.md -> docs/standards/semantic-release/index.md
+docs/developer/standard/service-tree.md -> docs/standards/service-tree/index.md
+docs/developer/standard/shell-scripts.md -> docs/standards/shell-scripts/index.md
+docs/developer/standard/taskfile.md -> docs/standards/taskfile/index.md
+infra/Dockerfile
+infra/root_chart/Chart.yaml
+infra/root_chart/templates/.gitkeep -> infra/root_chart/templates/configmap.yaml
+infra/root_chart/values.yaml
+nix/env.nix
+nix/fmt.nix
+nix/packages.nix
+nix/pre-commit.nix
+nix/shells.nix
+scripts/ci/docker.sh
+scripts/ci/helm.sh
+scripts/ci/pre-commit.sh
+scripts/ci/release.sh
+scripts/ci/setup.sh -> scripts/local/setup.sh
+scripts/local/secrets.sh
+tasks/Taskfile.docker.yaml
+tasks/Taskfile.helm.yaml
+tasks/Taskfile.secret.yaml !retired deleted with the secrets actions (commit 4273e521, ledger amendment); goal text still lists it, open item

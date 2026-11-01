@@ -7,6 +7,8 @@ mode="${1:-}"
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
+bun install --frozen-lockfile
+
 config="bunfig.${mode}.toml"
 coverage_file="coverage/${mode}/lcov.info"
 scope="src/lib/"

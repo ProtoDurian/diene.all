@@ -1,4 +1,3 @@
-import { activeSpanContext, traceContextFields } from '@atomicloud/diene.otel';
 import { type DestinationStream, pino, destination as pinoDestination } from 'pino';
 
 /** The logging surface injected into application adapters. */
@@ -13,18 +12,11 @@ export interface LoggerConfig {
   readonly level?: string;
   /** Where records are written. Tests pass an in-memory sink; production writes to stdout. */
   readonly destination?: DestinationStream;
-  /** Source of the ambient trace context. Injected so tests never need a live OTel SDK. */
-  readonly spanContext?: typeof activeSpanContext;
 }
 
 /** Build an independent logger with no module-level mutable instance. */
 export function createLogger(config: LoggerConfig = {}): ILogger {
-  const {
-    level = 'info',
-    destination = pinoDestination({ fd: 1, sync: true }),
-    spanContext = activeSpanContext,
-  } = config;
+  const { level = 'info', destination = pinoDestination({ fd: 1, sync: true }) } = config;
 
-  // Spread because Pino mutates mixin records while traceContextFields returns a frozen object.
-  return pino({ level, mixin: () => ({ ...traceContextFields(spanContext()) }) }, destination);
+  return pino({ level }, destination);
 }
