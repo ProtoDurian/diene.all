@@ -18,3 +18,9 @@ probes
 ### workspace [nix]
 result
 result-*
+
+### dotnet-base
+#### source: dotnet-base
+**/bin
+**/obj
+TestResults

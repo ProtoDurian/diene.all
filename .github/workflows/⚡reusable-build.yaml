@@ -25,6 +25,6 @@ jobs:
       - uses: AtomiCloud/actions.setup-nix@v3
         with:
           namespacelabs: ${{ (inputs.runs_on == '' || contains(inputs.runs_on, 'nscloud') || contains(inputs.runs_on, 'namespace-profile')) && 'true' || 'false' }}
-      - uses: AtomiCloud/actions.cache-nuget@v1
+      - uses: AtomiCloud/actions.cache-nuget@v2
       - name: Build solution
         run: nix develop .#ci -c ./scripts/ci/build.sh
