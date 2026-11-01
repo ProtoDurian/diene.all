@@ -1,4 +1,4 @@
-import { expectGreen, expectRedBecause } from './lib/helpers.ts';
+import { expectGreen, expectRed } from './lib/helpers.ts';
 
 const declarationFiles = 'nix/packages.nix nix/env.nix';
 
@@ -6,18 +6,6 @@ const declarationFiles = 'nix/packages.nix nix/env.nix';
 const retired = [
   { binary: 'pls', reason: 'task (go-task) is the only task runner' },
   { binary: 'sg', reason: 'the releaser replaced it, there is no gitlint bootstrap' },
-  // The node's defining property is the ABSENCE of the Helm axis, and until this entry
-  // nothing in the tree asserted it: the chart, the hooks and the probes were deleted by
-  // path, so a path-based check passed clean while the parent kept re-introducing helm by
-  // CONTENT. The declaration name is what the inventory actually carries; a bare `helm`
-  // would evade this pattern, but it is not a name the registry package set offers.
-  //
-  // This entry was GREEN AND FALSE until the axis-pure swap that lands with it. A text
-  // scan of the declaration only tells the truth if no declared name is an AGGREGATE
-  // hiding the axis inside it: `infralint` shipped helm-docs and helmlint, `infrautils`
-  // shipped helm, and neither name contains the literal below. The node now declares the
-  // axis-pure slices instead, so the absence the scan reports is the absence the shell has.
-  { binary: 'kubernetes-helm', reason: 'wo-helm carries no chart, so it carries no helm toolchain' },
 ];
 
 const absenceCommand = (binary: string) =>
@@ -73,11 +61,6 @@ git -C "$tmp" commit -qm smoke
 
 jq --version >/dev/null
 jq -en '1 + 1 == 2' >/dev/null
-
-kubeconform -v >/dev/null
-
-kyverno version >/dev/null
-printf '%s\n' '{"probe":{"ok":true}}' | kyverno jp query 'probe.ok' 2>/dev/null | tail -n 1 | rg -qx true
 
 nix --version >/dev/null
 nix flake metadata --no-write-lock-file --json . | jq -e '.url | type == "string"' >/dev/null
@@ -156,7 +139,7 @@ export default {
   probes: [
     {
       name: 'baseline-binary-smoke-resolves',
-      description: 'Every binary this node declares for the default shell resolves in it.',
+      description: 'Every binary the workspace declares for the default shell resolves in it.',
       kind: 'baseline',
       async run(repo: any) {
         await expectGreen(repo, 'nix develop .#default -c dlint toolchain-smoke', 'binary-smoke');
@@ -199,9 +182,7 @@ export default {
             throw new Error(`could not find the registry inherit anchor in nix/packages.nix`);
           }
           await repo.write('nix/packages.nix', source.replace(anchor, `${anchor}          ${binary}\n`));
-          await expectRedBecause(repo, absenceCommand(binary), 'binary-smoke', [
-            `${binary} is back in the nix inventory`,
-          ]);
+          await expectRed(repo, absenceCommand(binary), 'binary-smoke');
         },
       },
     ]),

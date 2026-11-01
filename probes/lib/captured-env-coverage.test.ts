@@ -54,27 +54,12 @@ describe('captured-env coverage of direct repo.exec shell entries', () => {
   });
 
   // The count is a tripwire, not a target: it exists so that ADDING a shell-entering
-  // call site is a decision somebody makes on purpose. It went 15 -> 16 when
-  // cache-tag-shape.ts gained a second direct site, then 16 -> 14 when that probe was
-  // deleted with the cache-policy gate it tested (owner ruling, 2026-08-05) — it had
-  // carried two of the sites. It is now 15 across 8 files: secret-guards.ts was deleted
-  // with the secrets fetch/scan actions it tested (-1), and hook-enforce-exec.ts and
-  // hook-shellcheck.ts each took a direct site so their mutation arms can assert the
-  // gate's refusal TEXT and not merely its exit code (+2). Move it only together with
-  // the sites that justify it.
-  //
-  // 15 -> 18 in the wave-5 cascade, and no call site was added: three of
-  // skills-sync.ts's own shell entries were entering the shell unwrapped while three
-  // siblings in the same file were wrapped. This test arrived from the parent, where
-  // skills-sync.ts has no such sites, so the merge is what first asserted the rule
-  // here — the sites predate it. Wrapping them is the fix the rule asks for; the count
-  // follows the sites, which is the direction this tripwire is meant to move in.
-  //
-  // 18 -> 10 across 6 files when skills-sync.ts and skills-freshness.ts were deleted:
-  // those two files carried eight of the eighteen sites between them. The number was
-  // measured on this tree, not carried over from the parent — the parent reaches 10 from
-  // a different starting count, so an equal number here is a coincidence of arithmetic
-  // and not evidence that either count is right.
+  // call site is a decision somebody makes on purpose. The population it names is every
+  // `repo.exec` in `probes/*.ts` whose command enters a development shell, so deleting a
+  // probe lowers it and a new direct site raises it. Move it only together with the sites
+  // that justify it — a number left one too high is an assertion that fails silently.
+  // The two `hook-` files hold a direct site each so their mutation arms can assert the
+  // gate's refusal TEXT and not merely its exit code.
   test('the wrapped set is the 10 known shell-entering call sites, across 6 files', () => {
     const wrapped = allSites.filter(site => site.wrapped);
     expect(wrapped).toHaveLength(10);

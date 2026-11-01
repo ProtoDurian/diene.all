@@ -51,13 +51,13 @@ Container images are version-pinned without digests.
 
 ## Build and runtime
 
-The local build and CI build share `scripts/local/build.sh`. The sample prints
-a composed key by default; `REDIS_HOST` plus `REDIS_PORT` enable a Redis round
-trip.
+The local build and CI build share `scripts/local/build.sh`.
+The sample prints a composed key by default; `REDIS_HOST` plus `REDIS_PORT`
+enable a Redis round trip.
 
-Application descendants use pino JSON logging with trace-context injection
-from `@atomicloud/diene.otel`. That application logging layer is intentionally
-not duplicated in this toolchain sample before the shared library is consumed.
+The sample logs pino JSON only. Trace-context injection belongs to the
+observability payload, which descendants add; this node declares no
+`@atomicloud/diene.*` dependency.
 
 ## TypeScript standards
 
@@ -75,13 +75,13 @@ Read the TypeScript variants alongside their shared standards:
 ## External service / compute cost
 
 - Codecov upload runs only in CI and is best-effort.
-- Integration tests and Docker image builds require a Docker runtime.
-- Unit, integration, build, and Docker are separate CI jobs.
+- Integration tests require a Docker runtime.
+- Unit, integration, and build are separate CI jobs.
 
 ## Template maintenance boundary
 
-Downstream templates may adapt package identity, coverage thresholds, badges,
-and the fenced illustrative `src/` plus `tests/` sample. They should not fork
-the inherited task, workflow, release, Nix, lint,
+Downstream templates may adapt package identity, coverage thresholds,
+badges, and the fenced illustrative `src/` plus `tests/`
+sample. They should not fork the inherited task, workflow, release, Nix, lint,
 or standards machinery. Shared fixes land at the earliest owning branch and
 merge down.
