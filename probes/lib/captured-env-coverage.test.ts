@@ -9,8 +9,20 @@ import { join } from 'node:path';
 // with a `nix develop` command and forgets the wrapper fails here instead of quietly
 // paying the entry cost the pilot exists to remove.
 const probesDir = fileURLToPath(new URL('../', import.meta.url));
+// The probe files the nix layer (main) owns. workspace inherits them byte-identical or
+// append-only (rules/PROBES.md §5; the named check probe-inheritance enforces it), so
+// their shell entries are main's to speed up, not this census's to wrap.
+const INHERITED = new Set([
+  'binary-smoke.ts',
+  'dev-shell.ts',
+  'direnv.ts',
+  'precommit-treefmt-actionlint.ts',
+  'precommit-treefmt-nixfmt.ts',
+  'precommit-treefmt-prettier.ts',
+  'precommit-treefmt-shfmt.ts',
+]);
 const probeFiles = readdirSync(probesDir)
-  .filter(name => name.endsWith('.ts'))
+  .filter(name => name.endsWith('.ts') && !INHERITED.has(name))
   .sort();
 
 const CONST_WITH_ENTRY = /^const\s+([A-Za-z_$][\w$]*)\s*=\s*(['"`])([\s\S]*?)\2;/gm;
@@ -60,35 +72,20 @@ describe('captured-env coverage of direct repo.exec shell entries', () => {
   // that justify it — a number left one too high is an assertion that fails silently.
   // The two `hook-` files hold a direct site each so their mutation arms can assert the
   // gate's refusal TEXT and not merely its exit code.
-  test('the wrapped set is the 10 known shell-entering call sites, across 6 files', () => {
+  test('the wrapped set is the 2 known shell-entering call sites, across 2 files', () => {
     const wrapped = allSites.filter(site => site.wrapped);
-    expect(wrapped).toHaveLength(10);
-    expect([...new Set(wrapped.map(site => site.file))].sort()).toEqual([
-      'hook-enforce-exec.ts',
-      'hook-shellcheck.ts',
-      'precommit-treefmt-actionlint.ts',
-      'precommit-treefmt-nixfmt.ts',
-      'precommit-treefmt-prettier.ts',
-      'precommit-treefmt-shfmt.ts',
-    ]);
+    expect(wrapped).toHaveLength(2);
+    expect([...new Set(wrapped.map(site => site.file))].sort()).toEqual(['hook-enforce-exec.ts', 'hook-shellcheck.ts']);
   });
 
-  // The exemption lives on the label, so it only holds while both features keep reaching
-  // helpers that pass one. dev-shell now uses the shared once-per-phase helper, while
-  // direnv retains its own labelled expectGreen call.
-  test('dev-shell and direnv still enter their shells through labelled helpers', () => {
-    const devShell = readFileSync(join(probesDir, 'dev-shell.ts'), 'utf8');
-    expect(devShell).toContain("import { expectDevShellsOnce } from './lib/helpers.ts'");
-    expect(devShell).not.toContain('capturedEnvCommand');
-    expect(devShell).toContain('await expectDevShellsOnce(repo);');
-
-    const direnv = readFileSync(join(probesDir, 'direnv.ts'), 'utf8');
-    expect(direnv).toContain("from './lib/helpers.ts'");
-    expect(direnv).not.toContain('capturedEnvCommand');
-    expect(direnv).toContain("'direnv',");
-
+  // The inherited files stay parent-shaped: no import of this lib, so a child edit that
+  // would turn one into a hidden override (wrapping its entries, say) shows up here too.
+  test('the inherited probe files stay parent-shaped and the dev-shell label stays exempt', () => {
+    expect(INHERITED.size).toBe(7);
+    for (const file of INHERITED) {
+      expect(readFileSync(join(probesDir, file), 'utf8')).not.toContain('./lib/');
+    }
     const helpers = readFileSync(join(probesDir, 'lib/helpers.ts'), 'utf8');
     expect(helpers).toContain("new Set(['dev-shell', 'direnv'])");
-    expect(helpers).toContain("await expectGreen(repo, DEV_SHELL_CHAIN, 'dev-shell');");
   });
 });

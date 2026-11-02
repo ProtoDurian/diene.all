@@ -12,7 +12,9 @@ in
 pre-commit-lib.run {
   src = ../.;
 
+  # hooks
   hooks = {
+    # formatter
     treefmt = {
       enable = true;
       package = formatter;
@@ -28,14 +30,6 @@ pre-commit-lib.run {
       enable = true;
       name = "dlint";
       entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH ${packages.dlint}/bin/dlint lint'";
-      pass_filenames = false;
-      language = "system";
-    };
-
-    a-release-policy = {
-      enable = true;
-      name = "Release workflow policy";
-      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH ${packages.atomiutils}/bin/bash scripts/validate/release-policy.sh'";
       pass_filenames = false;
       language = "system";
     };

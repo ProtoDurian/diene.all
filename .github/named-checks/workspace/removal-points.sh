@@ -62,7 +62,7 @@ SCAN_EXEMPT=('!.github/named-checks/**' '!Changelog.md' '!probes/lib/**')
 #   CLAUDE.md               awk drop the "# <Docker|Helm> ..." section
 #   nix/pre-commit.nix      H: drop treefmt exclude line and the a-helm-lint block
 #   nix/fmt.nix             H: drop the prettier exclude line
-#   .gitignore              H: drop the "### workspace [helm]" section
+#   .gitignore              H: drop the "### helm" section
 #   probes/features.json    jq del(rows of the axis's dropped probes)
 #   probes/binary-smoke.ts  sed drop the axis's smoke lines
 #   docs taskfile standard  paragraph rewritten per axis set
@@ -135,7 +135,7 @@ apply_H() {
   edit nix/pre-commit.nix drop_nix_block '    a-helm-lint = {'
   edit nix/pre-commit.nix sed_d '/"\^infra\/root_chart\/"/d'
   edit nix/fmt.nix sed_d '/"infra\/root_chart\/\*\*"/d'
-  edit .gitignore sed_z 's|\n### workspace \[helm\]\ninfra/root_chart/uploads/\n||'
+  edit .gitignore sed_z 's|^### helm\ninfra/root_chart/uploads/\n\n||'
 }
 
 apply_set_edits() {

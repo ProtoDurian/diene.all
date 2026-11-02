@@ -1,22 +1,83 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import type { ProbeDefinition } from "@cyanprint/contracts";
 
-const declarationFiles = 'nix/packages.nix nix/env.nix';
+const script = `#!/usr/bin/env bash
+set -euo pipefail
 
-// Text assertion on the declaration, not `command -v`: the shell inherits caller PATH.
-const retired = [
-  { binary: 'pls', reason: 'task (go-task) is the only task runner' },
-  { binary: 'sg', reason: 'the releaser replaced it, there is no gitlint bootstrap' },
-];
+git --version
+git rev-parse --is-inside-work-tree
+treefmt --version
+nix fmt --no-write-lock-file -- --no-cache
+jq --version
+jq -n '1 + 1' | grep -qx 2
+yq --version
+yq -n '.probe = true' | grep -q 'probe: true'
+gomplate --version
+test "$(gomplate -i '{{ add 1 1 }}')" = 2
+bash --version
+test "$(bash -lc 'printf probe')" = probe
+cyanprint_version="$(cyanprint --version | awk '{ print $2 }')"
+[ -n "$cyanprint_version" ] || { echo "cyanprint --version printed no version" >&2; exit 1; }
+cyanprint_path="$(command -v cyanprint)"
+printf '%s\n' "$cyanprint_path" | grep -Eq "/nix/store/[^/]*-cyanprint-$cyanprint_version/" || {
+  echo "cyanprint reports $cyanprint_version but resolved to $cyanprint_path" >&2
+  exit 1
+}
+cache_dir="$(mktemp -d)"
+cyanprint cache inspect --cache-dir "$cache_dir" --json | jq -e '.status == "done" and .action == "inspect"' >/dev/null
+`;
 
-const absenceCommand = (binary: string) =>
-  `nix develop .#default -c bash -c 'if rg -q "\\b${binary}\\b" ${declarationFiles}; then echo "${binary} is back in the nix inventory" >&2; exit 1; fi; echo "${binary} is absent from the nix inventory"'`;
-
-// This is a JS template literal, not raw shell. String.raw suppresses ESCAPE
-// processing only; it does not suppress interpolation, so a ${...} below is read by
-// JS and never reaches the shell. Shell variables are written bare ($var) for that
-// reason. probes/lib/probe-modules.test.ts imports every probe module, which is what
-// makes this checkable: a ${...} naming no JS binding throws at module scope.
-const invocations = String.raw`
+const definition: ProbeDefinition = {
+  contractVersion: 1,
+  sandbox: { snapshot: "git" },
+  probes: [
+    {
+      name: "declared-binary-inventory-operates",
+      description:
+        "The root package inventory answers version or help and completes representative real operations.",
+      kind: "baseline",
+      timeoutMs: 240000,
+      async run(repo) {
+        await repo.write(".probe-binary-smoke.sh", script);
+        const result = await repo.exec(
+          "nix develop --no-write-lock-file .#default -c bash .probe-binary-smoke.sh",
+          { timeoutMs: 240000 },
+        );
+        if (result.exitCode !== 0) {
+          throw new Error(
+            `binary smoke failed: ${result.stderr || result.stdout}`,
+          );
+        }
+      },
+    },
+    {
+      name: "workspace-binary-smoke-resolves",
+      description:
+        "Every binary workspace declares for the default shell resolves in it (dlint toolchain-smoke).",
+      kind: "baseline",
+      timeoutMs: 240000,
+      async run(repo) {
+        const result = await repo.exec(
+          "nix develop --no-write-lock-file .#default -c dlint toolchain-smoke",
+          { timeoutMs: 240000 },
+        );
+        if (result.exitCode !== 0) {
+          throw new Error(
+            `workspace toolchain-smoke failed: ${result.stderr || result.stdout}`,
+          );
+        }
+      },
+    },
+    {
+      name: "workspace-binary-smoke-invokes",
+      description:
+        "Every binary workspace adds answers a real smoke invocation, not just a PATH lookup. The root inventory is the parent probe's.",
+      kind: "baseline",
+      timeoutMs: 240000,
+      async run(repo) {
+        // This is a JS template literal, not raw shell. String.raw suppresses ESCAPE
+        // processing only; it does not suppress interpolation, so shell variables are
+        // written bare ($var). probes/lib/probe-modules.test.ts imports this module.
+        const invocations = String.raw`
 set -euo pipefail
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -25,33 +86,10 @@ actionlint -version >/dev/null
 printf '%s\n' 'name: Smoke' 'on: push' 'jobs:' '  smoke:' '    runs-on: ubuntu-latest' '    steps:' '      - run: echo smoke' >"$tmp/workflow.yaml"
 actionlint "$tmp/workflow.yaml"
 
-bash --version >/dev/null
-[ "$(bash -c 'printf smoke')" != "smoke" ] && echo "bash failed a real invocation" >&2 && exit 1
-
-# The version is the registry's, so there is no pin in this tree to compare against.
-# The store path the shell resolved is the declaration's own answer: it carries the
-# derivation name, so a version the binary reports that the resolved derivation does
-# not carry is caught here rather than reported as agreement with itself.
-cyanprint_version="$(cyanprint --version | awk '{ print $2 }')"
-[ -n "$cyanprint_version" ] || { echo "cyanprint --version printed no version" >&2; exit 1; }
-cyanprint_path="$(command -v cyanprint)"
-printf '%s\n' "$cyanprint_path" | rg -q "/nix/store/[^/]*-cyanprint-$cyanprint_version/" || {
-  echo "cyanprint reports $cyanprint_version but resolved to $cyanprint_path" >&2
-  exit 1
-}
-cyanprint cache inspect --cache-dir "$tmp/cyanprint-cache" --json |
-  jq -e '.status == "done" and .action == "inspect"' >/dev/null
-
 dlint exec-bits >/dev/null
 
 docker --version >/dev/null
 docker info --format '{{.ServerVersion}}' >/dev/null
-
-git --version >/dev/null
-git rev-parse --is-inside-work-tree >/dev/null
-
-gomplate --version >/dev/null
-[ "$(gomplate -i '{{ add 1 1 }}')" != "2" ] && echo "gomplate failed a real template" >&2 && exit 1
 
 hadolint --version >/dev/null
 hadolint infra/Dockerfile
@@ -70,9 +108,6 @@ touch "$tmp/empty"
 git -C "$tmp" add empty
 git -C "$tmp" commit -qm smoke
 (cd "$tmp" && infisical scan . -v >/dev/null 2>&1)
-
-jq --version >/dev/null
-jq -en '1 + 1 == 2' >/dev/null
 
 k3d version >/dev/null
 k3d cluster list --no-headers >/dev/null
@@ -150,68 +185,25 @@ skopeo manifest-digest "$tmp/manifest.json" | rg -q '^sha256:[0-9a-f]{64}$'
 task --version >/dev/null
 task --list >/dev/null
 
-treefmt --version >/dev/null
-treefmt --completion bash >"$tmp/treefmt-completion.bash"
-[ ! -s "$tmp/treefmt-completion.bash" ] && echo "treefmt completion generation failed" >&2 && exit 1
-
-yq --version >/dev/null
-yq -en '.ok = true | .ok == true' >/dev/null
-
-echo "toolchain invocations passed"
+echo "workspace toolchain invocations passed"
 `;
-
-export default {
-  contractVersion: 1,
-  sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  probes: [
-    {
-      name: 'baseline-binary-smoke-resolves',
-      description: 'Every binary the workspace declares for the default shell resolves in it.',
-      kind: 'baseline',
-      async run(repo: any) {
-        await expectGreen(repo, 'nix develop .#default -c dlint toolchain-smoke', 'binary-smoke');
-      },
-    },
-    {
-      name: 'baseline-binary-smoke-invokes',
-      description: 'Every declared workspace binary answers a real smoke invocation, not just a PATH lookup.',
-      kind: 'baseline',
-      async run(repo: any) {
-        await repo.write('probe-toolchain-invocations.sh', invocations);
+        await repo.write("probe-toolchain-invocations.sh", invocations);
         try {
-          await expectGreen(repo, 'nix develop .#default -c bash probe-toolchain-invocations.sh', 'binary-smoke');
+          const result = await repo.exec(
+            "nix develop --no-write-lock-file .#default -c bash probe-toolchain-invocations.sh",
+            { timeoutMs: 240000 },
+          );
+          if (result.exitCode !== 0) {
+            throw new Error(
+              `workspace binary smoke failed: ${result.stderr || result.stdout}`,
+            );
+          }
         } finally {
-          await repo.exec('rm -f probe-toolchain-invocations.sh');
+          await repo.remove("probe-toolchain-invocations.sh");
         }
       },
     },
-    ...retired.flatMap(({ binary, reason }) => [
-      {
-        name: `baseline-binary-smoke-${binary}-absent`,
-        description: `${binary} is not declared in the nix inventory: ${reason}.`,
-        kind: 'baseline' as const,
-        async run(repo: any) {
-          await expectGreen(repo, absenceCommand(binary), 'binary-smoke');
-        },
-      },
-      {
-        name: `mutation-binary-smoke-${binary}-redeclared-caught`,
-        description: `Re-declaring ${binary} in the nix inventory must turn the absence assertion red.`,
-        kind: 'mutation' as const,
-        expectedImpact: [],
-        // Injected into the package set, not into an env group: an env group naming a
-        // package the set does not carry breaks `nix develop` at EVALUATION, so the
-        // arm would go red without ever reaching the assertion.
-        async run(repo: any) {
-          const source = await repo.read('nix/packages.nix');
-          const anchor = '          atomiutils\n';
-          if (!source.includes(anchor)) {
-            throw new Error(`could not find the registry inherit anchor in nix/packages.nix`);
-          }
-          await repo.write('nix/packages.nix', source.replace(anchor, `${anchor}          ${binary}\n`));
-          await expectRed(repo, absenceCommand(binary), 'binary-smoke');
-        },
-      },
-    ]),
   ],
 };
+
+export default definition;

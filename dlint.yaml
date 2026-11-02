@@ -46,3 +46,4 @@ checks:
       - nix/packages.nix
       - nix/env.nix
       - nix/shells.nix
+  release-gating: {}
