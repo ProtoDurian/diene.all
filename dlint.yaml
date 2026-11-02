@@ -1,7 +1,7 @@
 schemaVersion: 1
 checks:
   action-pins:
-    trustedPattern: ^AtomiCloud/
+    trustedPattern: ^(AtomiCloud|ProtoDurian)/
     workflowsDir: .github/workflows
   exec-bits:
     globs:
