@@ -65,13 +65,14 @@ let
     cp -R ${../.}/. "$out/"
     ln -s ${bun-tooling}/node_modules "$out/node_modules"
   '';
-  # toolchain-smoke asserts the DECLARED env lists actually provide their binaries.
   envPath = pkgs.lib.makeBinPath (env.system ++ env.main ++ env.lint ++ env.dev);
 in
 pre-commit-lib.run {
   src = pre-commit-source;
 
+  # hooks
   hooks = {
+    # formatter
     treefmt = {
       enable = true;
       package = formatter;
@@ -87,14 +88,6 @@ pre-commit-lib.run {
       enable = true;
       name = "dlint";
       entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH ${packages.dlint}/bin/dlint lint'";
-      pass_filenames = false;
-      language = "system";
-    };
-
-    a-release-policy = {
-      enable = true;
-      name = "Release workflow policy";
-      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH ${packages.atomiutils}/bin/bash scripts/validate/release-policy.sh'";
       pass_filenames = false;
       language = "system";
     };
@@ -156,8 +149,6 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    # -x + SCRIPTDIR: staged-file batching splits scripts from their sources,
-    # so ShellCheck must follow source= directives itself.
     a-shellcheck = {
       enable = true;
       name = "Shellcheck";

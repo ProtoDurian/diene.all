@@ -1,13 +1,15 @@
-### workspace [vcs-env]
-.direnv
-.env
-.env.*
-.git
-.gitignore
-*.log
+### bun-base
+*.tsbuildinfo
+coverage
+dist
+node_modules
+tests
 
-### workspace [non-runtime]
-!README.md
+### nix
+result
+result-*
+
+### non-runtime
 *.md
 .claude
 .dockerignore
@@ -15,14 +17,10 @@
 docs
 probes
 
-### workspace [nix]
-result
-result-*
-
-### bun-base
-#### source: bun-base
-node_modules
-dist
-coverage
-*.tsbuildinfo
-tests
+### vcs-env
+.direnv
+.env
+.env.*
+.git
+.gitignore
+*.log
