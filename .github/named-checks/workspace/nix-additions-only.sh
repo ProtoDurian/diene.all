@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The nix layer (main) owns flake.nix and the layout of nix/*.nix; workspace
-# only extends them (owner review round 2, items 6 and 8): flake.nix is
-# byte-identical to main's, and no nix/*.nix tracked at main loses a line.
-
 main_ref="${NAMED_CHECKS_MAIN_REF:-origin/main}"
 
 if ! git rev-parse --verify --quiet "${main_ref}^{commit}" >/dev/null; then
@@ -12,7 +8,6 @@ if ! git rev-parse --verify --quiet "${main_ref}^{commit}" >/dev/null; then
   exit 1
 fi
 
-# index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"
 failed=0
 

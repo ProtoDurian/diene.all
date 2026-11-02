@@ -6,8 +6,6 @@ singleAttributePerLine: false
 singleQuote: true
 tabWidth: 2
 trailingComma: all
-# The probe files the nix layer (main) owns keep main's format (prettier defaults) so
-# workspace inherits them byte-identical or append-only (rules/PROBES.md §5).
 overrides:
   - files:
       - probes/binary-smoke.ts

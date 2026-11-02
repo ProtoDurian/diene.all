@@ -1,15 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The probes the nix layer (main) owns are inherited, never rewritten
-# (rules/PROBES.md §5). On a branch both ledger rows of a feature load the same
-# probes/<name>.ts, so an edited inherited file is a hidden override. Per file
-# tracked at main:
-#   - no line of main's file is deleted (byte-identical or append-only);
-#   - appended lines (additive) need a diene/workspace row of that name;
-#   - a byte-identical file (parent suffices) has no diene/workspace row.
-# Every probes/features.json row of main stays in the ledger unchanged.
-
 main_ref="${NAMED_CHECKS_MAIN_REF:-origin/main}"
 child=diene/workspace
 
@@ -18,7 +9,6 @@ if ! git rev-parse --verify --quiet "${main_ref}^{commit}" >/dev/null; then
   exit 1
 fi
 
-# index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"
 ledger="$(git show "${tree}:probes/features.json")"
 failed=0
@@ -36,7 +26,6 @@ for path in "${inherited[@]}"; do
     failed=1
     continue
   fi
-  # an identical file prints no numstat line
   numstat="$(git diff --no-renames --numstat "${main_ref}" "${tree}" -- "${path}")"
   read -r added deleted _ <<<"${numstat:-0 0 ${path}}"
   has_row="$(jq --arg t "${child}" --arg n "${name}" '[.[] | select(.template == $t and .name == $n)] | length' <<<"${ledger}")"

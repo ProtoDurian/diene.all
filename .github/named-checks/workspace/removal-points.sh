@@ -1,16 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Every strip axis's anchored entries are removable, leaving each many-owner file
-# valid (CHAIN-REFERENCES §1: only D and H strip). For D, H and D+H: copy the
-# tree, apply the ledger below, then assert the copy is valid and that nothing
-# left in it references a removed path. A reference the ledger misses fails the
-# scan, so the scan is what proves the ledger complete.
-#
-# LEDGER — read this section to review the strip. Paths are relative to the root.
-# A ledger entry that no longer matches the tree fails the check (stale anchor).
+# For D, H and D+H: strip a copy of the tree per this ledger, then assert the copy is
+# valid and no file in it still references a removed path.
 
-# --- D (docker): files and directories deleted --------------------------------
 D_PATHS=(
   infra/Dockerfile
   .dockerignore
@@ -21,13 +14,11 @@ D_PATHS=(
   docs/standards/docker
   probes/docker-build.ts
 )
-# D: strings no remaining file may contain
 D_TOKENS=(
   infra/Dockerfile .dockerignore reusable-docker Taskfile.docker docker.sh
   docker-push standards/docker docker/index.md docker-build
 )
 
-# --- H (helm): files and directories deleted ----------------------------------
 H_PATHS=(
   infra/root_chart
   '.github/workflows/⚡reusable-helm.yaml'
@@ -44,30 +35,10 @@ H_TOKENS=(
   helm/index.md a-helm-lint helm-lint helm-render
 )
 
-# --- D+H together: infra/ and cd.yaml (its only jobs are the two axes) --------
 DH_PATHS=(infra .github/workflows/cd.yaml)
 DH_TOKENS=('](infra)' 'infra/' workflows/cd.yaml)
 
-# --- Files that legitimately keep matching tokens -----------------------------
-# The declaration itself; machine-maintained history; the probe harness whose
-# command-string fixtures are generic and name no axis file.
 SCAN_EXEMPT=('!.github/named-checks/**' '!Changelog.md' '!probes/lib/**')
-
-# --- Anchored edits to many-owner files (see apply_* below) -------------------
-#   ci.yaml, cd.yaml        yq del(.jobs.<axis>)
-#   Taskfile.yaml           yq del(.includes.<axis>)
-#   dependabot.yml          yq del(.updates[] | ecosystem == <axis>)
-#   dlint.yaml              yq del(toolchain-smoke binaries of the axis);
-#                           D+H also del(ci-wiring orchestrator cd.yaml)
-#   CLAUDE.md               awk drop the "# <Docker|Helm> ..." section
-#   nix/pre-commit.nix      H: drop treefmt exclude line and the a-helm-lint block
-#   nix/fmt.nix             H: drop the prettier exclude line
-#   .gitignore              H: drop the "### helm" section
-#   probes/features.json    jq del(rows of the axis's dropped probes)
-#   probes/binary-smoke.ts  sed drop the axis's smoke lines
-#   docs taskfile standard  paragraph rewritten per axis set
-#   README.md               D+H: tasks/ and infra/ sentence rewritten; Taskfile includes: dropped
-#   service-tree standard   D+H: sentence naming cd.yaml dropped
 
 root="$(git rev-parse --show-toplevel)"
 work="$(mktemp -d)"
@@ -79,7 +50,6 @@ fail() {
   failed=1
 }
 
-# --- helpers ------------------------------------------------------------------
 rm_paths() {
   local p
   for p in "$@"; do
@@ -87,7 +57,6 @@ rm_paths() {
   done
 }
 
-# edit <file> <cmd...>: run cmd on file; the file must change.
 edit() {
   local file="$1"
   shift
@@ -109,7 +78,6 @@ sed_d() { sed -i "$1" "$2"; }
 drop_section() { awk -v h="$1" '$0 == h { skip = 1; next } /^# / { skip = 0 } !skip' "$2" >"${2}.new" && mv "${2}.new" "$2"; }
 drop_nix_block() { awk -v s="$1" '$0 == s { skip = 1 } skip { if ($0 ~ /^    };$/) { skip = 0; eat = 1 } next } eat && $0 == "" { eat = 0; next } { eat = 0; print }' "$2" >"${2}.new" && mv "${2}.new" "$2"; }
 
-# --- per-axis edits -----------------------------------------------------------
 apply_D() {
   rm_paths "${D_PATHS[@]}"
   edit .github/workflows/ci.yaml yq_del 'del(.jobs.docker)'
@@ -157,7 +125,6 @@ apply_set_edits() {
   esac
 }
 
-# --- validity assertions on the stripped copy ---------------------------------
 assert_valid() {
   local axes="$1" f tokens=() hits link target dir
 
@@ -203,7 +170,6 @@ assert_valid() {
   done < <(rg --hidden --no-ignore --only-matching --no-line-number --glob '*.md' '\]\([^)]+\)' . | sed 's#^\./##')
 }
 
-# --- run each strip variant on a fresh copy of HEAD's tree --------------------
 tree="$(git -C "${root}" write-tree)"
 for axes in D H DH; do
   copy="${work}/copy-${axes}"

@@ -6,7 +6,6 @@
   env,
 }:
 let
-  # toolchain-smoke asserts the DECLARED env lists actually provide their binaries.
   envPath = pkgs.lib.makeBinPath (env.system ++ env.main ++ env.lint ++ env.dev);
 in
 pre-commit-lib.run {
@@ -91,8 +90,6 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    # -x + SCRIPTDIR: staged-file batching splits scripts from their sources,
-    # so ShellCheck must follow source= directives itself.
     a-shellcheck = {
       enable = true;
       name = "Shellcheck";

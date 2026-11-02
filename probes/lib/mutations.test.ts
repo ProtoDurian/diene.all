@@ -136,9 +136,7 @@ describe('structural probe mutators', () => {
   });
 });
 
-// Command-string assertions against a fake repo cannot distinguish a restore that works from one
-// that silently does nothing. Exercise cleanup against a REAL git repository so staged deletions
-// cannot disappear from the worklist without making these regressions red.
+// A real git repository on purpose: a fake one cannot catch a restore that does nothing.
 describe('restoreProbeState against a real repository', () => {
   async function sandbox(): Promise<{ path: string; repo: ProbeRepo; git: (command: string) => string }> {
     const path = await mkdtemp(join(tmpdir(), 'probe-restore-'));
