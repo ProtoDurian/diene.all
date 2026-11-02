@@ -1,18 +1,17 @@
-# Coverage annotations are informational; explicit thresholds document allowed drops without blocking CI.
+# Informational only: the blocking gate is the bunfig coverageThreshold.
 coverage:
   status:
     project:
       default:
-        target: auto # compare against the base commit
-        threshold: 1% # tolerate up to a 1% project coverage drop
+        target: auto
+        threshold: 1%
         informational: true
     patch:
       default:
-        target: auto # coverage expected on the changed lines
-        threshold: 1% # tolerate up to a 1% patch coverage drop
+        target: auto
+        threshold: 1%
         informational: true
 
-# Keep each uploaded flag scoped to the source measured by its blocking local ledger.
 flags:
   unit:
     paths:

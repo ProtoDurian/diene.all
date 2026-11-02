@@ -17,10 +17,8 @@ describe('parseRedisEnvironment', () => {
     { label: 'an explicitly undefined host', input: { REDIS_HOST: undefined } },
     { label: 'a port but no host', input: { REDIS_PORT: '6380' } },
   ])('should report no connection for $label', ({ input }) => {
-    // Act
     const actual = parse(input);
 
-    // Assert
     should(actual.ok).be.true();
     should(actual.ok && actual.connection).be.undefined();
   });
@@ -33,22 +31,17 @@ describe('parseRedisEnvironment', () => {
     { label: 'the lowest port', input: { REDIS_HOST: 'cache', REDIS_PORT: '1' }, expected: 1 },
     { label: 'the highest port', input: { REDIS_HOST: 'cache', REDIS_PORT: '65535' }, expected: 65535 },
   ])('should resolve $label to port $expected', ({ input, expected }) => {
-    // Act
     const actual = parse(input);
 
-    // Assert
     should(actual.ok && actual.connection).eql({ host: 'cache', port: expected });
   });
 
   it('should trim surrounding whitespace from the host', () => {
-    // Arrange
     const input = { REDIS_HOST: '  cache  ' };
     const expected = { host: 'cache', port: DEFAULT_PORT };
 
-    // Act
     const actual = parse(input);
 
-    // Assert
     should(actual.ok && actual.connection).eql(expected);
   });
 
@@ -59,22 +52,17 @@ describe('parseRedisEnvironment', () => {
     { input: { REDIS_PORT: '0' }, expected: 'REDIS_PORT must be between 1 and 65535' },
     { input: { REDIS_PORT: '65536' }, expected: 'REDIS_PORT must be between 1 and 65535' },
   ])('should reject REDIS_PORT "$input.REDIS_PORT" with a named issue', ({ input, expected }) => {
-    // Act
     const actual = parse(input);
 
-    // Assert
     should(actual.ok).be.false();
     should(!actual.ok && actual.issues).eql([expected]);
   });
 
   it('should reject an invalid port even when a valid host is present', () => {
-    // Arrange
     const input = { REDIS_HOST: 'cache', REDIS_PORT: 'not-a-port' };
 
-    // Act
     const actual = parse(input);
 
-    // Assert
     should(actual.ok).be.false();
   });
 });

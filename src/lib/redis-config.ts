@@ -4,12 +4,11 @@ const DEFAULT_REDIS_PORT = 6379;
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
 
-/** The slice of the process environment this module reads. */
 export interface RedisEnvironment {
   readonly [name: string]: string | undefined;
 }
 
-/** Where a Redis instance lives; owned by the domain, not by any adapter. */
+/** Owned by the domain, not by any adapter. */
 export interface RedisConnection {
   readonly host: string;
   readonly port: number;
@@ -19,7 +18,6 @@ export type RedisConfigResult =
   | { readonly ok: true; readonly connection: RedisConnection | undefined }
   | { readonly ok: false; readonly issues: readonly string[] };
 
-/** Treat blank environment values as unset so defaults apply consistently. */
 function blankAsUnset(value: unknown): unknown {
   return typeof value === 'string' && value.trim() === '' ? undefined : value;
 }
@@ -38,7 +36,7 @@ const redisEnvironmentSchema = z.object({
   ),
 });
 
-/** Return invalid configuration as data; a missing host intentionally disables Redis. */
+/** A missing host disables Redis on purpose; it is not an error. */
 export function parseRedisEnvironment(environment: RedisEnvironment): RedisConfigResult {
   const parsed = redisEnvironmentSchema.safeParse(environment);
 

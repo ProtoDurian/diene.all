@@ -1,4 +1,3 @@
-/** Run cleanup while preserving an operation error as the authoritative failure. */
 export async function withCleanup<T>(
   operation: () => Promise<T>,
   cleanup: () => Promise<void>,
@@ -15,7 +14,7 @@ export async function withCleanup<T>(
       try {
         onCleanupFailure(cleanupError);
       } catch {
-        // Reporting is best-effort because it must not replace the operation error either.
+        // Best-effort: must not replace the operation error.
       }
     }
     throw error;

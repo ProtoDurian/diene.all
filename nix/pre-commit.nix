@@ -50,8 +50,7 @@ let
     else
       "darwin-${if pkgs.stdenv.hostPlatform.isAarch64 then "arm64" else "x64"}";
   biome-tool = "${bun-tooling}/node_modules/@biomejs/cli-${biome-platform}/biome";
-  # tsc resolves types and imports from ./node_modules. A tree that has not run
-  # setup (CI pre-commit) borrows the pinned tooling for this run only.
+  # tsc needs ./node_modules; a tree without setup (CI pre-commit) borrows the pinned tooling.
   typecheck-tool = pkgs.writeShellScript "bun-base-typecheck" ''
     set -euo pipefail
     if [ ! -e node_modules ]; then
@@ -152,8 +151,6 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    # ### bun-base-hooks
-    # #### source: bun-base
     a-biome = {
       enable = true;
       name = "Biome lint";

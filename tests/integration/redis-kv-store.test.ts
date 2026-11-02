@@ -14,7 +14,6 @@ interface RecordedLog {
 interface RecordingLogger {
   readonly logger: ILogger;
   readonly errors: RecordedLog[];
-  /** Resolves on the first error record, so a test awaits the event instead of sleeping. */
   readonly firstError: Promise<RecordedLog>;
 }
 
@@ -66,44 +65,33 @@ describe('RedisKeyValueStore (Testcontainers)', () => {
   }, 120_000);
 
   it('should persist and retrieve a namespaced value', async () => {
-    // Arrange
     const expected = 'hello';
 
-    // Act
     const actual = await persistSample(subject as IKeyValueStore, 'Bun Base', 'sample key', expected);
 
-    // Assert
     should(actual).equal(expected);
   });
 
   it('should overwrite the value already stored under a key', async () => {
-    // Arrange
     const expected = 'second';
 
-    // Act
     await persistSample(subject as IKeyValueStore, 'Bun Base', 'overwrite', 'first');
     const actual = await persistSample(subject as IKeyValueStore, 'Bun Base', 'overwrite', expected);
 
-    // Assert
     should(actual).equal(expected);
   });
 
   it('should return null for an unknown key', async () => {
-    // Arrange
     const input = 'bun-base:missing';
 
-    // Act
     const actual = await (subject as IKeyValueStore).get(input);
 
-    // Assert
     should(actual).be.null();
   });
 
   it('should log nothing while the connection is healthy', () => {
-    // Act
     const actual = (observed as RecordingLogger).errors;
 
-    // Assert
     should(actual).eql([]);
   });
 });
@@ -118,7 +106,7 @@ describe('RedisKeyValueStore against an endpoint that is not Redis', () => {
   }, 30_000);
 
   it('should report the failure through the injected logger instead of the console', async () => {
-    // Arrange — invalid RESP bytes exercise the non-ECONNREFUSED error branch deterministically.
+    // Invalid RESP bytes hit the non-ECONNREFUSED branch deterministically.
     const observed = recordingLogger();
     const listener: TCPSocketListener = Bun.listen({
       hostname: '127.0.0.1',
@@ -132,11 +120,9 @@ describe('RedisKeyValueStore against an endpoint that is not Redis', () => {
     rogue = listener;
     subject = createRedisStore({ host: '127.0.0.1', port: listener.port }, observed.logger);
 
-    // Act
     const attempt = subject.get('bun-base:protocol').catch(() => null);
     const actual = await observed.firstError;
 
-    // Assert
     should(actual.message).equal('unexpected redis connection error');
     should(actual.fields.host).equal('127.0.0.1');
     should(actual.fields.port).equal(listener.port);

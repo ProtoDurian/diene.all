@@ -173,8 +173,6 @@ release:
       - released
   hooks:
     # A file a hook writes joins commit.assets in the same edit.
-    # bun-base versions `package.json`, which the command below stamps and
-    # `commit.assets` lists.
     prepare:
       - phase: afterWrite
         command: './scripts/release/bump.sh ${version}'

@@ -48,7 +48,7 @@ strict findings.
 - Codecov is informational and uploads the independent `unit` and `int` flags
   with carryforward enabled.
 
-Tests use `bun:test`, `describe`/`it`, AAA comments, and `should` assertions.
+Tests use `bun:test`, `describe`/`it`, blank-line Arrange/Act/Assert blocks, and `should` assertions.
 Container images are version-pinned without digests.
 
 ## Build and runtime
