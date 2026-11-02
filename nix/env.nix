@@ -11,27 +11,23 @@ with packages;
   lint = [
     actionlint
     dlint
+    dn-inspect
+    dotnetlint
     infralint
     pre-commit
     shellcheck
     skills-sync
     treefmt
-    # ### dotnet-base-lint
-    # #### source: dotnet-base
-    dn-inspect
-    dotnetlint
   ];
 
   main = [
-    # ### dotnet-base-main
-    # #### source: dotnet-base
-    dotnet-sdk_10
-    xmlstarlet
     cyanprint
+    dotnet-sdk_10
     git
     go-task
     infisical
     shellcheck
+    xmlstarlet
   ];
 
   releaser = [

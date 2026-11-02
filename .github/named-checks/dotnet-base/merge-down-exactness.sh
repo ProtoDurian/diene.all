@@ -6,11 +6,6 @@ set -euo pipefail
 # registrations in parent files, and three line-local rewrites (the dotnetlint
 # wrapper around the pre-commit run, the package-set union, the release prepare
 # hook). Nothing tracked by shared is deleted or renamed.
-#
-# flake.lock is the one whole-file exception: atomipkgs bbf8c71 -> 116ef25
-# (nix-registry v5.9.1, which splits atomiutils into small bundles). It must be
-# workspace's lock byte for byte, so the hunk vanishes once shared takes it.
-flake_lock_blob=cfe880eec0ff82bc14a380e0ef0aedb5c5e44dce
 
 parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
@@ -42,12 +37,7 @@ while IFS=$'\t' read -r status path; do
     fi
     ;;
   M)
-    if [[ ${path} == flake.lock ]]; then
-      if [[ "$(git rev-parse "${tree}:flake.lock")" != "${flake_lock_blob}" ]]; then
-        echo "❌ flake.lock must be workspace's lock ${flake_lock_blob}" >&2
-        failed=1
-      fi
-    elif [[ ! ${path} =~ ${insert_only_pattern} && -z ${rewrite_max[${path}]:-} ]]; then
+    if [[ ! ${path} =~ ${insert_only_pattern} && -z ${rewrite_max[${path}]:-} ]]; then
       echo "❌ parent-owned file modified: ${path}" >&2
       failed=1
     fi

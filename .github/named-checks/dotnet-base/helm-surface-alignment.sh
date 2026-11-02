@@ -5,7 +5,7 @@ set -euo pipefail
 # the helm tasks, script, reusable workflow, standard and skill are the same
 # bytes as bun-base's recorded .3 commit (bun-base.sha, a graph ancestor via the
 # bun-base -> dotnet-base edge), and so are the helm jobs and the dependabot helm
-# entry, except for the per-stack Nix cache tag a CI lane passes.
+# entry.
 
 bun_base_sha="${NAMED_CHECKS_BUN_BASE_SHA:-$(cat "$(dirname "$0")/bun-base.sha")}"
 git rev-parse --verify --quiet "${bun_base_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${bun_base_sha}" || true
@@ -42,7 +42,7 @@ compare() {
     failed=1
   fi
 }
-compare .github/workflows/ci.yaml '.jobs.helm | del(.with.nix_cache_tag)'
+compare .github/workflows/ci.yaml '.jobs.helm'
 compare .github/workflows/cd.yaml '.jobs.helm'
 compare .github/dependabot.yml '.updates[] | select(.package-ecosystem == "helm")'
 
