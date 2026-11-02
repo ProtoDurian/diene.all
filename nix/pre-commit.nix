@@ -58,12 +58,6 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    # The selector is directory-shaped on purpose: every standard under
-    # docs/standards/ and every first-level skill trigger is linted, so adding a
-    # topic needs no edit here. Vendored skills sit deeper than one level and are
-    # ignored again by .markdownlint-cli2.jsonc. README.md and CLAUDE.md are
-    # workspace-owned, one top-level heading per section, and not this
-    # payload's subject.
     a-markdownlint = {
       enable = true;
       name = "Markdown lint";
