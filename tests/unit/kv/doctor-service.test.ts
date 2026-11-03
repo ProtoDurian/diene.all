@@ -14,7 +14,7 @@ describe('DoctorService', () => {
       const actual = await subject.platform();
 
       // Assert
-      should(actual).equal(expected);
+      actual.should.equal(expected);
     });
   });
 
@@ -29,14 +29,17 @@ describe('DoctorService', () => {
       const actual = await subject.probeBackend();
 
       // Assert
-      should(actual).be.true();
+      actual.should.be.true();
       const probeKey = store.setCalls[0]?.key ?? '';
-      should(probeKey).match(/^doctor:probe-/);
-      should(probeKey).not.equal(userKey);
-      should(store.setCalls[0]?.ttlSeconds).equal(30);
-      should(store.getCalls).deepEqual([probeKey]);
-      should(store.deleteCalls).deepEqual([probeKey]);
-      should(await store.get(userKey)).equal('user-owned');
+      probeKey.should.match(/^doctor:probe-/);
+      probeKey.should.not.equal(userKey);
+      should(store.setCalls[0]?.ttlSeconds).not.be.undefined();
+      (store.setCalls[0]?.ttlSeconds as number).should.equal(30);
+      store.getCalls.should.deepEqual([probeKey]);
+      store.deleteCalls.should.deepEqual([probeKey]);
+      const userValue = await store.get(userKey);
+      should(userValue).not.be.null();
+      (userValue as string).should.equal('user-owned');
     });
 
     it('should propagate the error when the store fails', async () => {
@@ -49,7 +52,7 @@ describe('DoctorService', () => {
       const actual = subject.probeBackend();
 
       // Assert
-      await should(actual).be.rejectedWith(expected);
+      await actual.should.be.rejectedWith(expected);
     });
 
     it('should still report a healthy backend when the probe cleanup fails', async () => {
@@ -66,7 +69,7 @@ describe('DoctorService', () => {
       const actual = await subject.probeBackend();
 
       // Assert
-      should(actual).be.true();
+      actual.should.be.true();
     });
   });
 });

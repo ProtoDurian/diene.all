@@ -1,5 +1,5 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
+import 'should';
 import { NamespacedKeyValidationError, namespacedKey, slugify } from '../../src/lib/kv/slug';
 
 describe('slugify', () => {
@@ -16,7 +16,7 @@ describe('slugify', () => {
     const actual = slugify(input);
 
     // Assert
-    should(actual).equal(expected);
+    actual.should.equal(expected);
   });
 
   it('should collapse a fully non-alphanumeric string to empty', () => {
@@ -28,7 +28,7 @@ describe('slugify', () => {
     const actual = slugify(input);
 
     // Assert
-    should(actual).equal(expected);
+    actual.should.equal(expected);
   });
 });
 describe('namespacedKey', () => {
@@ -42,7 +42,7 @@ describe('namespacedKey', () => {
     const actual = namespacedKey(namespace, key);
 
     // Assert
-    should(actual).equal(expected);
+    actual.should.equal(expected);
   });
 
   it('should throw NamespacedKeyValidationError when the namespace slugifies to empty', () => {
@@ -54,7 +54,7 @@ describe('namespacedKey', () => {
     const actual = () => namespacedKey(namespace, key);
 
     // Assert
-    should(actual).throw(NamespacedKeyValidationError, { message: 'namespace must not be empty' });
+    actual.should.throw(NamespacedKeyValidationError, { message: 'namespace must not be empty' });
   });
 
   it('should throw NamespacedKeyValidationError when the key slugifies to empty', () => {
@@ -66,6 +66,6 @@ describe('namespacedKey', () => {
     const actual = () => namespacedKey(namespace, key);
 
     // Assert
-    should(actual).throw(NamespacedKeyValidationError, { message: 'key must not be empty' });
+    actual.should.throw(NamespacedKeyValidationError, { message: 'key must not be empty' });
   });
 });

@@ -35,7 +35,8 @@ describe('RedisKeyValueStore (Testcontainers)', () => {
     const actual = await (subject as IKeyValueStore).get(key);
 
     // Assert
-    should(actual).equal(expected);
+    should(actual).not.be.null();
+    (actual as string).should.equal(expected);
   });
 
   it('should overwrite the value already stored under a key', async () => {
@@ -50,7 +51,8 @@ describe('RedisKeyValueStore (Testcontainers)', () => {
     const actual = await store.get(key);
 
     // Assert
-    should(actual).equal(expected);
+    should(actual).not.be.null();
+    (actual as string).should.equal(expected);
   });
 
   it('should return null for an unknown key', async () => {

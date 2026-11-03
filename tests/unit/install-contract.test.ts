@@ -2,7 +2,7 @@ import { describe, it } from 'bun:test';
 import { chmod, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import should from 'should';
+import 'should';
 
 interface InstallerResult {
   readonly code: number;
@@ -57,10 +57,10 @@ esac
     await Bun.write(join(payload, 'bun-cli'), '#!/usr/bin/env bash\necho bun-cli fixture\n');
     await chmod(join(payload, 'bun-cli'), 0o755);
     const tar = Bun.spawn(['tar', '-czf', archive, '-C', payload, 'bun-cli']);
-    should(await tar.exited).equal(0);
+    (await tar.exited).should.equal(0);
     const digestProc = Bun.spawn(['sha256sum', archive], { stdout: 'pipe' });
     const digest = (await new Response(digestProc.stdout).text()).split(' ')[0];
-    should(await digestProc.exited).equal(0);
+    (await digestProc.exited).should.equal(0);
     await Bun.write(
       join(this.fixtureDir, 'checksums.txt'),
       `${validChecksum ? digest : '0'.repeat(64)}  bun-cli_linux_amd64.tar.gz\n`,
@@ -103,8 +103,8 @@ describe('release installer contract', () => {
       const actual = await harness.run({ FAKE_OS: 'Plan9' });
 
       // Assert
-      should(actual.code).not.equal(0);
-      should(actual.err).containEql('unsupported OS');
+      actual.code.should.not.equal(0);
+      actual.err.should.containEql('unsupported OS');
     } finally {
       await harness.cleanup();
     }
@@ -121,8 +121,8 @@ describe('release installer contract', () => {
       const actual = await harness.run();
 
       // Assert
-      should(actual.code).not.equal(0);
-      should(actual.out + actual.err).containEql('FAILED');
+      actual.code.should.not.equal(0);
+      (actual.out + actual.err).should.containEql('FAILED');
     } finally {
       await harness.cleanup();
     }
@@ -139,9 +139,9 @@ describe('release installer contract', () => {
       const actual = await harness.run();
 
       // Assert
-      should(actual.code).equal(0);
-      should(actual.out).containEql('checksum verified');
-      should(await readFile(join(harness.installDir, 'bun-cli'), 'utf8')).containEql('bun-cli fixture');
+      actual.code.should.equal(0);
+      actual.out.should.containEql('checksum verified');
+      (await readFile(join(harness.installDir, 'bun-cli'), 'utf8')).should.containEql('bun-cli fixture');
     } finally {
       await harness.cleanup();
     }

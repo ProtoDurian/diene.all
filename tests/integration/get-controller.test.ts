@@ -18,9 +18,10 @@ describe('GetController', () => {
       const actual = await subject.handle('ns', 'key');
 
       // Assert
-      should(actual).equal(EXIT_OK);
-      should(io.successes[0]).equal(expected);
-      should(io.errors).be.empty();
+      actual.should.equal(EXIT_OK);
+      should(io.successes[0]).not.be.undefined();
+      (io.successes[0] as string).should.equal(expected);
+      io.errors.should.be.empty();
     });
 
     it('should warn and return exit 1 when the key is missing', async () => {
@@ -33,8 +34,9 @@ describe('GetController', () => {
       const actual = await subject.handle('ns', 'key');
 
       // Assert
-      should(actual).equal(EXIT_ERROR);
-      should(io.warnings[0]).containEql('not found: ns:key');
+      actual.should.equal(EXIT_ERROR);
+      should(io.warnings[0]).not.be.undefined();
+      (io.warnings[0] as string).should.containEql('not found: ns:key');
     });
 
     it('should fail fast with a missing-argument error when the key is omitted non-interactively', async () => {
@@ -47,9 +49,10 @@ describe('GetController', () => {
       const actual = await subject.handle('ns');
 
       // Assert
-      should(actual).equal(EXIT_ERROR);
-      should(io.errors[0]).containEql('missing argument: key');
-      should(store.getCalls).be.empty();
+      actual.should.equal(EXIT_ERROR);
+      should(io.errors[0]).not.be.undefined();
+      (io.errors[0] as string).should.containEql('missing argument: key');
+      store.getCalls.should.be.empty();
     });
 
     it('should prompt for the key and return its value when omitted interactively', async () => {
@@ -63,9 +66,10 @@ describe('GetController', () => {
       const actual = await subject.handle('ns');
 
       // Assert
-      should(actual).equal(EXIT_OK);
-      should(store.getCalls).deepEqual(['ns:prompted-key']);
-      should(io.successes[0]).equal(expected);
+      actual.should.equal(EXIT_OK);
+      store.getCalls.should.deepEqual(['ns:prompted-key']);
+      should(io.successes[0]).not.be.undefined();
+      (io.successes[0] as string).should.equal(expected);
     });
 
     it('should report an unreachable backend with exit 1 when the store fails', async () => {
@@ -78,8 +82,9 @@ describe('GetController', () => {
       const actual = await subject.handle('ns', 'key');
 
       // Assert
-      should(actual).equal(EXIT_ERROR);
-      should(io.errors[0]).containEql('failed to reach key-value backend');
+      actual.should.equal(EXIT_ERROR);
+      should(io.errors[0]).not.be.undefined();
+      (io.errors[0] as string).should.containEql('failed to reach key-value backend');
     });
   });
 });

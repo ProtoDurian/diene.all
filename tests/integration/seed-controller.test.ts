@@ -18,12 +18,12 @@ describe('SeedController', () => {
       const actual = await subject.handle('ns', '3');
 
       // Assert
-      should(actual).equal(EXIT_OK);
-      should(store.setCalls).have.length(3);
-      should(progress.totals).deepEqual([3]);
-      should(progress.ticks).equal(3);
-      should(progress.stopped).be.true();
-      should(io.successes).deepEqual(['seeded 3 entries under "ns"']);
+      actual.should.equal(EXIT_OK);
+      store.setCalls.should.have.length(3);
+      progress.totals.should.deepEqual([3]);
+      progress.ticks.should.equal(3);
+      progress.stopped.should.be.true();
+      io.successes.should.deepEqual(['seeded 3 entries under "ns"']);
     });
 
     it.each(['abc', '0', '-1', '1.5', '10001'])(
@@ -39,9 +39,10 @@ describe('SeedController', () => {
         const actual = await subject.handle('ns', input);
 
         // Assert
-        should(actual).equal(EXIT_ERROR);
-        should(store.setCalls).be.empty();
-        should(io.errors[0]).containEql('invalid input');
+        actual.should.equal(EXIT_ERROR);
+        store.setCalls.should.be.empty();
+        should(io.errors[0]).not.be.undefined();
+        (io.errors[0] as string).should.containEql('invalid input');
       },
     );
 
@@ -56,9 +57,10 @@ describe('SeedController', () => {
       const actual = await subject.handle('ns', '3');
 
       // Assert
-      should(actual).equal(EXIT_ERROR);
-      should(progress.stopped).be.true();
-      should(io.errors[0]).containEql('failed to reach the key-value backend');
+      actual.should.equal(EXIT_ERROR);
+      progress.stopped.should.be.true();
+      should(io.errors[0]).not.be.undefined();
+      (io.errors[0] as string).should.containEql('failed to reach the key-value backend');
     });
   });
 });

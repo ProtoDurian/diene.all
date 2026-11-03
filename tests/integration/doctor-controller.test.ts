@@ -18,9 +18,11 @@ describe('DoctorController', () => {
       const actual = await subject.handle();
 
       // Assert
-      should(actual).equal(EXIT_OK);
-      should(io.successes[0]).equal('platform: Darwin 25.0.0 arm64');
-      should(spinner.events.at(-1)).equal('succeed:key-value backend reachable');
+      actual.should.equal(EXIT_OK);
+      should(io.successes[0]).not.be.undefined();
+      (io.successes[0] as string).should.equal('platform: Darwin 25.0.0 arm64');
+      should(spinner.events.at(-1)).not.be.undefined();
+      (spinner.events.at(-1) as string).should.equal('succeed:key-value backend reachable');
     });
 
     it('should fail the spinner and return exit 1 when the backend is unreachable', async () => {
@@ -34,8 +36,9 @@ describe('DoctorController', () => {
       const actual = await subject.handle();
 
       // Assert
-      should(actual).equal(EXIT_ERROR);
-      should(spinner.events.at(-1)).containEql('fail:key-value backend unreachable');
+      actual.should.equal(EXIT_ERROR);
+      should(spinner.events.at(-1)).not.be.undefined();
+      (spinner.events.at(-1) as string).should.containEql('fail:key-value backend unreachable');
     });
 
     it('should degrade to a warning and still return exit 0 when the shell fails', async () => {
@@ -53,9 +56,10 @@ describe('DoctorController', () => {
       const actual = await subject.handle();
 
       // Assert
-      should(actual).equal(EXIT_OK);
-      should(io.warnings[0]).containEql('could not detect platform');
-      should(io.successes).be.empty();
+      actual.should.equal(EXIT_OK);
+      should(io.warnings[0]).not.be.undefined();
+      (io.warnings[0] as string).should.containEql('could not detect platform');
+      io.successes.should.be.empty();
     });
   });
 });

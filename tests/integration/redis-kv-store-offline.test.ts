@@ -1,5 +1,5 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
+import 'should';
 import { RedisKeyValueStore } from '../../src/adapters/kv/data/redis-kv-store';
 
 /** A loopback port nothing listens on: bind an ephemeral port, then release it. */
@@ -20,7 +20,7 @@ describe('RedisKeyValueStore (unreachable backend)', () => {
       const actual = subject.get('bun-cli:offline');
 
       // Assert
-      await should(actual).be.rejected();
+      await actual.should.be.rejected();
     } finally {
       await subject.close().catch(() => undefined);
     }

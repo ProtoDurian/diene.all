@@ -40,9 +40,10 @@ describe('CLI controllers against real Redis', () => {
     const getCode = await get.handle('real', 'round-trip');
 
     // Assert
-    should(setCode).equal(EXIT_OK);
-    should(getCode).equal(EXIT_OK);
-    should(io.successes.at(-1)).equal('hello');
+    setCode.should.equal(EXIT_OK);
+    getCode.should.equal(EXIT_OK);
+    should(io.successes.at(-1)).not.be.undefined();
+    (io.successes.at(-1) as string).should.equal('hello');
   });
 
   it('should seed entries through the controller into real Redis', async () => {
@@ -56,9 +57,11 @@ describe('CLI controllers against real Redis', () => {
     const actual = await seed.handle('real-seed', '3');
 
     // Assert
-    should(actual).equal(EXIT_OK);
-    should(await (store as RedisKeyValueStore).get('real-seed:sample-3')).equal('value-3');
-    should(progress.ticks).equal(3);
+    actual.should.equal(EXIT_OK);
+    const seeded = await (store as RedisKeyValueStore).get('real-seed:sample-3');
+    should(seeded).not.be.null();
+    (seeded as string).should.equal('value-3');
+    progress.ticks.should.equal(3);
   });
 
   it('should diagnose a real reachable Redis backend', async () => {
@@ -75,7 +78,8 @@ describe('CLI controllers against real Redis', () => {
     const actual = await doctor.handle();
 
     // Assert
-    should(actual).equal(EXIT_OK);
-    should(spinner.events.at(-1)).equal('succeed:key-value backend reachable');
+    actual.should.equal(EXIT_OK);
+    should(spinner.events.at(-1)).not.be.undefined();
+    (spinner.events.at(-1) as string).should.equal('succeed:key-value backend reachable');
   });
 });

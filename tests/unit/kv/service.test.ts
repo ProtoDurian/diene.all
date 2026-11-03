@@ -1,7 +1,7 @@
 import { describe, it } from 'bun:test';
 import should from 'should';
 import { KvService } from '../../../src/lib/kv/service';
-import { FakeKeyValueStore, captureProgress } from '../../helpers/fakes';
+import { FakeKeyValueStore, type SetCall, captureProgress } from '../../helpers/fakes';
 
 describe('KvService', () => {
   describe('setValue', () => {
@@ -15,9 +15,10 @@ describe('KvService', () => {
       const actual = await subject.setValue('Bun Base', 'Sample Key', 'hello');
 
       // Assert
-      should(actual).equal(expected);
-      should(store.setCalls).have.length(1);
-      should(store.setCalls[0]).deepEqual({ key: expected, value: 'hello', ttlSeconds: undefined });
+      actual.should.equal(expected);
+      store.setCalls.should.have.length(1);
+      should(store.setCalls[0]).not.be.undefined();
+      (store.setCalls[0] as SetCall).should.deepEqual({ key: expected, value: 'hello', ttlSeconds: undefined });
     });
 
     it('should pass the ttl through to the store', async () => {
@@ -30,7 +31,8 @@ describe('KvService', () => {
       await subject.setValue('ns', 'key', 'v', input);
 
       // Assert
-      should(store.setCalls[0]?.ttlSeconds).equal(input);
+      should(store.setCalls[0]?.ttlSeconds).not.be.undefined();
+      (store.setCalls[0]?.ttlSeconds as number).should.equal(input);
     });
   });
 
@@ -45,8 +47,8 @@ describe('KvService', () => {
       const actual = await subject.getValue('ns', 'key');
 
       // Assert
-      should(actual).deepEqual(expected);
-      should(store.getCalls).deepEqual(['ns:key']);
+      actual.should.deepEqual(expected);
+      store.getCalls.should.deepEqual(['ns:key']);
     });
 
     it('should return a null value for a missing key', async () => {
@@ -59,7 +61,7 @@ describe('KvService', () => {
       const actual = await subject.getValue('ns', 'missing');
 
       // Assert
-      should(actual).deepEqual(expected);
+      actual.should.deepEqual(expected);
     });
   });
 
@@ -75,12 +77,12 @@ describe('KvService', () => {
       await subject.seed('ns', input, progress);
 
       // Assert
-      should(store.setCalls).have.length(input);
-      should(store.setCalls.map(call => call.key)).deepEqual(['ns:sample-1', 'ns:sample-2', 'ns:sample-3']);
-      should(store.setCalls.map(call => call.value)).deepEqual(['value-1', 'value-2', 'value-3']);
-      should(progress.totals).deepEqual([input]);
-      should(progress.ticks).equal(input);
-      should(progress.stopped).be.true();
+      store.setCalls.should.have.length(input);
+      store.setCalls.map(call => call.key).should.deepEqual(['ns:sample-1', 'ns:sample-2', 'ns:sample-3']);
+      store.setCalls.map(call => call.value).should.deepEqual(['value-1', 'value-2', 'value-3']);
+      progress.totals.should.deepEqual([input]);
+      progress.ticks.should.equal(input);
+      progress.stopped.should.be.true();
     });
 
     it('should stop the progress reporter and propagate the error when the store throws mid-way', async () => {
@@ -94,8 +96,8 @@ describe('KvService', () => {
       const actual = subject.seed('ns', 3, progress);
 
       // Assert
-      await should(actual).be.rejectedWith(expected);
-      should(progress.stopped).be.true();
+      await actual.should.be.rejectedWith(expected);
+      progress.stopped.should.be.true();
     });
   });
 });
