@@ -87,6 +87,14 @@ See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).
 
 See [docs/standards/linting/index.md](docs/standards/linting/index.md).
 
+# Observability standards
+
+- [Observability](docs/standards/observability/index.md)
+- [Grafana dashboards](docs/standards/grafana-dashboards/index.md)
+- [OpenTelemetry alignment](docs/standards/observability/otel.md)
+- [Faro frontend variant](docs/standards/observability/faro.md)
+- [Primordial-chart rendering](docs/standards/observability/primordial-chart.md)
+
 # Release automation
 
 See [docs/standards/semantic-release/index.md](docs/standards/semantic-release/index.md).
