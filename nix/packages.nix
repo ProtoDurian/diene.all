@@ -11,6 +11,11 @@ let
         inherit
           atomiutils
           cyanprint
+          dlint
+          infralint
+          infrautils
+          releaser
+          skills-sync
           ;
       }
     );
@@ -19,7 +24,13 @@ let
       with pkgs-2605;
       {
         inherit
+          actionlint
           git
+          go-task
+          infisical
+          nix
+          pre-commit
+          shellcheck
           treefmt
           ;
       }

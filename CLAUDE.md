@@ -1,3 +1,37 @@
+# Agent skills
+
+`.claude/skills/vendor/` is tool-owned and is never hand-edited. Nothing in this
+tree writes it: the tool that does is consumed per-template from the Nix registry,
+and this tree declares no packages for it to vendor.
+
+# CI/CD workflows
+
+See [docs/standards/ci-cd/index.md](docs/standards/ci-cd/index.md).
+
+# Conventional commits
+
+See [docs/standards/conventional-commits/index.md](docs/standards/conventional-commits/index.md).
+
+# CyanPrint-managed files
+
+`.cyan_state.yaml` records what CyanPrint manages here:
+
+- `files`: every path the last generation wrote.
+- `provenance`: per path, how it was merged: `source` (the winning template),
+  `decision` (`added`, `resolver-merged` or `lww-override`), `resolver` and
+  `contributors` (every template that supplied a version).
+
+Check a file there before you edit it:
+
+- **Not listed:** yours. Edit freely.
+- **Listed:** make the smallest line-level edit. No reformatting, reordering,
+  rewriting or renaming, so the next `cyanprint update` 3-way merge stays clean.
+- **More than one contributor:** merged from several templates. Change only your
+  own part.
+- Never hand-edit or delete `.cyan_state.yaml`.
+
+To pull template changes, use the `cyanprint-update` skill.
+
 # Development Environment
 
 All binaries, tools, and PATH are managed by **Nix**. Do not install tools manually or modify PATH outside of the nix configuration.
@@ -23,3 +57,39 @@ See **[docs/standards/nix/index.md](docs/standards/nix/index.md)** for the full 
 - Environment groups and shells
 - Formatters and pre-commit hooks
 - Adding registries
+
+# Docker build and publishing
+
+See [docs/standards/docker/index.md](docs/standards/docker/index.md).
+
+# Helm charts and publishing
+
+See [docs/standards/helm/index.md](docs/standards/helm/index.md).
+
+# Infisical and secrets
+
+See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).
+
+# Linting and pre-commit
+
+See [docs/standards/linting/index.md](docs/standards/linting/index.md).
+
+# Release automation
+
+See [docs/standards/semantic-release/index.md](docs/standards/semantic-release/index.md).
+
+# Repository standards
+
+Follow the linked standard before changing its surface.
+
+# Service-tree identity
+
+See [docs/standards/service-tree/index.md](docs/standards/service-tree/index.md).
+
+# Shell scripts
+
+See [docs/standards/shell-scripts/index.md](docs/standards/shell-scripts/index.md).
+
+# Taskfile conventions
+
+See [docs/standards/taskfile/index.md](docs/standards/taskfile/index.md).

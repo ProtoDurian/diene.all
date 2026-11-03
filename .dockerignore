@@ -1,0 +1,19 @@
+### nix
+result
+result-*
+
+### non-runtime
+*.md
+.claude
+.dockerignore
+.github
+docs
+probes
+
+### vcs-env
+.direnv
+.env
+.env.*
+.git
+.gitignore
+*.log
