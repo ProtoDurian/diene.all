@@ -13,12 +13,10 @@ export interface CliResult {
   readonly err: string;
 }
 
-/** Runs one CLI journey and reports its transport result — the single seam the SIT suite drives. */
 export interface CliDriver {
   run(args: string[], env?: Record<string, string>): Promise<CliResult>;
 }
 
-/** Black-box driver: spawns the compiled standalone binary. The true SIT tier — no coverage. */
 export class BinaryCliDriver implements CliDriver {
   constructor(
     private readonly bin: string,
@@ -42,7 +40,6 @@ export class BinaryCliDriver implements CliDriver {
   }
 }
 
-/** In-process driver: same journeys via the glue factory with captured IO — instrumentable full-system coverage. */
 export class InProcessCliDriver implements CliDriver {
   constructor(
     private readonly host: string,

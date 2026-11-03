@@ -19,9 +19,6 @@ nonroot)
   rg -F ':nonroot AS runtime' infra/Dockerfile
   ;;
 release-backup-order)
-  # schemaVersion 2: the old semantic-release plugin list is gone. The backup must
-  # still run BEFORE the release writes the new changelog, and the releaser must not
-  # publish a GitHub release of its own because GoReleaser owns this node's.
   yq -o=json '.' release.yaml | jq -e '
     .release.hooks.prepare[0].phase == "beforeWrite" and
     .release.hooks.prepare[0].command == "./scripts/release/backup-changelog.sh" and

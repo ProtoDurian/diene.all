@@ -5,7 +5,6 @@ import type { ICliIo } from '../../terminal/console-io';
 import { EXIT_ERROR, EXIT_OK } from '../../cli/exit-codes';
 import { MAX_TTL_SECONDS, TtlSchema } from './validator';
 
-/** `set <namespace> <key> <value> [--ttl <seconds>]` — validates the req and routes to KvService. */
 export class SetController {
   constructor(
     private readonly kv: KvService,

@@ -1,6 +1,5 @@
 import chalk from 'chalk';
 
-/** Presentation port for the CLI controllers — success/warn to stdout, error to stderr. */
 export interface ICliIo {
   success(message: string): void;
   warn(message: string): void;

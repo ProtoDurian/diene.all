@@ -3,14 +3,12 @@ import type { IPrompt } from '../../src/adapters/terminal/prompt';
 import type { ISpinner } from '../../src/adapters/terminal/spinner';
 import type { IKeyValueStore, IProgressReporter, IShell } from '../../src/lib/kv/interfaces';
 
-/** Records a single `set` call so tests can assert the composed key, value, and ttl. */
 export interface SetCall {
   readonly key: string;
   readonly value: string;
   readonly ttlSeconds: number | undefined;
 }
 
-/** In-memory `IKeyValueStore` for unit tests — no real Redis; optionally throws to exercise the unreachable-backend path. */
 export class FakeKeyValueStore implements IKeyValueStore {
   readonly setCalls: SetCall[] = [];
   readonly getCalls: string[] = [];
@@ -46,7 +44,6 @@ export class FakeKeyValueStore implements IKeyValueStore {
   }
 }
 
-/** Captures everything written to the CLI IO so tests can assert on rendered output. */
 export interface CapturedIo extends ICliIo {
   readonly successes: string[];
   readonly warnings: string[];
@@ -80,7 +77,6 @@ export function captureIo(): CapturedIo {
   };
 }
 
-/** Records spinner transitions so tests can assert on live feedback. */
 export interface CapturedSpinner extends ISpinner {
   readonly events: string[];
 }
@@ -101,7 +97,6 @@ export function captureSpinner(): CapturedSpinner {
   };
 }
 
-/** Records progress-reporter activity so tests can assert totals and ticks. */
 export interface CapturedProgress extends IProgressReporter {
   readonly totals: number[];
   ticks: number;
@@ -126,7 +121,6 @@ export function captureProgress(): CapturedProgress {
   return reporter;
 }
 
-/** Canned `IShell` — returns a fixed platform string or throws the configured failure. */
 export class FakeShell implements IShell {
   constructor(private readonly result: string | Error) {}
 
@@ -136,7 +130,6 @@ export class FakeShell implements IShell {
   }
 }
 
-/** Canned `IPrompt` — answers every question with the configured value. */
 export class FakePrompt implements IPrompt {
   constructor(private readonly answer: string) {}
 

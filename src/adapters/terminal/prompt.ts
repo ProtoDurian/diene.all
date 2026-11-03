@@ -1,6 +1,5 @@
 import inquirer from 'inquirer';
 
-/** Interactive-input port for the CLI controllers (never used off a TTY). */
 export interface IPrompt {
   ask(message: string): Promise<string>;
 }

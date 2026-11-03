@@ -1,6 +1,5 @@
 import ora, { type Ora } from 'ora';
 
-/** Live-status port for the CLI controllers. */
 export interface ISpinner {
   start(text: string): void;
   succeed(text: string): void;

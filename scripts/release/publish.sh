@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Release orchestration (mirrors sulfone.iridium):
-#   publish.sh            → real release: stage packages, push to Gemfury, then publish GH + cask
-#   publish.sh --snapshot → dry-run: build everything into dist/ with NO publish
 SNAPSHOT=0
 [ "${1:-}" = "--snapshot" ] && SNAPSHOT=1
 
@@ -22,7 +19,6 @@ fi
 [ -z "${FURY_TOKEN:-}" ] && echo "❌ 'FURY_TOKEN' env var not set" >&2 && exit 1
 [ -z "${GITHUB_TOKEN:-}" ] && echo "❌ 'GITHUB_TOKEN' env var not set" >&2 && exit 1
 
-# Release notes = this version's changelog section (diff of Changelog.md vs Changelog.old.md).
 echo "⚙️ Generating changelog diff ..."
 if [ ! -f Changelog.md ] || [ ! -f Changelog.old.md ]; then
   touch IncrementalChangelog.md

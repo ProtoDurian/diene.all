@@ -82,7 +82,7 @@ let
         };
       in
       {
-        # !A84: keep the pinned bun; the compiled runtime and the deps hash depend on it.
+        # Keep the pinned bun; the compiled runtime and depsHash depend on it.
         bun-cli = atomiLib.buildBunCli {
           name = cliName;
           version = manifest.version;

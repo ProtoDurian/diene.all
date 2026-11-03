@@ -18,11 +18,9 @@ import { DoctorService } from '../src/lib/kv/doctor-service';
 import { KvService } from '../src/lib/kv/service';
 // ─── end domain imports ───────────────────────────────────────────────────────────────────────
 
-// Per-instance identity (tokenization find/replace lands here): binary name and description.
 const BINARY_NAME = 'bun-cli';
 const DESCRIPTION = 'Sample CLI baseline over the AtomiCloud Redis key-value library';
 
-/** Scaffold: the commander program skeleton (identity + `--help`/`--version`), domain-free. */
 export function createProgram(): Command {
   return new Command()
     .name(BINARY_NAME)
@@ -32,7 +30,6 @@ export function createProgram(): Command {
 }
 
 // ─── DOMAIN WIRING · the ONLY scaffold↔domain seam (delete through END to retarget the CLI) ───────
-/** The adapters a CLI invocation needs; the SIT in-process driver injects captured/test doubles here. */
 export interface CliWorld {
   readonly store: IKeyValueStore;
   readonly io: ICliIo;
@@ -43,7 +40,6 @@ export interface CliWorld {
   readonly interactive: boolean;
 }
 
-// Sample-domain defaults (the replacement domain brings its own backend defaults).
 const REDIS_DEFAULT_HOST = '127.0.0.1';
 const REDIS_DEFAULT_PORT = 6379;
 const RedisHostSchema = z.string().trim().min(1, 'REDIS_HOST must not be blank');
@@ -53,7 +49,6 @@ const RedisPortSchema = z
   .transform(Number)
   .pipe(z.number().int().min(1).max(65535));
 
-/** REDIS_HOST/REDIS_PORT env overrides (needed under docker, where 127.0.0.1 is the container). */
 export function resolveConnection(env: Readonly<Record<string, string | undefined>> = process.env): RedisConnection {
   return {
     host: env.REDIS_HOST === undefined ? REDIS_DEFAULT_HOST : RedisHostSchema.parse(env.REDIS_HOST),
@@ -61,7 +56,6 @@ export function resolveConnection(env: Readonly<Record<string, string | undefine
   };
 }
 
-/** The real production world: real backend + the shipped IO adapters. */
 export function buildWorld(): CliWorld {
   const io = new ConsoleIo();
   return {
@@ -75,7 +69,6 @@ export function buildWorld(): CliWorld {
   };
 }
 
-/** Route the sample domain onto the program — structural typing bridges scaffold ports to domain ports. */
 export function registerDomain(program: Command, world: CliWorld): void {
   const kv = new KvService(world.store);
   const doctor = new DoctorService(world.store, world.shell);
@@ -86,7 +79,6 @@ export function registerDomain(program: Command, world: CliWorld): void {
 }
 // ─── END DOMAIN WIRING ────────────────────────────────────────────────────────────────────────
 
-/** Composition root: build the program, wire the domain, run it, and release resources. */
 async function execute(argv: string[]): Promise<void> {
   const program = createProgram();
   const bootstrapIo = new ConsoleIo();

@@ -5,7 +5,6 @@ import type { ICliIo } from '../../terminal/console-io';
 import type { IPrompt } from '../../terminal/prompt';
 import { EXIT_ERROR, EXIT_OK } from '../../cli/exit-codes';
 
-/** `get <namespace> [key]` — prompts for a missing key on a TTY, fails fast in CI so it never hangs. */
 export class GetController {
   constructor(
     private readonly kv: KvService,

@@ -1,6 +1,5 @@
 import cliProgress, { type SingleBar } from 'cli-progress';
 
-/** Scaffold-owned progress port — structurally matches any domain progress reporter the glue bridges. */
 export interface IProgressBar {
   start(total: number): void;
   tick(): void;

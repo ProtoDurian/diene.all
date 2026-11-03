@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Cross-compile the standalone CLI (entry from package.json .bin) for every supported target.
 ./scripts/local/setup.sh
 
 ENTRY="$(jq -r '.bin | to_entries[0].value' package.json)"
 [ -z "${ENTRY}" ] && echo "❌ no .bin entry in package.json" >&2 && exit 1
 [ "${ENTRY}" = "null" ] && echo "❌ no .bin entry in package.json" >&2 && exit 1
 
-# Artifact prefix is the .bin key (the CLI's own name) — never hardcode the sample name.
 PREFIX="$(jq -r '.bin | to_entries[0].key' package.json)"
 [ -z "${PREFIX}" ] && echo "❌ no .bin entry in package.json" >&2 && exit 1
 [ "${PREFIX}" = "null" ] && echo "❌ no .bin entry in package.json" >&2 && exit 1

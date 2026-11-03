@@ -6,7 +6,6 @@ import type { ICliIo } from '../../terminal/console-io';
 import { EXIT_ERROR, EXIT_OK } from '../../cli/exit-codes';
 import { CountSchema, MAX_SEED_COUNT } from './validator';
 
-/** `seed <namespace> <count>` — validates the req and routes to KvService.seed. */
 export class SeedController {
   constructor(
     private readonly kv: KvService,
