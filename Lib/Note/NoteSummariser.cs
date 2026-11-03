@@ -1,6 +1,5 @@
 namespace AtomiCloud.DotnetBase.Lib.Note;
 
-/// <summary>Pure, deterministic note preview formatter.</summary>
 public class NoteSummariser : INoteSummariser
 {
     private const string Ellipsis = "…";

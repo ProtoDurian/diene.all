@@ -2,9 +2,6 @@ version: '3'
 
 includes:
   docker: tasks/Taskfile.docker.yaml
-
-  # ### dotnet-base-test-includes
-  # #### source: dotnet-base
   test:unit:
     taskfile: tasks/Taskfile.test.yaml
     vars:
@@ -24,14 +21,6 @@ tasks:
     desc: Run all repository gates
     cmds:
       - pre-commit run --all-files
-
-  skills:sync:
-    desc: Verify the repository's explicit no-runtime skills contract
-    cmds:
-      - skills-sync sync
-
-  # ### dotnet-base-tasks
-  # #### source: dotnet-base
   clean:
     desc: Remove .NET build and test artifacts
     cmds:
@@ -73,6 +62,11 @@ tasks:
     desc: Emit the non-blocking LLM dead-code review
     cmds:
       - ./scripts/local/dotnet-dead-code.sh --llm
+
+  deadcode:strict:
+    desc: Run both blocking dead-code passes
+    cmds:
+      - ./scripts/local/dotnet-dead-code.sh --strict
 
   test:
     desc: Run unit and integration tests

@@ -4,9 +4,6 @@ set -euo pipefail
 kind="${1:-}"
 mode="${2:-normal}"
 
-# This is the ONE place the tier list lives. scripts/ci/test.sh used to keep a
-# second copy; it passes the mode straight through now, so the refusal has to name
-# the value it rejected or a caller two scripts up cannot tell what it sent.
 [ "${kind}" != "unit" ] && [ "${kind}" != "int" ] && echo "❌ test tier '${kind}' is not one of unit|int (usage: dotnet-test.sh <unit|int> [--watch|--coverage])" >&2 && exit 1
 [ "${mode}" != "normal" ] && [ "${mode}" != "--watch" ] && [ "${mode}" != "--coverage" ] && echo "❌ Unknown mode '${mode}'" >&2 && exit 1
 
@@ -62,10 +59,7 @@ mkdir -p "${coverage}"
 accumulator="${coverage}/coverage.json"
 last_index=$((${#projects[@]} - 1))
 
-# Build every registered project before measuring. Coverlet instruments assemblies after
-# the build that `dotnet test` performs implicitly; on a clean tree that ordering can hand
-# the test host an uninstrumented copy and report a fully exercised assembly as 0 covered
-# lines. Building first makes the instrumented output deterministic.
+# Build first: the implicit `dotnet test` build can hand Coverlet an uninstrumented copy.
 for project_rel in "${projects[@]}"; do
   echo "🏗️ Building ${kind} coverage project: ${project_rel}"
   dotnet build "${root}/${project_rel}" -c Release

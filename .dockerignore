@@ -1,29 +1,24 @@
-### workspace-build
-#### source: workspace
-.git
-.gitignore
-.direnv
-.env
-.env.*
-*.log
+### dotnet-base
+**/bin
+**/obj
+TestResults
 
-### workspace-docs
-#### source: workspace
+### nix
+result
+result-*
+
+### non-runtime
+*.md
 .claude
 .dockerignore
 .github
 docs
 probes
-*.md
-!README.md
 
-### workspace-output
-#### source: workspace
-result
-result-*
-
-### dotnet-base-output
-#### source: dotnet-base
-**/bin
-**/obj
-TestResults
+### vcs-env
+.direnv
+.env
+.env.*
+.git
+.gitignore
+*.log
