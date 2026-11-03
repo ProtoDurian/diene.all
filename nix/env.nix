@@ -18,7 +18,6 @@ with packages;
     treefmt
   ];
 
-  # releaser: setup.sh runs `releaser conventions`; the probes run setup in .#ci
   main = [
     bun
     cyanprint

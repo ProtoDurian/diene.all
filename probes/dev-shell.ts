@@ -23,7 +23,7 @@ const definition: ProbeDefinition = {
       timeoutMs: 240000,
       async run(repo) {
         const result = await repo.exec(
-          'nix develop --no-write-lock-file .#ci -c true && nix develop --no-write-lock-file .#cd -c true && nix develop --no-write-lock-file .#releaser -c true',
+          'nix develop --no-write-lock-file .#ci -c releaser --version && nix develop --no-write-lock-file .#cd -c true && nix develop --no-write-lock-file .#releaser -c true',
           { timeoutMs: 240000 },
         );
         if (result.exitCode !== 0) {
