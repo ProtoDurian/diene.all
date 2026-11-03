@@ -20,7 +20,7 @@ rules remain in `docs/standards/`.
   `task test:int:coverage` write scoped LCOV artifacts.
 - `task test:watch` watches the unit tier.
 - `task build` bundles `src/index.ts` to `dist/index.js`.
-- `task deadcode` runs both Knip passes.
+- `task deadcode` runs the two non-blocking LLM Knip views.
 - `task run -- <args>` executes the source entry point.
 - `task preview -- <args>` rebuilds and executes the bundled artifact.
 - `task docker:build` and `task docker:run` build and run the Bun image.
@@ -33,9 +33,13 @@ dependency through Testcontainers.
 ## Quality gates
 
 Biome is lint-only; treefmt owns formatting. TypeScript uses strict no-emit
-typechecking. Knip uses one `knip.json` and runs twice as blocking hooks: the
-repository view includes tests, while `--production` starts at `src/index.ts`
-and catches files used only by tests.
+typechecking. Knip has four dead-code modes, none with ignore or exclude lists:
+
+- `knip.json`: blocking hook over source and tests, so dead test code fails too.
+- `knip.production.json`: blocking `--production` hook from `src/index.ts`
+  that ignores test usage, so a file only tests use fails.
+- `knip.llm.json`: non-blocking repository review for LLMs.
+- `knip.production.llm.json`: non-blocking production review for LLMs.
 
 ## Test and coverage tiers
 

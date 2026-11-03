@@ -114,8 +114,8 @@ pre-commit-lib.run {
     a-deadcode-production = {
       enable = true;
       name = "Knip production dead code";
-      entry = "./node_modules/.bin/knip --production --include files";
-      files = "(^package\\.json$|^tsconfig\\.json$|^knip\\.json$|\\.(ts|tsx)$)";
+      entry = "./node_modules/.bin/knip --config knip.production.json --production";
+      files = "(^package\\.json$|^tsconfig\\.json$|^knip\\.production\\.json$|\\.(ts|tsx)$)";
       pass_filenames = false;
       language = "system";
     };
