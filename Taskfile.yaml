@@ -64,6 +64,11 @@ tasks:
     cmds:
       - ./scripts/local/dotnet-dead-code.sh --llm
 
+  deadcode:strict:
+    desc: Run both blocking dead-code passes
+    cmds:
+      - ./scripts/local/dotnet-dead-code.sh --strict
+
   test:
     desc: Run unit and integration tests
     cmds:

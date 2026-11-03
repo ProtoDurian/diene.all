@@ -25,7 +25,8 @@ shared workspace, standards, Docker, Helm, secret, and release surfaces.
 | `task test:unit:coverage`          | Enforce the merged unit coverage ledger.                       |
 | `task test:int:coverage`           | Enforce the merged integration coverage ledger.                |
 | `task test:unit:watch`             | Watch the fast unit tier.                                      |
-| `task deadcode`                    | Emit the broad, non-blocking LLM review.                       |
+| `task deadcode`                    | Emit both broad, non-blocking LLM reviews.                     |
+| `task deadcode:strict`             | Run both blocking dead-code passes, as CI does.                |
 | `task lint`                        | Run every generated pre-commit hook.                           |
 
 ## Projects and coverage
@@ -51,10 +52,12 @@ dead-code project discovery follow the naming convention automatically.
 
 dn-inspect has four dead-code modes, none with exclusion lists:
 
-- strict all projects: blocking CI pass over source and tests, so dead test code fails too.
-- strict production: blocking CI pass over `App*`/`Lib*` only, so code only tests use fails.
+- strict all projects (`--strict-all`): blocking pass over source and tests, so dead test code fails too.
+- strict production (`--strict-production`): blocking pass over `App*`/`Lib*` only, so code only tests use fails.
 - LLM all projects: `task deadcode`, broad filter, non-blocking.
 - LLM production: `task deadcode`, broad filter, non-blocking.
+
+CI and `task deadcode:strict` run both strict passes; `task deadcode` runs both LLM views.
 
 The SDK is pinned by `global.json`; packages use Central Package Management.
 `NuGetAuditMode=all`, analyzers, deterministic builds, and warnings-as-errors are
