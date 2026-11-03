@@ -251,11 +251,6 @@
   },
   {
     "template": "diene/dotnet-base",
-    "name": "dotnet-codecov-config",
-    "class": "presence"
-  },
-  {
-    "template": "diene/dotnet-base",
     "name": "dotnet-binary-smoke",
     "class": "smoke"
   }

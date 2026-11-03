@@ -28,7 +28,7 @@ export default {
     },
     {
       name: 'mutation-dotnet-multi-project-coverage-caught',
-      description: 'An uncovered Lib2 member is caught without filter, Codecov, or CI surgery.',
+      description: 'An uncovered Lib2 member is caught without filter or CI surgery.',
       kind: 'mutation',
       expectedImpact: [
         'dotnet-coverage-artifact-scope',

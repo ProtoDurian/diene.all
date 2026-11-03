@@ -44,9 +44,8 @@ escapes the tier ledger, and re-checks the tier minimum against every package's 
 `line-rate` rather than the merged total alone.
 
 Adding `Lib2` and `UnitTest2` requires one solution line per project and one YAML
-list entry for `UnitTest2`. Assembly filters, merged thresholds, Codecov globs,
-and production dead-code project discovery follow the naming convention
-automatically. Codecov remains informational.
+list entry for `UnitTest2`. Assembly filters, merged thresholds, and production
+dead-code project discovery follow the naming convention automatically.
 
 ## Dead code and supply chain
 
