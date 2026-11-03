@@ -6,12 +6,12 @@ git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch 
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ shared .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 
 topics='datetime|domain-driven-design|functional-practices|solid-principles|stateless-oop-di|testing|utilities|validation'
-config='package\.json|bun\.lock|tsconfig\.json|biome\.json|bunfig\.(unit|int)\.toml|knip(\.production)?(\.llm)?\.json|codecov\.yml'
+config='package\.json|bun\.lock|tsconfig\.json|biome\.json|bunfig\.(unit|int)\.toml|knip\.json'
 scripts='scripts/ci/(build|test)\.sh|scripts/local/(build|deadcode)\.sh|scripts/release/bump\.sh'
 probes='probes/bun-[a-z-]+\.ts|probes/lib/(bun-command|lcov)\.ts'
 added_pattern="^((${config})|src/.+\.ts|tests/.+\.(ts|toml)|tasks/Taskfile\.test\.yaml|${scripts}|${probes}|\.github/workflows/⚡reusable-(build|test)\.yaml|docs/developer/bun-baseline\.md|docs/standards/(${topics})/languages/typescript\.md|\.github/named-checks/bun-base/[^/]+)$"
-insert_only_pattern='^(\.dockerignore|\.gitignore|\.github/workflows/ci\.yaml|CLAUDE\.md|README\.md|Taskfile\.yaml|nix/env\.nix|nix/packages\.nix|probes/features\.json|scripts/local/setup\.sh)$'
-declare -A rewrite_max=(['infra/Dockerfile']=11 ['nix/pre-commit.nix']=1 ['release.yaml']=3)
+insert_only_pattern='^(\.claude/skills/testing/SKILL\.md|\.dockerignore|\.gitignore|\.github/workflows/ci\.yaml|CLAUDE\.md|README\.md|Taskfile\.yaml|nix/env\.nix|nix/packages\.nix|nix/pre-commit\.nix|probes/features\.json|scripts/ci/pre-commit\.sh|scripts/local/setup\.sh)$'
+declare -A rewrite_max=(['infra/Dockerfile']=11 ['release.yaml']=3)
 
 # index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"

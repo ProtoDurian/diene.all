@@ -6,68 +6,10 @@
   env,
 }:
 let
-  bun-tooling = pkgs.stdenvNoCC.mkDerivation {
-    pname = "bun-base-pre-commit-tooling";
-    version = "1";
-    src = builtins.path {
-      path = ../.;
-      name = "bun-base-pre-commit-tooling-source";
-      filter =
-        path: type:
-        type == "directory"
-        || builtins.elem (baseNameOf path) [
-          "bun.lock"
-          "package.json"
-        ];
-    };
-    nativeBuildInputs = [
-      packages.bun
-      pkgs.cacert
-    ];
-    dontConfigure = true;
-    buildPhase = ''
-      runHook preBuild
-      export HOME="$TMPDIR"
-      export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
-      bun install --frozen-lockfile --no-progress --backend=copyfile --cpu='*' --os='*'
-      runHook postBuild
-    '';
-    installPhase = ''
-      runHook preInstall
-      mkdir -p "$out"
-      cp -R node_modules "$out/node_modules"
-      runHook postInstall
-    '';
-    dontFixup = true;
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
-    outputHash = "sha256-6uHtrwoZSi6boa2dEQwZ/j9Avvr4U1k8pWj7IbckAmE=";
-  };
-  bun-tool = name: "${packages.bun}/bin/bun ${bun-tooling}/node_modules/.bin/${name}";
-  biome-platform =
-    if pkgs.stdenv.hostPlatform.isLinux then
-      "linux-${if pkgs.stdenv.hostPlatform.isAarch64 then "arm64" else "x64"}-musl"
-    else
-      "darwin-${if pkgs.stdenv.hostPlatform.isAarch64 then "arm64" else "x64"}";
-  biome-tool = "${bun-tooling}/node_modules/@biomejs/cli-${biome-platform}/biome";
-  # tsc needs ./node_modules; a tree without setup (CI pre-commit) borrows the pinned tooling.
-  typecheck-tool = pkgs.writeShellScript "bun-base-typecheck" ''
-    set -euo pipefail
-    if [ ! -e node_modules ]; then
-      ln -s ${bun-tooling}/node_modules node_modules
-      trap 'rm -f node_modules' EXIT
-    fi
-    ${bun-tool "tsc"} --noEmit
-  '';
-  pre-commit-source = pkgs.runCommand "bun-base-pre-commit-source" { } ''
-    mkdir -p "$out"
-    cp -R ${../.}/. "$out/"
-    ln -s ${bun-tooling}/node_modules "$out/node_modules"
-  '';
   envPath = pkgs.lib.makeBinPath (env.system ++ env.main ++ env.lint ++ env.dev);
 in
 pre-commit-lib.run {
-  src = pre-commit-source;
+  src = ../.;
 
   # hooks
   hooks = {
@@ -154,7 +96,7 @@ pre-commit-lib.run {
     a-biome = {
       enable = true;
       name = "Biome lint";
-      entry = "${biome-tool} lint --no-errors-on-unmatched";
+      entry = "./node_modules/.bin/biome lint --no-errors-on-unmatched";
       files = "(^biome\\.json$|\\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$)";
       pass_filenames = true;
       language = "system";
@@ -163,7 +105,7 @@ pre-commit-lib.run {
     a-deadcode = {
       enable = true;
       name = "Knip repository dead code";
-      entry = "${bun-tool "knip"} --config knip.json";
+      entry = "./node_modules/.bin/knip";
       files = "(^package\\.json$|^tsconfig\\.json$|^knip\\.json$|\\.(ts|tsx)$)";
       pass_filenames = false;
       language = "system";
@@ -172,8 +114,8 @@ pre-commit-lib.run {
     a-deadcode-production = {
       enable = true;
       name = "Knip production dead code";
-      entry = "${bun-tool "knip"} --config knip.production.json";
-      files = "(^package\\.json$|^tsconfig\\.json$|^knip\\.production\\.json$|\\.(ts|tsx)$)";
+      entry = "./node_modules/.bin/knip --production --include files";
+      files = "(^package\\.json$|^tsconfig\\.json$|^knip\\.json$|\\.(ts|tsx)$)";
       pass_filenames = false;
       language = "system";
     };
@@ -181,7 +123,7 @@ pre-commit-lib.run {
     typecheck = {
       enable = true;
       name = "TypeScript typecheck";
-      entry = "${typecheck-tool}";
+      entry = "./node_modules/.bin/tsc --noEmit";
       files = "(^package\\.json$|^tsconfig\\.json$|\\.(ts|tsx|mts|cts)$)";
       pass_filenames = false;
       language = "system";

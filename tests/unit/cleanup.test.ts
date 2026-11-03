@@ -1,94 +1,120 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
-import { withCleanup } from '../../src/lib/cleanup';
+import 'should';
+import type { ILogger } from '../../src/lib/sample/interfaces';
+import { Cleanup } from '../../src/lib/sample/cleanup';
 
 const PRIMARY = new Error('the operation blew up');
 const SECONDARY = new Error('the disconnect blew up');
 
-describe('withCleanup', () => {
-  it('should return the operation result and run the cleanup', async () => {
-    const calls: string[] = [];
-    const expected = 'value';
+function recordingLogger(warnings: string[]): ILogger {
+  return {
+    info: () => undefined,
+    warn: fields => warnings.push(String(fields.reason)),
+    error: () => undefined,
+  };
+}
 
-    const actual = await withCleanup(
+describe('Cleanup', () => {
+  it('should return the operation result and run the cleanup', async () => {
+    // Arrange
+    const calls: string[] = [];
+    const subject = new Cleanup(recordingLogger(calls));
+
+    // Act
+    const actual = await subject.run(
       async () => {
         calls.push('operation');
-        return expected;
+        return 'value';
       },
       async () => {
         calls.push('cleanup');
       },
-      () => calls.push('reported'),
     );
 
-    should(actual).equal(expected);
-    should(calls).eql(['operation', 'cleanup']);
+    // Assert
+    actual.should.equal('value');
+    calls.should.deepEqual(['operation', 'cleanup']);
   });
 
   it('should surface a cleanup failure when the operation succeeded', async () => {
-    const reported: unknown[] = [];
+    // Arrange
+    const warnings: string[] = [];
+    const subject = new Cleanup(recordingLogger(warnings));
 
-    const actual = withCleanup(
+    // Act
+    const actual = subject.run(
       async () => 'value',
       async () => {
         throw SECONDARY;
       },
-      error => reported.push(error),
     );
 
-    await should(actual).be.rejectedWith(SECONDARY);
-    should(reported).eql([]);
+    // Assert
+    await actual.should.be.rejectedWith(SECONDARY);
+    warnings.should.deepEqual([]);
   });
 
   it('should rethrow the operation error after a successful cleanup', async () => {
+    // Arrange
     const calls: string[] = [];
+    const subject = new Cleanup(recordingLogger(calls));
 
-    const actual = withCleanup(
+    // Act
+    const actual = subject.run(
       async () => {
         throw PRIMARY;
       },
       async () => {
         calls.push('cleanup');
       },
-      () => calls.push('reported'),
     );
 
-    await should(actual).be.rejectedWith(PRIMARY);
-    should(calls).eql(['cleanup']);
+    // Assert
+    await actual.should.be.rejectedWith(PRIMARY);
+    calls.should.deepEqual(['cleanup']);
   });
 
-  it('should keep the operation error when the cleanup also fails', async () => {
-    const reported: unknown[] = [];
+  it('should keep the operation error and log the cleanup failure', async () => {
+    // Arrange
+    const warnings: string[] = [];
+    const subject = new Cleanup(recordingLogger(warnings));
 
-    const actual = withCleanup(
+    // Act
+    const actual = subject.run(
       async () => {
         throw PRIMARY;
       },
       async () => {
         throw SECONDARY;
       },
-      error => reported.push(error),
     );
 
-    await should(actual).be.rejectedWith(PRIMARY);
-    should(reported).eql([SECONDARY]);
+    // Assert
+    await actual.should.be.rejectedWith(PRIMARY);
+    warnings.should.deepEqual([String(SECONDARY)]);
   });
 
-  it('should keep the operation error when cleanup reporting also fails', async () => {
-    const reportingError = new Error('reporting blew up');
+  it('should keep the operation error when logging the cleanup failure also fails', async () => {
+    // Arrange
+    const subject = new Cleanup({
+      info: () => undefined,
+      warn: () => {
+        throw new Error('logging blew up');
+      },
+      error: () => undefined,
+    });
 
-    const actual = withCleanup(
+    // Act
+    const actual = subject.run(
       async () => {
         throw PRIMARY;
       },
       async () => {
         throw SECONDARY;
       },
-      () => {
-        throw reportingError;
-      },
     );
 
-    await should(actual).be.rejectedWith(PRIMARY);
+    // Assert
+    await actual.should.be.rejectedWith(PRIMARY);
   });
 });

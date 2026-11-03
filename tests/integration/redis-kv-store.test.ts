@@ -2,9 +2,10 @@ import { afterAll, beforeAll, describe, it } from 'bun:test';
 import type { TCPSocketListener } from 'bun';
 import should from 'should';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
-import type { IKeyValueStore } from '../../src/adapters/kv-store';
-import { createRedisStore, persistSample } from '../../src/index';
-import type { ILogger } from '../../src/lib/logger';
+import { RedisKeyValueStore } from '../../src/adapters/redis-kv-store';
+import type { ILogger } from '../../src/lib/sample/interfaces';
+import { KeyComposer } from '../../src/lib/sample/key';
+import { SampleService } from '../../src/lib/sample/service';
 
 interface RecordedLog {
   readonly fields: Record<string, unknown>;
@@ -40,9 +41,10 @@ function recordingLogger(): RecordingLogger {
 }
 
 describe('RedisKeyValueStore (Testcontainers)', () => {
-  let container: StartedTestContainer | undefined;
-  let subject: IKeyValueStore | undefined;
-  let observed: RecordingLogger | undefined;
+  let container: StartedTestContainer;
+  let store: RedisKeyValueStore;
+  let observed: RecordingLogger;
+  let subject: SampleService;
 
   beforeAll(async () => {
     container = await new GenericContainer('redis:7.4.5-alpine')
@@ -50,55 +52,57 @@ describe('RedisKeyValueStore (Testcontainers)', () => {
       .withWaitStrategy(Wait.forLogMessage(/Ready to accept connections/))
       .start();
     observed = recordingLogger();
-    subject = createRedisStore(
-      {
-        host: container.getHost(),
-        port: container.getMappedPort(6379),
-      },
-      observed.logger,
-    );
+    store = new RedisKeyValueStore({ host: container.getHost(), port: container.getMappedPort(6379) }, observed.logger);
+    subject = new SampleService(store, new KeyComposer('Bun Base'));
   }, 120_000);
 
   afterAll(async () => {
-    await subject?.close();
+    await store?.close();
     await container?.stop();
   }, 120_000);
 
   it('should persist and retrieve a namespaced value', async () => {
+    // Arrange
     const expected = 'hello';
 
-    const actual = await persistSample(subject as IKeyValueStore, 'Bun Base', 'sample key', expected);
+    // Act
+    const actual = await subject.roundTrip('sample key', expected);
 
-    should(actual).equal(expected);
+    // Assert
+    should(actual).not.be.null();
+    (actual as string).should.equal(expected);
   });
 
   it('should overwrite the value already stored under a key', async () => {
+    // Arrange
     const expected = 'second';
+    await subject.roundTrip('overwrite', 'first');
 
-    await persistSample(subject as IKeyValueStore, 'Bun Base', 'overwrite', 'first');
-    const actual = await persistSample(subject as IKeyValueStore, 'Bun Base', 'overwrite', expected);
+    // Act
+    const actual = await subject.roundTrip('overwrite', expected);
 
-    should(actual).equal(expected);
+    // Assert
+    should(actual).not.be.null();
+    (actual as string).should.equal(expected);
   });
 
   it('should return null for an unknown key', async () => {
-    const input = 'bun-base:missing';
+    // Act
+    const actual = await store.get('bun-base:missing');
 
-    const actual = await (subject as IKeyValueStore).get(input);
-
+    // Assert
     should(actual).be.null();
   });
 
   it('should log nothing while the connection is healthy', () => {
-    const actual = (observed as RecordingLogger).errors;
-
-    should(actual).eql([]);
+    // Assert
+    observed.errors.should.deepEqual([]);
   });
 });
 
 describe('RedisKeyValueStore against an endpoint that is not Redis', () => {
   let rogue: TCPSocketListener | undefined;
-  let subject: IKeyValueStore | undefined;
+  let subject: RedisKeyValueStore | undefined;
 
   afterAll(async () => {
     await subject?.close().catch(() => undefined);
@@ -106,6 +110,7 @@ describe('RedisKeyValueStore against an endpoint that is not Redis', () => {
   }, 30_000);
 
   it('should report the failure through the injected logger instead of the console', async () => {
+    // Arrange
     // Invalid RESP bytes hit the non-ECONNREFUSED branch deterministically.
     const observed = recordingLogger();
     const listener: TCPSocketListener = Bun.listen({
@@ -118,15 +123,16 @@ describe('RedisKeyValueStore against an endpoint that is not Redis', () => {
       },
     });
     rogue = listener;
-    subject = createRedisStore({ host: '127.0.0.1', port: listener.port }, observed.logger);
+    subject = new RedisKeyValueStore({ host: '127.0.0.1', port: listener.port }, observed.logger);
 
+    // Act
     const attempt = subject.get('bun-base:protocol').catch(() => null);
     const actual = await observed.firstError;
 
-    should(actual.message).equal('unexpected redis connection error');
-    should(actual.fields.host).equal('127.0.0.1');
-    should(actual.fields.port).equal(listener.port);
-    should(actual.fields.reason).be.a.String();
+    // Assert
+    actual.message.should.equal('unexpected redis connection error');
+    actual.fields.should.have.properties({ host: '127.0.0.1', port: listener.port });
+    actual.fields.should.have.property('reason').which.is.a.String();
     await attempt;
   }, 30_000);
 });

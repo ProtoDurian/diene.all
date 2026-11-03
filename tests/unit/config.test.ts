@@ -1,14 +1,10 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
-import { parseRedisEnvironment, type RedisConfigResult, type RedisEnvironment } from '../../src/lib/redis-config';
+import 'should';
+import { RedisConfigParser } from '../../src/lib/sample/config';
 
 const DEFAULT_PORT = 6379;
 
-function parse(input: RedisEnvironment): RedisConfigResult {
-  return parseRedisEnvironment(input);
-}
-
-describe('parseRedisEnvironment', () => {
+describe('RedisConfigParser', () => {
   it.each([
     { label: 'no variables at all', input: {} },
     { label: 'an empty host', input: { REDIS_HOST: '' } },
@@ -17,10 +13,14 @@ describe('parseRedisEnvironment', () => {
     { label: 'an explicitly undefined host', input: { REDIS_HOST: undefined } },
     { label: 'a port but no host', input: { REDIS_PORT: '6380' } },
   ])('should report no connection for $label', ({ input }) => {
-    const actual = parse(input);
+    // Arrange
+    const subject = new RedisConfigParser(input);
 
-    should(actual.ok).be.true();
-    should(actual.ok && actual.connection).be.undefined();
+    // Act
+    const actual = subject.parse();
+
+    // Assert
+    actual.should.deepEqual({ ok: true, connection: undefined });
   });
 
   it.each([
@@ -31,18 +31,26 @@ describe('parseRedisEnvironment', () => {
     { label: 'the lowest port', input: { REDIS_HOST: 'cache', REDIS_PORT: '1' }, expected: 1 },
     { label: 'the highest port', input: { REDIS_HOST: 'cache', REDIS_PORT: '65535' }, expected: 65535 },
   ])('should resolve $label to port $expected', ({ input, expected }) => {
-    const actual = parse(input);
+    // Arrange
+    const subject = new RedisConfigParser(input);
 
-    should(actual.ok && actual.connection).eql({ host: 'cache', port: expected });
+    // Act
+    const actual = subject.parse();
+
+    // Assert
+    actual.should.deepEqual({ ok: true, connection: { host: 'cache', port: expected } });
   });
 
   it('should trim surrounding whitespace from the host', () => {
-    const input = { REDIS_HOST: '  cache  ' };
-    const expected = { host: 'cache', port: DEFAULT_PORT };
+    // Arrange
+    const subject = new RedisConfigParser({ REDIS_HOST: '  cache  ' });
+    const expected = { ok: true, connection: { host: 'cache', port: DEFAULT_PORT } };
 
-    const actual = parse(input);
+    // Act
+    const actual = subject.parse();
 
-    should(actual.ok && actual.connection).eql(expected);
+    // Assert
+    actual.should.deepEqual(expected);
   });
 
   it.each([
@@ -51,18 +59,15 @@ describe('parseRedisEnvironment', () => {
     { input: { REDIS_PORT: '-1' }, expected: 'REDIS_PORT must be a whole number, for example 6379' },
     { input: { REDIS_PORT: '0' }, expected: 'REDIS_PORT must be between 1 and 65535' },
     { input: { REDIS_PORT: '65536' }, expected: 'REDIS_PORT must be between 1 and 65535' },
+    { input: { REDIS_HOST: 'cache', REDIS_PORT: '0' }, expected: 'REDIS_PORT must be between 1 and 65535' },
   ])('should reject REDIS_PORT "$input.REDIS_PORT" with a named issue', ({ input, expected }) => {
-    const actual = parse(input);
+    // Arrange
+    const subject = new RedisConfigParser(input);
 
-    should(actual.ok).be.false();
-    should(!actual.ok && actual.issues).eql([expected]);
-  });
+    // Act
+    const actual = subject.parse();
 
-  it('should reject an invalid port even when a valid host is present', () => {
-    const input = { REDIS_HOST: 'cache', REDIS_PORT: 'not-a-port' };
-
-    const actual = parse(input);
-
-    should(actual.ok).be.false();
+    // Assert
+    actual.should.deepEqual({ ok: false, issues: [expected] });
   });
 });
