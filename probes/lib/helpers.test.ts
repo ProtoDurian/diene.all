@@ -3,17 +3,14 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { devShellCommand } from './exec';
-import { capturedEnvCommand, DEV_SHELL_CHAIN, expectDevShellsOnce, expectRedBecause } from './helpers';
+import { capturedEnvCommand, expectRedBecause } from './helpers';
 
 const ENV_DIR = '/captures';
 
-// The four-shell chain dev-shell.ts asserts, verbatim.
 const CHAINED =
   'nix develop --no-write-lock-file .#default -c true && nix develop --no-write-lock-file .#ci -c true && ' +
   'nix develop --no-write-lock-file .#cd -c true && nix develop --no-write-lock-file .#releaser -c true';
 
-// A real corpus command whose payload is a single-quoted bash script containing its own
-// escaped single quotes — the shape the rewrite is most likely to corrupt.
 const EMBEDDED_QUOTES =
   `nix develop .#ci -c bash -c 'set -euo pipefail; first="$(mktemp -d)"; ` +
   `trap "rm -rf \\"$first\\"" EXIT; test "$(cat skill)" = '"'"'committed skill'"'"''`;
@@ -95,34 +92,6 @@ describe('captured-env rewrite — flag on', () => {
   });
 });
 
-describe('duplicate dev-shell proof', () => {
-  test('one real shell chain proves both duplicate feature arms in one sandbox phase', async () => {
-    const commands: string[] = [];
-    const outcomes = [{ exitCode: 1 }, { exitCode: 0 }, { exitCode: 0 }, { exitCode: 0 }];
-    const repo = {
-      exec: async (command: string) => {
-        commands.push(command);
-        return outcomes.shift() ?? { exitCode: 1 };
-      },
-    };
-
-    await expectDevShellsOnce(repo);
-    await expectDevShellsOnce(repo);
-
-    expect(DEV_SHELL_CHAIN).toBe(CHAINED);
-    expect(commands.filter(command => command === DEV_SHELL_CHAIN)).toHaveLength(1);
-    expect(commands).toEqual([
-      '[ -f .git/cyanprint-probe-dev-shell-checked ]',
-      DEV_SHELL_CHAIN,
-      ': > .git/cyanprint-probe-dev-shell-checked',
-      '[ -f .git/cyanprint-probe-dev-shell-checked ]',
-    ]);
-  });
-});
-
-// The byte assertions above cannot show that the rewritten string still *runs* the same
-// argv. These do, against a hand-written capture, with no nix anywhere: `sh -c` is exactly
-// how cyanprint's probe sandbox executes a probe command (packages/core/src/probe/spawn.ts).
 describe('captured-env rewrite — the rewritten command actually runs', () => {
   const dir = mkdtempSync(join(tmpdir(), 'captured-env-test-'));
   writeFileSync(join(dir, 'ci.sh'), 'export PROBE_TEST_MARKER=from-capture\n');
@@ -171,8 +140,6 @@ describe('captured-env rewrite — the rewritten command actually runs', () => {
 
 type Recorded = { command: string; options?: { timeoutMs?: number } };
 
-// None of these commands contain a `nix develop .#<shell> -c ` entry, so the captured-env
-// rewrite is a no-op on them whatever PROBE_CAPTURED_ENV holds.
 function fakeRepo(result: { exitCode: number; stdout?: string; stderr?: string }) {
   const calls: Recorded[] = [];
   return {
@@ -184,7 +151,6 @@ function fakeRepo(result: { exitCode: number; stdout?: string; stderr?: string }
   };
 }
 
-// Assert-the-asserter: every arm is driven on a known-bad case as well as a known-good one.
 describe('expectRedBecause', () => {
   test('accepts a red whose output names every declared reason', async () => {
     const repo = fakeRepo({ exitCode: 1, stdout: 'error TS2322: Type mismatch\n' });

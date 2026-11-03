@@ -1,6 +1,6 @@
-# diene-go-base
+# diene-workspace
 
-Minimal Helm surface for the Diene Go language base
+Minimal workspace baseline chart
 
 Chart metadata (version, type, appVersion) is defined in
 [`Chart.yaml`](Chart.yaml). Configurable values and their defaults are defined in

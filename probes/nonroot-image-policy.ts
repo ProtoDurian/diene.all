@@ -1,4 +1,4 @@
-import { expectGreen, expectRedWithDiagnostic } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic } from './lib/go.ts';
 
 export default {
   contractVersion: 1,

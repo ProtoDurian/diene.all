@@ -11,6 +11,7 @@ import (
 )
 
 func TestCompiledArtifactRedisJourney(t *testing.T) {
+	// Arrange
 	ctx := context.Background()
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
@@ -33,8 +34,11 @@ func TestCompiledArtifactRedisJourney(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve Redis endpoint: %v", err)
 	}
+
+	// Act
 	// #nosec G204 -- the executable is fixed; only the isolated testcontainer endpoint is dynamic.
 	output, err := exec.CommandContext(ctx, "../../../dist/go-base", "note", endpoint, "Sample Journey", "connected").CombinedOutput()
+	// Assert
 	if err != nil {
 		t.Fatalf("run compiled artifact: %v\n%s", err, output)
 	}

@@ -1,5 +1,5 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
-import { plantProductionOnlySymbol } from './lib/go.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic, plantProductionOnlySymbol } from './lib/go.ts';
 
 // The production deadcode component, invoked directly rather than through the composite dispatcher.
 const gate = 'nix develop .#ci -c ./scripts/local/deadcode-production.sh';

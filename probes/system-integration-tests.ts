@@ -1,4 +1,4 @@
-import { expectGreen } from './lib/helpers.ts';
+import { expectGreen } from './lib/go.ts';
 
 // The CI system-integration lane is self-contained: it sets the repository up and runs the compiled artifact against a real Redis.
 const gate = 'nix develop .#ci -c ./scripts/ci/sit.sh';

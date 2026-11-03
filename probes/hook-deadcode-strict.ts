@@ -1,5 +1,5 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
-import { plantProductionOnlySymbol } from './lib/go.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic, plantProductionOnlySymbol } from './lib/go.ts';
 
 // The blocking hook is its own enforcement mechanism: registration, runtime and sequencing are only proven here.
 const gate = 'nix develop .#ci -c pre-commit run a-deadcode --all-files';

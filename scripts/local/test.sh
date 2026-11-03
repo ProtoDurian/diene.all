@@ -13,12 +13,12 @@ packages="$(yq -r ".tiers.${mode}.packages" .config/go-base.coverage.yaml)"
 [ "${watch}" = "true" ] && exec gotestsum --watch -- "${tests}"
 
 # Resolve -coverpkg only for coverage runs so plain tests leave no empty coverage output.
-[ "${coverage}" = "true" ] && mkdir -p coverage
+[ "${coverage}" = "true" ] && mkdir -p "coverage/${mode}"
 cover_packages="$([ "${coverage}" = "true" ] && go list "${packages}" | paste -sd, - || echo "")"
 coverage_args=()
-[ "${coverage}" = "true" ] && coverage_args=(-covermode=atomic -coverpkg="${cover_packages}" -coverprofile="coverage/${mode}.out")
+[ "${coverage}" = "true" ] && coverage_args=(-covermode=atomic -coverpkg="${cover_packages}" -coverprofile="coverage/${mode}/coverage.out")
 
 gotestsum --format pkgname -- -count=1 "${coverage_args[@]}" "${tests}"
-[ "${coverage}" = "true" ] && ./scripts/validate/go-coverage.sh "${mode}" "coverage/${mode}.out"
+[ "${coverage}" = "true" ] && ./scripts/validate/go-coverage.sh "${mode}" "coverage/${mode}/coverage.out"
 
 echo "✅ Go ${mode} tests passed"

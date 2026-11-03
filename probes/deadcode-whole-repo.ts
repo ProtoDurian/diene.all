@@ -1,5 +1,5 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
-import { plantGoFile } from './lib/go.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic, plantGoFile } from './lib/go.ts';
 
 // The whole-repository deadcode component, invoked directly rather than through the composite dispatcher.
 const gate = 'nix develop .#ci -c ./scripts/local/deadcode-whole.sh';

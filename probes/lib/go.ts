@@ -1,5 +1,32 @@
 import type { ProbeRepo } from '@cyanprint/contracts';
-import { restoreProbeState } from './helpers.ts';
+import { capturedEnvCommand, restoreProbeState } from './helpers.ts';
+
+// Cold Go module and build caches run past the parent helpers' 240 s cap.
+const GO_TIMEOUT_MS = 600000;
+
+export async function expectGreen(repo: any, command: string, label: string, timeoutMs = GO_TIMEOUT_MS): Promise<void> {
+  const result = await repo.exec(capturedEnvCommand(command, label), { timeoutMs });
+  if (result.exitCode !== 0) {
+    throw new Error(`${label} failed on the healthy repo: ${result.stderr || result.stdout}`);
+  }
+}
+
+export async function expectRedWithDiagnostic(
+  repo: any,
+  command: string,
+  label: string,
+  expected: RegExp,
+  timeoutMs = GO_TIMEOUT_MS,
+): Promise<void> {
+  const result = await repo.exec(capturedEnvCommand(command, label), { timeoutMs });
+  if (result.exitCode === 0) {
+    throw new Error(`${label} stayed green after sabotage`);
+  }
+  const diagnostic = `${result.stdout}\n${result.stderr}`;
+  if (!expected.test(diagnostic)) {
+    throw new Error(`${label} failed for the wrong reason; expected ${expected}: ${diagnostic}`);
+  }
+}
 
 function directory(path: string): string {
   return path.slice(0, path.lastIndexOf('/'));

@@ -3,14 +3,19 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
-// Stage-2 claims that every command which enters a development shell now goes through
-// capturedEnvCommand. That claim is only worth anything if it cannot silently rot, so it
-// is asserted against the source rather than trusted: a new probe that calls repo.exec
-// with a `nix develop` command and forgets the wrapper fails here instead of quietly
-// paying the entry cost the pilot exists to remove.
 const probesDir = fileURLToPath(new URL('../', import.meta.url));
+// Main's probe files (rules/PROBES.md §5): never wrap their shell entries here.
+const INHERITED = new Set([
+  'binary-smoke.ts',
+  'dev-shell.ts',
+  'direnv.ts',
+  'precommit-treefmt-actionlint.ts',
+  'precommit-treefmt-nixfmt.ts',
+  'precommit-treefmt-prettier.ts',
+  'precommit-treefmt-shfmt.ts',
+]);
 const probeFiles = readdirSync(probesDir)
-  .filter(name => name.endsWith('.ts'))
+  .filter(name => name.endsWith('.ts') && !INHERITED.has(name))
   .sort();
 
 const CONST_WITH_ENTRY = /^const\s+([A-Za-z_$][\w$]*)\s*=\s*(['"`])([\s\S]*?)\2;/gm;
@@ -53,62 +58,19 @@ describe('captured-env coverage of direct repo.exec shell entries', () => {
     expect(unwrapped).toEqual([]);
   });
 
-  // The count is a tripwire, not a target: it exists so that ADDING a shell-entering
-  // call site is a decision somebody makes on purpose. It went 15 -> 16 when
-  // cache-tag-shape.ts gained a second direct site, then 16 -> 14 when that probe was
-  // deleted with the cache-policy gate it tested (owner ruling, 2026-08-05) — it had
-  // carried two of the sites. It is now 15 across 8 files: secret-guards.ts was deleted
-  // with the secrets fetch/scan actions it tested (-1), and hook-enforce-exec.ts and
-  // hook-shellcheck.ts each took a direct site so their mutation arms can assert the
-  // gate's refusal TEXT and not merely its exit code (+2). Move it only together with
-  // the sites that justify it.
-  //
-  // 15 -> 18 in the wave-5 cascade, and no call site was added: three of
-  // skills-sync.ts's own shell entries were entering the shell unwrapped while three
-  // siblings in the same file were wrapped. This test arrived from the parent, where
-  // skills-sync.ts has no such sites, so the merge is what first asserted the rule
-  // here — the sites predate it. Wrapping them is the fix the rule asks for; the count
-  // follows the sites, which is the direction this tripwire is meant to move in.
-  // 18 -> 19 on `go-base`, same shape and same reason as the 15 -> 18 above: no call
-  // site was added. `docker-build.ts` is a go-only probe the parent does not have, and
-  // its skopeo index inspection was entering `.#cd` unwrapped while the build command
-  // beside it went through expectGreen. The rule arrived with the merge, so the site
-  // predates the assertion that now covers it. Wrapping it is the fix the rule asks
-  // for, and the count follows the site.
-  //
-  // 19 -> 11 across 7 files when the old local skills synchronizer was replaced by
-  // the compact three-call-path registry probe and skills-freshness was retired:
-  // those two old probes carried eight of the nineteen direct shell-entry sites.
-  test('the wrapped set is the 11 known shell-entering call sites, across 7 files', () => {
+  // A tripwire: change this count only together with the call sites it counts.
+  test('the wrapped set is the 2 known shell-entering call sites, across 2 files', () => {
     const wrapped = allSites.filter(site => site.wrapped);
-    expect(wrapped).toHaveLength(11);
-    expect([...new Set(wrapped.map(site => site.file))].sort()).toEqual([
-      'docker-build.ts',
-      'hook-enforce-exec.ts',
-      'hook-shellcheck.ts',
-      'precommit-treefmt-actionlint.ts',
-      'precommit-treefmt-nixfmt.ts',
-      'precommit-treefmt-prettier.ts',
-      'precommit-treefmt-shfmt.ts',
-    ]);
+    expect(wrapped).toHaveLength(2);
+    expect([...new Set(wrapped.map(site => site.file))].sort()).toEqual(['hook-enforce-exec.ts', 'hook-shellcheck.ts']);
   });
 
-  // The exemption lives on the label, so it only holds while both features keep reaching
-  // helpers that pass one. dev-shell now uses the shared once-per-phase helper, while
-  // direnv retains its own labelled expectGreen call.
-  test('dev-shell and direnv still enter their shells through labelled helpers', () => {
-    const devShell = readFileSync(join(probesDir, 'dev-shell.ts'), 'utf8');
-    expect(devShell).toContain("import { expectDevShellsOnce } from './lib/helpers.ts'");
-    expect(devShell).not.toContain('capturedEnvCommand');
-    expect(devShell).toContain('await expectDevShellsOnce(repo);');
-
-    const direnv = readFileSync(join(probesDir, 'direnv.ts'), 'utf8');
-    expect(direnv).toContain("from './lib/helpers.ts'");
-    expect(direnv).not.toContain('capturedEnvCommand');
-    expect(direnv).toContain("'direnv',");
-
+  test('the inherited probe files stay parent-shaped and the dev-shell label stays exempt', () => {
+    expect(INHERITED.size).toBe(7);
+    for (const file of INHERITED) {
+      expect(readFileSync(join(probesDir, file), 'utf8')).not.toContain('./lib/');
+    }
     const helpers = readFileSync(join(probesDir, 'lib/helpers.ts'), 'utf8');
     expect(helpers).toContain("new Set(['dev-shell', 'direnv'])");
-    expect(helpers).toContain("await expectGreen(repo, DEV_SHELL_CHAIN, 'dev-shell');");
   });
 });
