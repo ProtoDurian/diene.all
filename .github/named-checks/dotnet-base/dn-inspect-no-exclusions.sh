@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# R12: dead-code inspection has no exclusion list anywhere in its surface. The
-# dead-code scripts never narrow dn-inspect (--include / --exclude), no ReSharper
-# settings or .editorconfig can switch an inspection off, and no source file
-# suppresses one.
-
 # index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"
 failed=0

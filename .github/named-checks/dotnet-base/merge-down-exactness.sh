@@ -1,17 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# After merge-down from shared, the diff from shared's .3 commit is the .NET
-# toolchain only (R2): new files on this node's paths, insertion-only
-# registrations in parent files, and three line-local rewrites (the dotnetlint
-# wrapper around the pre-commit run, the package-set union, the release prepare
-# hook). Nothing tracked by shared is deleted or renamed.
-
 parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ shared .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 
-# The C# variants of the shared standards this node owns.
 topics='datetime|domain-driven-design|functional-practices|solid-principles|stateless-oop-di|testing|utilities|validation'
 projects='(App|Lib|UnitTest|IntTest)[A-Za-z0-9]*/[^/]+\.(cs|csproj)|(App|Lib|UnitTest|IntTest)[A-Za-z0-9]*/.+/[^/]+\.cs'
 config='dotnet-base\.slnx|global\.json|Directory\.(Build|Packages)\.props|codecov\.yml|\.config/dotnet-(base\.test\.yaml|tools\.json)|nix/dotnet-deps\.json'
@@ -19,7 +12,6 @@ scripts='scripts/ci/(build|test|dead-code)\.sh|scripts/local/(build|dotnet-dead-
 probes='probes/(dotnet-[a-z-]+|hook-dotnetlint)\.ts|probes/lib/dotnet\.ts'
 docs="docs/developer/dotnet-baseline\\.md|docs/domain/note\\.md|docs/standards/authorization/index\\.md|docs/standards/(${topics})/languages/csharp\\.md"
 added_pattern="^((${projects})|(${config})|(${scripts})|(${probes})|(${docs})|tasks/Taskfile\\.test\\.yaml|\\.github/workflows/⚡reusable-(build|test|dead-code)\\.yaml|\\.claude/skills/(authorization|dotnet-base)/SKILL\\.md|\\.github/named-checks/dotnet-base/[^/]+)$"
-# Parent files that may only gain lines.
 insert_only_pattern='^(\.dockerignore|\.gitignore|\.github/dependabot\.yml|\.github/workflows/ci\.yaml|CLAUDE\.md|README\.md|Taskfile\.yaml|nix/env\.nix|probes/features\.json|scripts/local/setup\.sh)$'
 # Parent files with a line-local rewrite, and how many parent lines each may drop.
 declare -A rewrite_max=(['nix/packages.nix']=1 ['nix/pre-commit.nix']=1 ['release.yaml']=3)

@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# dotnet-base is cut from shared and replays its own .NET history: HEAD contains
-# shared's recorded .3 commit (parent.sha) and the replayed dotnet-base line
-# (replay.sha, the branch tip the go-live graph was seeded with).
-
 dir="$(dirname "$0")"
 parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "${dir}/parent.sha")}"
 replay_sha="${NAMED_CHECKS_REPLAY_SHA:-$(cat "${dir}/replay.sha")}"

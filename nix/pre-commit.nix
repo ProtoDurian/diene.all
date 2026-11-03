@@ -7,15 +7,12 @@
 }:
 let
   envPath = pkgs.lib.makeBinPath (env.system ++ env.main ++ env.lint ++ env.dev);
-  # ### dotnet-base-dotnetlint
-  # #### source: dotnet-base
   dotnetlint-project = pkgs.buildDotnetModule {
     pname = "dotnet-base-dependencies";
     version = "0";
     src = ../.;
     projectFile = "dotnet-base.slnx";
-    # Generated, never hand-authored: `nix build .#pre-commit.fetch-deps` (exposed at
-    # the bottom of this file) rewrites nix/dotnet-deps.json, the pinned NuGet closure.
+    # Never hand-edit: regenerate with the `fetch-deps` output at the bottom of this file.
     nugetDeps = ./dotnet-deps.json;
     dotnet-sdk = packages.dotnet-sdk_10;
   };
@@ -140,8 +137,6 @@ in
       language = "system";
     };
 
-    # ### dotnet-base-hooks
-    # #### source: dotnet-base
     dotnetlint = {
       enable = true;
       name = ".NET lint";

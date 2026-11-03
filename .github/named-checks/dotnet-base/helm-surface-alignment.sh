@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# dotnet-base mirrors bun-base's Helm surface exactly (goal axis H): the chart,
-# the helm tasks, script, reusable workflow, standard and skill are the same
-# bytes as bun-base's recorded .3 commit (bun-base.sha, a graph ancestor via the
-# bun-base -> dotnet-base edge), and so are the helm jobs and the dependabot helm
-# entry.
-
 bun_base_sha="${NAMED_CHECKS_BUN_BASE_SHA:-$(cat "$(dirname "$0")/bun-base.sha")}"
 git rev-parse --verify --quiet "${bun_base_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${bun_base_sha}" || true
 git rev-parse --verify --quiet "${bun_base_sha}^{commit}" >/dev/null || { echo "❌ bun-base .3 commit ${bun_base_sha} not found; fetch it first" >&2 && exit 1; }
@@ -32,7 +26,6 @@ for path in "${paths[@]}"; do
   fi
 done
 
-# yq expression for the comparable shape of one workflow/config fragment.
 compare() {
   local file="$1" expression="$2" ours theirs
   ours="$(git show "${tree}:${file}" | yq -o=json "${expression}")"

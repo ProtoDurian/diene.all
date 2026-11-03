@@ -1,8 +1,6 @@
 import { capturedEnvCommand } from './helpers.ts';
 
-// The parent helpers cap one run at 240 s. A .NET arm restores NuGet and builds cold,
-// which measures past that, so the .NET probes take these variants with a 600 s
-// default; the behaviour is otherwise the parent helpers' own.
+// A cold .NET restore and build runs past the parent helpers' 240 s cap.
 const DOTNET_TIMEOUT_MS = 600000;
 
 export async function expectGreen(
@@ -93,9 +91,7 @@ export async function addSecondUnitProject(repo: any, uncovered: boolean): Promi
   });
 }
 
-// Registers a fully covered project whose assembly name escapes the unit `Lib*` ledger and
-// widens the Coverlet include filter to admit it. Both merged packages sit at 100%, so the
-// merged line threshold still passes and only the Cobertura package-scope parse can fail.
+// Both packages stay at 100%, so only the Cobertura package-scope parse can fail.
 export async function addEscapingUnitProject(repo: any): Promise<void> {
   await repo.write(
     'Escape/Escape.csproj',

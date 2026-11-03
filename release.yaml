@@ -173,8 +173,7 @@ release:
       - released
   hooks:
     # A file a hook writes joins commit.assets in the same edit.
-    # dotnet-base versions `App/App.csproj`, which the command below stamps and
-    # `commit.assets` lists.
+    # bump.sh stamps `App/App.csproj`, so `commit.assets` lists it.
     prepare:
       - phase: afterWrite
         command: './scripts/release/bump.sh ${version}'

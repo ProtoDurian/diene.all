@@ -1,8 +1,7 @@
 import { defineSmoke } from './lib/definition.ts';
 import { expectGreen } from './lib/dotnet.ts';
 
-// The inherited workspace binary-smoke covers the parent inventory; this covers the
-// binaries this node adds. String.raw keeps the shell's backslashes; $var is shell.
+// String.raw keeps the shell's backslashes; $var is shell, not a template.
 const invocations = String.raw`
 set -euo pipefail
 tmp="$(mktemp -d)"

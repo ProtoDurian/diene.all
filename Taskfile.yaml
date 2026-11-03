@@ -3,8 +3,6 @@ version: '3'
 includes:
   docker: tasks/Taskfile.docker.yaml
   helm: tasks/Taskfile.helm.yaml
-  # ### dotnet-base-test-includes
-  # #### source: dotnet-base
   test:unit:
     taskfile: tasks/Taskfile.test.yaml
     vars:
@@ -24,8 +22,6 @@ tasks:
     desc: Run all repository gates
     cmds:
       - pre-commit run --all-files
-  # ### dotnet-base-tasks
-  # #### source: dotnet-base
   clean:
     desc: Remove .NET build and test artifacts
     cmds:

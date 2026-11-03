@@ -4,7 +4,6 @@ using StackExchange.Redis;
 
 namespace AtomiCloud.DotnetBase.App;
 
-/// <summary>Composition root: explicit wiring of domain interfaces to concrete adapters.</summary>
 public static class Program
 {
     public static async Task Main()
