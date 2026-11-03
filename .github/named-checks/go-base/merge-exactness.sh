@@ -13,8 +13,8 @@ docs="docs/developer/go-baseline\\.md|docs/standards/(${topics})/languages/go\\.
 added_pattern="^((${source})|(${scripts})|(${probes})|(${docs})|tasks/Taskfile\\.test\\.yaml|\\.github/workflows/⚡reusable-(build|dead-code|test|vuln)\\.yaml|\\.claude/skills/go-baseline/SKILL\\.md|\\.github/named-checks/go-base/[^/]+)$"
 insert_only_pattern='^(\.dockerignore|\.gitignore|\.github/dependabot\.yml|\.github/workflows/ci\.yaml|CLAUDE\.md|README\.md|Taskfile\.yaml|nix/(env|fmt|packages|pre-commit)\.nix|probes/features\.json|scripts/ci/pre-commit\.sh|scripts/local/setup\.sh)$'
 declare -A rewrite_max=()
-# Owner-signed whole-file exception: the Go runtime image replaces the parent's stub.
-whole_file='^infra/Dockerfile$'
+# Owner-signed whole-file exceptions (!A102): the Go runtime image, and the lock until workspace takes the newer registry.
+whole_file='^(infra/Dockerfile|flake\.lock)$'
 
 # index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"
@@ -52,6 +52,11 @@ while IFS=$'\t' read -r added deleted path; do
     failed=1
   fi
 done < <(git -c core.quotePath=false diff --no-renames --numstat "${parent_sha}" "${tree}")
+
+if ! diff <(git show "${parent_sha}:flake.lock" | jq -S 'del(.nodes.atomipkgs)') <(git show "${tree}:flake.lock" | jq -S 'del(.nodes.atomipkgs)') >/dev/null; then
+  echo "❌ flake.lock may differ from shared only in the atomipkgs node" >&2
+  failed=1
+fi
 
 if [[ ${failed} -ne 0 ]]; then
   exit 1
