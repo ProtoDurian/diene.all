@@ -12,7 +12,6 @@ probes='probes/[a-z-]+\.ts|probes/lib/go\.ts'
 docs="docs/developer/go-baseline\\.md|docs/standards/(${topics})/languages/go\\.md"
 added_pattern="^((${source})|(${scripts})|(${probes})|(${docs})|tasks/Taskfile\\.test\\.yaml|\\.github/workflows/⚡reusable-(build|dead-code|test|vuln)\\.yaml|\\.claude/skills/go-baseline/SKILL\\.md|\\.github/named-checks/go-base/[^/]+)$"
 insert_only_pattern='^(\.dockerignore|\.gitignore|\.github/dependabot\.yml|\.github/workflows/ci\.yaml|CLAUDE\.md|README\.md|Taskfile\.yaml|nix/(env|fmt|packages|pre-commit)\.nix|probes/features\.json|scripts/ci/pre-commit\.sh|scripts/local/setup\.sh)$'
-# Parent files with a line-local rewrite, and how many parent lines each may drop.
 declare -A rewrite_max=()
 # Owner-signed whole-file exception: the Go runtime image replaces the parent's stub.
 whole_file='^infra/Dockerfile$'

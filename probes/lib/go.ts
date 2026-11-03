@@ -60,7 +60,6 @@ export async function flipGoAssertion(repo: ProbeRepo): Promise<string> {
   throw new Error('no structural Go assertion target found');
 }
 
-// Return the untracked fixture path so the caller can clean it precisely.
 export async function plantWhiteBoxTest(repo: ProbeRepo): Promise<string> {
   const paths = (await repo.glob('tests/**/*_test.go')).sort();
   if (paths.length === 0) {
@@ -92,7 +91,6 @@ export async function breakAdapter(repo: ProbeRepo): Promise<string> {
   throw new Error('no structural adapter method target found');
 }
 
-// Resolve fallible metadata before writing, then return the exact fixture path.
 export async function plantGoFile(
   repo: ProbeRepo,
   glob: string,
@@ -106,7 +104,6 @@ export async function plantGoFile(
   return target;
 }
 
-// Return both halves of the test-only-reachability fixture for atomic cleanup.
 export async function plantProductionOnlySymbol(repo: ProbeRepo): Promise<string[]> {
   const tests = (await repo.glob('tests/unit/**/*_test.go')).sort();
   if (tests.length === 0) {
