@@ -7,10 +7,10 @@ cd "${root_dir}"
 echo "📦 Installing dependencies..."
 bun install --frozen-lockfile
 
-echo "📝 Repository dead-code review"
-./node_modules/.bin/knip --config knip.llm.json --no-exit-code
+echo "📝 Repository dead code"
+./node_modules/.bin/knip
 
-echo "📝 Production dead-code review"
-./node_modules/.bin/knip --config knip.production.llm.json --no-exit-code
+echo "📝 Production dead code"
+./node_modules/.bin/knip --production --include files
 
-echo "✅ Dead-code review complete"
+echo "✅ Dead-code check complete"

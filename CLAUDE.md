@@ -4,6 +4,13 @@
 tree writes it: the tool that does is consumed per-template from the Nix registry,
 and this tree declares no packages for it to vendor.
 
+# Bun and TypeScript
+
+Read [the Bun baseline](docs/developer/bun-baseline.md) before changing the Bun
+toolchain, task surface, test tiers, coverage ledgers, build, or illustrative
+sample. Follow the TypeScript variants linked from that baseline alongside the
+shared engineering standards.
+
 # CI/CD workflows
 
 See [docs/standards/ci-cd/index.md](docs/standards/ci-cd/index.md).
@@ -12,6 +19,52 @@ See [docs/standards/ci-cd/index.md](docs/standards/ci-cd/index.md).
 
 See [docs/standards/conventional-commits/index.md](docs/standards/conventional-commits/index.md).
 
+# CyanPrint-managed files
+
+`.cyan_state.yaml` records what CyanPrint manages here:
+
+- `files`: every path the last generation wrote.
+- `provenance`: per path, how it was merged: `source` (the winning template),
+  `decision` (`added`, `resolver-merged` or `lww-override`), `resolver` and
+  `contributors` (every template that supplied a version).
+
+Check a file there before you edit it:
+
+- **Not listed:** yours. Edit freely.
+- **Listed:** make the smallest line-level edit. No reformatting, reordering,
+  rewriting or renaming, so the next `cyanprint update` 3-way merge stays clean.
+- **More than one contributor:** merged from several templates. Change only your
+  own part.
+- Never hand-edit or delete `.cyan_state.yaml`.
+
+To pull template changes, use the `cyanprint-update` skill.
+
+# Development Environment
+
+All binaries, tools, and PATH are managed by **Nix**. Do not install tools manually or modify PATH outside of the nix configuration.
+
+## Prerequisites
+
+1. **Nix** — package manager ([install](https://nixos.org/download))
+2. **Docker** — container runtime ([install](https://docs.docker.com/get-docker))
+3. **direnv** — auto-loads the nix shell on `cd` ([install](https://direnv.net/docs/installation.html))
+
+## Getting Started
+
+```bash
+direnv allow    # first time only — loads the nix dev shell
+```
+
+## Nix Configuration
+
+See **[docs/standards/nix/index.md](docs/standards/nix/index.md)** for the full guide on:
+
+- File structure (`flake.nix`, `nix/`, `.envrc`)
+- Adding/removing packages
+- Environment groups and shells
+- Formatters and pre-commit hooks
+- Adding registries
+
 # Infisical and secrets
 
 See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).
@@ -19,12 +72,6 @@ See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).
 # Linting and pre-commit
 
 See [docs/standards/linting/index.md](docs/standards/linting/index.md).
-
-# Nix flakes and development shells
-
-Use the repository's Nix shell for every command. Read
-[docs/standards/nix/index.md](docs/standards/nix/index.md) before changing the
-flake or `nix/` modules.
 
 # Release automation
 
@@ -45,13 +92,3 @@ See [docs/standards/shell-scripts/index.md](docs/standards/shell-scripts/index.m
 # Taskfile conventions
 
 See [docs/standards/taskfile/index.md](docs/standards/taskfile/index.md).
-
-<!-- ### bun-base -->
-<!-- #### source: bun-base -->
-
-# Bun and TypeScript
-
-Read [the Bun baseline](docs/developer/bun-baseline.md) before changing the Bun
-toolchain, task surface, test tiers, coverage ledgers, build, or illustrative
-sample. Follow the TypeScript variants linked from that baseline alongside the
-shared engineering standards.
