@@ -31,12 +31,15 @@ public class RedisNoteRepository_RoundTrip : IAsyncLifetime
     [Fact]
     public async Task It_should_persist_a_note_and_read_the_same_value_back()
     {
+        // Arrange
         var subject = new RedisNoteRepository(_connection);
         var input = new NoteRecord { Title = "Round trip", Body = "stored in Redis" };
 
+        // Act
         var saved = await subject.Save(input, TestContext.Current.CancellationToken);
         var actual = await subject.Find(saved.Id, TestContext.Current.CancellationToken);
 
+        // Assert
         actual.Should().NotBeNull();
         actual!.Id.Should().Be(saved.Id);
         actual.Record.Should().Be(input);
@@ -45,20 +48,26 @@ public class RedisNoteRepository_RoundTrip : IAsyncLifetime
     [Fact]
     public async Task It_should_return_null_when_the_note_is_absent()
     {
+        // Arrange
         var subject = new RedisNoteRepository(_connection);
 
+        // Act
         var actual = await subject.Find("missing", TestContext.Current.CancellationToken);
 
+        // Assert
         actual.Should().BeNull();
     }
 
     [Fact]
     public async Task It_should_reject_blank_note_ids()
     {
+        // Arrange
         var subject = new RedisNoteRepository(_connection);
 
+        // Act
         var act = async () => await subject.Find(" ", TestContext.Current.CancellationToken);
 
+        // Assert
         await act.Should().ThrowAsync<ArgumentException>()
             .WithParameterName("id");
     }
