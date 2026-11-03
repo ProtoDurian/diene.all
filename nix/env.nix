@@ -5,15 +5,16 @@ with packages;
     git
     go-task
     infisical
-    sg
-    skopeo
+    releaser
   ];
 
   lint = [
     actionlint
+    dlint
     infralint
     pre-commit
     shellcheck
+    skills-sync
     treefmt
   ];
 
@@ -22,17 +23,17 @@ with packages;
     git
     go-task
     infisical
+    releaser
     shellcheck
-    skopeo
   ];
 
-  # sg is a temporary bootstrap, retained only until the releaser tool is published.
   releaser = [
-    sg
+    releaser
   ];
 
   system = [
     atomiutils
     infrautils
+    nix
   ];
 }

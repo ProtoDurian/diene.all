@@ -1,21 +1,31 @@
-.direnv/
+### helm
+infra/root_chart/uploads/
+
+### nix-init
+.direnv
 .pre-commit-config.yaml
 /result
 /result-*
 
-.env
-.env.*
-!.env.example
-.kagent/
-.kloop/
-*.log
-*.swo
-*.swp
-*~
-.DS_Store
+### os-editors
 ._*
+.DS_Store
 .idea/
 .vscode/
 Thumbs.db
 desktop.ini
-infra/root_chart/uploads/
+
+### secrets
+.env
+.env.*
+
+### secrets-keep
+!.env.example
+
+### tooling
+*.log
+*.swo
+*.swp
+*~
+.kagent/
+.kloop/

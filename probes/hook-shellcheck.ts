@@ -1,17 +1,18 @@
 import { capturedEnvCommand, expectGreen } from './lib/helpers.ts';
 
-// A script and the script it sources routinely land in different pre-commit batches,
-// so the gate is only honest if it follows declared sources. The fixture below is
-// healthy shell; it is checked WITHOUT its sourced sibling in the batch, which is what
-// deterministic pre-commit partitioning does in practice. Bare ShellCheck raises
-// SC1091 there, so this arm turns red the moment source following leaves the hook.
+// Each sourcing fixture is checked without the file it sources, as pre-commit batching does.
 const sourceFixtureDir = 'probe-shellcheck-source';
 const sourcedFixture = `${sourceFixtureDir}/init-state.sh`;
 const repoRelativeFixture = `${sourceFixtureDir}/mark-done.sh`;
 const scriptRelativeFixture = `${sourceFixtureDir}/next-file.sh`;
+const findingFixture = `${sourceFixtureDir}/unquoted-expansion.sh`;
+const findingBody = `#!/usr/bin/env bash
+set -euo pipefail
+
+echo $HOME/$UNQUOTED
+`;
 
 const sourcedBody = `#!/usr/bin/env bash
-# Sourced by the sibling fixtures; declares the state they read.
 set -euo pipefail
 
 STATE_VERSION=1
@@ -79,27 +80,27 @@ export default {
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        // The subject was `scripts/release/bump.sh` until the release bump machinery was
-        // deleted. Any tracked shell script proves the same thing - that the hook reads
-        // real repository shell and refuses incorrect shell - so this points at a script
-        // the workspace cannot lose: the freshness validator the skills gate calls.
-        const target = 'scripts/validate/skills-freshness.sh';
-        const source = await repo.read(target);
-        await repo.write(target, `${source}\necho $UNQUOTED\n`);
-        const result = await repo.exec(
-          capturedEnvCommand('nix develop .#ci -c pre-commit run a-shellcheck --all-files', 'hook-shellcheck'),
-          { timeoutMs: 240000 },
-        );
-        if (result.exitCode === 0) {
-          throw new Error('hook-shellcheck stayed green after sabotage');
-        }
-        // The exit code alone would also be satisfied by a hook that died for an
-        // unrelated reason, so the finding itself has to appear: SC2086 is ShellCheck's
-        // code for the unquoted expansion this arm plants.
-        if (!`${result.stdout}${result.stderr}`.includes('SC2086')) {
-          throw new Error(
-            `hook-shellcheck refused without reporting the unquoted expansion: ${result.stdout}${result.stderr}`,
+        await repo.write(findingFixture, findingBody);
+        try {
+          // --all-files reads only tracked files, so the fixture must be staged.
+          const staged = await repo.exec(`git add ${findingFixture}`);
+          if (staged.exitCode !== 0) {
+            throw new Error(`could not stage the shellcheck fixture: ${staged.stderr || staged.stdout}`);
+          }
+          const result = await repo.exec(
+            capturedEnvCommand('nix develop .#ci -c pre-commit run a-shellcheck --all-files', 'hook-shellcheck'),
+            { timeoutMs: 240000 },
           );
+          if (result.exitCode === 0) {
+            throw new Error('hook-shellcheck stayed green after sabotage');
+          }
+          if (!`${result.stdout}${result.stderr}`.includes('SC2086')) {
+            throw new Error(
+              `hook-shellcheck refused without reporting the unquoted expansion: ${result.stdout}${result.stderr}`,
+            );
+          }
+        } finally {
+          await removeSourceFixture(repo);
         }
       },
     },

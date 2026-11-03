@@ -1,16 +1,19 @@
-.git
-.gitignore
-.direnv
-.env
-.env.*
-*.log
+### nix
+result
+result-*
 
+### non-runtime
+*.md
 .claude
+.dockerignore
 .github
 docs
 probes
-*.md
-!README.md
 
-result
-result-*
+### vcs-env
+.direnv
+.env
+.env.*
+.git
+.gitignore
+*.log
