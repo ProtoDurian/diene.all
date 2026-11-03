@@ -1,6 +1,7 @@
 import { expectGreen, expectRed } from './lib/dotnet.ts';
 
-const gate = "nix develop .#ci -c sh -c 'dotnet restore dotnet-base.slnx >/dev/null && pre-commit run dotnetlint --all-files'";
+const gate =
+  "nix develop .#ci -c sh -c 'dotnet restore dotnet-base.slnx >/dev/null && pre-commit run dotnetlint --all-files'";
 
 export default {
   contractVersion: 1,
