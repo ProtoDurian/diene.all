@@ -24,11 +24,6 @@ H_PATHS=(
   probes/hook-helm-lint.ts
 )
 
-# --- flake.lock: atomipkgs bbf8c71 -> 116ef25 (the v5 tag) ---------------------
-# bun-base's lock predates the axis-pure slices the nix hunks below need. This
-# is workspace's lock byte for byte, so the hunk vanishes once bun-base takes it.
-FLAKE_LOCK_BLOB=cfe880eec0ff82bc14a380e0ef0aedb5c5e44dce
-
 parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ bun-base .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
@@ -93,7 +88,6 @@ drop_yaml_job() {
 }
 # drop_lines <first regex> <last regex>: that line range and the blank line after it.
 drop_lines() { awk -v a="$1" -v b="$2" 'skip == 0 && $0 ~ a { skip = 1 } skip == 1 { if ($0 ~ b) skip = 2; next } skip == 2 && $0 == "" { skip = 0; next } { if (skip == 2) skip = 0; print }' "$3" >"${3}.new" && mv "${3}.new" "$3"; }
-put_blob() { git -C "${root}" cat-file blob "$1" >"$2"; }
 
 apply_H() {
   rm_paths "${H_PATHS[@]}"
@@ -109,7 +103,7 @@ apply_H() {
   edit nix/pre-commit.nix drop_nix_block '    a-helm-lint = {'
   edit nix/pre-commit.nix sed_e '/"\^infra\/root_chart\/"/d'
   edit nix/fmt.nix sed_e '/"infra\/root_chart\/\*\*"/d'
-  edit .gitignore sed_z 's|\n### workspace \[helm\]\ninfra/root_chart/uploads/\n||'
+  edit .gitignore sed_z 's|\n### helm\ninfra/root_chart/uploads/\n||'
   edit docs/standards/taskfile/index.md sed_z 's#Docker and Helm tasks are keyed by the artifact they act on — one task set per\nDockerfile and per chart. See \[the Docker standard\](\.\./docker/index\.md) and\n\[the Helm standard\](\.\./helm/index\.md) for that naming convention\.#Docker tasks are keyed by the artifact they act on — one task set per Dockerfile.\nSee [the Docker standard](../docker/index.md) for that naming convention.#'
 
   # bun-base's H contributions
@@ -121,7 +115,6 @@ apply_H() {
   # helm, so they leave with the aggregate and their declared smokes go too.
   edit nix/packages.nix sed_e 's/^          infralint$/          # Axis-pure slices: the infralint\/infrautils aggregates ship helm, helm-docs and helmlint.\n          infralint-core\n          infralint-docker/;s/^          infrautils$/          infrautils-core\n          infrautils-docker/'
   edit nix/env.nix sed_e 's/^    infralint$/    infralint-core\n    infralint-docker/;s/^    infrautils$/    infrautils-core\n    infrautils-docker/'
-  edit flake.lock put_blob "${FLAKE_LOCK_BLOB}"
   edit dlint.yaml sed_e '/^      - k3d$/d;/^      - kubectl version --client$/d'
   edit probes/binary-smoke.ts drop_lines '^k3d version' '^printf .* kyverno jp query'
 }

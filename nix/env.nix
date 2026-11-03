@@ -6,8 +6,6 @@ with packages;
     go-task
     infisical
     releaser
-    # ### bun-cli-dev-release-tools
-    # #### source: bun-cli
     dpkg
     gh
     go
@@ -27,22 +25,17 @@ with packages;
   ];
 
   main = [
-    # ### bun-base-main
-    # #### source: bun-base
     bun
-    nodejs
-    # setup.sh runs `releaser conventions`; the probes run setup in .#ci
-    releaser
     cyanprint
     git
     go-task
     infisical
+    nodejs
+    releaser
     shellcheck
   ];
 
   releaser = [
-    # ### bun-cli-release-tools
-    # #### source: bun-cli
     dpkg
     gh
     git

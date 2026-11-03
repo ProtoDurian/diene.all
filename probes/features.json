@@ -41,11 +41,6 @@
   },
   {
     "template": "diene/workspace",
-    "name": "direnv",
-    "class": "smoke"
-  },
-  {
-    "template": "diene/workspace",
     "name": "fmt-actionlint",
     "class": "gate"
   },
@@ -223,11 +218,6 @@
     "template": "diene/bun-base",
     "name": "bun-preview",
     "class": "smoke"
-  },
-  {
-    "template": "diene/bun-base",
-    "name": "bun-codecov-config",
-    "class": "presence"
   },
   {
     "template": "diene/bun-cli",

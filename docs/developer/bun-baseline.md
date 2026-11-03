@@ -22,7 +22,7 @@ rules remain in `docs/standards/`.
 - `task test:watch` watches the unit tier.
 - `task build` bundles the `package.json` `bin` entry to `dist/bun-cli.js`.
 - `task compile` emits the three supported standalone binaries under `dist/bin/`.
-- `task deadcode` runs the two non-blocking LLM-review Knip configurations.
+- `task deadcode` runs the two non-blocking LLM Knip views.
 - `task run -- <args>` executes the source entry point.
 - `task preview -- <args>` compiles and executes this host's standalone binary.
 - `task up` and `task down` manage the sample Redis used for interactive CLI runs.
@@ -34,10 +34,13 @@ There is no `task dev` surface. Integration and SIT own isolated Redis container
 ## Quality gates
 
 Biome is lint-only; treefmt owns formatting. TypeScript uses strict no-emit
-typechecking. Knip runs twice as blocking hooks: the repository view includes
-tests, while the production view starts at `bin/bun-cli.ts` and catches files
-used only by tests. The LLM Knip variants are review-only and never suppress
-strict findings.
+typechecking. Knip has four dead-code modes, none with ignore or exclude lists:
+
+- `knip.json`: blocking hook over source and tests, so dead test code fails too.
+- `knip.production.json`: blocking `--production` hook from `bin/bun-cli.ts`
+  that ignores test usage, so a file only tests use fails.
+- `knip.llm.json`: non-blocking repository review for LLMs.
+- `knip.production.llm.json`: non-blocking production review for LLMs.
 
 ## Test and coverage tiers
 
@@ -48,10 +51,9 @@ strict findings.
   records the full-system `coverage/sit/lcov.info` ledger.
 - Both CI entry points require an LCOV artifact, reject paths outside their
   tier ledger, and require every ledger line to be hit.
-- Codecov is informational and uploads the independent `unit` and `int` flags
-  with carryforward enabled.
 
-Tests use `bun:test`, `describe`/`it`, AAA comments, and `should` assertions.
+Tests use `bun:test`, `describe`/`it`, `// Arrange` / `// Act` / `// Assert`
+blocks, and prototype `should` assertions.
 Container images are version-pinned without digests.
 
 ## Build and runtime
@@ -80,7 +82,6 @@ Read the TypeScript variants alongside their shared standards:
 
 ## External service / compute cost
 
-- Codecov upload runs only in CI and is best-effort.
 - Integration tests and Docker image builds require a Docker runtime.
 - Unit, integration, build, and Docker are separate CI jobs.
 

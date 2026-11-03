@@ -3,11 +3,8 @@ root = "tests/integration"
 coverageReporter = ["text", "lcov"]
 coverageDir = "coverage/int"
 coverageSkipTestFiles = true
-# Int ledger = the adapters tier only; the domain is the unit ledger, the glue is not an adapter, tests/** never counts.
-# The glue lives in bin/ on this node, not in a src/index.ts, so bin/** is what gets excluded here.
 coveragePathIgnorePatterns = ["bin/**", "src/lib/**", "tests/**"]
 
-# Real containers; the first run of a lane pulls the image.
 timeout = 120000
 
 # Imports every src/adapters module so an untested one is measured at 0% rather than absent.

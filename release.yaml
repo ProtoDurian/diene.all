@@ -167,20 +167,11 @@ release:
       - Changelog.old.md
       - docs/developer/CommitConventions.md
       - package.json
-  # ### bun-cli-release
-  # #### source: bun-cli
-  # GoReleaser owns the GitHub release on this node (scripts/release/publish.sh
-  # publishes archives, checksums, deb/rpm and the cask against the tag), so the
-  # releaser must not publish one too: two publishers on one tag collide.
+  # GoReleaser publishes this tag's GitHub release; a second publisher would collide.
   github: false
   hooks:
-    # ### bun-base-release
-    # #### source: bun-base
-    # Filled here: this node versions `package.json`, which the command below
-    # stamps and `commit.assets` lists.
-    # bun-cli: the beforeWrite hook snapshots Changelog.md to Changelog.old.md
-    # before the release writes it, so publish.sh can diff the two into this
-    # version's notes; it must stay ahead of the afterWrite bump.
+    # A file a hook writes joins commit.assets in the same edit.
+    # beforeWrite must run before afterWrite: publish.sh diffs Changelog.old.md.
     prepare:
       - phase: beforeWrite
         command: ./scripts/release/backup-changelog.sh

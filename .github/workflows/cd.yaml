@@ -6,16 +6,12 @@ on:
       - 'v*.*.*'
 
 jobs:
-  # ### bun-cli-release
-  # #### source: bun-cli
   goreleaser:
     name: GoReleaser Publish
     permissions:
       contents: write
     uses: ./.github/workflows/⚡reusable-goreleaser.yaml
     secrets: inherit
-    with:
-      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
 
   docker:
     name: Docker Image

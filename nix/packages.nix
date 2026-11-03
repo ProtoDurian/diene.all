@@ -23,16 +23,13 @@ let
           ;
       }
     );
-    nix-unstable = (with pkgs-unstable; { });
+
     nix-2605 = (
       with pkgs-2605;
       {
         inherit
           actionlint
-          # ### bun-base-packages
-          # #### source: bun-base
           bun
-          nodejs
           dpkg
           gh
           git
@@ -41,6 +38,7 @@ let
           goreleaser
           infisical
           nix
+          nodejs
           pre-commit
           ripgrep
           rpm
@@ -50,8 +48,12 @@ let
       }
     );
 
-    # ### bun-cli-package
-    # #### source: bun-cli
+    nix-unstable = (
+      with pkgs-unstable;
+      {
+      }
+    );
+
     cli =
       let
         manifest = builtins.fromJSON (builtins.readFile ../package.json);
@@ -80,8 +82,7 @@ let
         };
       in
       {
-        # Owner !A78: the compiled CLI comes from the registry builder, never an in-template derivation.
-        # !A84: keep the pinned bun (the compiled runtime and the deps hash depend on it).
+        # !A84: keep the pinned bun; the compiled runtime and the deps hash depend on it.
         bun-cli = atomiLib.buildBunCli {
           name = cliName;
           version = manifest.version;
@@ -94,4 +95,4 @@ let
   };
 in
 with all;
-nix-2605 // nix-unstable // atomipkgs // cli
+atomipkgs // nix-2605 // nix-unstable // cli

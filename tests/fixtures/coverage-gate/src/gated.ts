@@ -1,5 +1,3 @@
-// This fixture exposes a function that the sabotage deliberately leaves uncovered.
-
 export function alwaysMeasured(value: number): number {
   return value + 1;
 }

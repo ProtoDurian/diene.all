@@ -46,6 +46,8 @@ ADDED=(
   tests/unit/install-contract.test.ts
   tests/unit/kv/doctor-service.test.ts
   tests/unit/kv/service.test.ts
+  # the slug helper moves with the kv domain; the parent dropped its own copy
+  tests/unit/slug.test.ts
   # goreleaser
   .goreleaser.yaml
   go.mod
@@ -138,15 +140,12 @@ MODIFIED=(
   probes/bun-run.ts
   probes/bun-unit-coverage.ts
   probes/features.json
-  # sample tests that follow the slug move into kv/
+  # the store test follows the adapter into kv/data
   tests/integration/redis-kv-store.test.ts
-  tests/unit/slug.test.ts
   # owner !A78/!A84: buildBunCli comes from atomipkgs.lib (flake input passed to
   # nix/packages.nix; the lock floats atomipkgs v5 to the release that ships it)
   flake.nix
   flake.lock
-  # the bun tooling fixed-output hash follows the dependency set
-  nix/pre-commit.nix
   # toolchain smoke declares the release tools the dev group adds
   dlint.yaml
 )
@@ -154,16 +153,19 @@ MODIFIED=(
 DELETED=(
   # sanctioned fenced swap: the bun-base sample and its single-entry glue (M35)
   src/index.ts
-  src/lib/slug.ts
-  src/adapters/kv-store.ts
+  src/adapters/pino-logger.ts
   src/adapters/redis-kv-store.ts
-  # used only by src/index.ts; the CLI entry owns its own env parsing and cleanup
-  src/lib/cleanup.ts
-  src/lib/logger.ts
-  src/lib/redis-config.ts
+  src/lib/sample/cleanup.ts
+  src/lib/sample/config.ts
+  src/lib/sample/interfaces.ts
+  src/lib/sample/key.ts
+  src/lib/sample/service.ts
+  src/lib/sample/structures.ts
+  tests/integration/pino-logger.test.ts
   tests/unit/cleanup.test.ts
-  tests/unit/logger.test.ts
-  tests/unit/redis-config.test.ts
+  tests/unit/config.test.ts
+  tests/unit/key.test.ts
+  tests/unit/service.test.ts
 )
 
 parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"

@@ -20,8 +20,6 @@ jobs:
       contents: read
     uses: ./.github/workflows/⚡reusable-precommit.yaml
     secrets: inherit
-    with:
-      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
 
   named-checks:
     name: named-checks
@@ -29,39 +27,6 @@ jobs:
       contents: read
     uses: ./.github/workflows/⚡reusable-named-checks.yaml
     secrets: inherit
-    with:
-      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
-
-  # ### bun-base-ci
-  # #### source: bun-base
-  unit:
-    name: Unit Tests
-    permissions:
-      contents: read
-    uses: ./.github/workflows/⚡reusable-test.yaml
-    secrets: inherit
-    with:
-      mode: unit
-      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
-
-  int:
-    name: Integration Tests
-    permissions:
-      contents: read
-    uses: ./.github/workflows/⚡reusable-test.yaml
-    secrets: inherit
-    with:
-      mode: int
-      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
-
-  build:
-    name: Build Validation
-    permissions:
-      contents: read
-    uses: ./.github/workflows/⚡reusable-build.yaml
-    secrets: inherit
-    with:
-      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
 
   docker:
     name: Docker Image
@@ -75,18 +40,37 @@ jobs:
       image_name: diene-bun-cli
       dockerfile: ./infra/Dockerfile
       platform: linux/amd64
-      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
+  unit:
+    name: Unit Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-test.yaml
+    secrets: inherit
+    with:
+      mode: unit
 
-  # ### bun-cli-ci
-  # #### source: bun-cli
+  int:
+    name: Integration Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-test.yaml
+    secrets: inherit
+    with:
+      mode: int
+
+  build:
+    name: Build Validation
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-build.yaml
+    secrets: inherit
+
   compile:
     name: Compile Binaries
     permissions:
       contents: read
     uses: ./.github/workflows/⚡reusable-compile.yaml
     secrets: inherit
-    with:
-      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
 
   sit:
     name: SIT
@@ -95,8 +79,6 @@ jobs:
       contents: read
     uses: ./.github/workflows/⚡reusable-sit.yaml
     secrets: inherit
-    with:
-      nix_cache_tag: nix-store-cache-bun-ubuntu-26.04-amd64
 
   smoke:
     name: Smoke ${{ matrix.target }}
