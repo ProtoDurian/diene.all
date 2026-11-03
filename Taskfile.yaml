@@ -34,7 +34,7 @@ tasks:
       - ./scripts/local/build.sh
 
   deadcode:
-    desc: Check repository and production dead code
+    desc: Review dead code with the LLM Knip views
     cmds:
       - ./scripts/local/deadcode.sh
 
