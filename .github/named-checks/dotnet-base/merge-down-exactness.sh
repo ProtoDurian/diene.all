@@ -7,14 +7,14 @@ git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "‚ù
 
 topics='datetime|domain-driven-design|functional-practices|solid-principles|stateless-oop-di|testing|utilities|validation'
 projects='(App|Lib|UnitTest|IntTest)[A-Za-z0-9]*/[^/]+\.(cs|csproj)|(App|Lib|UnitTest|IntTest)[A-Za-z0-9]*/.+/[^/]+\.cs'
-config='dotnet-base\.slnx|global\.json|Directory\.(Build|Packages)\.props|codecov\.yml|\.config/dotnet-(base\.test\.yaml|tools\.json)|nix/dotnet-deps\.json'
+config='dotnet-base\.slnx|global\.json|Directory\.(Build|Packages)\.props|\.config/dotnet-(base\.test\.yaml|tools\.json)'
 scripts='scripts/ci/(build|test|dead-code)\.sh|scripts/local/(build|dotnet-dead-code|dotnet-test)\.sh|scripts/release/bump\.sh'
 probes='probes/(dotnet-[a-z-]+|hook-dotnetlint)\.ts|probes/lib/dotnet\.ts'
 docs="docs/developer/dotnet-baseline\\.md|docs/domain/note\\.md|docs/standards/authorization/index\\.md|docs/standards/(${topics})/languages/csharp\\.md"
 added_pattern="^((${projects})|(${config})|(${scripts})|(${probes})|(${docs})|tasks/Taskfile\\.test\\.yaml|\\.github/workflows/‚ö°reusable-(build|test|dead-code)\\.yaml|\\.claude/skills/(authorization|dotnet-base)/SKILL\\.md|\\.github/named-checks/dotnet-base/[^/]+)$"
-insert_only_pattern='^(\.dockerignore|\.gitignore|\.github/dependabot\.yml|\.github/workflows/ci\.yaml|CLAUDE\.md|README\.md|Taskfile\.yaml|nix/env\.nix|probes/features\.json|scripts/local/setup\.sh)$'
+insert_only_pattern='^(\.dockerignore|\.gitignore|\.github/dependabot\.yml|\.github/workflows/ci\.yaml|CLAUDE\.md|README\.md|Taskfile\.yaml|nix/(env|packages|pre-commit)\.nix|probes/features\.json|scripts/ci/pre-commit\.sh|scripts/local/setup\.sh)$'
 # Parent files with a line-local rewrite, and how many parent lines each may drop.
-declare -A rewrite_max=(['nix/packages.nix']=1 ['nix/pre-commit.nix']=1 ['release.yaml']=3)
+declare -A rewrite_max=(['release.yaml']=3)
 
 # index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"

@@ -1,5 +1,7 @@
 import { expectGreen, expectRed } from './lib/dotnet.ts';
 
+const gate = "nix develop .#ci -c sh -c 'dotnet restore dotnet-base.slnx >/dev/null && pre-commit run dotnetlint --all-files'";
+
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
@@ -12,7 +14,7 @@ export default {
       description: 'The generated dotnetlint hook accepts the healthy C# surface.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, 'nix develop .#ci -c pre-commit run dotnetlint --all-files', 'hook-dotnetlint', 600000);
+        await expectGreen(repo, gate, 'hook-dotnetlint', 600000);
       },
     },
     {
@@ -31,7 +33,7 @@ export default {
           'Lib/LintViolation.cs',
           'using System.Text;\n\nnamespace AtomiCloud.DotnetBase.Lib;\n\npublic static class LintViolation\n{\n    public static int Value => 1;\n}\n',
         );
-        await expectRed(repo, 'nix develop .#ci -c pre-commit run dotnetlint --all-files', 'hook-dotnetlint', 600000);
+        await expectRed(repo, gate, 'hook-dotnetlint', 600000);
       },
     },
   ],

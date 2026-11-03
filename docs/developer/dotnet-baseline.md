@@ -58,18 +58,9 @@ The SDK is pinned by `global.json`; packages use Central Package Management.
 `NuGetAuditMode=all`, analyzers, deterministic builds, and warnings-as-errors are
 enforced in Release builds.
 
-`nix/dotnet-deps.json` pins the NuGet closure used by the reproducible Nix
-restore. Regenerate it after changing a project package reference, a central
-package version, or the pinned SDK:
-
-```bash
-nix_system="$(nix eval --impure --raw --expr builtins.currentSystem)"
-nix build ".#checks.${nix_system}.pre-commit-check.fetch-deps"
-./result nix/dotnet-deps.json
-```
-
-The command exposes `buildDotnetModule.passthru.fetch-deps`; its output replaces
-`nix/dotnet-deps.json`.
+The `dotnetlint` pre-commit hook runs `dotnet format --no-restore`, so it expects
+`dotnet restore dotnet-base.slnx` to have run; `task setup` and CI's pre-commit
+script both restore first.
 
 ## Docker, Helm, and release
 
