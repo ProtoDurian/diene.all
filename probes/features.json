@@ -233,10 +233,5 @@
     "template": "diene/bun-base",
     "name": "bun-preview",
     "class": "smoke"
-  },
-  {
-    "template": "diene/bun-base",
-    "name": "bun-codecov-config",
-    "class": "presence"
   }
 ]
