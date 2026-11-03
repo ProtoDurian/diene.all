@@ -68,7 +68,7 @@ sed_e() { sed -i "$1" "$2"; }
 sed_z() { sed -i -z "$1" "$2"; }
 drop_section() { awk -v h="$1" '$0 == h { skip = 1; next } /^# / { skip = 0 } !skip' "$2" >"${2}.new" && mv "${2}.new" "$2"; }
 drop_nix_block() { awk -v s="$1" '$0 == s { skip = 1 } skip { if ($0 ~ /^    };$/) { skip = 0; eat = 1 } next } eat && $0 == "" { eat = 0; next } { eat = 0; print }' "$2" >"${2}.new" && mv "${2}.new" "$2"; }
-# drop_yaml_job <key line>: the job, its deeper-indented body and the blank line before it.
+# drop_yaml_job <key line>: the job, its deeper-indented body and one blank separator.
 drop_yaml_job() {
   awk -v k="$1" '
     { line[NR] = $0 }
@@ -76,8 +76,8 @@ drop_yaml_job() {
       n = 0
       for (i = 1; i <= NR; i++) {
         if (line[i] == k) {
-          if (n > 0 && out[n] == "") n--
           for (i++; i <= NR && (line[i] == "" || line[i] ~ /^    /); i++) {}
+          if (i > NR && n > 0 && out[n] == "") n--
           i--
           continue
         }
@@ -96,7 +96,10 @@ apply_H() {
   edit .github/workflows/cd.yaml drop_yaml_job '  helm:'
   edit Taskfile.yaml sed_e '/^  helm: tasks\/Taskfile\.helm\.yaml$/d'
   edit .github/dependabot.yml yq_del 'del(.updates[] | select(.package-ecosystem == "helm"))'
-  edit dlint.yaml sed_e '/^      - helm version$/d;/^      - helm-docs$/d;/^      - kubeconform -v$/d;/^      - kyverno version$/d'
+  edit dlint.yaml sed_e '/^      - helm version$/d'
+  edit dlint.yaml sed_e '/^      - helm-docs$/d'
+  edit dlint.yaml sed_e '/^      - kubeconform -v$/d'
+  edit dlint.yaml sed_e '/^      - kyverno version$/d'
   edit CLAUDE.md drop_section '# Helm charts and publishing'
   edit probes/features.json yq_del 'del(.[] | select(.name == "helm-lint" or .name == "helm-render" or .name == "hook-helm-lint"))'
   edit probes/binary-smoke.ts drop_lines '^helm-docs --version' '^helm template diene-workspace infra/root_chart'
@@ -107,17 +110,20 @@ apply_H() {
   edit docs/standards/taskfile/index.md sed_z 's#Docker and Helm tasks are keyed by the artifact they act on — one task set per\nDockerfile and per chart. See \[the Docker standard\](\.\./docker/index\.md) and\n\[the Helm standard\](\.\./helm/index\.md) for that naming convention\.#Docker tasks are keyed by the artifact they act on — one task set per Dockerfile.\nSee [the Docker standard](../docker/index.md) for that naming convention.#'
 
   # dotnet-base's H contributions
-  # shellcheck disable=SC2016
-  edit docs/developer/dotnet-baseline.md sed_e 's/^shared workspace, standards, Docker, Helm, secret, and release surfaces\.$/shared workspace, standards, Docker, secret, and release surfaces./;s/^## Docker, Helm, and release$/## Docker and release/'
+  edit docs/developer/dotnet-baseline.md sed_e 's/^shared workspace, standards, Docker, Helm, secret, and release surfaces\.$/shared workspace, standards, Docker, secret, and release surfaces./'
+  edit docs/developer/dotnet-baseline.md sed_e 's/^## Docker, Helm, and release$/## Docker and release/'
   # shellcheck disable=SC2016
   edit docs/developer/dotnet-baseline.md sed_z 's#The Dockerfile and the Helm chart are the parent template.s stubs, unchanged, for\ndescendants to replace; the Helm surface (chart, lint hook, tasks, OCI packaging,\nCI/CD jobs, dependabot entry) is identical to `bun-base`.s\. #The Dockerfile is the parent template'"'"'s stub, unchanged, for descendants to\nreplace. #'
 
   # nix: the aggregates carry H by content; take the axis-pure slices. Docker
   # (D) keeps its slices. kubectl and k3d ship only in infrautils-k8s, beside
   # helm, so they leave with the aggregate and their declared smokes go too.
-  edit nix/packages.nix sed_e 's/^          infralint$/          # Axis-pure slices: the infralint\/infrautils aggregates ship helm, helm-docs and helmlint.\n          infralint-core\n          infralint-docker/;s/^          infrautils$/          infrautils-core\n          infrautils-docker/'
-  edit nix/env.nix sed_e 's/^    infralint$/    infralint-core\n    infralint-docker/;s/^    infrautils$/    infrautils-core\n    infrautils-docker/'
-  edit dlint.yaml sed_e '/^      - k3d$/d;/^      - kubectl version --client$/d'
+  edit nix/packages.nix sed_e 's/^          infralint$/          # Axis-pure slices: the infralint\/infrautils aggregates ship helm, helm-docs and helmlint.\n          infralint-core\n          infralint-docker/'
+  edit nix/packages.nix sed_e 's/^          infrautils$/          infrautils-core\n          infrautils-docker/'
+  edit nix/env.nix sed_e 's/^    infralint$/    infralint-core\n    infralint-docker/'
+  edit nix/env.nix sed_e 's/^    infrautils$/    infrautils-core\n    infrautils-docker/'
+  edit dlint.yaml sed_e '/^      - k3d$/d'
+  edit dlint.yaml sed_e '/^      - kubectl version --client$/d'
   edit probes/binary-smoke.ts drop_lines '^k3d version' '^printf .* kyverno jp query'
 }
 
