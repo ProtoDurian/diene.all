@@ -57,12 +57,14 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/⚡reusable-dead-code.yaml
+    secrets: inherit
 
   unit:
     name: Unit Tests
     permissions:
       contents: read
     uses: ./.github/workflows/⚡reusable-test.yaml
+    secrets: inherit
     with:
       mode: unit
 
@@ -71,6 +73,7 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/⚡reusable-test.yaml
+    secrets: inherit
     with:
       mode: int
 
@@ -79,3 +82,4 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/⚡reusable-build.yaml
+    secrets: inherit

@@ -49,10 +49,12 @@ dead-code project discovery follow the naming convention automatically.
 
 ## Dead code and supply chain
 
-CI runs two strict dn-inspect mechanisms: all projects, then production-only
-`App*`/`Lib*` projects so exports reachable only from tests still fail. Local
-`task deadcode` uses a deliberately broad filter and never blocks. Exclusion lists
-are forbidden.
+dn-inspect has four dead-code modes, none with exclusion lists:
+
+- strict all projects: blocking CI pass over source and tests, so dead test code fails too.
+- strict production: blocking CI pass over `App*`/`Lib*` only, so code only tests use fails.
+- LLM all projects: `task deadcode`, broad filter, non-blocking.
+- LLM production: `task deadcode`, broad filter, non-blocking.
 
 The SDK is pinned by `global.json`; packages use Central Package Management.
 `NuGetAuditMode=all`, analyzers, deterministic builds, and warnings-as-errors are
