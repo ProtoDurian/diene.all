@@ -26,6 +26,7 @@ with packages;
     git
     go-task
     infisical
+    releaser
     shellcheck
     xmlstarlet
   ];
