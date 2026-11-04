@@ -18,6 +18,9 @@ include="$(yq -er ".coverage.${kind}.include // [] | join(\"%2c\")" "${config}")
 exclude="$(yq -er ".coverage.${kind}.exclude // [] | join(\"%2c\")" "${config}")"
 results="${root}/TestResults/${kind}"
 coverage="${results}/coverage"
+type="${kind}"
+[ "${kind}" = "int" ] && type="integration"
+report_dir="${root}/reports/${type}"
 
 [ "${#projects[@]}" -eq 0 ] && echo "❌ Missing .coverage.${kind}.projects entries in ${config}" >&2 && exit 1
 [ -z "${minimum}" ] && echo "❌ Missing .coverage.${kind}.minimum in ${config}" >&2 && exit 1
@@ -34,7 +37,7 @@ if [ "${mode}" = "--watch" ]; then
   exec dotnet watch --project "${root}/${projects[0]}" test -c Release
 fi
 
-rm -rf "${results}"
+rm -rf "${results}" "${report_dir}"
 mkdir -p "${results}"
 failed=0
 
@@ -55,7 +58,7 @@ if [ "${mode}" = "normal" ]; then
   exit 0
 fi
 
-mkdir -p "${coverage}"
+mkdir -p "${coverage}" "${report_dir}"
 accumulator="${coverage}/coverage.json"
 last_index=$((${#projects[@]} - 1))
 
@@ -69,8 +72,9 @@ for index in "${!projects[@]}"; do
   project_rel="${projects[${index}]}"
   project_name="$(basename "${project_rel}" .csproj)"
   format="json"
+  output="${coverage}/coverage"
   threshold_args=()
-  [ "${index}" -eq "${last_index}" ] && format="json%2ccobertura" && threshold_args=(/p:Threshold="${minimum}" /p:ThresholdType=line /p:ThresholdStat=total)
+  [ "${index}" -eq "${last_index}" ] && format="cobertura" && output="${report_dir}/coverage" && threshold_args=(/p:Threshold="${minimum}" /p:ThresholdType=line /p:ThresholdStat=total)
   merge_args=()
   [ -f "${accumulator}" ] && merge_args=(/p:MergeWith="${accumulator}")
 
@@ -80,7 +84,7 @@ for index in "${!projects[@]}"; do
     --logger "trx;LogFileName=${kind}-${project_name}.trx" \
     --results-directory "${results}" \
     /p:CollectCoverage=true \
-    /p:CoverletOutput="${coverage}/coverage" \
+    /p:CoverletOutput="${output}" \
     /p:CoverletOutputFormat="${format}" \
     /p:Include="${include}" \
     /p:Exclude="${exclude}" \
@@ -91,7 +95,7 @@ for index in "${!projects[@]}"; do
   [ "${code}" -ne 0 ] && failed=1
 done
 
-report="${coverage}/coverage.cobertura.xml"
+report="${report_dir}/coverage.cobertura.xml"
 [ "${failed}" -ne 0 ] && echo "❌ ${kind} tests or merged coverage failed" >&2 && exit 1
 [ ! -f "${report}" ] && echo "❌ No merged ${kind} coverage report produced" >&2 && exit 1
 ! command -v xmlstarlet >/dev/null && echo "❌ xmlstarlet is required to validate ${kind} Cobertura coverage" >&2 && exit 1

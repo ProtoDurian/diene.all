@@ -36,5 +36,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ inputs.mode }}
-          path: TestResults/${{ inputs.mode }}/coverage/coverage.cobertura.xml
+          path: reports/
           if-no-files-found: warn
