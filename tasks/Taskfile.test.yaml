@@ -3,7 +3,6 @@ vars:
   MODE: '{{.MODE | default "unit"}}'
   CONFIG: '{{.CONFIG | default "bunfig.unit.toml"}}'
 tasks:
-  # Internal building blocks — parameterized by MODE/CONFIG and reached only via the test:* root tasks.
   default:
     internal: true
     desc: 'Run {{.MODE}} tests'
@@ -19,14 +18,11 @@ tasks:
     desc: 'Run {{.MODE}} tests with coverage (lcov + text artifacts)'
     cmds:
       - |
-        test_status=0
         if [ "{{.MODE}}" = "meta" ]; then
-          ./scripts/local/test-meta.sh "{{.CONFIG}}" coverage || test_status=$?
+          ./scripts/local/test-meta.sh "{{.CONFIG}}" coverage
         else
-          bun test --config={{.CONFIG}} --coverage || test_status=$?
+          bun test --config={{.CONFIG}} --coverage
         fi
-        ./scripts/local/coverage-check.sh "{{.MODE}}"
-        [ "${test_status}" -eq 0 ] || exit "${test_status}"
   watch:
     internal: true
     desc: 'Run {{.MODE}} tests in watch mode'

@@ -1,44 +1,38 @@
-### nix-root
-#### source: main
-.direnv/
-.pre-commit-config.yaml
-result
-result-*
+### bun-base
+*.tsbuildinfo
+coverage/
+dist/
+node_modules/
 
-### workspace
-#### source: workspace
-.env
-.env.*
-!.env.example
-.kagent/
-.kloop/
-*.log
-*.swo
-*.swp
-*~
-.DS_Store
+### bun-lib
+*.tgz
+.npmrc
+
+### nix-init
+.direnv
+.pre-commit-config.yaml
+/result
+/result-*
+
+### os-editors
 ._*
+.DS_Store
 .idea/
 .vscode/
 Thumbs.db
 desktop.ini
 
-### bun-base
-#### source: bun-base
-node_modules/
-dist/
-coverage/
-*.tsbuildinfo
+### secrets
+.env
+.env.*
 
-### bun-lib
-#### source: bun-lib
-*.tgz
-.npmrc
+### secrets-keep
+!.env.example
 
-### bun-result
-#### source: lib/bun/result
-!.claude/skills/result/
-!.claude/skills/result/**
-!docs/standards/result/
-!docs/standards/result/**
-!tests/**/result-*.test.ts
+### tooling
+*.log
+*.swo
+*.swp
+*~
+.kagent/
+.kloop/
