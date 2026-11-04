@@ -43,6 +43,10 @@ grep -qxF "import type { Option } from './index.js';" dist/test-helper.d.ts
 grep -qxF "import type { Result } from './index.js';" dist/test-helper.d.ts
 grep -qxF "import type { Option } from './index.cjs';" dist/test-helper.d.cts
 grep -qxF "import type { Result } from './index.cjs';" dist/test-helper.d.cts
+! grep -q "'\.\./" dist/test-helper.d.ts dist/test-helper.d.cts || {
+  echo "❌ dist/test-helper declarations still import from ../" >&2
+  exit 1
+}
 
 echo "🏃 Verifying ESM and CJS runtime exports..."
 node --input-type=module -e "import { Ok } from './dist/index.js'; if (await Ok(1).map((value) => value + 1).unwrap() !== 2) process.exit(1)"

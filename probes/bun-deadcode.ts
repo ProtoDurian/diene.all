@@ -16,7 +16,7 @@ export default {
     },
     {
       name: 'mutation-bun-deadcode-caught',
-      description: 'An unused exported library member turns the repository Knip hook red.',
+      description: 'An unused library module or exported member turns the repository Knip hook red.',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {

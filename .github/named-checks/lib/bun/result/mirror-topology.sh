@@ -6,7 +6,7 @@ set -euo pipefail
 # ratchet/lib/bun-result-g<N>; each head there must be that step's strip commit:
 # first parent = a commit of THIS branch (an ancestor of HEAD), a
 # `Mirrors-Sha:` trailer naming that same parent, and no named-checks surface.
-# A re-rooted or hand-pushed head fails. The mirror's default branch is the
+# A re-rooted, hand-pushed or content-altered head fails. The mirror's default branch is the
 # owner's to publish and is reported, not judged.
 #
 # NAMED_CHECKS_MIRROR_SHA=<sha> additionally requires a publish head that
@@ -47,6 +47,9 @@ while read -r head ref; do
     fail "${branch}: mirrored commit ${parent} is not on this branch (foreign base)"
   fi
   [[ -z "$(git ls-tree -r --name-only "${head}" -- .github/named-checks scripts/ci/named-checks.sh)" ]] || fail "${branch}: head ${head} still ships named checks"
+  if [[ -n ${parent} ]] && ! git diff --quiet "${parent}" "${head}" -- . ':!.github/named-checks' ':!scripts/ci/named-checks.sh' ':!.github/workflows'; then
+    fail "${branch}: head ${head} changes files outside the strip surface"
+  fi
   [[ ${parent} == "${want}" ]] && matched=1
   echo "  ${branch} @ ${head} mirrors ${parent}"
   git update-ref -d "${local_ref}"

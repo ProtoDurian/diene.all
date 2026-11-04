@@ -38,5 +38,18 @@ export default {
         await expectBunRed(repo, command, 'bun-meta-conditional');
       },
     },
+    {
+      name: 'mutation-bun-meta-coverage-caught',
+      description: 'An untested TestHelper module turns the meta coverage ledger red.',
+      kind: 'mutation',
+      expectedImpact: ['bun-deadcode'],
+      async run(repo: any) {
+        await repo.write(
+          'src/test-helper/__probe_uncovered__.ts',
+          'export function probeHelperUncovered(): number {\n  return 1;\n}\n',
+        );
+        await expectBunRed(repo, command, 'bun-meta-conditional');
+      },
+    },
   ],
 };

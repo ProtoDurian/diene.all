@@ -126,4 +126,18 @@ describe('TestHelper payload formatting', () => {
       'Expected variant: None\nActual variant: Some\nActual payload:\n[object Object]',
     );
   });
+
+  it('should name an Error payload by its name and message', async () => {
+    // Arrange
+    const expected = 'Expected variant: Ok\nActual variant: Err\nActual payload:\nError: db timeout';
+
+    // Act
+    const assertion = (await expectOk(Err(new Error('db timeout'))).catch(
+      error => error as TestHelperError,
+    )) as TestHelperError;
+    const actual = assertion.message;
+
+    // Assert
+    actual.should.equal(expected);
+  });
 });

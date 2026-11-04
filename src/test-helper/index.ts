@@ -4,6 +4,9 @@ import type { Result } from '../lib/result.js';
 type Variant = 'Ok' | 'Err' | 'Some' | 'None';
 
 function formatPayload(payload: unknown): string {
+  if (payload instanceof Error) {
+    return `${payload.name}: ${payload.message}`;
+  }
   try {
     const json = JSON.stringify(payload, null, 2);
     return json ?? String(payload);

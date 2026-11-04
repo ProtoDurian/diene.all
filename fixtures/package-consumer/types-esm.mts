@@ -1,4 +1,5 @@
 import {
+  type DU,
   Err,
   Ok,
   Res,
@@ -19,4 +20,6 @@ const value: number = await expectOk(hydrated);
 const error: string = await expectErr(failure);
 const some: string = await expectSome(option);
 
-void [value, error, some];
+const kind: DU<[['ok', number], ['err', string]]> = { __kind: 'ok', value };
+
+void [value, error, some, kind];

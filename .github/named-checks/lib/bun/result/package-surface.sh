@@ -20,7 +20,8 @@ q() { jq -r "$1" <<<"${manifest}"; }
 
 [[ "$(q .name)" == "@atomicloud/diene.result" ]] || fail "package name is $(q .name), not @atomicloud/diene.result"
 [[ "$(q '(.dependencies // {}) | length')" == 0 ]] || fail "runtime dependencies declared: $(q '.dependencies | keys | join(", ")')"
-non_optional="$(q '(.peerDependencies // {}) | keys - ((.peerDependenciesMeta // {}) | to_entries | map(select(.value.optional == true)) | map(.key)) | join(", ")' 2>/dev/null || q '(.peerDependencies // {}) | keys | join(", ")')"
+# shellcheck disable=SC2016
+non_optional="$(q '. as $m | (($m.peerDependencies // {}) | keys) - (($m.peerDependenciesMeta // {}) | to_entries | map(select(.value.optional == true) | .key)) | join(", ")')"
 [[ -z ${non_optional} ]] || fail "non-optional peerDependencies: ${non_optional}"
 for condition in import require; do
   for kind in types default; do

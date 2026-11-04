@@ -1,7 +1,7 @@
 {
   "name": "@atomicloud/diene.result",
   "version": "1.0.2",
-  "description": "Result and Option monads with dual-format ESM/CJS builds and a dependency-light /test-helper for AtomiCloud/diene.bun-result",
+  "description": "Result and Option monads with dual-format ESM/CJS builds and a dependency-free /test-helper for AtomiCloud/diene.bun-result",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -26,6 +26,13 @@
         "types": "./dist/test-helper.d.cts",
         "default": "./dist/test-helper.cjs"
       }
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "test-helper": [
+        "./dist/test-helper.d.ts"
+      ]
     }
   },
   "files": [
