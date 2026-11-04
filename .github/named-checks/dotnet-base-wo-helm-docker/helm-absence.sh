@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The inherited Helm-free state holds: no H path, no reference to one, no H job, include,
-# hook, Dependabot entry or probe row, no helm-carrying nix aggregate, and no
-# helm binary in the default shell. The many-owner files the strip edited
-# still parse and lint (D removed cd.yaml, so only ci.yaml is checked).
+# The inherited Helm-free state holds, and the many-owner files the strip edited still parse and lint.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -85,15 +82,15 @@ nix develop -i --keep HOME .#default -c bash -c '
 
 # --- the many-owner files the strip edited still parse and lint ---------------------
 for f in .github/workflows/ci.yaml .github/dependabot.yml Taskfile.yaml dlint.yaml; do
-  yq e '.' "${f}" >/dev/null 2>&1 || fail "${f} is not valid YAML"
+  show "${f}" | yq e '.' - >/dev/null 2>&1 || fail "${f} is not valid YAML"
 done
-jq -e . probes/features.json >/dev/null 2>&1 || fail "probes/features.json is not valid JSON"
+show probes/features.json | jq -e . >/dev/null 2>&1 || fail "probes/features.json is not valid JSON"
 for f in nix/packages.nix nix/env.nix nix/pre-commit.nix nix/fmt.nix; do
-  nix-instantiate --parse "${f}" >/dev/null 2>"${work}/nix.out" || fail "${f} does not parse: $(head -3 "${work}/nix.out")"
+  show "${f}" | nix-instantiate --parse - >/dev/null 2>"${work}/nix.out" || fail "${f} does not parse: $(head -3 "${work}/nix.out")"
 done
 actionlint -config-file .github/actionlint.yaml .github/workflows/*.y*ml >"${work}/actionlint.out" 2>&1 || fail "actionlint failed: $(head -5 "${work}/actionlint.out")"
 task --list-all >"${work}/task.out" 2>&1 || fail "task --list-all failed: $(head -5 "${work}/task.out")"
-jq -e . flake.lock >/dev/null 2>&1 || fail "flake.lock is not valid JSON"
+show flake.lock | jq -e . >/dev/null 2>&1 || fail "flake.lock is not valid JSON"
 
 if [[ ${failed} -ne 0 ]]; then
   exit 1

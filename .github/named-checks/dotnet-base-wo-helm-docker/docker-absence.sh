@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Nothing of D survives: no D path, no reference to one, no D job, include,
-# Dependabot entry, dlint smoke or probe row, no docker-axis nix slice, and no
-# docker binary in the default shell. The many-owner files the strip edited
-# still parse and lint.
+# Nothing of D survives, and the many-owner files the strip edited still parse and lint.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -35,6 +32,7 @@ D_TOKENS=(
   infra/Dockerfile .dockerignore reusable-docker Taskfile.docker docker.sh
   docker-push standards/docker docker/index.md docker-build
   '](infra)' 'infra/' workflows/cd.yaml 'docker:build' 'docker:run'
+  'Docker and Helm' 'image or chart'
 )
 # The declaration itself; machine-maintained history; the probe harness whose
 # command-string fixtures are generic and name no axis file.
@@ -88,11 +86,11 @@ nix develop -i --keep HOME .#default -c bash -c '
 
 # --- the many-owner files the strip edited still parse and lint ---------------------
 for f in .github/workflows/ci.yaml .github/dependabot.yml Taskfile.yaml dlint.yaml; do
-  yq e '.' "${f}" >/dev/null 2>&1 || fail "${f} is not valid YAML"
+  show "${f}" | yq e '.' - >/dev/null 2>&1 || fail "${f} is not valid YAML"
 done
-jq -e . probes/features.json >/dev/null 2>&1 || fail "probes/features.json is not valid JSON"
+show probes/features.json | jq -e . >/dev/null 2>&1 || fail "probes/features.json is not valid JSON"
 for f in nix/packages.nix nix/env.nix; do
-  nix-instantiate --parse "${f}" >/dev/null 2>"${work}/nix.out" || fail "${f} does not parse: $(head -3 "${work}/nix.out")"
+  show "${f}" | nix-instantiate --parse - >/dev/null 2>"${work}/nix.out" || fail "${f} does not parse: $(head -3 "${work}/nix.out")"
 done
 actionlint -config-file .github/actionlint.yaml .github/workflows/*.y*ml >"${work}/actionlint.out" 2>&1 || fail "actionlint failed: $(head -5 "${work}/actionlint.out")"
 task --list-all >"${work}/task.out" 2>&1 || fail "task --list-all failed: $(head -5 "${work}/task.out")"
