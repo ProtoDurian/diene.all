@@ -28,5 +28,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ inputs.mode }}
-          path: coverage/${{ inputs.mode }}
+          path: reports/
           if-no-files-found: warn
