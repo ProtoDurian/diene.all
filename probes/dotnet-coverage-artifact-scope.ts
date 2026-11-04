@@ -6,9 +6,13 @@ const REPORT = 'TestResults/unit/coverage/coverage.cobertura.xml';
 const PARSE_MARKER = 'Parsed unit Cobertura package scope and per-package line rates';
 const ESCAPE_MESSAGE = 'unit coverage escaped its [Lib*]* ledger: Escape';
 
-async function output(repo: any, command: string, timeoutMs: number): Promise<{ code: number; text: string }> {
+async function output(
+  repo: any,
+  command: string,
+  timeoutMs: number,
+): Promise<{ code: number; text: string; stdout: string }> {
   const result = await repo.exec(command, { timeoutMs });
-  return { code: result.exitCode, text: `${result.stdout}\n${result.stderr}` };
+  return { code: result.exitCode, text: `${result.stdout}\n${result.stderr}`, stdout: result.stdout };
 }
 
 export default defineGate({
@@ -34,7 +38,8 @@ export default defineGate({
         throw new Error(`the merged unit Cobertura artifact is unreadable: ${parsed.text}`);
       }
 
-      const [valid, ...packages] = parsed.text
+      // stdout only: the shell writes its own warnings to stderr, which are not report rows.
+      const [valid, ...packages] = parsed.stdout
         .split('\n')
         .map(line => line.trim())
         .filter(line => line.length > 0);

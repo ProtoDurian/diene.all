@@ -11,6 +11,7 @@ import {
   flipAssertion,
   invalidWorkflow,
   plantSecret,
+  staleHelmDocs,
   uncoverDomainFile,
   unformatFile,
 } from './mutations';
@@ -106,6 +107,14 @@ describe('structural probe mutators', () => {
     expect(repo.commands).toEqual(["git add -- 'probe-secret.txt'"]);
   });
 
+  test('makes helm-docs stale by adding a documented value', async () => {
+    const repo = new FakeRepo({
+      'infra/root_chart/values.yaml': 'service: app\n',
+    });
+    await staleHelmDocs(repo);
+    expect(await repo.read('infra/root_chart/values.yaml')).toContain('probeHelmDocsStale');
+  });
+
   test('creates formatter-specific violations', async () => {
     const repo = new FakeRepo({ 'nix/packages.nix': 'value = true;\n' });
     await unformatFile(repo, { formatter: 'nixfmt' });
@@ -127,9 +136,7 @@ describe('structural probe mutators', () => {
   });
 });
 
-// Command-string assertions against a fake repo cannot distinguish a restore that works from one
-// that silently does nothing. Exercise cleanup against a REAL git repository so staged deletions
-// cannot disappear from the worklist without making these regressions red.
+// A real git repository on purpose: a fake one cannot catch a restore that does nothing.
 describe('restoreProbeState against a real repository', () => {
   async function sandbox(): Promise<{ path: string; repo: ProbeRepo; git: (command: string) => string }> {
     const path = await mkdtemp(join(tmpdir(), 'probe-restore-'));
