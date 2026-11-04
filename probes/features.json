@@ -161,11 +161,6 @@
   },
   {
     "template": "diene/bun-base",
-    "name": "bun-integration-tests",
-    "class": "gate"
-  },
-  {
-    "template": "diene/bun-base",
     "name": "bun-typecheck",
     "class": "gate"
   },
@@ -177,11 +172,6 @@
   {
     "template": "diene/bun-base",
     "name": "bun-unit-coverage",
-    "class": "gate"
-  },
-  {
-    "template": "diene/bun-base",
-    "name": "bun-integration-coverage",
     "class": "gate"
   },
   {

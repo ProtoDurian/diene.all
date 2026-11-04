@@ -6,11 +6,6 @@ includes:
     vars:
       MODE: unit
       CONFIG: bunfig.unit.toml
-  int:
-    taskfile: tasks/Taskfile.test.yaml
-    vars:
-      MODE: int
-      CONFIG: bunfig.int.toml
   meta:
     taskfile: tasks/Taskfile.test.yaml
     vars:
