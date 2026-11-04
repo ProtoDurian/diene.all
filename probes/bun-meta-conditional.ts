@@ -1,4 +1,5 @@
 import { expectBunGreen, expectBunRed } from './lib/bun-command.ts';
+import { assertScopedLcov } from './lib/lcov.ts';
 
 const command = 'nix develop .#ci -c ./scripts/ci/test.sh meta';
 
@@ -7,14 +8,12 @@ export default {
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
   probes: [
     {
-      name: 'baseline-bun-meta-conditional-noop-green',
-      description: 'The absent TestHelper/meta-test pair is an explicit success with no coverage artifact.',
+      name: 'baseline-bun-meta-conditional-active-green',
+      description: 'The shipped TestHelper activates the meta tier: green, with a ledger scoped to src/test-helper.',
       kind: 'baseline',
       async run(repo: any) {
         await expectBunGreen(repo, command, 'bun-meta-conditional');
-        if ((await repo.glob('coverage/meta/lcov.info')).length !== 0) {
-          throw new Error('no-op meta tier must not emit a coverage artifact');
-        }
+        await assertScopedLcov(repo, 'coverage/meta/lcov.info', 'src/test-helper/');
       },
     },
     {
