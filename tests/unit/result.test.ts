@@ -1,5 +1,5 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
+import 'should';
 import { UnwrapError } from '../../src/lib/error.js';
 import { Err, KResult, Ok, Res, type Result } from '../../src/lib/result.js';
 
@@ -14,13 +14,13 @@ describe('Result construction and serialization', () => {
     const err = Err<number, string>(promisedError);
 
     // Assert
-    should(ok).be.instanceof(KResult);
-    should(await ok.isOk()).be.true();
-    should(await ok.isErr()).be.false();
-    should(await ok.unwrap()).equal(7);
-    should(await err.isErr()).be.true();
-    should(await err.isOk()).be.false();
-    should(await err.unwrapErr()).equal('boom');
+    ok.should.be.instanceof(KResult);
+    (await ok.isOk()).should.be.true();
+    (await ok.isErr()).should.be.false();
+    (await ok.unwrap()).should.equal(7);
+    (await err.isErr()).should.be.true();
+    (await err.isOk()).should.be.false();
+    (await err.unwrapErr()).should.equal('boom');
   });
 
   it('should round-trip both ResultSerial variants through JSON', async () => {
@@ -33,8 +33,8 @@ describe('Result construction and serialization', () => {
     const err = Res.fromSerial<number, string>(errWire);
 
     // Assert
-    should(await ok.unwrap()).equal(11);
-    should(await err.unwrapErr()).equal('bad');
+    (await ok.unwrap()).should.equal(11);
+    (await err.unwrapErr()).should.equal('bad');
   });
 
   it('should flatten promised Results through fromAsync and async', async () => {
@@ -48,9 +48,9 @@ describe('Result construction and serialization', () => {
     const asyncResult = Res.async(async () => Ok<number, string>(9));
 
     // Assert
-    should(await ok.unwrap()).equal(3);
-    should(await err.unwrapErr()).equal('no');
-    should(await asyncResult.unwrap()).equal(9);
+    (await ok.unwrap()).should.equal(3);
+    (await err.unwrapErr()).should.equal('no');
+    (await asyncResult.unwrap()).should.equal(9);
   });
 
   it('should collect all Ok payloads and collect every Err payload', async () => {
@@ -63,8 +63,8 @@ describe('Result construction and serialization', () => {
     const errResult = Res.all(...mixed);
 
     // Assert
-    should(await okResult.unwrap()).eql([1, 'two']);
-    should(await errResult.unwrapErr()).eql(['first', 'second']);
+    (await okResult.unwrap()).should.deepEqual([1, 'two']);
+    (await errResult.unwrapErr()).should.deepEqual(['first', 'second']);
   });
 });
 
@@ -81,10 +81,10 @@ describe('Result transforms', () => {
     const mappedErr = err.mapErr(async error => `${error}!`);
 
     // Assert
-    should(await mappedOk.unwrap()).equal(20);
-    should(await untouchedErr.unwrapErr()).equal('bad');
-    should(await untouchedOk.unwrap()).equal(2);
-    should(await mappedErr.unwrapErr()).equal('bad!');
+    (await mappedOk.unwrap()).should.equal(20);
+    (await untouchedErr.unwrapErr()).should.equal('bad');
+    (await untouchedOk.unwrap()).should.equal(2);
+    (await mappedErr.unwrapErr()).should.equal('bad!');
   });
 
   it('should chain Ok values and short-circuit Err values', async () => {
@@ -98,9 +98,9 @@ describe('Result transforms', () => {
     const chainedErr = err.andThen(value => Ok<string, string>(`v:${value}`));
 
     // Assert
-    should(await chainedOk.unwrap()).equal('v:4');
-    should(await chainedToErr.unwrapErr()).equal('e:4');
-    should(await chainedErr.unwrapErr()).equal('stop');
+    (await chainedOk.unwrap()).should.equal('v:4');
+    (await chainedToErr.unwrapErr()).should.equal('e:4');
+    (await chainedErr.unwrapErr()).should.equal('stop');
   });
 
   it('should match both variants and expose their native payloads', async () => {
@@ -114,10 +114,10 @@ describe('Result transforms', () => {
     const errMatch = err.match(arms);
 
     // Assert
-    should(await okMatch).equal('ok:5');
-    should(await errMatch).equal('err:x');
-    should(await ok.native()).equal(5);
-    should(await err.native()).equal('x');
+    (await okMatch).should.equal('ok:5');
+    (await errMatch).should.equal('err:x');
+    (await ok.native()).should.equal(5);
+    (await err.native()).should.equal('x');
   });
 });
 
@@ -132,12 +132,12 @@ describe('Result extraction and projection', () => {
     const unwrapOkFromErr = (await err.unwrap().catch(error => error as UnwrapError)) as UnwrapError;
 
     // Assert
-    should(unwrapErrFromOk).be.instanceof(UnwrapError);
-    should(unwrapErrFromOk.type).equal('Expected Err got Ok');
-    should(unwrapErrFromOk.monadType).equal('result');
-    should(unwrapOkFromErr).be.instanceof(UnwrapError);
-    should(unwrapOkFromErr.type).equal('Expected Ok got Error');
-    should(unwrapOkFromErr.monadType).equal('result');
+    unwrapErrFromOk.should.be.instanceof(UnwrapError);
+    unwrapErrFromOk.type.should.equal('Expected Err got Ok');
+    unwrapErrFromOk.monadType.should.equal('result');
+    unwrapOkFromErr.should.be.instanceof(UnwrapError);
+    unwrapOkFromErr.type.should.equal('Expected Ok got Error');
+    unwrapOkFromErr.monadType.should.equal('result');
   });
 
   it('should return immediate, promised, sync-deferred, and async-deferred fallbacks', async () => {
@@ -146,11 +146,11 @@ describe('Result extraction and projection', () => {
     const err = Err<number, string>('four');
 
     // Act / Assert
-    should(await ok.unwrapOr(99)).equal(1);
-    should(await err.unwrapOr(99)).equal(99);
-    should(await err.unwrapOr(Promise.resolve(88))).equal(88);
-    should(await err.unwrapOr(error => error.length)).equal(4);
-    should(await err.unwrapOr(async error => error.length + 1)).equal(5);
+    (await ok.unwrapOr(99)).should.equal(1);
+    (await err.unwrapOr(99)).should.equal(99);
+    (await err.unwrapOr(Promise.resolve(88))).should.equal(88);
+    (await err.unwrapOr(error => error.length)).should.equal(4);
+    (await err.unwrapOr(async error => error.length + 1)).should.equal(5);
   });
 
   it('should project each channel into Option', async () => {
@@ -165,10 +165,10 @@ describe('Result extraction and projection', () => {
     const errSome = err.err();
 
     // Assert
-    should(await okSome.unwrap()).equal(2);
-    should(await okNone.isNone()).be.true();
-    should(await errNone.isNone()).be.true();
-    should(await errSome.unwrap()).equal('z');
+    (await okSome.unwrap()).should.equal(2);
+    (await okNone.isNone()).should.be.true();
+    (await errNone.isNone()).should.be.true();
+    (await errSome.unwrap()).should.equal('z');
   });
 });
 
@@ -191,9 +191,9 @@ describe('Result side effects', () => {
     });
 
     // Assert
-    should(await afterAsync.unwrap()).equal(6);
-    should(await afterErr.unwrapErr()).equal('skip');
-    should(seen).eql([6, 7]);
+    (await afterAsync.unwrap()).should.equal(6);
+    (await afterErr.unwrapErr()).should.equal('skip');
+    seen.should.deepEqual([6, 7]);
   });
 
   it('should preserve successful exec values and normalize every thrown shape', async () => {
@@ -213,10 +213,10 @@ describe('Result side effects', () => {
     });
 
     // Assert
-    should(await success.unwrap()).equal(7);
-    should((await fromError.unwrapErr()).message).equal('error-shape');
-    should((await fromString.unwrapErr()).message).equal('string-shape');
-    should((await fromObject.unwrapErr()).message).equal('{"shape":"object"}');
+    (await success.unwrap()).should.equal(7);
+    (await fromError.unwrapErr()).message.should.equal('error-shape');
+    (await fromString.unwrapErr()).message.should.equal('string-shape');
+    (await fromObject.unwrapErr()).message.should.equal('{"shape":"object"}');
   });
 
   it('should map pre-existing Err values through the default and custom exec mappers', async () => {
@@ -235,9 +235,9 @@ describe('Result side effects', () => {
     );
 
     // Assert
-    should(await preserved.unwrapErr()).equal(nativeError);
-    should((await normalized.unwrapErr()).message).equal('{"code":4}');
-    should((await custom.unwrapErr()).message).equal('mapped:raw');
+    (await preserved.unwrapErr()).should.equal(nativeError);
+    (await normalized.unwrapErr()).message.should.equal('{"code":4}');
+    (await custom.unwrapErr()).message.should.equal('mapped:raw');
   });
 });
 
@@ -250,7 +250,7 @@ describe('Result type surface', () => {
     const concrete = value as KResult<number, string>;
 
     // Assert
-    should(concrete).be.instanceof(KResult);
-    should(await concrete.unwrap()).equal(10);
+    concrete.should.be.instanceof(KResult);
+    (await concrete.unwrap()).should.equal(10);
   });
 });

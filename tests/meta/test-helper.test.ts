@@ -1,5 +1,6 @@
 import { describe, it } from 'bun:test';
 import should from 'should';
+import 'should';
 import { None, Some } from '../../src/lib/option.js';
 import { Err, Ok } from '../../src/lib/result.js';
 import { expectErr, expectNone, expectOk, expectSome, TestHelperError } from '../../src/test-helper/index.js';
@@ -15,8 +16,8 @@ describe('Result TestHelper assertions', () => {
     const errValue = expectErr(err);
 
     // Assert
-    should(await okValue).equal(5);
-    should(await errValue).equal('boom');
+    (await okValue).should.equal(5);
+    (await errValue).should.equal('boom');
   });
 
   it('should fail loudly with an Err object payload diff when Ok was expected', async () => {
@@ -27,11 +28,11 @@ describe('Result TestHelper assertions', () => {
     const assertion = (await expectOk(actual).catch(error => error as TestHelperError)) as TestHelperError;
 
     // Assert
-    should(assertion).be.instanceof(TestHelperError);
-    should(assertion.expected).equal('Ok');
-    should(assertion.actual).equal('Err');
+    assertion.should.be.instanceof(TestHelperError);
+    assertion.expected.should.equal('Ok');
+    assertion.actual.should.equal('Err');
     should(assertion.payload).eql({ code: 409 });
-    should(assertion.message).equal('Expected variant: Ok\nActual variant: Err\nActual payload:\n{\n  "code": 409\n}');
+    assertion.message.should.equal('Expected variant: Ok\nActual variant: Err\nActual payload:\n{\n  "code": 409\n}');
   });
 
   it('should fail loudly with an Ok payload diff when Err was expected', async () => {
@@ -42,9 +43,9 @@ describe('Result TestHelper assertions', () => {
     const assertion = (await expectErr(actual).catch(error => error as TestHelperError)) as TestHelperError;
 
     // Assert
-    should(assertion).be.instanceof(TestHelperError);
-    should(assertion.expected).equal('Err');
-    should(assertion.actual).equal('Ok');
+    assertion.should.be.instanceof(TestHelperError);
+    assertion.expected.should.equal('Err');
+    assertion.actual.should.equal('Ok');
     should(assertion.payload).equal(7);
   });
 
@@ -56,9 +57,9 @@ describe('Result TestHelper assertions', () => {
     const assertion = (await expectOk(actual).catch(error => error as TestHelperError)) as TestHelperError;
 
     // Assert
-    should(assertion.actual).equal('Err');
+    assertion.actual.should.equal('Err');
     should(assertion.payload).be.undefined();
-    should(assertion.message).equal('Expected variant: Ok\nActual variant: Err\nActual payload:\nundefined');
+    assertion.message.should.equal('Expected variant: Ok\nActual variant: Err\nActual payload:\nundefined');
   });
 });
 
@@ -73,7 +74,7 @@ describe('Option TestHelper assertions', () => {
     const noneValue = expectNone(none);
 
     // Assert
-    should(await someValue).equal(9);
+    (await someValue).should.equal(9);
     should(await noneValue).be.undefined();
   });
 
@@ -85,11 +86,11 @@ describe('Option TestHelper assertions', () => {
     const assertion = (await expectNone(actual).catch(error => error as TestHelperError)) as TestHelperError;
 
     // Assert
-    should(assertion).be.instanceof(TestHelperError);
-    should(assertion.expected).equal('None');
-    should(assertion.actual).equal('Some');
+    assertion.should.be.instanceof(TestHelperError);
+    assertion.expected.should.equal('None');
+    assertion.actual.should.equal('Some');
     should(assertion.payload).equal('present');
-    should(assertion.message).equal('Expected variant: None\nActual variant: Some\nActual payload:\n"present"');
+    assertion.message.should.equal('Expected variant: None\nActual variant: Some\nActual payload:\n"present"');
   });
 
   it('should fail loudly when Some was expected but None was received', async () => {
@@ -100,11 +101,11 @@ describe('Option TestHelper assertions', () => {
     const assertion = (await expectSome(actual).catch(error => error as TestHelperError)) as TestHelperError;
 
     // Assert
-    should(assertion).be.instanceof(TestHelperError);
-    should(assertion.expected).equal('Some');
-    should(assertion.actual).equal('None');
+    assertion.should.be.instanceof(TestHelperError);
+    assertion.expected.should.equal('Some');
+    assertion.actual.should.equal('None');
     should(assertion.payload).be.undefined();
-    should(assertion.message).equal('Expected variant: Some\nActual variant: None');
+    assertion.message.should.equal('Expected variant: Some\nActual variant: None');
   });
 });
 
@@ -120,8 +121,8 @@ describe('TestHelper payload formatting', () => {
     const circularError = new TestHelperError('None', 'Some', circularPayload);
 
     // Assert
-    should(functionError.message).startWith('Expected variant: Ok\nActual variant: Err\nActual payload:\n');
-    should(circularError.message).equal(
+    functionError.message.should.startWith('Expected variant: Ok\nActual variant: Err\nActual payload:\n');
+    circularError.message.should.equal(
       'Expected variant: None\nActual variant: Some\nActual payload:\n[object Object]',
     );
   });

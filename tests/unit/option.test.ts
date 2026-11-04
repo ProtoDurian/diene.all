@@ -1,5 +1,6 @@
 import { describe, it } from 'bun:test';
 import should from 'should';
+import 'should';
 import { UnwrapError } from '../../src/lib/error.js';
 import { KOption, None, Opt, Some, type Option, type OptionSerial } from '../../src/lib/option.js';
 import { Err, Ok } from '../../src/lib/result.js';
@@ -15,11 +16,11 @@ describe('Option construction and serialization', () => {
     const mapped = nativeValues.map(value => Opt.fromNative(value));
 
     // Assert
-    should(some).be.instanceof(KOption);
-    should(await some.isSome()).be.true();
-    should(await some.isNone()).be.false();
-    should(await none.isNone()).be.true();
-    should(await none.isSome()).be.false();
+    some.should.be.instanceof(KOption);
+    (await some.isSome()).should.be.true();
+    (await some.isNone()).should.be.false();
+    (await none.isNone()).should.be.true();
+    (await none.isSome()).should.be.false();
     should(await mapped[0]?.unwrap()).equal(0);
     should(await mapped[1]?.isNone()).be.true();
     should(await mapped[2]?.isNone()).be.true();
@@ -35,8 +36,8 @@ describe('Option construction and serialization', () => {
     const none = Opt.fromSerial(noneWire);
 
     // Assert
-    should(await some.unwrap()).equal(12);
-    should(await none.isNone()).be.true();
+    (await some.unwrap()).should.equal(12);
+    (await none.isNone()).should.be.true();
     should(await some.native()).equal(12);
     should(await none.native()).be.null();
   });
@@ -54,11 +55,11 @@ describe('Option construction and serialization', () => {
     const withNone = Opt.all(Some(1), None<string>());
 
     // Assert
-    should(await some.unwrap()).equal(4);
-    should(await none.isNone()).be.true();
-    should(await asyncOption.unwrap()).equal(8);
-    should(await allSome.unwrap()).eql([1, 'two']);
-    should(await withNone.isNone()).be.true();
+    (await some.unwrap()).should.equal(4);
+    (await none.isNone()).should.be.true();
+    (await asyncOption.unwrap()).should.equal(8);
+    (await allSome.unwrap()).should.deepEqual([1, 'two']);
+    (await withNone.isNone()).should.be.true();
   });
 });
 
@@ -73,8 +74,8 @@ describe('Option transforms', () => {
     const mappedNone = none.map(value => value * 10);
 
     // Assert
-    should(await mappedSome.unwrap()).equal(20);
-    should(await mappedNone.isNone()).be.true();
+    (await mappedSome.unwrap()).should.equal(20);
+    (await mappedNone.isNone()).should.be.true();
   });
 
   it('should chain Some values, propagate mapped None, and short-circuit original None', async () => {
@@ -88,9 +89,9 @@ describe('Option transforms', () => {
     const chainedNone = none.andThen(value => Some(`v:${value}`));
 
     // Assert
-    should(await chainedSome.unwrap()).equal('v:6');
-    should(await chainedToNone.isNone()).be.true();
-    should(await chainedNone.isNone()).be.true();
+    (await chainedSome.unwrap()).should.equal('v:6');
+    (await chainedToNone.isNone()).should.be.true();
+    (await chainedNone.isNone()).should.be.true();
   });
 
   it('should match Some and both deferred and immediate None arms', async () => {
@@ -104,9 +105,9 @@ describe('Option transforms', () => {
     const noneDeferred = none.match<string>({ some: value => `some:${value}`, none: async () => 'deferred' });
 
     // Assert
-    should(await someMatch).equal('some:5');
-    should(await noneImmediate).equal('none');
-    should(await noneDeferred).equal('deferred');
+    (await someMatch).should.equal('some:5');
+    (await noneImmediate).should.equal('none');
+    (await noneDeferred).should.equal('deferred');
   });
 });
 
@@ -120,10 +121,10 @@ describe('Option extraction and side effects', () => {
     const rejected = (await none.unwrap().catch(error => error as UnwrapError)) as UnwrapError;
 
     // Assert
-    should(await some.unwrap()).equal(9);
-    should(rejected).be.instanceof(UnwrapError);
-    should(rejected.type).equal('Expected Some got None');
-    should(rejected.monadType).equal('option');
+    (await some.unwrap()).should.equal(9);
+    rejected.should.be.instanceof(UnwrapError);
+    rejected.type.should.equal('Expected Some got None');
+    rejected.monadType.should.equal('option');
   });
 
   it('should return immediate, promised, sync-deferred, and async-deferred fallbacks', async () => {
@@ -132,11 +133,11 @@ describe('Option extraction and side effects', () => {
     const none = None<number>();
 
     // Act / Assert
-    should(await some.unwrapOr(99)).equal(1);
-    should(await none.unwrapOr(99)).equal(99);
-    should(await none.unwrapOr(Promise.resolve(88))).equal(88);
-    should(await none.unwrapOr(() => 77)).equal(77);
-    should(await none.unwrapOr(async () => 66)).equal(66);
+    (await some.unwrapOr(99)).should.equal(1);
+    (await none.unwrapOr(99)).should.equal(99);
+    (await none.unwrapOr(Promise.resolve(88))).should.equal(88);
+    (await none.unwrapOr(() => 77)).should.equal(77);
+    (await none.unwrapOr(async () => 66)).should.equal(66);
   });
 
   it('should run sync and async effects only for Some while preserving the Option', async () => {
@@ -157,9 +158,9 @@ describe('Option extraction and side effects', () => {
     });
 
     // Assert
-    should(await afterAsync.unwrap()).equal(4);
-    should(await afterNone.isNone()).be.true();
-    should(seen).eql([4, 5]);
+    (await afterAsync.unwrap()).should.equal(4);
+    (await afterNone.isNone()).should.be.true();
+    seen.should.deepEqual([4, 5]);
   });
 });
 
@@ -176,10 +177,10 @@ describe('Option to Result conversion', () => {
     const noneAsErr = none.asErr(Promise.resolve('fallback'));
 
     // Assert
-    should(await someAsOk.unwrap()).equal(5);
-    should(await noneAsOk.unwrapErr()).equal('missing');
-    should(await someAsErr.unwrapErr()).equal(5);
-    should(await noneAsErr.unwrap()).equal('fallback');
+    (await someAsOk.unwrap()).should.equal(5);
+    (await noneAsOk.unwrapErr()).should.equal('missing');
+    (await someAsErr.unwrapErr()).should.equal(5);
+    (await noneAsErr.unwrap()).should.equal('fallback');
   });
 
   it('should map Some and every None arm shape through asResult', async () => {
@@ -197,8 +198,8 @@ describe('Option to Result conversion', () => {
 
     // Assert
     should(await fromSome.unwrap()).equal('v:3');
-    should(await fromNoneValue.unwrapErr()).equal('empty');
-    should(await fromNoneFunction.unwrap()).equal('fallback');
+    (await fromNoneValue.unwrapErr()).should.equal('empty');
+    (await fromNoneFunction.unwrap()).should.equal('fallback');
   });
 });
 
@@ -211,7 +212,7 @@ describe('Option type surface', () => {
     const concrete = value as KOption<number>;
 
     // Assert
-    should(concrete).be.instanceof(KOption);
-    should(await concrete.unwrap()).equal(10);
+    concrete.should.be.instanceof(KOption);
+    (await concrete.unwrap()).should.equal(10);
   });
 });
