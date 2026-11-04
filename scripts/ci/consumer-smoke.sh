@@ -25,14 +25,16 @@ trap 'rm -rf "${work}"' EXIT
 cat >"${work}/package.json" <<JSON
 { "name": "bun-lib-consumer-fixture", "private": true, "version": "0.0.0" }
 JSON
-cat >"${work}/tsconfig.json" <<'JSON'
+# The public types reference pino's, which need Node's: give the fixture the repo's pinned @types/node.
+cat >"${work}/tsconfig.json" <<JSON
 {
   "compilerOptions": {
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "strict": true,
     "noEmit": true,
-    "types": []
+    "types": ["node"],
+    "typeRoots": ["${root_dir}/node_modules/@types"]
   },
   "include": ["*.mts", "*.cts"]
 }
