@@ -20,16 +20,16 @@ type OptionSome<T extends Option<unknown>[]> = {
 
 type OptionSerial<T> = ISome<T> | INone;
 
-class Opt {
+const Opt = {
   // From Serial format of an option, convert it into an option type
   /**
    * @template T
    * @param input - serialized format of the option
    * @returns {Option<T>} option reconstructed from the serial format
    */
-  static fromSerial<T>(input: OptionSerial<T> | Promise<OptionSerial<T>>): Option<T> {
+  fromSerial<T>(input: OptionSerial<T> | Promise<OptionSerial<T>>): Option<T> {
     return new KOption<T>(Promise.resolve(input));
-  }
+  },
 
   // takes in a value and returns a new option with a some value
   /**
@@ -37,19 +37,19 @@ class Opt {
    * @param input - value to wrap in an option
    * @returns {Option<T>} option with a some value
    */
-  static fromNative<T>(input?: T | null | undefined) {
+  fromNative<T>(input?: T | null | undefined) {
     if (input === null || input === undefined) {
       return None<T>();
     }
     return Some(input);
-  }
+  },
 
   // takes in a list of options and returns a new option with a list of some values if all the results are some, and none if any are none
   /**
    * @template T
    * @param i - list of options
    */
-  static all<T extends Option<unknown>[]>(...i: [...T]): Option<OptionSome<T>> {
+  all<T extends Option<unknown>[]>(...i: [...T]): Option<OptionSome<T>> {
     const closure = async (): Promise<Option<OptionSome<T>>> => {
       const some: OptionSome<T> = [] as OptionSome<T>;
       let none = 0;
@@ -77,7 +77,7 @@ class Opt {
       return Some(some);
     };
     return Opt.fromAsync(closure());
-  }
+  },
 
   // Resolve the promise of an option, Promise<Option<T>> to Option<T> without async/await
   /**
@@ -85,7 +85,7 @@ class Opt {
    * @param p - promise of an option to resolve
    * @returns {Option<T>} resolved option
    */
-  static fromAsync<T>(p: Promise<Option<T>>): Option<T> {
+  fromAsync<T>(p: Promise<Option<T>>): Option<T> {
     return new KOption<T>(
       (async () => {
         const r = await p;
@@ -97,7 +97,7 @@ class Opt {
         return Promise.resolve(['none', null]);
       })(),
     );
-  }
+  },
 
   // Create an Option from an async function
   /**
@@ -105,10 +105,10 @@ class Opt {
    * @param fn - async function that returns an option
    * @returns {Option<T>} option from the async function
    */
-  static async<T>(fn: () => Promise<Option<T>>): Option<T> {
+  async<T>(fn: () => Promise<Option<T>>): Option<T> {
     return Opt.fromAsync(fn());
-  }
-}
+  },
+};
 
 interface Option<T> {
   // Checks if the Option is Some

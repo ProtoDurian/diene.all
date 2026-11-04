@@ -45,17 +45,17 @@ type ResultOk<T extends Result<unknown, unknown>[]> = {
   [K in keyof T]: K extends number ? (T[K] extends Result<infer U, unknown> ? U : never) : never;
 };
 
-class Res {
+const Res = {
   // From Serial format of a result, convert it into a result type
   /**
    * @template T,E
    * @param a - serialized format of the result
    * @return {Result<T,E>} - new instance of `Result` by deserializing the serial format
    */
-  static fromSerial<T, E>(a: ResultSerial<T, E> | Promise<ResultSerial<T, E>>): Result<T, E> {
+  fromSerial<T, E>(a: ResultSerial<T, E> | Promise<ResultSerial<T, E>>): Result<T, E> {
     const p = Promise.resolve(a) satisfies Promise<ResultSerial<T, E>>;
     return new KResult<T, E>(p);
-  }
+  },
 
   // Resolve the promise of a result, Promise<Result<T, E>> to Result<T,E> without async/await
   /**
@@ -63,7 +63,7 @@ class Res {
    * @param p - promise of a result to resolve
    * @returns {Result<T,E>} - resolved result
    */
-  static fromAsync<T, E>(p: Promise<Result<T, E>>): Result<T, E> {
+  fromAsync<T, E>(p: Promise<Result<T, E>>): Result<T, E> {
     return new KResult<T, E>(
       (async () => {
         const r = await p;
@@ -77,7 +77,7 @@ class Res {
         }
       })(),
     );
-  }
+  },
 
   // Create a Result from async function
   /**
@@ -85,16 +85,16 @@ class Res {
    * @param fn - function that results in a Result, asynchronous
    * @returns {Result<T,E>} - resolved result
    */
-  static async<T, E>(fn: () => Promise<Result<T, E>>): Result<T, E> {
+  async<T, E>(fn: () => Promise<Result<T, E>>): Result<T, E> {
     return Res.fromAsync(fn());
-  }
+  },
 
   // takes in a list of results and returns a new result with a list of ok values if all results are ok or a list of error values if at least one result is an error
   /**
    * @template
    * @param i - list of results
    */
-  static all<T extends Result<unknown, unknown>[]>(...i: [...T]): Result<ResultOk<T>, ResultErr<T>> {
+  all<T extends Result<unknown, unknown>[]>(...i: [...T]): Result<ResultOk<T>, ResultErr<T>> {
     const closure = async (): Promise<Result<ResultOk<T>, ResultErr<T>>> => {
       const ok: ResultOk<T> = [] as unknown as ResultOk<T>;
       const err: ResultErr<T> = [] as unknown as ResultErr<T>;
@@ -122,8 +122,8 @@ class Res {
       return Ok(ok);
     };
     return Res.fromAsync(closure());
-  }
-}
+  },
+};
 
 interface Result<T, E> {
   // returns a Promise of a boolean indicating whether the variant of the Result is "ok"
