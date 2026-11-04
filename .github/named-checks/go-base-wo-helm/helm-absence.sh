@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Nothing of H survives: no H path, no reference to one, no H job, include,
-# hook, Dependabot entry or probe row, no helm-carrying nix aggregate, and no
-# helm binary in the default shell. The many-owner files the strip edited
-# still parse and lint.
+# Nothing of H survives, and the many-owner files the strip edited still parse.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -28,7 +25,6 @@ H_PATHS=(
   probes/helm-lint.ts
   probes/helm-render.ts
   probes/hook-helm-lint.ts
-  .helmignore
 )
 # Strings no remaining file may contain (the parent ledger's H_TOKENS).
 H_TOKENS=(
@@ -43,11 +39,14 @@ SCAN_EXEMPT=(':!.github/named-checks/**' ':!Changelog.md' ':!probes/lib/**')
 for p in "${H_PATHS[@]}"; do
   if [[ -n "$(git ls-tree --name-only "${tree}" -- "${p}")" ]]; then fail "H path still tracked: ${p}"; fi
 done
+if git ls-tree -r --name-only "${tree}" | grep -Eq '(^|/)\.helmignore$'; then fail ".helmignore still tracked"; fi
 
 # --- references -------------------------------------------------------------------
 args=()
 for t in "${H_TOKENS[@]}"; do args+=(-e "${t}"); done
-hits="$(git -c core.quotePath=false grep -n -F "${args[@]}" "${tree}" -- . "${SCAN_EXEMPT[@]}" || true)"
+rc=0
+hits="$(git -c core.quotePath=false grep -n -F "${args[@]}" "${tree}" -- . "${SCAN_EXEMPT[@]}")" || rc=$?
+[[ ${rc} -le 1 ]] || fail "git grep failed (exit ${rc})"
 [[ -z ${hits} ]] || fail "files still reference removed H paths:"$'\n'"${hits}"
 
 # --- anchored entries -------------------------------------------------------------

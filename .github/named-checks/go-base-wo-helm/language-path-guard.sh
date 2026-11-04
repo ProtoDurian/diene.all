@@ -10,8 +10,8 @@ git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "‚ù
 
 # index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"
-mapfile -t touched < <(git -c core.quotePath=false diff --no-renames --name-only "${parent_sha}" "${tree}" |
-  grep -E '^docs/standards/[^/]+/languages/go\.md$' || true)
+changed="$(git -c core.quotePath=false diff --no-renames --name-only "${parent_sha}" "${tree}")"
+mapfile -t touched < <(grep -E '^docs/standards/[^/]+/languages/go\.md$' <<<"${changed}" || true)
 
 if [[ ${#touched[@]} -gt 0 ]]; then
   echo "‚ùå the strip touches a protected language variant:" >&2

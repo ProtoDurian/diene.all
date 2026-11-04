@@ -3,7 +3,6 @@ set -euo pipefail
 
 # go-base-wo-helm is cut from go-base: HEAD contains go-base's recorded .3 commit.
 
-# The graph ancestor: go-base at its recorded .3 commit (parent.sha).
 parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ go-base .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }

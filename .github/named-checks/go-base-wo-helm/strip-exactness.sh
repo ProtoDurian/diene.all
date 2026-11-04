@@ -78,7 +78,7 @@ drop_yaml_job() {
         if (line[i] == k) {
           if (n > 0 && out[n] == "") n--
           for (i++; i <= NR && (line[i] == "" || line[i] ~ /^    /); i++) {}
-          i--
+          for (i--; line[i] == ""; i--) {}
           continue
         }
         out[++n] = line[i]
@@ -107,7 +107,9 @@ apply_H() {
   edit docs/standards/taskfile/index.md sed_z 's#Docker and Helm tasks are keyed by the artifact they act on — one task set per\nDockerfile and per chart. See \[the Docker standard\](\.\./docker/index\.md) and\n\[the Helm standard\](\.\./helm/index\.md) for that naming convention\.#Docker tasks are keyed by the artifact they act on — one task set per Dockerfile.\nSee [the Docker standard](../docker/index.md) for that naming convention.#'
 
   # go-base's H contributions
-  edit docs/developer/go-baseline.md sed_z 's|## Docker and Helm\n|## Docker\n|;s| The root chart remains a minimal\nall-yes Helm surface and is intentionally independent of downstream service\nchart design\.\n|\n|;s|surface, the Docker entrypoint and chart\nmetadata\. |surface and the Docker entrypoint.\n|'
+  edit docs/developer/go-baseline.md sed_z 's|## Docker and Helm\n|## Docker\n|'
+  edit docs/developer/go-baseline.md sed_z 's| The root chart remains a minimal\nall-yes Helm surface and is intentionally independent of downstream service\nchart design\.\n|\n|'
+  edit docs/developer/go-baseline.md sed_z 's|surface, the Docker entrypoint and chart\nmetadata\. |surface and the Docker entrypoint.\n|'
 
   # nix: the aggregates carry H by content; take the axis-pure slices. Docker
   # (D) keeps its slices. kubectl and k3d ship only in infrautils-k8s, beside
