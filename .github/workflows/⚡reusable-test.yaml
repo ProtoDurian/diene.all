@@ -18,8 +18,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
-        with:
-          namespacelabs: 'true'
       - uses: AtomiCloud/actions.cache-nuget@v2
       - uses: AtomiCloud/actions.setup-docker@v2
       - name: Run ${{ inputs.mode }} coverage
