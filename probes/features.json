@@ -283,5 +283,10 @@
     "template": "diene/go-base",
     "name": "system-integration-tests",
     "class": "smoke"
+  },
+  {
+    "template": "diene/observability",
+    "name": "observability-standards-present",
+    "class": "presence"
   }
 ]
