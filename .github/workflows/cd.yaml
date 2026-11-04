@@ -15,6 +15,6 @@ jobs:
     uses: ./.github/workflows/⚡reusable-docker.yaml
     secrets: inherit
     with:
-      image_name: diene-go-base
+      image_name: diene-workspace
       dockerfile: ./infra/Dockerfile
       version: ${{ github.ref_name }}

@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Populate the module cache first so skills-sync cannot vendor from a partial tree.
-go mod download
+root_dir="$(git rev-parse --show-toplevel)"
+cd "${root_dir}"
 
 releaser conventions -c release.yaml
 skills-sync sync
+
+go mod download
 
 echo "✅ setup completed"

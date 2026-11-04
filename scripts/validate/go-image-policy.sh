@@ -7,7 +7,6 @@ policy="${1:-}"
 dockerfile="infra/Dockerfile"
 [ ! -f "${dockerfile}" ] && echo "❌ '${dockerfile}' not found" >&2 && exit 1
 
-# Read stages the way Docker does: keywords are case-insensitive and indentable, --flags are noise, and an uninterpretable shape is a parse failure rather than a skipped line.
 reader_status=0
 instructions="$(awk -v OFS='\t' '
   { keyword = toupper($1) }
@@ -30,7 +29,6 @@ parse_line="$(awk -F '\t' '$1 == "PARSE" {print $2; exit}' <<<"${instructions}")
 final_from="$(awk -F '\t' '$1 == "FROM" {stage = $2} END {print stage}' <<<"${instructions}")"
 [ -z "${final_from}" ] && echo "❌ '${dockerfile}' declares no image stage" >&2 && exit 1
 
-# Every stage starts unprivileged again, and within the final stage the last USER wins.
 final_user="$(awk -F '\t' '$1 == "FROM" {user = ""} $1 == "USER" {user = $2} END {print user}' <<<"${instructions}")"
 observed_user="$([ -n "${final_user}" ] && echo "USER ${final_user}" || echo '<none declared>')"
 

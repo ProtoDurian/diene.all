@@ -1,5 +1,5 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
-import { unformatGo } from './lib/go.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic, unformatGo } from './lib/go.ts';
 
 const gate = 'nix fmt --no-write-lock-file -- --ci --formatters gofumpt';
 

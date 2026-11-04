@@ -1,13 +1,13 @@
-### workspace [vcs-env]
-.direnv
-.env
-.env.*
-.git
-.gitignore
-*.log
+### go-base
+coverage
+dist
+reports
 
-### workspace [non-runtime]
-!README.md
+### nix
+result
+result-*
+
+### non-runtime
 *.md
 .claude
 .dockerignore
@@ -15,10 +15,10 @@
 docs
 probes
 
-### workspace [nix]
-result
-result-*
-
-coverage
-dist
-reports
+### vcs-env
+.direnv
+.env
+.env.*
+.git
+.gitignore
+*.log

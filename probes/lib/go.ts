@@ -1,5 +1,32 @@
 import type { ProbeRepo } from '@cyanprint/contracts';
-import { restoreProbeState } from './helpers.ts';
+import { capturedEnvCommand, restoreProbeState } from './helpers.ts';
+
+// Cold Go module and build caches run past the parent helpers' 240 s cap.
+const GO_TIMEOUT_MS = 600000;
+
+export async function expectGreen(repo: any, command: string, label: string, timeoutMs = GO_TIMEOUT_MS): Promise<void> {
+  const result = await repo.exec(capturedEnvCommand(command, label), { timeoutMs });
+  if (result.exitCode !== 0) {
+    throw new Error(`${label} failed on the healthy repo: ${result.stderr || result.stdout}`);
+  }
+}
+
+export async function expectRedWithDiagnostic(
+  repo: any,
+  command: string,
+  label: string,
+  expected: RegExp,
+  timeoutMs = GO_TIMEOUT_MS,
+): Promise<void> {
+  const result = await repo.exec(capturedEnvCommand(command, label), { timeoutMs });
+  if (result.exitCode === 0) {
+    throw new Error(`${label} stayed green after sabotage`);
+  }
+  const diagnostic = `${result.stdout}\n${result.stderr}`;
+  if (!expected.test(diagnostic)) {
+    throw new Error(`${label} failed for the wrong reason; expected ${expected}: ${diagnostic}`);
+  }
+}
 
 function directory(path: string): string {
   return path.slice(0, path.lastIndexOf('/'));
@@ -33,7 +60,6 @@ export async function flipGoAssertion(repo: ProbeRepo): Promise<string> {
   throw new Error('no structural Go assertion target found');
 }
 
-// Return the untracked fixture path so the caller can clean it precisely.
 export async function plantWhiteBoxTest(repo: ProbeRepo): Promise<string> {
   const paths = (await repo.glob('tests/**/*_test.go')).sort();
   if (paths.length === 0) {
@@ -65,7 +91,6 @@ export async function breakAdapter(repo: ProbeRepo): Promise<string> {
   throw new Error('no structural adapter method target found');
 }
 
-// Resolve fallible metadata before writing, then return the exact fixture path.
 export async function plantGoFile(
   repo: ProbeRepo,
   glob: string,
@@ -79,7 +104,6 @@ export async function plantGoFile(
   return target;
 }
 
-// Return both halves of the test-only-reachability fixture for atomic cleanup.
 export async function plantProductionOnlySymbol(repo: ProbeRepo): Promise<string[]> {
   const tests = (await repo.glob('tests/unit/**/*_test.go')).sort();
   if (tests.length === 0) {
