@@ -25,7 +25,6 @@ instructions="$(awk -v OFS='\t' '
 parse_line="$(awk -F '\t' '$1 == "PARSE" {print $2; exit}' <<<"${instructions}")"
 [ -n "${parse_line}" ] && echo "❌ could not parse '${dockerfile}' image instruction on line ${parse_line}" >&2 && exit 1
 
-# Read policy from the shipped final stage so an earlier compliant stage cannot vouch for a later unsafe one.
 final_from="$(awk -F '\t' '$1 == "FROM" {stage = $2} END {print stage}' <<<"${instructions}")"
 [ -z "${final_from}" ] && echo "❌ '${dockerfile}' declares no image stage" >&2 && exit 1
 

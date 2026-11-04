@@ -9,7 +9,6 @@ watch="${3:-false}"
 tests="$(yq -r ".tiers.${mode}.tests" .config/go-base.coverage.yaml)"
 packages="$(yq -r ".tiers.${mode}.packages" .config/go-base.coverage.yaml)"
 
-# Watch mode replaces this script so execution cannot fall through to a coverage gate without a profile.
 [ "${watch}" = "true" ] && exec gotestsum --watch -- "${tests}"
 
 profile="reports/${mode/int/integration}/coverage.out"

@@ -23,7 +23,7 @@ export default {
       async run(repo: any) {
         const original = await repo.read('infra/Dockerfile');
         try {
-          // Leave the compliant declaration in place: the effective user is the last one Docker reads, case-insensitively and indented.
+          // Keep the compliant USER: Docker uses the last one.
           await repo.patch('infra/Dockerfile', {
             find: 'USER 65532:65532\n',
             replace: 'USER 65532:65532\n  user 0:0\n',
