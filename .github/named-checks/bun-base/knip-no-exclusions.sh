@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# R12: Knip configuration carries no ignore/exclude entries, at any depth, in
-# any of the four configs.
-
 tree="$(git write-tree)"
 mapfile -t configs < <(git -c core.quotePath=false ls-tree --name-only "${tree}" | grep -E '^knip(\.production)?(\.llm)?\.json$' || true)
 

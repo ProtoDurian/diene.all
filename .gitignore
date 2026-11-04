@@ -1,23 +1,20 @@
-### workspace [nix]
-.direnv/
+### bun-base
+*.tsbuildinfo
+coverage/
+dist/
+node_modules/
+
+### bun-lib
+*.tgz
+.npmrc
+
+### nix-init
+.direnv
 .pre-commit-config.yaml
 /result
 /result-*
 
-### workspace [secrets]
-!.env.example
-.env
-.env.*
-
-### workspace [tooling]
-*.log
-*.swo
-*.swp
-*~
-.kagent/
-.kloop/
-
-### workspace [os-editors]
+### os-editors
 ._*
 .DS_Store
 .idea/
@@ -25,14 +22,17 @@
 Thumbs.db
 desktop.ini
 
-### bun-base
-#### source: bun-base
-node_modules/
-dist/
-coverage/
-*.tsbuildinfo
+### secrets
+.env
+.env.*
 
-### bun-lib
-#### source: bun-lib
-*.tgz
-.npmrc
+### secrets-keep
+!.env.example
+
+### tooling
+*.log
+*.swo
+*.swp
+*~
+.kagent/
+.kloop/

@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# shared ships agnostic standards only: no language variants (each base adds its
-# own), no observability or grafana-dashboards content (the observability
-# payload branch owns it), and no legacy docs/developer/standard/** path.
-
 tree="$(git write-tree)"
 mapfile -t offending < <(git -c core.quotePath=false ls-tree -r --name-only "${tree}" |
   grep -E '(^|/)languages/[^/]+\.md$|^(docs/standards|\.claude/skills)/(observability|grafana-dashboards)(/|$)|^docs/developer/standard/' |

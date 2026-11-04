@@ -4,8 +4,8 @@
 
 - Import from the package root (`@atomicloud/diene.bun-lib`); let the exports map
   pick the right module and declaration file for your module system.
-- Depend on the published API surface only — `buildSampleKey`,
-  `createRedisStore`, `persistSample`, and the `IKeyValueStore` /
+- Depend on the published API surface only — `KeyComposer`, `SampleService`,
+  `RedisKeyValueStore`, `RedisConfigParser`, `Cleanup`, and the `IKeyValueStore` /
   `RedisConnection` types.
 - Provide your own `RedisConnection` and close the store you create.
 
@@ -16,7 +16,7 @@
 
 ## TestHelper
 
-This library ships **no** TestHelper: its surface is pure functions plus a thin
+This library ships **no** TestHelper: its surface is small sample classes plus a thin
 Redis-backed store, so consumers fake the `IKeyValueStore` port directly in
 their own tests. If a real, repeated consumer pain later appears (for example a
 shared fake store or an assertion helper every consumer rewrites), add it as a

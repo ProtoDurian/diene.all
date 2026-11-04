@@ -1,5 +1,3 @@
-# ### bun-base-reusable-test
-# #### source: bun-base
 name: ⚡ Reusable Tests
 
 on:
@@ -9,48 +7,28 @@ on:
         description: Test mode to run (unit, int, or conditional meta)
         required: true
         type: string
-      runs_on:
-        description: 'JSON runs-on value. Empty (default): Namespace 4x8 with a 20 GB cache volume. Pass a JSON label list or a namespace-profile-* label to override.'
-        required: false
-        type: string
-        default: ''
-      nix_cache_tag:
-        description: 'Namespace cache volume tag for the Nix store. Give each stack (language toolchain) its own tag so its closure stays warm; keep the number of tags small.'
-        required: false
-        type: string
-        default: 'nix-store-cache-ubuntu-26.04-amd64'
-    secrets:
-      CODECOV_TOKEN:
-        required: false
 
 jobs:
   test:
     name: ${{ inputs.mode == 'int' && 'Integration Tests' || inputs.mode == 'meta' && 'Meta Tests' || 'Unit Tests' }}
-    runs-on: ${{ fromJSON(inputs.runs_on != '' && inputs.runs_on || format('["nscloud-ubuntu-26.04-amd64-4x8-with-cache","nscloud-cache-size-20gb","nscloud-cache-tag-{0}"]', inputs.nix_cache_tag)) }}
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
     timeout-minutes: 30
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
         with:
-          namespacelabs: ${{ (inputs.runs_on == '' || contains(inputs.runs_on, 'nscloud') || contains(inputs.runs_on, 'namespace-profile')) && 'true' || 'false' }}
+          namespacelabs: 'true'
       - uses: AtomiCloud/actions.cache-bun@v2
       - name: Run ${{ inputs.mode }} tests
         env:
           TEST_MODE: ${{ inputs.mode }}
         run: nix develop .#ci -c ./scripts/ci/test.sh "$TEST_MODE"
       - name: Upload ${{ inputs.mode }} coverage artifact
-        if: ${{ always() && hashFiles(format('coverage/{0}/lcov.info', inputs.mode)) != '' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ inputs.mode }}
           path: coverage/${{ inputs.mode }}
           if-no-files-found: warn
-      - name: Upload ${{ inputs.mode }} coverage to Codecov
-        if: ${{ always() && hashFiles(format('coverage/{0}/lcov.info', inputs.mode)) != '' }}
-        continue-on-error: true
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
-        with:
-          files: coverage/${{ inputs.mode }}/lcov.info
-          flags: ${{ inputs.mode }}
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-          disable_search: true

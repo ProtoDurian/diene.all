@@ -7,8 +7,8 @@ description: Use when consuming @atomicloud/diene.bun-lib — importing its API,
 from the package root; both `import` and `require` resolve, and TypeScript picks
 up `.d.ts` (ESM) or `.d.cts` (CJS) automatically.
 
-- **ESM**: `import { buildSampleKey, createRedisStore, persistSample } from '@atomicloud/diene.bun-lib';`
-- **CJS**: `const { buildSampleKey } = require('@atomicloud/diene.bun-lib');`
+- **ESM**: `import { KeyComposer, RedisKeyValueStore, SampleService } from '@atomicloud/diene.bun-lib';`
+- **CJS**: `const { KeyComposer } = require('@atomicloud/diene.bun-lib');`
 
 Read [patterns.md](patterns.md) for the do's, don'ts, and — because this
 library ships no TestHelper — how to create one for it when a real consumer need

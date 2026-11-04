@@ -23,7 +23,7 @@ export default {
         const entrySource = await repo.read('src/index.ts');
         const path = (await repo.glob('src/lib/**/*.ts')).sort().find((candidate: string) => {
           const modulePath = `./${candidate.replace(/^src\//, '').replace(/\.ts$/, '')}`;
-          return !entrySource.includes(modulePath);
+          return !entrySource.includes(`export * from '${modulePath}'`);
         });
         if (!path) throw new Error('no internal TypeScript library source found');
         await repo.write(path, `${await repo.read(path)}\nexport const probeDead = 1;\n`);

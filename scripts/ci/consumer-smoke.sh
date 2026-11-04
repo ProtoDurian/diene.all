@@ -38,21 +38,21 @@ cat >"${work}/tsconfig.json" <<'JSON'
 }
 JSON
 cat >"${work}/esm.mjs" <<JS
-import { buildSampleKey } from '${name}';
-if (buildSampleKey('Consumer Proof', 'ESM') !== 'consumer-proof:esm') throw new Error('ESM import returned the wrong key');
+import { KeyComposer } from '${name}';
+if (new KeyComposer('Consumer Proof').compose('ESM') !== 'consumer-proof:esm') throw new Error('ESM import returned the wrong key');
 JS
 cat >"${work}/cjs.cjs" <<JS
-const { buildSampleKey } = require('${name}');
-if (buildSampleKey('Consumer Proof', 'CJS') !== 'consumer-proof:cjs') throw new Error('CJS require returned the wrong key');
+const { KeyComposer } = require('${name}');
+if (new KeyComposer('Consumer Proof').compose('CJS') !== 'consumer-proof:cjs') throw new Error('CJS require returned the wrong key');
 JS
 cat >"${work}/types-esm.mts" <<TS
-import { buildSampleKey } from '${name}';
-const key: string = buildSampleKey('Consumer Proof', 'ESM');
+import { KeyComposer } from '${name}';
+const key: string = new KeyComposer('Consumer Proof').compose('ESM');
 export { key };
 TS
 cat >"${work}/types-cjs.cts" <<TS
-import { buildSampleKey } from '${name}';
-const key: string = buildSampleKey('Consumer Proof', 'CJS');
+import { KeyComposer } from '${name}';
+const key: string = new KeyComposer('Consumer Proof').compose('CJS');
 export { key };
 TS
 
