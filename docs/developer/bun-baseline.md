@@ -47,6 +47,8 @@ typechecking. Knip has four dead-code modes, none with ignore or exclude lists:
   and cover only `src/adapters/**`.
 - Both CI entry points require an LCOV artifact, reject paths outside their
   tier ledger, and require every ledger line to be hit.
+- Each tier writes its own LCOV file: `reports/unit/lcov.info` and
+  `reports/integration/lcov.info`.
 
 Tests use `bun:test`, `describe`/`it`, `// Arrange` / `// Act` / `// Assert`
 blocks, and prototype `should` assertions.
