@@ -22,9 +22,7 @@ echo "📝 Emitting bundled declarations..."
 bunx dts-bundle-generator -o dist/index.d.ts src/index.ts --no-check
 cp dist/index.d.ts dist/index.d.cts
 bunx tsc -p tsconfig.declarations.json
-# The helper references the root and result packages by name, so a single emitted
-# declaration resolves correctly under both the import (.d.ts) and require (.d.cts)
-# conditions — no per-format specifier rewrite is required.
+# The helper names the root package, so one declaration serves both conditions.
 cp dist/.declarations/test-helper/index.d.ts dist/test-helper.d.ts
 cp dist/.declarations/test-helper/index.d.ts dist/test-helper.d.cts
 rm -rf dist/.declarations
