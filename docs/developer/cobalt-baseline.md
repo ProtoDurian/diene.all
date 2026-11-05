@@ -1,69 +1,53 @@
 # Cobalt baseline
 
-This branch is the materialized cobalt product: the External Secrets Operator plus the Infisical source-of-secrets (SoS) `ClusterSecretStore` gateway for AtomiCloud clusters. It instantiates the helm-wrapper shape as a concrete chart instance (S30), so it carries an ordinary testing pyramid, not a CyanPrint probe matrix.
+`cobalt` is the secrets gateway: the vendored External Secrets Operator (`external-secrets` 2.7.0) plus one chart-owned
+`ClusterSecretStore` named `infisical`. It is a materialized helm-wrapper instance (S30): an ordinary unit + integration
+testing pyramid, no `probes/`.
 
-## Purpose
+## What the chart renders
 
-cobalt is the cluster-wide root of the read chain. The `ClusterSecretStore` binds to the SoS Infisical project (tokens only) and is scoped to the cluster's landscape (env == landscape): it can read all SoS tokens for that landscape and nothing else. Downstream carbon (per-cluster chart) pulls its platform's SoS token through this store and creates the platform `SecretStore`; services declare `ExternalSecrets` against that store.
+- ESO with upstream defaults. The only overrides: `fullnameOverride: cobalt-eso`, LPSM `commonLabels`, the Reloader pod
+  annotation, pod-level `runAsNonRoot`, and CPU/memory requests and limits for the controller, webhook and cert-controller.
+- The `infisical` `ClusterSecretStore` (`external-secrets.io/v1`):
+  - provider Infisical, `hostAPI: https://secrets.atomi.cloud`;
+  - `secretsScope`: `projectSlug: sos`, `environmentSlug` = `serviceTree.landscape`, `secretsPath: /`, `recursive: true`.
+    It reads every SoS token of the cluster's landscape and nothing else.
+  - auth: `universalAuthCredentials` that reference the SoS bootstrap Secret (`store.credentials`: name, namespace, keys).
+    T3's cluster provisioning writes that Secret; cobalt never creates it and never holds a literal.
+- No PushSecret, no ExternalSecret, no hook Job, no config vendoring, no docker axis. Cobalt is pull-only.
 
-- Pull-only ESO plumbing. There is no `PushSecret` anywhere in diene; cobalt never writes to Infisical.
-- The SoS bootstrap credential (the Infisical universal-auth client id/secret) is written into the cluster by the T3 cluster controller during provisioning. cobalt only consumes the bootstrap `Secret`; it never bootstraps the credential itself and never inlines credential literals.
-- Infisical runs on Primordial. If Primordial (and Infisical with it) goes down, the consequence is a rotation/sync pause only; already-materialized k8s Secrets persist in-cluster.
+## Values
 
-## Rendering model
+1. `chart/values.yaml` — serviceTree (`secrets` / `cobalt` / `sos` / layer `1`), the store block, ESO overrides.
+2. `chart/values.<landscape>.yaml` — `serviceTree.landscape` (and its LPSM label). This sets the store's SoS environment and is
+   the only per-landscape delta.
+3. `chart/values.<cluster>.yaml` — `serviceTree.cluster` (and its LPSM label).
 
-Render values in two independent dimensions (disjoint landscape/cluster vocabularies, never a cross-product):
+The base chart refuses to render without a landscape. `upstream.commonLabels` are literal values; the chart refuses any drift
+from `labelPrefix` + `serviceTree`. Release namespace = `serviceTree.platform` = `secrets`.
 
-1. `chart/values.yaml` — service-tree defaults plus the SoS store and minimal ESO overrides.
-2. `chart/values.<landscape>.yaml` — landscape identity; pins the store's SoS environment (`environmentSlug`). This is the only per-landscape delta.
-3. `chart/values.<cluster>.yaml` — thin cluster identity.
+Reloader: ESO's `global.podAnnotations` fallback opts all three workloads in (`reloader.stakater.com/auto: "true"`); set the
+same key to `"false"` to opt out.
 
-The sample stack is `values.yaml` → `values.example.yaml` → `values.lapras.yaml`. The base chart deliberately fails to render without a landscape overlay: the store MUST be scoped to a landscape.
+## CRDs and API version
 
-ESO's supported `global.podAnnotations` fallback opts the controller, webhook, and cert-controller into Reloader by default with `reloader.stakater.com/auto: "true"`. Unsafe workloads deliberately opt out by overriding that value with the string `"false"`; the unit tier renders and asserts both states across all three Deployments.
+- The ESO CRDs are normal Helm templates (`installCRDs: true`), so `helm upgrade` carries CRD updates. There is no CRD-apply
+  step. `scripts/validate/cobalt-expected-crds.txt` pins the rendered CRD set; refresh it on a dependency bump.
+- Everything cobalt authors is `external-secrets.io/v1`. `crds.unsafeServeV1Beta1` stays upstream `false`.
+- A first install cannot hold a CR of a CRD the same release creates. ArgoCD handles it through
+  `SkipDryRunOnMissingResource=true` on the store. Plain Helm needs an install without the store first (the k3d test uses a
+  post-renderer), then an upgrade.
 
-## Identity and naming
+## Tests
 
-- `labelPrefix` (default `atomi.cloud`) is the only prefix input; every service-tree label/annotation helper reads it.
-- LPSM is `{landscape, platform, service, module}`. cobalt is cluster-wide layer-1 infrastructure, so `platform` is a layer-1 scope marker (`cluster`) rather than a release namespace.
-- The `ClusterSecretStore` fullname is `cobalt-sos` (`<service>-<token>`, exactly one dash, fused token). The ESO subchart receives `fullnameOverride: cobalt-eso`.
-
-## Secrets
-
-The `ClusterSecretStore` uses the Infisical provider with universal-auth credentials read from the bootstrap `Secret` (`cobalt-sos-bootstrap` in the `external-secrets` namespace). The template refuses any inline credential literal. The store is landscape-scoped: `projectSlug: sos`, `environmentSlug` from the overlay, `secretsPath: /`, `recursive: false`. All resources use `external-secrets.io/v1`; v1beta1 is never authored.
-
-The v1-only and CRD-lifecycle contracts are standalone checkers. Product CI first proves each baseline, then feeds the same checker a copied v1beta1 manifest or an `installCRDs=false` render and requires that mutation to fail. The lifecycle checker compares the render with the complete pinned ESO 2.7.0 CRD name set, so a missing CRD cannot pass as a successful negative test.
-
-## Absent wrapper surfaces
-
-cobalt inherits the helm-wrapper shape but three sample surfaces are intentionally absent: there is no pre-sync migration hook Job, no build-phase config vendoring, and no ExternalSecret folder-prefix mapping (cobalt authors a `ClusterSecretStore`, not `ExternalSecret`s).
-
-## Rendered-manifest validation
-
-`scripts/validate/cobalt.sh rendered-manifests` runs the generic chart-bearing-repository stage:
-
-1. Helm renders the stacked values.
-2. kubeconform validates Kubernetes objects plus the checked-in local `ClusterSecretStore` schema. Upstream ESO CRD definitions are vendored and skipped (`-skip CustomResourceDefinition`); they are validated upstream.
-3. Kyverno CLI evaluates definition-only native ValidatingAdmissionPolicy fixtures against the workload and Service resources named by those policies' `resourceRules`.
-
-The local VAP profile covers explicit non-latest tags, requests/limits, non-root baseline-plus security, and the NodePort prohibition. cobalt proves the wiring with one `:latest` fault (`vap-latest-negative`).
+- Unit: `scripts/ci/cobalt.sh` runs every `scripts/validate/cobalt.sh` mode. Each contract has negative fixtures in the same
+  mode that must fail for the expected reason. `rendered-manifests` is the inherited stage: `helm template` → kubeconform (the
+  store against its CRD's v1 schema) → `kyverno apply policies/vap` on the three ESO Deployments and the webhook Service.
+- Integration: `scripts/ci/cobalt-k3d.sh` installs on k3d. It checks that the ESO pods are healthy, that the store is
+  applied by Helm, that the API server rejects a malformed store, and that `v1beta1` is not served. Then it round-trips the
+  chart through a local OCI registry. Ready is not asserted, because it needs a live Infisical.
+- `task latest` prints the newest upstream chart and image tags.
 
 ## Publishing
 
-OCI is the default publish/consume mode. Git chart repositories remain secondary. `scripts/release/bump.sh` stamps `chart/Chart.yaml` at the release commit. `scripts/ci/publish.sh` refuses a manifest/tag mismatch, regenerates Helm docs, derives the package name from `chart/Chart.yaml`, and supports git packaging plus OCI dry-run or push.
-
-## Tokenization surface
-
-Tokenize these isolated scalars when materializing an instance:
-
-- chart and release name (`diene-cobalt`, `cobalt-sos`, `cobalt-eso`);
-- `serviceTree` platform/service/module/layer values;
-- `labelPrefix`;
-- upstream chart name/version/repository (`external-secrets`, `2.7.0`) and vendored archive filename;
-- upstream image reference (`ghcr.io/external-secrets/external-secrets`);
-- Infisical `hostAPI`, SoS `projectSlug`, and the bootstrap `Secret` name/namespace;
-- OCI organization/repository path and secondary git repository URL;
-- landscape and cluster overlay filenames;
-- k3d cluster and local registry names.
-
-Held ENV profile names, final landscape rosters, and the exact bootstrap credential interface stay outside this node until their owning work lands.
+OCI is the default mode and git is secondary (inherited `scripts/ci/publish.sh`). The package is `cobalt-<version>.tgz`.

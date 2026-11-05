@@ -7,6 +7,7 @@ release_version="${RELEASE_VERSION:-}"
 output_dir="${PUBLISH_OUTPUT_DIR:-dist/${mode}}"
 oci_registry="${OCI_REGISTRY:-}"
 oci_repository="${OCI_REPOSITORY:-charts}"
+oci_repository="${oci_repository,,}"
 plain_http="${OCI_PLAIN_HTTP:-false}"
 oci_username="${OCI_USERNAME:-}"
 oci_password="${OCI_PASSWORD:-}"
@@ -17,17 +18,12 @@ oci_password="${OCI_PASSWORD:-}"
 version="${release_version#v}"
 manifest_version="$(yq -r '.version' chart/Chart.yaml)"
 [ "${manifest_version}" != "${version}" ] && echo "❌ Chart version ${manifest_version} does not match tag ${version}" >&2 && exit 1
-chart_name="$(yq -r '.name' chart/Chart.yaml)"
 
 helm-docs --chart-search-root chart
 mkdir -p "${output_dir}"
-# Dependencies are vendored (chart/charts/*.tgz committed); only build when the
-# archive is missing so packaging works offline against the committed vendor.
-if ! ls chart/charts/*.tgz >/dev/null 2>&1; then
-  helm dependency build chart
-fi
+helm dependency build chart
 helm package chart --destination "${output_dir}" --version "${version}"
-package="${output_dir}/${chart_name}-${version}.tgz"
+package="${output_dir}/cobalt-${version}.tgz"
 [ ! -s "${package}" ] && echo "❌ chart package was not created" >&2 && exit 1
 
 if [ "${mode}" = "git" ]; then

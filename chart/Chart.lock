@@ -1,6 +1,6 @@
 dependencies:
 - name: external-secrets
-  repository: https://charts.external-secrets.io
+  repository: oci://ghcr.io/external-secrets/charts
   version: 2.7.0
-digest: sha256:d7f1af0e99551afdc3663d68c3992e6468808f17a7ad67187e72a9acb1874250
-generated: "2026-07-19T09:29:44.163874491Z"
+digest: sha256:e20ef668dc1ebb2eb855b1a2fe962d516deccc3c536abd6ad822d99f412fc7d7
+generated: "2026-11-05T23:07:05.084715269Z"

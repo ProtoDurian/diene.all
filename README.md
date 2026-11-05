@@ -1,19 +1,42 @@
-# Diene workspace baseline
-
-Diene's reproducible development environment is managed by Nix. Run `direnv allow` once, then use `task` tasks from the loaded shell.
-
-This branch is the workspace baseline without Docker, inherited by every downstream sample: split CI/CD, Helm, secrets, release configuration, validators, and standards.
-
-## Commands
+# Commands
 
 Run `task --list` for every available task and its description. The task set is
 declared in [`Taskfile.yaml`](Taskfile.yaml), whose `includes:` block maps each
 namespace to a file under [`tasks/`](tasks); a task shown as `<namespace>:<task>`
-is that key in the included file. Build artifacts — Helm charts — live under
-[`infra/`](infra) and may be plural, so their tasks are keyed per artifact. See [the Taskfile standard](docs/standards/taskfile/index.md) for the
+is that key in the included file. Build artifacts — Dockerfiles and Helm charts —
+live under [`infra/`](infra) and may be plural, so their tasks are keyed per
+artifact. See [the Taskfile standard](docs/standards/taskfile/index.md) for the
 conventions.
 
-## Standards
+# Development Environment
+
+All binaries, tools, and PATH are managed by **Nix**. Do not install tools manually or modify PATH outside of the nix configuration.
+
+## Prerequisites
+
+1. **[Nix](https://nixos.org/download)** — package manager
+2. **[Docker](https://docs.docker.com/get-docker)** — container runtime
+3. **[direnv](https://direnv.net/docs/installation.html)** — auto-loads the nix shell on `cd`
+
+## Getting Started
+
+```bash
+direnv allow    # first time only — loads the nix dev shell
+```
+
+Once allowed, direnv automatically loads the development environment whenever you enter the project directory.
+
+## Nix Configuration
+
+See [docs/standards/nix/index.md](docs/standards/nix/index.md) for the full guide on:
+
+- File structure (`flake.nix`, `nix/`, `.envrc`)
+- Adding/removing packages
+- Environment groups and shells
+- Formatters and pre-commit hooks
+- Adding registries
+
+# Standards
 
 The conventions this repository follows live under
 [`docs/standards/`](docs/standards). Read the standard for the surface you are
@@ -21,18 +44,16 @@ changing before you change it. [`CLAUDE.md`](CLAUDE.md) links the ones an agent
 reaches for most often; it is a convenience, not a required index, and nothing
 checks that it names every surface.
 
-Domain-specific architecture and behavior belongs under
-[`docs/domain/`](docs/domain/README.md), not under `docs/standards/`.
+# Workspace baseline
 
-<!-- ### cobalt -->
-<!-- #### source: cobalt -->
+This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, Docker, Helm, secrets, release configuration, validators, and standards.
 
-## Cobalt chart
+# Cobalt
 
-This branch is the External Secrets Operator plus the Infisical source-of-secrets `ClusterSecretStore` gateway: a materialized chart product with stacked values, generated schema, rendered-manifest validation, dual publish modes, and a reserved k3d integration tier.
+This branch materializes the Helm wrapper as `cobalt`: External Secrets Operator 2.7.0 plus the `infisical` ClusterSecretStore (SoS project, scoped to the cluster landscape).
 
-- `task build` — build the pinned upstream chart dependency.
-- `task test:unit` — run schema, lint, render, VAP, store-contract, and publish dry-runs.
-- `task test:int` — install on ephemeral k3d and round-trip the chart through a local OCI registry (reserved proof).
+- `task build` — build the pinned chart dependency.
+- `task test:unit` — run schema, lint, render, store/CRD/v1 contracts, VAP, and publish dry-runs.
+- `task test:int` — install on ephemeral k3d, check ESO health and the applied store, and round-trip the chart through a local OCI registry.
 - `task example:lapras:template` — render the independent landscape + cluster stack.
 - [Cobalt baseline](docs/developer/cobalt-baseline.md)

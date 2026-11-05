@@ -1,9 +1,6 @@
-# Independent landscape overlay. The landscape pins the ClusterSecretStore's SoS
-# environment (env == landscape); it is the only per-landscape delta.
 serviceTree:
   landscape: example
 
-store:
-  infisical:
-    secretsScope:
-      environmentSlug: example
+upstream:
+  commonLabels:
+    atomi.cloud/landscape: example

@@ -1,4 +1,6 @@
-# Independent local-cluster overlay. It contains no landscape decision; the local
-# install proves the operator deploys and the store applies schema-valid.
 serviceTree:
   cluster: lapras
+
+upstream:
+  commonLabels:
+    atomi.cloud/cluster: lapras

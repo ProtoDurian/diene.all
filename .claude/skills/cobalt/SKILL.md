@@ -1,6 +1,6 @@
 ---
 name: cobalt
-description: Use when changing the cobalt External Secrets Operator + Infisical ClusterSecretStore chart, its values overlays, helpers, or product validation and publishing machinery.
+description: Use when changing the cobalt External Secrets Operator wrapper chart, its ClusterSecretStore, values overlays, validation or publishing.
 ---
 
-Read [the Cobalt baseline](../../../docs/developer/cobalt-baseline.md) and the linked Helm, service-tree, validation, testing, and release standards before editing this surface.
+Read [the Cobalt baseline](../../../docs/developer/cobalt-baseline.md) and the linked Helm, service-tree and release standards before editing this surface.

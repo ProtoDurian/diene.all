@@ -1,105 +1,95 @@
-# Diene workspace agent guide
-
-## Agent skills
+# Agent skills
 
 `.claude/skills/vendor/` is tool-owned and is never hand-edited. Nothing in this
 tree writes it: the tool that does is consumed per-template from the Nix registry,
 and this tree declares no packages for it to vendor.
 
-## CI/CD workflows
+# CI/CD workflows
 
 See [docs/standards/ci-cd/index.md](docs/standards/ci-cd/index.md).
 
-## Conventional commits
+# Conventional commits
 
 See [docs/standards/conventional-commits/index.md](docs/standards/conventional-commits/index.md).
 
-## Data validation
+# CyanPrint-managed files
 
-See [docs/standards/validation/index.md](docs/standards/validation/index.md).
+`.cyan_state.yaml` records what CyanPrint manages here:
 
-## Date and time
+- `files`: every path the last generation wrote.
+- `provenance`: per path, how it was merged: `source` (the winning template),
+  `decision` (`added`, `resolver-merged` or `lww-override`), `resolver` and
+  `contributors` (every template that supplied a version).
 
-See [docs/standards/datetime/index.md](docs/standards/datetime/index.md).
+Check a file there before you edit it:
 
-## Domain-driven design
+- **Not listed:** yours. Edit freely.
+- **Listed:** make the smallest line-level edit. No reformatting, reordering,
+  rewriting or renaming, so the next `cyanprint update` 3-way merge stays clean.
+- **More than one contributor:** merged from several templates. Change only your
+  own part.
+- Never hand-edit or delete `.cyan_state.yaml`.
 
-See [docs/standards/domain-driven-design/index.md](docs/standards/domain-driven-design/index.md).
+To pull template changes, use the `cyanprint-update` skill.
 
-## Functional practices
+# Development Environment
 
-See [docs/standards/functional-practices/index.md](docs/standards/functional-practices/index.md).
+All binaries, tools, and PATH are managed by **Nix**. Do not install tools manually or modify PATH outside of the nix configuration.
 
-## Helm charts and publishing
+## Prerequisites
+
+1. **Nix** — package manager ([install](https://nixos.org/download))
+2. **Docker** — container runtime ([install](https://docs.docker.com/get-docker))
+3. **direnv** — auto-loads the nix shell on `cd` ([install](https://direnv.net/docs/installation.html))
+
+## Getting Started
+
+```bash
+direnv allow    # first time only — loads the nix dev shell
+```
+
+## Nix Configuration
+
+See **[docs/standards/nix/index.md](docs/standards/nix/index.md)** for the full guide on:
+
+- File structure (`flake.nix`, `nix/`, `.envrc`)
+- Adding/removing packages
+- Environment groups and shells
+- Formatters and pre-commit hooks
+- Adding registries
+
+# Helm charts and publishing
 
 See [docs/standards/helm/index.md](docs/standards/helm/index.md).
 
-## Infisical and secrets
+# Infisical and secrets
 
 See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).
 
-## Linting and pre-commit
+# Linting and pre-commit
 
 See [docs/standards/linting/index.md](docs/standards/linting/index.md).
 
-## Nix flakes and development shells
-
-Use the repository's Nix shell for every command. Read
-[docs/standards/nix/index.md](docs/standards/nix/index.md) before changing the
-flake or `nix/` modules.
-
-## Release automation
+# Release automation
 
 See [docs/standards/semantic-release/index.md](docs/standards/semantic-release/index.md).
 
-## Repository standards
+# Repository standards
 
-Follow the linked standard before changing its surface. Domain-specific
-architecture and behavior belongs under [docs/domain/](docs/domain/README.md),
-not under `docs/standards/`.
+Follow the linked standard before changing its surface.
 
-## Service-tree identity
+# Service-tree identity
 
 See [docs/standards/service-tree/index.md](docs/standards/service-tree/index.md).
 
-## Shell scripts
+# Shell scripts
 
 See [docs/standards/shell-scripts/index.md](docs/standards/shell-scripts/index.md).
 
-## Software design philosophy
-
-See [docs/standards/software-design-philosophy/index.md](docs/standards/software-design-philosophy/index.md).
-
-## SOLID principles
-
-See [docs/standards/solid-principles/index.md](docs/standards/solid-principles/index.md).
-
-## Stateless OOP and dependency injection
-
-See [docs/standards/stateless-oop-di/index.md](docs/standards/stateless-oop-di/index.md).
-
-## Taskfile conventions
+# Taskfile conventions
 
 See [docs/standards/taskfile/index.md](docs/standards/taskfile/index.md).
 
-## Testing
+# Cobalt
 
-See [docs/standards/testing/index.md](docs/standards/testing/index.md).
-
-## Three-layer architecture
-
-See [docs/standards/three-layer-architecture/index.md](docs/standards/three-layer-architecture/index.md).
-
-## Utility libraries
-
-See [docs/standards/utilities/index.md](docs/standards/utilities/index.md).
-
-Domain-specific architecture and behavior belongs under
-[docs/domain/](docs/domain/README.md).
-
-<!-- ### cobalt -->
-<!-- #### source: cobalt -->
-
-## Cobalt chart
-
-Read [docs/developer/cobalt-baseline.md](docs/developer/cobalt-baseline.md) before changing `chart/`, the stacked values, the Infisical ClusterSecretStore, the ESO subchart overrides, or chart validation and publishing.
+Read [docs/developer/cobalt-baseline.md](docs/developer/cobalt-baseline.md) before changing `chart/`, the stacked values, the ClusterSecretStore, LPSM labels, or chart publishing.

@@ -1,13 +1,12 @@
 apiVersion: v2
-name: diene-cobalt
-description: External Secrets Operator plus the Infisical source-of-secrets ClusterSecretStore gateway for AtomiCloud clusters
+name: cobalt
+description: AtomiCloud secrets gateway - External Secrets Operator plus the SoS Infisical ClusterSecretStore
 type: application
 version: 0.1.0
 appVersion: '2.7.0'
 kubeVersion: '>=1.27.0-0'
 dependencies:
   - name: external-secrets
-    alias: eso
+    alias: upstream
     version: 2.7.0
-    repository: https://charts.external-secrets.io
-    condition: eso.enabled
+    repository: oci://ghcr.io/external-secrets/charts

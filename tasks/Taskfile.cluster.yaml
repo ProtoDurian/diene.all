@@ -2,17 +2,15 @@ version: '3'
 
 tasks:
   debug:
-    desc: Render the stacked chart with debug output
+    desc: Render the stacked chart with debug output from the vendored charts/
     dir: '{{.ROOT_DIR}}/chart'
     cmds:
-      - helm dependency build
       - helm template {{.RELEASE_NAME}} . --namespace {{.NAMESPACE}} --debug --values values.{{.LANDSCAPE}}.yaml --values values.{{.CLUSTER}}.yaml {{.CLI_ARGS}}
 
   template:
-    desc: Render the stacked chart
+    desc: Render the stacked chart from the vendored charts/
     dir: '{{.ROOT_DIR}}/chart'
     cmds:
-      - helm dependency build
       - helm template {{.RELEASE_NAME}} . --namespace {{.NAMESPACE}} --values values.{{.LANDSCAPE}}.yaml --values values.{{.CLUSTER}}.yaml {{.CLI_ARGS}}
 
   install:
