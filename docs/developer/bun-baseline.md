@@ -48,7 +48,7 @@ typechecking. Knip has four dead-code modes, none with ignore or exclude lists:
 - Integration tests live under `tests/integration/`, use Testcontainers Redis,
   and cover only `src/adapters/**`.
 - SIT lives under `tests/sit/`: binary mode is black-box, while in-process mode
-  records the full-system `coverage/sit/lcov.info` ledger.
+  records the full-system `reports/e2e/lcov.info` ledger.
 - Both CI entry points require an LCOV artifact, reject paths outside their
   tier ledger, and require every ledger line to be hit.
 - Each tier writes its own LCOV file: `reports/unit/lcov.info` and

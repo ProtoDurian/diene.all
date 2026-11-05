@@ -90,9 +90,9 @@ tasks:
   test:sit:coverage:
     desc: Run SIT journeys in-process and emit the full-system ledger
     cmds:
-      - rm -rf coverage/sit
+      - rm -rf reports/e2e
       - SIT_DRIVER=inprocess bun test --config=bunfig.sit.toml --coverage
-      - test -f coverage/sit/lcov.info
+      - test -f reports/e2e/lcov.info
 
   test:watch:
     desc: Watch the fast unit suite

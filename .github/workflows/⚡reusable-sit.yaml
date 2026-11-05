@@ -11,8 +11,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
-        with:
-          namespacelabs: 'true'
       - uses: AtomiCloud/actions.cache-bun@v2
       - name: Download compiled binaries
         uses: actions/download-artifact@v8

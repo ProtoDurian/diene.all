@@ -18,8 +18,6 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
-        with:
-          namespacelabs: 'true'
       - uses: AtomiCloud/actions.cache-bun@v2
       - name: Validate the Nix CLI package
         run: nix build .#bun-cli

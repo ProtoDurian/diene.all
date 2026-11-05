@@ -5,7 +5,7 @@ export default commandGate(
   "nix develop .#ci -c bash -lc './scripts/local/setup.sh && task test:sit:coverage'",
   {
     path: 'bunfig.sit.toml',
-    find: 'coverageDir = "coverage/sit"',
-    replace: 'coverageDir = "coverage/wrong"',
+    find: 'coverageDir = "reports/e2e"',
+    replace: 'coverageDir = "reports/wrong"',
   },
 );
