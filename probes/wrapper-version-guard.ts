@@ -9,7 +9,7 @@ export default defineGate({
     async run(repo: any) {
       await expectGreen(
         repo,
-        'nix develop .#cd -c ./scripts/validate/helm-wrapper.sh version',
+        'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh version',
         'wrapper-version-guard',
       );
     },
@@ -25,7 +25,7 @@ export default defineGate({
         await repo.patch(path, { find: 'version: 0.1.0', replace: 'version: 0.2.0' });
         await expectRed(
           repo,
-          'nix develop .#cd -c ./scripts/validate/helm-wrapper.sh version',
+          'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh version',
           'wrapper-version-guard',
         );
       } finally {
