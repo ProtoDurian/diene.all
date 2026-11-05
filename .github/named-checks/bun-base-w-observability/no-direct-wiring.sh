@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# No observability wiring is authored on this branch: the payload arrives only
-# by merging observability's .3 commit. On the first-parent chain from
-# bun-base .3 to HEAD, a commit that is not a merge may touch only this node's
-# named checks; a merge of the payload may touch only payload paths; a merge
-# of bun-base history is a parent cascade; any other merge only records a
-# superseded tip and keeps its first parent's tree.
-
 here="$(dirname "$0")"
 own_pattern='^\.github/named-checks/bun-base-w-observability/[^/]+$'
 
