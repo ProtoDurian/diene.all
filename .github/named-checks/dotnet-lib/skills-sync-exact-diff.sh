@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # The vendored-skill tree is exactly what skills-sync writes: a frozen sync changes
-# nothing and the index agrees with it.
+# nothing, and with no runtime declared nothing is vendored at all.
 
 cd "$(git rev-parse --show-toplevel)"
 
@@ -12,6 +12,10 @@ if ! skills-sync sync --frozen; then
 fi
 if [[ -n "$(git status --porcelain -- .claude/skills)" ]]; then
   echo "❌ skills-sync left changes under .claude/skills" >&2
+  exit 1
+fi
+if [[ "$(yq '.runtimes // [] | length' skills-sync.yaml)" == 0 && -n "$(git ls-files -- .claude/skills/vendor)" ]]; then
+  echo "❌ skills-sync declares no runtime but .claude/skills/vendor tracks files" >&2
   exit 1
 fi
 
