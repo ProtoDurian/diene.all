@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# bun-base depends on no graph descendant: every @atomicloud/diene.* package is
-# built from a bun-base descendant, so package.json declares none of them.
-
 tree="$(git write-tree)"
 found="$(git show "${tree}:package.json" | jq -r '[(.dependencies, .devDependencies, .peerDependencies, .optionalDependencies) // {} | keys[] | select(startswith("@atomicloud/diene."))] | unique | join(", ")')"
 

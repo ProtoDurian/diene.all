@@ -1,9 +1,8 @@
 import { describe, it } from 'bun:test';
 import { rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import should from 'should';
+import 'should';
 
-/** Drive the same fixture command green and sabotaged to prove the threshold blocks. */
 const REPOSITORY_ROOT = resolve(import.meta.dir, '../..');
 const FIXTURE_CONFIG = 'tests/fixtures/coverage-gate/bunfig.toml';
 const FIXTURE_COVERAGE_DIR = 'coverage/fixture';
@@ -37,11 +36,12 @@ describe('coverage threshold gate', () => {
   it('should pass and write a scoped lcov artifact when the fixture suite is intact', async () => {
     // Act
     const actual = await runGate(false);
+    const artifactExists = await Bun.file(resolve(REPOSITORY_ROOT, FIXTURE_ARTIFACT)).exists();
 
     // Assert
-    should(actual.exitCode).equal(0, actual.output);
-    should(actual.output).match(/0 fail/);
-    should(await Bun.file(resolve(REPOSITORY_ROOT, FIXTURE_ARTIFACT)).exists()).be.true();
+    actual.exitCode.should.equal(0, actual.output);
+    actual.output.should.match(/0 fail/);
+    artifactExists.should.be.true();
   }, 120_000);
 
   it('should fail when a test is skipped, even though no test fails', async () => {
@@ -49,8 +49,8 @@ describe('coverage threshold gate', () => {
     const actual = await runGate(true);
 
     // Assert
-    should(actual.exitCode).equal(1, actual.output);
-    should(actual.output).match(/0 fail/);
-    should(actual.output).match(/1 skip/);
+    actual.exitCode.should.equal(1, actual.output);
+    actual.output.should.match(/0 fail/);
+    actual.output.should.match(/1 skip/);
   }, 120_000);
 });

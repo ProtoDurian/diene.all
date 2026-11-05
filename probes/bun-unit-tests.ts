@@ -25,10 +25,10 @@ export default {
         const paths = await repo.glob('tests/unit/**/*.test.ts');
         for (const path of paths) {
           const source = await repo.read(path);
-          if (source.includes('should(actual).equal(expected);')) {
+          if (source.includes('actual.should.equal(expected);')) {
             await repo.write(
               path,
-              source.replace('should(actual).equal(expected);', 'should(actual).not.equal(expected);'),
+              source.replace('actual.should.equal(expected);', 'actual.should.not.equal(expected);'),
             );
             await expectBunRed(
               repo,

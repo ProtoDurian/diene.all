@@ -6,7 +6,7 @@ export default {
   probes: [
     {
       name: 'baseline-bun-deadcode-review-green',
-      description: 'Both lax LLM-review Knip variants run without enforcing false positives.',
+      description: 'The deadcode task runs both LLM-review Knip views green.',
       kind: 'baseline',
       async run(repo: any) {
         await expectBunGreen(repo, 'nix develop .#ci -c task deadcode', 'bun-deadcode-review');

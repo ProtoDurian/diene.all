@@ -19,27 +19,31 @@ let
           ;
       }
     );
-    nix-unstable = (with pkgs-unstable; { });
+
     nix-2605 = (
       with pkgs-2605;
       {
         inherit
           actionlint
-          # ### bun-base-packages
-          # #### source: bun-base
           bun
-          nodejs
           git
           go-task
           infisical
           nix
+          nodejs
           pre-commit
           shellcheck
           treefmt
           ;
       }
     );
+
+    nix-unstable = (
+      with pkgs-unstable;
+      {
+      }
+    );
   };
 in
 with all;
-nix-2605 // nix-unstable // atomipkgs
+atomipkgs // nix-2605 // nix-unstable
