@@ -45,10 +45,10 @@ describe('validateMetricRecord', () => {
     actual.value.should.eql(-4);
   });
 
-  it('should allow a zero counter but reject a negative counter', async () => {
+  it.each<MetricKind>(['counter', 'histogram'])('should allow zero but reject a negative %s', async kind => {
     // Act
-    const zero = await expectOk(validateMetricRecord({ kind: 'counter', name: 'hits', value: 0 }));
-    const error = await expectErr(validateMetricRecord({ kind: 'counter', name: 'hits', value: -1 }));
+    const zero = await expectOk(validateMetricRecord({ kind, name: 'hits', value: 0 }));
+    const error = await expectErr(validateMetricRecord({ kind, name: 'hits', value: -1 }));
 
     // Assert
     zero.value.should.eql(0);

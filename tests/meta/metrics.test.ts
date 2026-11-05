@@ -35,6 +35,19 @@ describe('InMemoryMetricsCollector', () => {
     subject.calls.should.have.length(0);
   });
 
+  it('should reject a negative histogram value like a real collector', async () => {
+    // Arrange
+    const subject = new InMemoryMetricsCollector();
+
+    // Act
+    const error = await expectErr(subject.record({ kind: 'histogram', name: 'latency', value: -1 }));
+
+    // Assert
+    error.code.should.eql('invalid-input');
+    error.details.should.eql({ field: 'value' });
+    subject.metrics.should.have.length(0);
+  });
+
   it('should record the call but drop the metric on an injected failure', async () => {
     // Arrange
     const subject = new InMemoryMetricsCollector();

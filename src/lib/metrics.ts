@@ -37,8 +37,8 @@ function checkMetricRecord(metric: MetricRecord): Checked<Readonly<MetricRecord>
   if (typeof metric.value !== 'number' || !Number.isFinite(metric.value)) {
     return invalidMetric('value', 'Metric value must be finite');
   }
-  if (metric.kind === 'counter' && metric.value < 0) {
-    return invalidMetric('value', 'Counter values must not be negative');
+  if ((metric.kind === 'counter' || metric.kind === 'histogram') && metric.value < 0) {
+    return invalidMetric('value', 'Counter and histogram values must not be negative');
   }
   if (metric.unit !== undefined && (typeof metric.unit !== 'string' || metric.unit.trim() === '')) {
     return invalidMetric('unit', 'Metric unit must not be blank');
