@@ -15,6 +15,14 @@ export async function expectRedBecause(
   return expectRedBecauseWithin(repo, command, label, reasons, { timeoutMs: DOTNET_TIMEOUT_MS });
 }
 
+export async function manifestVersion(repo: any): Promise<string> {
+  const version = /<Version>([^<]+)<\/Version>/.exec(await repo.read('Version.props'))?.[1];
+  if (!version) {
+    throw new Error('Version.props declares no <Version>');
+  }
+  return version;
+}
+
 export async function packPackages(repo: any, label: string): Promise<void> {
   await expectGreen(
     repo,

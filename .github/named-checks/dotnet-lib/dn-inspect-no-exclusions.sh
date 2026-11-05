@@ -34,7 +34,7 @@ while IFS= read -r path; do
 done < <(grep -E '\.cs$' <<<"${files}" || true)
 
 while IFS= read -r path; do
-  if git show "${tree}:${path}" | grep -nE '<NoWarn>'; then
+  if git show "${tree}:${path}" | grep -nE '<NoWarn[ >]|NoWarn='; then
     echo "❌ ${path} switches a diagnostic off" >&2
     failed=1
   fi

@@ -1,16 +1,8 @@
 import { defineGate } from './lib/definition.ts';
 import { expectGreen } from './lib/dotnet.ts';
-import { expectRedBecause } from './lib/dotnet-package.ts';
+import { expectRedBecause, manifestVersion } from './lib/dotnet-package.ts';
 
 const GUARD = 'nix develop .#ci -c ./scripts/validate/dotnet-publish.sh';
-
-async function manifestVersion(repo: any): Promise<string> {
-  const version = /<Version>([^<]+)<\/Version>/.exec(await repo.read('Version.props'))?.[1];
-  if (!version) {
-    throw new Error('Version.props declares no <Version>');
-  }
-  return version;
-}
 
 export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },

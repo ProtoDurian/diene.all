@@ -46,8 +46,6 @@ describe('packPackages helper', () => {
   test('restores before packing rather than reusing the stale --no-restore flag', async () => {
     const repo = new RecordingRepo();
     await packPackages(repo, 'pack-label');
-    // The accepted CI repair removed --no-restore from `dotnet pack`; the probe
-    // helper must match so the three package probes restore before packing.
     expect(repo.commands[0]).not.toContain('--no-restore');
   });
 });
