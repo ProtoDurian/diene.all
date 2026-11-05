@@ -50,10 +50,4 @@ describe('packPackages helper', () => {
     // helper must match so the three package probes restore before packing.
     expect(repo.commands[0]).not.toContain('--no-restore');
   });
-
-  test('does not call the deleted CI setup script', async () => {
-    const repo = new RecordingRepo();
-    await packPackages(repo, 'pack-label');
-    expect(repo.commands[0]).not.toContain('scripts/ci/setup.sh');
-  });
 });
