@@ -22,6 +22,17 @@ describe('PortError', () => {
     subject.details.should.eql({ field: 'executable', attempts: 2 });
   });
 
+  it('should keep the message it was given', () => {
+    // Arrange
+    const expected = 'disk full';
+
+    // Act
+    const actual = portError('vfs', 'io', 'writeFile', expected).message;
+
+    // Assert
+    actual.should.equal(expected);
+  });
+
   it('should freeze a defensive copy of the details record', () => {
     // Arrange
     const source: Record<string, unknown> = { field: 'name' };
