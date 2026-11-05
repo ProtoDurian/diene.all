@@ -32,8 +32,8 @@ D_PATHS=(
   probes/nonroot-image-policy.ts
   scripts/validate/go-image-policy.sh
 )
-# Strings no remaining file may contain (workspace's D_TOKENS, plus cd.yaml,
-# infra/ and go-base's image policy, which leave with D once H is gone).
+# Strings no remaining file may contain (workspace's D_TOKENS, plus cd.yaml and
+# infra/, which leave with D once H is gone, and go-base's image policy).
 D_TOKENS=(
   infra/Dockerfile .dockerignore reusable-docker Taskfile.docker docker.sh
   docker-push standards/docker docker/index.md docker-build

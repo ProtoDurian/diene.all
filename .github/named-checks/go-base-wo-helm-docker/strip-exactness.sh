@@ -13,7 +13,7 @@ set -euo pipefail
 
 # --- whole paths removed ------------------------------------------------------
 D_PATHS=(
-  infra
+  infra/Dockerfile
   .dockerignore
   '.github/workflows/⚡reusable-docker.yaml'
   # cd.yaml's only job is the docker one once H is gone
@@ -95,6 +95,7 @@ drop_lines() { awk -v a="$1" -v b="$2" 'skip == 0 && $0 ~ a { skip = 1 } skip ==
 
 apply_D() {
   rm_paths "${D_PATHS[@]}"
+  rmdir infra || fail "infra/ is not empty after the D strip"
   # workspace ledger
   edit .github/workflows/ci.yaml drop_yaml_job '  docker:'
   edit Taskfile.yaml sed_e '/^  docker: tasks\/Taskfile\.docker\.yaml$/d'
