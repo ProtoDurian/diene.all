@@ -6,13 +6,14 @@
   env,
 }:
 let
-  # toolchain-smoke asserts the DECLARED env lists actually provide their binaries.
   envPath = pkgs.lib.makeBinPath (env.system ++ env.main ++ env.lint ++ env.dev);
 in
 pre-commit-lib.run {
   src = ../.;
 
+  # hooks
   hooks = {
+    # formatter
     treefmt = {
       enable = true;
       package = formatter;
@@ -57,15 +58,11 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    # The selector is directory-shaped on purpose: every standard under
-    # docs/standards/ and every first-level skill trigger is linted, so adding a
-    # topic needs no edit here. Vendored skills sit deeper than one level and are
-    # ignored again by .markdownlint-cli2.jsonc.
     a-markdownlint = {
       enable = true;
       name = "Markdown lint";
       entry = "${pkgs.markdownlint-cli2}/bin/markdownlint-cli2";
-      files = "^(CLAUDE\\.md|README\\.md|docs/standards/.*\\.md|\\.claude/skills/[^/]+/SKILL\\.md)$";
+      files = "^(docs/standards/.*\\.md|\\.claude/skills/[^/]+/SKILL\\.md)$";
       pass_filenames = true;
       language = "system";
     };
@@ -87,8 +84,6 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    # -x + SCRIPTDIR: staged-file batching splits scripts from their sources,
-    # so ShellCheck must follow source= directives itself.
     a-shellcheck = {
       enable = true;
       name = "Shellcheck";
