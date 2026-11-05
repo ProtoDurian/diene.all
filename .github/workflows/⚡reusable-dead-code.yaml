@@ -13,8 +13,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
-        with:
-          namespacelabs: 'true'
       - uses: AtomiCloud/actions.cache-nuget@v2
       - name: Run strict dead-code inspection
         run: nix develop .#ci -c ./scripts/ci/dead-code.sh

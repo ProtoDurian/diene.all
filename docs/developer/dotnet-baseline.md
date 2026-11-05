@@ -39,7 +39,9 @@ tier:
 - unit: every `[Lib*]*` assembly at 100%;
 - integration: every `[App*]*` assembly at 80%.
 
-The runner then parses the merged `coverage.cobertura.xml` with `xmlstarlet`: it
+The runner writes each tier's merged Cobertura report to its own file
+(`reports/unit/coverage.cobertura.xml`, `reports/integration/coverage.cobertura.xml`)
+and parses it with `xmlstarlet`: it
 rejects a report that measured zero lines, rejects any package whose assembly name
 escapes the tier ledger, and re-checks the tier minimum against every package's own
 `line-rate` rather than the merged total alone.
