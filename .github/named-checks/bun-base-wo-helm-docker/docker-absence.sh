@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# No D surface survives in the files; edited shared files parse and lint.
 # Binaries are not checked (owner !A103): the bundles keep docker on PATH.
 
 cd "$(git rev-parse --show-toplevel)"

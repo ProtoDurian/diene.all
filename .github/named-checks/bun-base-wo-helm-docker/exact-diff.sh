@@ -10,7 +10,7 @@ set -euo pipefail
 # LEDGER — read this section to review the strip. It is workspace's own D
 # ledger (.github/named-checks/workspace/removal-points.sh apply_D, plus its
 # D+H set edits: H is already gone, so infra/ and cd.yaml carry only D) and the
-# D contributions bun-base adds on top of it.
+# D contributions bun-base adds on top of it, then this node's own D edits.
 
 # --- whole paths removed ------------------------------------------------------
 D_PATHS=(

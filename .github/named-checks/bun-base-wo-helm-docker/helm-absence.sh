@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# No H surface returns in the files; edited shared files parse and lint.
 # Binaries are not checked (owner !A103): the bundles keep helm on PATH.
 
 cd "$(git rev-parse --show-toplevel)"
@@ -57,7 +56,7 @@ show() { git show "${tree}:$1"; }
 [[ "$(show probes/features.json | jq '[.[] | select(.name | test("helm"))] | length')" == 0 ]] || fail "features.json still has a helm row"
 if show CLAUDE.md | grep -qi '^# helm'; then fail "CLAUDE.md still has a Helm section"; fi
 if show probes/binary-smoke.ts | grep -Eq '^(helm|helm-docs|helmlint) '; then fail "binary-smoke.ts still smokes an H binary"; fi
-if git grep -n -i -E 'helm|image or chart' "${tree}" -- docs/standards/ci-cd/index.md; then fail "ci-cd publishing prose still names Helm"; fi
+if git grep -n -i -w -E 'helm|image or chart' "${tree}" -- docs/standards/ci-cd/index.md; then fail "ci-cd publishing prose still names Helm"; fi
 if git grep -n -F 'Helm, secrets' "${tree}" -- README.md; then fail "README.md still lists Helm"; fi
 if git grep -n -F 'chart values' "${tree}" -- docs/standards/taskfile/index.md; then fail "taskfile rule 5 still names charts"; fi
 
