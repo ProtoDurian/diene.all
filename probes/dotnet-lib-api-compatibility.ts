@@ -23,11 +23,12 @@ export default defineGate({
   },
   mutation: {
     name: 'mutation-dotnet-lib-api-compatibility-caught',
-    description: 'Removing one public 1.0 member that nothing in Lib calls turns PackageValidation red.',
+    description:
+      'Removing a public member the published 1.0.0 package ships, and nothing in Lib reads, turns PackageValidation red.',
     expectedImpact: [],
     async run(repo: any) {
-      await repo.patch('Lib/NoteService.cs', {
-        find: '    public Task<NotePrincipal> Create(NoteRecord record, CancellationToken cancellationToken = default) =>\n        notes.Save(record, cancellationToken);\n\n',
+      await repo.patch('Lib/NotePrincipal.cs', {
+        find: '    public required string Id { get; init; }\n',
         replace: '',
       });
       await expectRedBecause(
