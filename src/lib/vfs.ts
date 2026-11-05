@@ -36,7 +36,7 @@ function invalidVfsInput(operation: string, field: string, message: string): Che
   return rejected(portError('vfs', 'invalid-input', operation, message, { field }));
 }
 
-function checkVfsPath(path: string, operation = 'path'): Checked<string, VfsError> {
+function checkVfsPath(path: string, operation: string): Checked<string, VfsError> {
   if (typeof path !== 'string' || path === '' || path.includes('\0')) {
     return invalidVfsInput(operation, 'path', 'VFS path must be a non-empty NUL-free string');
   }
@@ -78,7 +78,7 @@ function checkRecursiveOptions(
   return accepted(Object.freeze({ recursive: options.recursive ?? false }));
 }
 
-function validateVfsPath(path: string, operation = 'path'): Result<string, VfsError> {
+function validateVfsPath(path: string, operation: string): Result<string, VfsError> {
   return resultFromChecked(checkVfsPath(path, operation));
 }
 

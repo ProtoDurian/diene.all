@@ -16,7 +16,7 @@ describe('validateVfsPath', () => {
     ['the root', '/'],
   ])('should accept a canonical absolute path (%s)', async (_label, path) => {
     // Act
-    const actual = await expectOk(validateVfsPath(path));
+    const actual = await expectOk(validateVfsPath(path, 'stat'));
 
     // Assert
     actual.should.eql(path);
@@ -28,7 +28,7 @@ describe('validateVfsPath', () => {
     ['NUL', '/a\0b'],
   ])('should reject a non-usable path (%s)', async (_label, path) => {
     // Act
-    const error = await expectErr(validateVfsPath(path));
+    const error = await expectErr(validateVfsPath(path, 'stat'));
 
     // Assert
     error.port.should.eql('vfs');
@@ -38,7 +38,7 @@ describe('validateVfsPath', () => {
 
   it('should reject a relative path', async () => {
     // Act
-    const error = await expectErr(validateVfsPath('a/b'));
+    const error = await expectErr(validateVfsPath('a/b', 'stat'));
 
     // Assert
     error.message.should.match(/must be absolute/);
@@ -49,7 +49,7 @@ describe('validateVfsPath', () => {
     ['double slash', '/a//b'],
   ])('should reject a non-canonical path (%s)', async (_label, path) => {
     // Act
-    const error = await expectErr(validateVfsPath(path));
+    const error = await expectErr(validateVfsPath(path, 'stat'));
 
     // Assert
     error.message.should.match(/must be canonical/);
@@ -60,7 +60,7 @@ describe('validateVfsPath', () => {
     ['double dot', '/a/../b'],
   ])('should reject dot segments (%s)', async (_label, path) => {
     // Act
-    const error = await expectErr(validateVfsPath(path));
+    const error = await expectErr(validateVfsPath(path, 'stat'));
 
     // Assert
     error.message.should.match(/must not contain dot segments/);
@@ -153,13 +153,13 @@ describe('recursive option validators', () => {
 describe('checkVfsPath', () => {
   it('should expose accepted and rejected Checked branches', () => {
     // Act
-    const ok = checkVfsPath('/a');
-    const bad = checkVfsPath('relative');
+    const ok = checkVfsPath('/a', 'list');
+    const bad = checkVfsPath('relative', 'list');
 
     // Assert
     ok.ok.should.be.true();
     if (ok.ok) ok.value.should.eql('/a');
     bad.ok.should.be.false();
-    if (!bad.ok) bad.error.operation.should.eql('path');
+    if (!bad.ok) bad.error.operation.should.eql('list');
   });
 });
