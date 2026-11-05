@@ -1,26 +1,28 @@
-### workspace [nix]
-.direnv/
+### nix-init
+.direnv
 .pre-commit-config.yaml
 /result
 /result-*
 
-### workspace [secrets]
-!.env.example
-.env
-.env.*
-
-### workspace [tooling]
-*.log
-*.swo
-*.swp
-*~
-.kagent/
-.kloop/
-
-### workspace [os-editors]
+### os-editors
 ._*
 .DS_Store
 .idea/
 .vscode/
 Thumbs.db
 desktop.ini
+
+### secrets
+.env
+.env.*
+
+### secrets-keep
+!.env.example
+
+### tooling
+*.log
+*.swo
+*.swp
+*~
+.kagent/
+.kloop/
