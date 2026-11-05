@@ -5,7 +5,7 @@ export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
   baseline: {
     name: 'baseline-wrapper-rendered-manifests-green',
-    description: 'Helm, kubeconform, and definition-only VAP evaluation accept the full stack.',
+    description: 'Helm, kubeconform, and definition-only VAP evaluation accept every stack and the upstream sub-chart.',
     async run(repo: any) {
       await expectGreen(
         repo,

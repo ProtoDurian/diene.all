@@ -60,8 +60,10 @@ done
 [[ "$(show probes/features.json | jq '[.[] | select(.name | test("docker"))] | length')" == 0 ]] || fail "features.json still has a docker row"
 if show CLAUDE.md | grep -qi '^# docker'; then fail "CLAUDE.md still has a Docker section"; fi
 if show probes/binary-smoke.ts | grep -Eq '^(docker|hadolint) '; then fail "binary-smoke.ts still smokes a D binary"; fi
-built="$(git -c core.quotePath=false ls-tree -r --name-only "${tree}" | grep -iE '(^|/)(Dockerfile[^/]*|[^/]*\.dockerfile|docker-compose[^/]*|compose\.ya?ml)$' || true)"
+built="$(git -c core.quotePath=false ls-tree -r --name-only "${tree}" | grep -iE '(^|/)(Dockerfile[^/]*|Containerfile[^/]*|[^/]*\.(docker|container)file|docker-compose[^/]*|compose\.ya?ml)$' || true)"
 [[ -z ${built} ]] || fail "Docker build inputs are tracked: ${built//$'\n'/ }"
+shell="$(git -c core.quotePath=false grep -n -I -E '\b(docker|podman) (build|push|buildx)\b|\bbuildah\b|\bkaniko\b' "${tree}" -- .github/workflows scripts tasks Taskfile.yaml infra || true)"
+[[ -z ${shell} ]] || fail "image build/push commands are tracked: ${shell//$'\n'/ }"
 for f in .github/workflows/*.y*ml; do
   [[ "$(show "${f}" | yq '[.jobs[].steps[]?.uses // "" | select(test("docker/(build-push|setup-buildx|login)-action"))] | length')" == 0 ]] || fail "${f} builds or pushes an image"
 done

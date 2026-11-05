@@ -14,7 +14,7 @@ export default defineGate({
   },
   mutation: {
     name: 'mutation-wrapper-release-lint-types-caught',
-    description: 'A commit-msg hook linting against another vocabulary is rejected.',
+    description: 'A commit-msg hook linting against a config other than release.yaml diverges from the declared types.',
     expectedImpact: [],
     async run(repo: any) {
       const path = 'nix/pre-commit.nix';

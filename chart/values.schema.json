@@ -248,6 +248,18 @@
                 "enabled": {
                     "type": "boolean"
                 },
+                "identity": {
+                    "type": "object",
+                    "properties": {
+                        "concreteLandscapes": {
+                            "type": "array",
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
                 "logtoApp": {
                     "type": "object",
                     "properties": {

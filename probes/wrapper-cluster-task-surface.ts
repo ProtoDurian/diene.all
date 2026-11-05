@@ -5,7 +5,8 @@ export default defineSmoke({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
   baseline: {
     name: 'baseline-wrapper-cluster-task-surface-green',
-    description: 'The stacked landscape:cluster include exposes debug, template, install, and remove.',
+    description:
+      'The stacked landscape:cluster include exposes debug, template, install, and remove, and template renders.',
     async run(repo: any) {
       await expectGreen(
         repo,

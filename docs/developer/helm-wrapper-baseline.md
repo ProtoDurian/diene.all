@@ -12,7 +12,7 @@ Render values in two independent dimensions:
 
 The sample stack is `values.yaml` → `values.example.yaml` → `values.lapras.yaml`. Landscape and cluster vocabularies must remain disjoint. Do not create cross-product filenames.
 
-Run `task build`, `task example:lapras:template`, or `task test:unit`. `task test:int` creates an ephemeral k3d cluster, installs the local stack, waits for healthy pods, and proves an OCI push/pull against the cluster's local registry.
+Run `task build`, `task example:lapras:template`, or `task test:unit`. `debug` and `template` render from the committed `chart/charts/` and need no network; `install` runs `helm dependency build` first. `task test:int` creates an ephemeral k3d cluster, installs the local stack, waits for healthy pods, and proves an OCI push/pull against the cluster's local registry.
 
 ## Identity and naming
 
@@ -20,19 +20,23 @@ Run `task build`, `task example:lapras:template`, or `task test:unit`. `task tes
 - LPSM remains `{landscape, platform, service, module}`. The platform hostname slot always comes from the release namespace; a values file cannot stamp another platform.
 - Ordinary hostnames are `<module>.<service>.<namespace>.<landscape>.<zone>`.
 - Optional physical-instance hostnames are `<module>.<service>.<namespace>.<instance>.<landscape>.<zone>`. Instance is returned separately by the parser and never becomes an LPSM slot.
+- Every hostname label, generated or parsed, must be one lowercase DNS-1123 label of at most 63 bytes. The parser refuses empty segments.
 - `instance` is opaque: the helper accepts only one lowercase DNS-1123 label of at most 63 bytes and refuses dots, uppercase, an explicit empty string and longer values. An absent instance gives the ordinary form.
-- The fleet identity endpoint is `api.lithium.aldehyde.<landscape>.cluster.atomi.cloud` for a concrete landscape. The `identityIssuer` helper refuses the consumer platform (release namespace) and `primordial.vlandscape`.
+- The fleet identity endpoint is `api.lithium.aldehyde.<landscape>.cluster.atomi.cloud` for a concrete landscape. The `identityIssuer` helper accepts only a landscape listed in `primordial.identity.concreteLandscapes`. It refuses anything else, and it names the consumer platform (release namespace) and `primordial.vlandscape` explicitly.
 - Physical ids are repository-qualified before normalization. DNS-1123 labels longer than 63 characters are shortened with a stable hash, while original and normalized values are stored together as annotations.
-- Resource names use `<service>-<token>` with exactly one dash. Tokens fuse components (`main-cache` → `maincache`). Every enabled dependency receives an explicit conforming `fullnameOverride`.
+- Resource names use `<service>-<token>` with exactly one dash. Tokens fuse components (`main-cache` → `maincache`). The primary workload token is `serviceTree.module`, so `fullnameOverride` must equal `<service>-<module>`. Every enabled dependency receives an explicit conforming `fullnameOverride`; the `fullname` check renders the sub-chart and also covers generated Secret names.
 
 The helpers are generic by design. Final environment-owned instance segments, hosted profile fixtures, and exposure semantics stay outside this node until their owning work lands.
 
 ## Secrets and config
 
-The wrapper assumes the platform SecretStore already exists. It emits one service-scoped ExternalSecret, targets one service Secret, and uses folder-level `dataFrom.find` plus rewrite rules:
+The wrapper assumes the platform SecretStore already exists. It emits one service-scoped ExternalSecret, targets one Secret named `<service>-secrets`, and uses folder-level `dataFrom.find` plus rewrite rules. The key prefix comes from the folder: strip the leading `/`, uppercase it and turn every non-alphanumeric character into `_`.
 
 - `/shared/X` → `SHARED_X`
-- `/<service>/X` → `<SERVICE>_X`
+- `/wrapper/X` → `WRAPPER_X`
+- `/team/wrapper-api/X` → `TEAM_WRAPPER_API_X`
+
+Rendering refuses when one prefix equals or starts with the other, or a folder yields an empty prefix.
 
 Individual key mappings are forbidden. There is no secret-provider toggle.
 
@@ -54,7 +58,7 @@ The Deployment always uses `RollingUpdate`; the hook never recreates it.
 
 `scripts/validate/helm-wrapper.sh rendered-manifests` runs the generic chart-bearing-repository stage:
 
-1. Helm renders the stacked values.
+1. Helm renders every stack (`values.yaml`, `+example`, `+example+lapras`) and once more with `upstream.enabled=true`. The upstream render passes `--skip-tests`, because podinfo's `helm test` Pods have upstream-fixed names.
 2. kubeconform validates Kubernetes objects plus the checked-in local CR schemas.
 3. Kyverno CLI evaluates definition-only native ValidatingAdmissionPolicy fixtures against the resources named by those policies' `resourceRules`. kubeconform still validates the complete render; the narrow Kyverno input avoids its offline GVR lookup failure on unrelated custom resources.
 
@@ -67,7 +71,7 @@ The sample renders the frozen current shapes for `PlatformDependency`, `VirtualL
 - dependency delivery is exactly `external | local | replicated`;
 - a v-landscape target has one writer plus `placement.preferredHost` and no sharing fields;
 - VLS carries no free-form hostname;
-- LogtoApp renders one CR per `primordial.logtoApp.landscapes` entry, each with `identityRef: {platform, landscape}`; the issuer and the credential destination (`<landscape>:/<service>`) are recorded as annotations because T3 derives them and defines no spec field for them; a repeated or name-colliding landscape, the consumer platform or the v-landscape refuses;
+- LogtoApp renders one CR per `primordial.logtoApp.landscapes` entry, each with `identityRef: {platform, landscape}`; the issuer and the credential destination (`<landscape>:/<service>`) are recorded as annotations because T3 derives them and defines no spec field for them; a repeated or name-colliding landscape, the consumer platform, the v-landscape or any landscape not in `primordial.identity.concreteLandscapes` refuses;
 - LogtoApp declares paths, `extraRedirectUris`, and `resourceRefs`, never per-row redirects;
 - Problem carries `spec.module` and fuses the module into its name;
 - CloudflareDeploy uses `desiredVersionFrom.tag`, never a hand-pinned version id.

@@ -24,7 +24,7 @@ jobs:
         env:
           OCI_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
           OCI_REGISTRY: ghcr.io
-          OCI_REPOSITORY: ${{ github.repository }}
+          OCI_REPOSITORY: ${{ github.repository_owner }}/charts
           OCI_USERNAME: ${{ github.actor }}
           PUBLISH_DRY_RUN: 'false'
           PUBLISH_MODE: oci

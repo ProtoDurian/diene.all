@@ -1,5 +1,5 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause } from './lib/helpers.ts';
 
 export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
@@ -12,15 +12,22 @@ export default defineGate({
   },
   mutation: {
     name: 'mutation-wrapper-values-schema-caught',
-    description: 'An unsupported provider value is rejected by the generated schema.',
+    description: 'An unsupported provider in a committed overlay is rejected by the generated schema.',
     expectedImpact: [],
     async run(repo: any) {
-      await repo.write('chart/values.probe-invalid.yaml', 'gateway:\n  provider: unsupported\n');
-      await expectRed(
-        repo,
-        'nix develop .#ci -c helm lint chart --values chart/values.probe-invalid.yaml',
-        'wrapper-values-schema',
-      );
+      const path = 'chart/values.lapras.yaml';
+      const original = await repo.read(path);
+      try {
+        await repo.write(path, `${original}\ngateway:\n  provider: unsupported\n`);
+        await expectRedBecause(
+          repo,
+          'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh schema',
+          'wrapper-values-schema',
+          ['schema rejected the stack', "at '/gateway/provider'"],
+        );
+      } finally {
+        await repo.write(path, original);
+      }
     },
   },
 });

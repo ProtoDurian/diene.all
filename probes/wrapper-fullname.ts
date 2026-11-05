@@ -5,7 +5,7 @@ export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
   baseline: {
     name: 'baseline-wrapper-fullname-green',
-    description: 'Rendered names and dependency overrides use service plus one dash plus fused token.',
+    description: 'Every rendered, generated-Secret, and sub-chart name uses service plus one dash plus fused token.',
     async run(repo: any) {
       await expectGreen(repo, 'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh fullname', 'wrapper-fullname');
     },

@@ -11,7 +11,7 @@ fail() {
 
 files="$(git -c core.quotePath=false ls-tree -r --name-only "${tree}")"
 
-built="$(grep -E '^(chart/files/config/|dist/|reports/|coverage/|result|\.direnv/|node_modules/)|(^|/)probe-report\.json$' <<<"${files}" || true)"
+built="$(grep -E '^(chart/files/config/|dist/|reports/|coverage/|result(-[^/]*)?$|result/|\.direnv/|node_modules/)|(^|/)probe-report\.json$' <<<"${files}" || true)"
 [[ -z ${built} ]] || fail "build outputs are tracked:"$'\n'"${built}"
 
 # The only committed archives are the Chart.lock dependencies (goal: vendored upstream deps).

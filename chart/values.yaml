@@ -124,6 +124,8 @@ primordial:
     edge: edge.atomi.cloud/v1alpha1
   targetLandscape: example
   vlandscape: example-vlandscape
+  identity:
+    concreteLandscapes: [example] # @schema item:string;uniqueItems:true
   placement:
     preferredHost: example-host
   platformDependency:

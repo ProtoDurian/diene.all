@@ -8,7 +8,7 @@ trap 'rm -rf "${tmp}"' EXIT
 
 accepts() {
   printf '%s: check\n' "$1" >"${tmp}/msg"
-  releaser lint-commit -c "${config}" "${tmp}/msg" >/dev/null 2>&1
+  releaser lint-commit -c "${2:-${config}}" "${tmp}/msg" >/dev/null 2>&1
 }
 
 declared="$(yq -r '.types[].type' "${config}" | LC_ALL=C sort)"
@@ -24,13 +24,14 @@ vocabulary)
   accepts 'dep(upstream)' || accepts dep || { echo "❌ releaser lint-commit rejects dep" >&2 && exit 1; }
   ;;
 types)
-  grep -q "releaser lint-commit -c ${config}\"" nix/pre-commit.nix || { echo "❌ the commit-msg hook does not lint against ${config}" >&2 && exit 1; }
+  hook_config="$(sed -n 's#.*releaser lint-commit -c \([^ "]*\)".*#\1#p' nix/pre-commit.nix)"
+  [ -z "${hook_config}" ] && echo "❌ nix/pre-commit.nix has no releaser lint-commit hook" >&2 && exit 1
   accepted=""
   for t in ${declared} amend upstream wip revert release hotfix deps bogus; do
-    if accepts "${t}"; then accepted+="${t}"$'\n'; fi
+    if accepts "${t}" "${hook_config}"; then accepted+="${t}"$'\n'; fi
   done
   accepted="$(printf '%s' "${accepted}" | LC_ALL=C sort -u)"
-  [ "${accepted}" != "${declared}" ] && echo "❌ releaser lint-commit accepts [${accepted//$'\n'/ }] but ${config} declares [${declared//$'\n'/ }]" >&2 && exit 1
+  [ "${accepted}" != "${declared}" ] && echo "❌ the commit-msg hook (releaser lint-commit -c ${hook_config}) accepts [${accepted//$'\n'/ }] but ${config} declares [${declared//$'\n'/ }]" >&2 && exit 1
   ;;
 *)
   echo "❌ unknown release lint mode '${mode}'" >&2

@@ -36,11 +36,26 @@ expect_refusal() {
   rg -q -- "${pattern}" "${tmp}/refusal.txt" || { echo "❌ wrong refusal for $*" >&2 && cat "${tmp}/refusal.txt" >&2 && exit 1; }
 }
 
+stacks=("" "--values chart/values.example.yaml" "--values chart/values.example.yaml --values chart/values.lapras.yaml")
+
+# The podinfo helm-test hook Pods are upstream-named and only exist on `helm test`.
+render_upstream() {
+  helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --set upstream.enabled=true --skip-tests
+}
+
+expect_dns_names() {
+  local file="$1"
+  yq eval-all -o=json '.' "${file}" | jq -s -e 'map(select(.kind != null) | .metadata.name, (.spec.target.name? // empty)) | length > 0 and all(.[]; type == "string" and test("^[a-z0-9]+-[a-z0-9]+$"))' >/dev/null ||
+    { echo "❌ a rendered or generated name in ${file} is not <service>-<token>" >&2 && yq eval-all -o=json '.' "${file}" | jq -s -r 'map(select(.kind != null) | .metadata.name, (.spec.target.name? // empty))[]' >&2 && exit 1; }
+}
+
 case "${mode}" in
 schema)
-  helm lint chart --namespace "${namespace}" >/dev/null
-  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml >/dev/null
-  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml --values chart/values.lapras.yaml >/dev/null
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    helm lint chart --namespace "${namespace}" ${stack} >"${tmp}/schema.txt" 2>&1 ||
+      { echo "❌ schema rejected the stack '${stack:-values.yaml}'" >&2 && cat "${tmp}/schema.txt" >&2 && exit 1; }
+  done
   ;;
 schema-drift)
   bash ./scripts/local/generate-chart-schema.sh "${tmp}/values.schema.json" >/dev/null
@@ -62,9 +77,9 @@ config-vendoring)
   ;;
 labels)
   helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --values chart/values.lapras.yaml >"${tmp}/rendered.yaml"
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" | jq -s -e 'map(select(.kind != null)) | all(.[]; .metadata.labels["atomi.cloud/platform"] == "sample" and .metadata.labels["atomi.cloud/service"] == "wrapper" and .metadata.labels["atomi.cloud/module"] == "api" and .metadata.labels["atomi.cloud/layer"] == "2" and .metadata.labels["atomi.cloud/landscape"] == "example" and .metadata.labels["atomi.cloud/cluster"] == "lapras" and .metadata.annotations["atomi.cloud/platform"] == "sample")' >/dev/null
+  yq eval-all -o=json '.' "${tmp}/rendered.yaml" | jq -s -e 'map(select(.kind != null)) | length > 0 and all(.[]; .metadata.labels["atomi.cloud/platform"] == "sample" and .metadata.labels["atomi.cloud/service"] == "wrapper" and .metadata.labels["atomi.cloud/module"] == "api" and .metadata.labels["atomi.cloud/layer"] == "2" and .metadata.labels["atomi.cloud/landscape"] == "example" and .metadata.labels["atomi.cloud/cluster"] == "lapras" and .metadata.annotations["atomi.cloud/platform"] == "sample")' >/dev/null
   helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --values chart/values.lapras.yaml --set labelPrefix=example.dev >"${tmp}/override.yaml"
-  yq eval-all -o=json '.' "${tmp}/override.yaml" | jq -s -e 'map(select(.kind != null)) | all(.[]; .metadata.labels["example.dev/platform"] == "sample" and .metadata.annotations["example.dev/service"] == "wrapper" and .metadata.labels["atomi.cloud/platform"] == null and .metadata.annotations["atomi.cloud/service"] == null)' >/dev/null
+  yq eval-all -o=json '.' "${tmp}/override.yaml" | jq -s -e 'map(select(.kind != null)) | length > 0 and all(.[]; .metadata.labels["example.dev/platform"] == "sample" and .metadata.annotations["example.dev/service"] == "wrapper" and .metadata.labels["atomi.cloud/platform"] == null and .metadata.annotations["atomi.cloud/service"] == null)' >/dev/null
   ;;
 reloader)
   helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml >"${tmp}/default.yaml"
@@ -74,22 +89,41 @@ reloader)
   ;;
 secret)
   helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --set secret.enabled=true >"${tmp}/secret.yaml"
-  yq eval-all -o=json '.' "${tmp}/secret.yaml" | jq -s -e 'map(select(.kind == "ExternalSecret"))[0] as $secret | $secret.metadata.name == "wrapper-secrets" and $secret.spec.target.name == "wrapper" and ($secret.spec.data == null) and $secret.spec.dataFrom[0].rewrite[0].regexp.target == "SHARED_$1" and $secret.spec.dataFrom[1].rewrite[0].regexp.target == "WRAPPER_$1"' >/dev/null
+  yq eval-all -o=json '.' "${tmp}/secret.yaml" | jq -s -e 'map(select(.kind == "ExternalSecret")) | length == 1 and .[0].spec.data == null' >/dev/null ||
+    { echo "❌ ExternalSecret declares hand-written key mappings (spec.data)" >&2 && exit 1; }
+  yq eval-all -o=json '.' "${tmp}/secret.yaml" | jq -s -e 'map(select(.kind == "ExternalSecret"))[0] as $secret | $secret.metadata.name == "wrapper-secrets" and $secret.spec.target.name == "wrapper-secrets" and ($secret.spec.dataFrom | map(.find.path)) == ["/shared", "/wrapper"] and ($secret.spec.dataFrom | map(.rewrite[0].regexp.target)) == ["SHARED_$1", "WRAPPER_$1"]' >/dev/null ||
+    { echo "❌ ExternalSecret name or folder-derived prefixes are wrong" >&2 && exit 1; }
+  helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --set secret.sharedFolder=/common --set secret.serviceFolder=/team/wrapper-api |
+    yq eval-all -o=json '.' | jq -s -e 'map(select(.kind == "ExternalSecret"))[0].spec.dataFrom | map(.rewrite[0].regexp.target) == ["COMMON_$1", "TEAM_WRAPPER_API_$1"]' >/dev/null ||
+    { echo "❌ ExternalSecret prefixes are not derived from the folders" >&2 && exit 1; }
+  expect_refusal 'secret key prefixes "SHARED_" \(/shared\) and "SHARED_" \(/shared\) collide' "${namespace}" --set secret.serviceFolder=/shared
+  expect_refusal 'collide' "${namespace}" --set secret.sharedFolder=/wrapper/inner
+  expect_refusal 'yields an empty key prefix' "${namespace}" --set secret.serviceFolder=/
   ;;
 fullname)
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml >"${tmp}/names.yaml"
-  yq eval-all -o=json '.' "${tmp}/names.yaml" | jq -s -e 'map(select(.kind != null) | .metadata.name) | all(.[]; test("^[a-z0-9]+-[a-z0-9]+$"))' >/dev/null
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    helm template "${release}" chart --namespace "${namespace}" ${stack} >"${tmp}/names.yaml"
+    expect_dns_names "${tmp}/names.yaml"
+  done
+  render_upstream >"${tmp}/upstream.yaml"
+  expect_dns_names "${tmp}/upstream.yaml"
+  yq eval-all -o=json '.' "${tmp}/upstream.yaml" | jq -s -e 'map(select(.kind == "Deployment") | .metadata.name) | sort == ["wrapper-api", "wrapper-upstream"]' >/dev/null ||
+    { echo "❌ the upstream sub-chart did not render under its fullnameOverride" >&2 && exit 1; }
   yq -e '.upstream.fullnameOverride | test("^[a-z0-9]+-[a-z0-9]+$")' chart/values.yaml >/dev/null
   ;;
 primordial)
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --set primordial.enabled=true --set 'primordial.logtoApp.landscapes={example,serving}' >"${tmp}/primordial.yaml"
+  helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --set primordial.enabled=true --set 'primordial.identity.concreteLandscapes={example,serving}' --set 'primordial.logtoApp.landscapes={example,serving}' >"${tmp}/primordial.yaml"
   kubeconform -strict -summary -schema-location default -schema-location 'schemas/{{ .ResourceKind }}.json' "${tmp}/primordial.yaml"
   yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "PlatformDependency"))[0].spec as $spec | [$spec.database, $spec.kv, $spec.cache, $spec.store] | map(. // {}) | add | to_entries | all(.[]; (.value.engine | keys) == [.value.type])' >/dev/null
   yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "LogtoApp")) | map(.metadata.name) == ["wrapper-identityexample", "wrapper-identityserving"] and map(.spec.identityRef) == [{platform: "sample", landscape: "example"}, {platform: "sample", landscape: "serving"}] and map(.metadata.annotations["atomi.cloud/identity-issuer"]) == ["api.lithium.aldehyde.example.cluster.atomi.cloud", "api.lithium.aldehyde.serving.cluster.atomi.cloud"] and map(.metadata.annotations["atomi.cloud/credential-destination"]) == ["example:/wrapper", "serving:/wrapper"]' >/dev/null
   yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "Problem")) | length == 1 and .[0].spec.module == "api" and .[0].metadata.name == "wrapper-problemsapi"' >/dev/null
-  ! rg -n '(^|[[:space:]])(share|sharedVia|redirectUris|desiredVersion):' "${tmp}/primordial.yaml"
-  expect_refusal 'repeats "example"' "${namespace}" --set 'primordial.logtoApp.landscapes={example,serving,example}'
-  expect_refusal 'repeats "serv-ing"' "${namespace}" --set 'primordial.logtoApp.landscapes={serving,serv-ing}'
+  if rg -n '(^|[[:space:]])(share|sharedVia|redirectUris|desiredVersion):' "${tmp}/primordial.yaml" >&2; then
+    echo "❌ primordial CRs carry a forbidden sharing/redirect/version field" >&2 && exit 1
+  fi
+  expect_refusal 'repeats "example"' "${namespace}" --set 'primordial.identity.concreteLandscapes={example,serving}' --set 'primordial.logtoApp.landscapes={example,serving,example}'
+  expect_refusal 'repeats "serv-ing"' "${namespace}" --set 'primordial.identity.concreteLandscapes={serving,serv-ing}' --set 'primordial.logtoApp.landscapes={serving,serv-ing}'
+  expect_refusal '"nitroso" is not listed in primordial.identity.concreteLandscapes' "${namespace}" --set 'primordial.logtoApp.landscapes={example,nitroso}'
   expect_refusal 'is the consumer platform' "${namespace}" --set 'primordial.logtoApp.landscapes={example,sample}'
   expect_refusal 'is a virtual landscape' "${namespace}" --set 'primordial.logtoApp.landscapes={example-vlandscape}'
   expect_refusal 'at least one concrete landscape' "${namespace}" --set 'primordial.logtoApp.landscapes=null'
@@ -119,9 +153,16 @@ lpsm)
   for bad in run.42 Run42 RUN42 '' -run42 run42- "${label_63}a" 'run_42'; do
     expect_refusal 'must be one lowercase DNS-1123 label of at most 63 bytes' nitroso --set-string contracts.lpsm.instance="${bad}"
   done
-  render_contracts nitroso --set contracts.lpsm.identityLandscape=serving | jq -e '."identity.issuer" == "api.lithium.aldehyde.serving.cluster.atomi.cloud"' >/dev/null
+  for bad in 'api..nitroso.example.local.example.invalid' "api.wrapper.nitroso.${label_63}a.example.local.example.invalid" 'api.-zinc.nitroso.example.local.example.invalid'; do
+    expect_refusal 'must be one lowercase DNS-1123 label of at most 63 bytes' nitroso --set-string contracts.lpsm.parseHostname="${bad}"
+  done
+  expect_refusal 'hostname label "'"${label_63}"'a" must be one lowercase DNS-1123 label' nitroso --set-string contracts.lpsm.service="${label_63}a"
+  expect_refusal 'hostname label "-serving" must be one lowercase DNS-1123 label' nitroso --set-string contracts.lpsm.landscape=-serving
+  render_contracts nitroso --set 'primordial.identity.concreteLandscapes={example,serving}' --set contracts.lpsm.identityLandscape=serving | jq -e '."identity.issuer" == "api.lithium.aldehyde.serving.cluster.atomi.cloud"' >/dev/null
   expect_refusal 'is the consumer platform' nitroso --set contracts.lpsm.identityLandscape=nitroso
   expect_refusal 'is a virtual landscape' nitroso --set contracts.lpsm.identityLandscape=example-vlandscape
+  expect_refusal '"nitroso" is not listed in primordial.identity.concreteLandscapes' "${namespace}" --set contracts.lpsm.identityLandscape=nitroso
+  expect_refusal '"serving" is not listed in primordial.identity.concreteLandscapes' nitroso --set contracts.lpsm.identityLandscape=serving
   label_a="$(render_contracts "${namespace}" --set-string instance.physicalId=repository-a:pr-123 | jq -r '."instance.label"')"
   label_b="$(render_contracts "${namespace}" --set-string instance.physicalId=repository-b:pr-123 | jq -r '."instance.label"')"
   [ "${label_a}" = "${label_b}" ] && echo "❌ repository-qualified instance labels collided" >&2 && exit 1
@@ -137,16 +178,31 @@ lb)
   yq eval-all -o=json '.' "${tmp}/do.yaml" | jq -s -e 'map(select(.kind == "Service" and .metadata.name == "wrapper-gateway"))[0] | .spec.type == "LoadBalancer" and .metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-eip-allocations"] == null and .metadata.annotations["oci.oraclecloud.com/reserved-ips"] == null' >/dev/null
   yq eval-all -o=json '.' "${tmp}/oci.yaml" | jq -s -e 'map(select(.kind == "Service" and .metadata.name == "wrapper-gateway"))[0].metadata.annotations["oci.oraclecloud.com/reserved-ips"] == "203.0.113.10"' >/dev/null
   yq eval-all -o=json '.' "${tmp}/aws.yaml" | jq -s -e 'map(select(.kind == "Service" and .metadata.name == "wrapper-gateway"))[0] | .metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-subnets"] == "subnet-a,subnet-b" and .metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-eip-allocations"] == "eipalloc-a,eipalloc-b"' >/dev/null
-  ! rg -n 'nodePort:|hostPort:' "${tmp}/do.yaml" "${tmp}/oci.yaml" "${tmp}/aws.yaml"
+  if rg -n 'nodePort:|hostPort:' "${tmp}/do.yaml" "${tmp}/oci.yaml" "${tmp}/aws.yaml" >&2; then
+    echo "❌ rendered gateway carries nodePort/hostPort" >&2 && exit 1
+  fi
   ;;
 task-surface)
-  task --list-all --json | jq -e '[.tasks[].name] as $names | ["debug", "template", "install", "remove"] | all(("example:lapras:" + .) | IN($names[]))' >/dev/null
+  task --list-all --json | jq -e '[.tasks[].name] as $names | ["debug", "template", "install", "remove"] | all(("example:lapras:" + .) | IN($names[]))' >/dev/null ||
+    { echo "❌ example:lapras is missing a debug/template/install/remove task" >&2 && exit 1; }
+  task --silent example:lapras:template >"${tmp}/task-template.yaml"
+  rg -q '^kind: Deployment$' "${tmp}/task-template.yaml" || { echo "❌ example:lapras:template rendered no Deployment" >&2 && exit 1; }
+  rg -q 'atomi.cloud/cluster: "lapras"' "${tmp}/task-template.yaml" || { echo "❌ example:lapras:template did not stack values.lapras.yaml" >&2 && exit 1; }
   ;;
 rendered-manifests)
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml >"${tmp}/rendered.yaml"
-  kubeconform -strict -summary -schema-location default -schema-location 'schemas/{{ .ResourceKind }}.json' "${tmp}/rendered.yaml"
-  yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "${tmp}/rendered.yaml" >"${tmp}/vap-resources.yaml"
-  kyverno apply policies/vap --resource "${tmp}/vap-resources.yaml" --detailed-results --remove-color
+  index=0
+  for stack in "${stacks[@]}" upstream; do
+    index=$((index + 1))
+    if [ "${stack}" = upstream ]; then
+      render_upstream >"${tmp}/rendered-${index}.yaml"
+    else
+      # shellcheck disable=SC2086
+      helm template "${release}" chart --namespace "${namespace}" ${stack} >"${tmp}/rendered-${index}.yaml"
+    fi
+    kubeconform -strict -summary -schema-location default -schema-location 'schemas/{{ .ResourceKind }}.json' "${tmp}/rendered-${index}.yaml"
+    yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "${tmp}/rendered-${index}.yaml" >"${tmp}/vap-resources-${index}.yaml"
+    kyverno apply policies/vap --resource "${tmp}/vap-resources-${index}.yaml" --detailed-results --remove-color
+  done
   ;;
 publish-git)
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/git" bash ./scripts/ci/publish.sh >/dev/null

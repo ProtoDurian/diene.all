@@ -47,7 +47,7 @@
 {{- end -}}
 
 {{- define "diene-helm-wrapper.primaryName" -}}
-{{- $expected := include "diene-helm-wrapper.resourceName" (dict "root" . "token" "api") -}}
+{{- $expected := include "diene-helm-wrapper.resourceName" (dict "root" . "token" (required "serviceTree.module is required" .Values.serviceTree.module)) -}}
 {{- if ne .Values.fullnameOverride $expected -}}
 {{- fail (printf "fullnameOverride must be %q, got %q" $expected .Values.fullnameOverride) -}}
 {{- end -}}
@@ -95,9 +95,7 @@ reloader.stakater.com/auto: 'true'
 {{- $zone := required "hostname zone is required" .zone | lower | trimPrefix "." -}}
 {{- $platform := $root.Release.Namespace | lower -}}
 {{- range $label := list $module $service $platform $landscape }}
-{{- if not (regexMatch "^[a-z0-9-]+$" $label) -}}
-{{- fail (printf "hostname label %q is not DNS-compatible" $label) -}}
-{{- end -}}
+{{- include "diene-helm-wrapper.dnsLabel" $label -}}
 {{- end -}}
 {{- if hasKey . "instance" -}}
 {{- $instance := .instance -}}
@@ -121,6 +119,9 @@ reloader.stakater.com/auto: 'true'
 {{- if eq $landscape (toString .root.Values.primordial.vlandscape) -}}
 {{- fail (printf "identity landscape %q is a virtual landscape; only a concrete landscape selects an issuer" $landscape) -}}
 {{- end -}}
+{{- if not (has $landscape (default list .root.Values.primordial.identity.concreteLandscapes)) -}}
+{{- fail (printf "identity landscape %q is not listed in primordial.identity.concreteLandscapes; only a concrete landscape selects an issuer" $landscape) -}}
+{{- end -}}
 {{- printf "api.lithium.aldehyde.%s.cluster.atomi.cloud" $landscape -}}
 {{- end -}}
 
@@ -133,11 +134,30 @@ reloader.stakater.com/auto: 'true'
 {{- end -}}
 {{- $prefix := trimSuffix $suffix $hostname -}}
 {{- $parts := splitList "." $prefix -}}
+{{- if not (or (eq (len $parts) 4) (eq (len $parts) 5)) -}}
+{{- fail (printf "hostname %q must use the canonical dotted LPSM form" $hostname) -}}
+{{- end -}}
+{{- range $label := $parts }}
+{{- include "diene-helm-wrapper.dnsLabel" $label -}}
+{{- end -}}
 {{- if eq (len $parts) 4 -}}
 {{- toJson (dict "landscape" (index $parts 3) "platform" (index $parts 2) "service" (index $parts 1) "module" (index $parts 0) "instance" "") -}}
 {{- else if eq (len $parts) 5 -}}
 {{- toJson (dict "landscape" (index $parts 4) "platform" (index $parts 2) "service" (index $parts 1) "module" (index $parts 0) "instance" (index $parts 3)) -}}
-{{- else -}}
-{{- fail (printf "hostname %q must use the canonical dotted LPSM form" $hostname) -}}
 {{- end -}}
+{{- end -}}
+
+{{- define "diene-helm-wrapper.dnsLabel" -}}
+{{- if not (and (le (len .) 63) (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" .)) -}}
+{{- fail (printf "hostname label %q must be one lowercase DNS-1123 label of at most 63 bytes" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "diene-helm-wrapper.secretPrefix" -}}
+{{- $folder := required "secret folder is required" . | trimPrefix "/" -}}
+{{- $prefix := regexReplaceAll "[^A-Za-z0-9]" $folder "_" | upper -}}
+{{- if eq $prefix "" -}}
+{{- fail (printf "secret folder %q yields an empty key prefix" .) -}}
+{{- end -}}
+{{- printf "%s_" $prefix -}}
 {{- end -}}
