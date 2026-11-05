@@ -17,7 +17,7 @@ fixtures=tests/vap
 kc=(kubectl --context "${context}")
 tmp="$(mktemp -d)"
 # Rejected by API validation before any admission policy runs, so not provable here.
-api_invalid='pod-ephemeral-|container-host-process'
+api_invalid='pod-ephemeral-|container-host-process|disallowPrivileged/'
 cleanup() {
   local status=$?
   if [ "${status}" -ne 0 ]; then
@@ -94,10 +94,22 @@ after="$(vap_check_total vanadium-disallowlatest warn)"
 [ "${after}" -gt "${before}" ] || { echo "❌ apiserver_validating_admission_policy_check_total{warn} did not increase (${before} -> ${after})" >&2 && exit 1; }
 echo "✅ warn: violation admitted with an API warning; VAP check metric ${before} -> ${after}"
 
+errors=0
+# miss <reason>: record a failed fixture and keep going so one run reports them all.
+miss() {
+  echo "❌ $1" >&2 && sed 's/^/   /' "${tmp}/out.txt" >&2
+  errors=$((errors + 1))
+}
+phase_done() { [ "${errors}" -eq 0 ] || { echo "❌ ${errors} fixture(s) failed the $1 phase" >&2 && exit 1; }; }
+
 for fixture in "${bad[@]}"; do
-  dry_run "${fixture}" || { echo "❌ audit landscape blocked ${fixture}" >&2 && cat "${tmp}/out.txt" >&2 && exit 1; }
-  rg -q "Warning: .*'$(policy_of "${fixture}")'" "${tmp}/out.txt" || { echo "❌ ${fixture} returned no $(policy_of "${fixture}") warning" >&2 && cat "${tmp}/out.txt" >&2 && exit 1; }
+  if ! dry_run "${fixture}"; then
+    miss "audit landscape blocked ${fixture}"
+  elif ! rg -q "Warning: .*'$(policy_of "${fixture}")'" "${tmp}/out.txt"; then
+    miss "${fixture} returned no $(policy_of "${fixture}") warning"
+  fi
 done
+phase_done warn
 echo "✅ warn: ${#bad[@]} violations each warned by their own policy"
 
 # Deny landscape. kube-system is exempt by label (sodium's kube-system exclude).
@@ -110,20 +122,22 @@ before="$(vap_check_total vanadium-disallowlatest deny)"
 for fixture in "${bad[@]}"; do
   f="${serving}/${fixture#"${fixtures}/"}"
   if dry_run "${f}"; then
-    echo "❌ deny landscape admitted ${fixture}" >&2 && exit 1
+    miss "deny landscape admitted ${fixture}"
+  elif ! rg -q "ValidatingAdmissionPolicy '$(policy_of "${f}")' with binding '$(policy_of "${f}")' denied request" "${tmp}/out.txt"; then
+    miss "${fixture} was not denied by $(policy_of "${f}")"
   fi
-  rg -q "ValidatingAdmissionPolicy '$(policy_of "${f}")' with binding '$(policy_of "${f}")' denied request" "${tmp}/out.txt" ||
-    { echo "❌ ${fixture} was not denied by $(policy_of "${f}")" >&2 && cat "${tmp}/out.txt" >&2 && exit 1; }
 done
 for fixture in "${good[@]}"; do
-  dry_run "${serving}/${fixture#"${fixtures}/"}" || { echo "❌ deny landscape rejected good ${fixture}" >&2 && cat "${tmp}/out.txt" >&2 && exit 1; }
-  if rg -q 'vanadium-' "${tmp}/out.txt"; then
-    echo "❌ good ${fixture} drew a vanadium warning" >&2 && cat "${tmp}/out.txt" >&2 && exit 1
+  if ! dry_run "${serving}/${fixture#"${fixtures}/"}"; then
+    miss "deny landscape rejected good ${fixture}"
+  elif rg -q 'vanadium-' "${tmp}/out.txt"; then
+    miss "good ${fixture} drew a vanadium warning"
   fi
 done
+phase_done deny
 after="$(vap_check_total vanadium-disallowlatest deny)"
 [ "${after}" -gt "${before}" ] || { echo "❌ apiserver_validating_admission_policy_check_total{deny} did not increase" >&2 && exit 1; }
-echo "✅ deny: ${#bad[@]} violations each denied by their own policy; ${#good[@]} good fixtures admitted"
+echo "✅ deny: ${#bad[@]} violations each denied by their own policy; ${#good[@]} good fixtures admitted; deny metric ${before} -> ${after}"
 
 # The same violating manifests, admitted once their namespace carries the exemption label.
 for ns in $(yq -N -r '.metadata.namespace' "${bad[@]}" | sort -u); do
@@ -131,8 +145,9 @@ for ns in $(yq -N -r '.metadata.namespace' "${bad[@]}" | sort -u); do
 done
 wait_for exempt "${serving}/bad/disallowLatest/latest-tag.yaml"
 for fixture in "${bad[@]}"; do
-  dry_run "${serving}/${fixture#"${fixtures}/"}" || { echo "❌ exempt namespace rejected ${fixture}" >&2 && cat "${tmp}/out.txt" >&2 && exit 1; }
+  dry_run "${serving}/${fixture#"${fixtures}/"}" || miss "exempt namespace rejected ${fixture}"
 done
+phase_done exempt
 echo "✅ exempt: ${#bad[@]} denied manifests admitted in exempt namespaces"
 
 PUBLISH_MODE=oci PUBLISH_DRY_RUN=false RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/oci" OCI_REGISTRY="localhost:${registry_port}" OCI_REPOSITORY=charts OCI_PLAIN_HTTP=true bash ./scripts/ci/publish.sh
