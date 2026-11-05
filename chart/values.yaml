@@ -37,6 +37,8 @@ upstream:
       metrics: { enabled: true }
       logs: { enabled: false }
       traces: { enabled: false }
+      auth: { type: bearerToken, bearerTokenKey: ALUMINIUM_VICTORIAMETRICS_TOKEN }
+      secret: { create: false, name: aluminium-secrets }
     gigapipe:
       type: otlp
       protocol: http
@@ -44,6 +46,8 @@ upstream:
       metrics: { enabled: false }
       logs: { enabled: true }
       traces: { enabled: true }
+      auth: { type: basic, usernameKey: ALUMINIUM_GIGAPIPE_USERNAME, passwordKey: ALUMINIUM_GIGAPIPE_PASSWORD }
+      secret: { create: false, name: aluminium-secrets }
 
   applicationObservability:
     enabled: true
@@ -105,13 +109,30 @@ upstream:
 
   collectorCommon:
     alloy:
+      # The alloy chart reads the pod securityContext only from global.
+      global:
+        podSecurityContext: { runAsNonRoot: true }
       labels: &lpsm
         atomi.cloud/platform: telemetry
         atomi.cloud/service: aluminium
         atomi.cloud/module: telemetry
         atomi.cloud/layer: '1'
+      alloy:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 473
+          readOnlyRootFilesystem: true
+        # Alloy writes its WAL to storagePath; the root filesystem is read-only.
+        mounts:
+          extra: [{ name: storage, mountPath: /tmp/alloy }]
+      configReloader:
+        resources:
+          requests: { cpu: 10m, memory: 50Mi }
+          limits: { cpu: 50m, memory: 64Mi }
       controller:
         podLabels: *lpsm
+        volumes:
+          extra: [{ name: storage, emptyDir: {} }]
 
   collectors:
     alloy-metrics:
@@ -122,8 +143,12 @@ upstream:
           limits: { cpu: 500m, memory: 512Mi }
     alloy-logs:
       presets: [daemonset]
+      global:
+        podSecurityContext: { runAsNonRoot: false, runAsUser: 0 }
       alloy:
         stabilityLevel: public-preview
+        # Reading /var/log/pods needs root; the scoped VAP allowance is pending charts/vap-policies.
+        securityContext: { runAsNonRoot: false, runAsUser: 0 }
         mounts: { varlog: true }
         resources:
           requests: { cpu: 50m, memory: 64Mi }

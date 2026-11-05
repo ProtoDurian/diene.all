@@ -24,7 +24,6 @@ scan() {
   [[ ${rc} -le 1 ]] || { echo "❌ git grep failed (${rc}) for $*" >&2 && exit 2; }
 }
 
-# Pre-sync hook Job: no wrapper template declares one and no stack renders one.
 hits="$(scan chart/templates -E 'argocd\.argoproj\.io/hook:|helm\.sh/hook:')"
 [[ -z ${hits} ]] || fail "wrapper templates declare hooks:"$'\n'"${hits}"
 stacks=("" "--values chart/values.example.yaml" "--values chart/values.example.yaml --values chart/values.lapras.yaml")
@@ -40,13 +39,11 @@ for stack in "${stacks[@]}"; do
   [[ -z ${hooks} ]] || fail "stack '${stack:-values.yaml}' renders a pre-sync hook: ${hooks//$'\n'/ }"
 done
 
-# Build-phase config vendoring.
 vendored="$(grep -E '^(config/|chart/files/|scripts/local/vendor-chart-config\.sh$)' <<<"${files}" || true)"
 [[ -z ${vendored} ]] || fail "config vendoring surface is tracked: ${vendored//$'\n'/ }"
 hits="$(scan . -E 'vendor-chart-config|chart/files/config|\.Files\.(Glob|Get)')"
 [[ -z ${hits} ]] || fail "config vendoring is still wired:"$'\n'"${hits}"
 
-# Docker axis.
 docker_paths="$(grep -iE '(^|/)(Dockerfile[^/]*|Containerfile[^/]*|[^/]*\.(docker|container)file|\.dockerignore|docker-compose[^/]*|compose\.ya?ml|Taskfile\.docker\.ya?ml|docker\.sh|⚡reusable-docker\.ya?ml)$|^\.claude/skills/docker-push/|^docs/standards/docker/' <<<"${files}" || true)"
 [[ -z ${docker_paths} ]] || fail "docker axis is tracked: ${docker_paths//$'\n'/ }"
 hits="$(scan . -E '\b(docker|podman) (build|push|buildx)\b|\bbuildah\b|\bkaniko\b|docker/(build-push|setup-buildx|login)-action|reusable-docker|Taskfile\.docker')"
@@ -59,7 +56,6 @@ done
 [[ "$(show .github/dependabot.yml | yq '[.updates[] | select(.package-ecosystem == "docker")] | length')" == 0 ]] || fail "dependabot.yml has a docker entry"
 [[ "$(show dlint.yaml | yq '[.checks["toolchain-smoke"].binaries[] | select(test("^(docker|hadolint)( |$)"))] | length')" == 0 ]] || fail "dlint.yaml smokes a docker binary"
 
-# Bromine / Doppler.
 hits="$(scan . -i -E 'doppler|bromine')"
 [[ -z ${hits} ]] || fail "doppler or bromine in active inputs:"$'\n'"${hits}"
 

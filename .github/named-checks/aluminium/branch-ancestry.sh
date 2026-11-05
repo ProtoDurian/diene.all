@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
+parent_sha="$(cat "$(dirname "$0")/parent.sha")"
+[[ ${parent_sha} =~ ^[0-9a-f]{40}$ ]] || { echo "❌ parent.sha must be one full 40-hex commit id, got '${parent_sha}'" >&2 && exit 1; }
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ helm-wrapper .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 

@@ -22,7 +22,7 @@ diagnose() {
 cleanup() {
   local status=$?
   [ "${status}" -ne 0 ] && diagnose
-  [ -n "${forward_pid}" ] && kill "${forward_pid}" 2>/dev/null
+  [ -n "${forward_pid}" ] && { kill "${forward_pid}" 2>/dev/null || true; }
   bash ./scripts/local/delete-k3d-cluster.sh >/dev/null 2>&1 || true
   rm -rf "${tmp}"
   exit "${status}"
@@ -48,6 +48,23 @@ done
   { echo "❌ alloy-logs is clustered" >&2 && exit 1; }
 "${kc[@]}" get pods -l app.kubernetes.io/instance=aluminium-alloy-metrics -o json | jq -e '.items | length > 0 and all(.[]; .status.phase == "Running")' >/dev/null
 "${kc[@]}" get pods -l app.kubernetes.io/instance=aluminium-alloy-logs -o json | jq -e '.items | length > 0 and all(.[]; .status.phase == "Running")' >/dev/null
+
+# shellcheck disable=SC2016 # expands inside the pod
+"${kc[@]}" exec daemonset/aluminium-alloy-logs -c alloy -- sh -c 'f="$(find /var/log/pods -name "*.log" -type f | head -n 1)"; [ -n "$f" ] && head -c 1 "$f" >/dev/null' ||
+  { echo "❌ alloy-logs cannot read /var/log/pods" >&2 && exit 1; }
+logs_pod="$("${kc[@]}" get pods -l app.kubernetes.io/instance=aluminium-alloy-logs -o jsonpath='{.items[0].metadata.name}')"
+tailed=""
+for _ in $(seq 1 30); do
+  tailed="$(kubectl --context "k3d-${cluster_name}" get --raw "/api/v1/namespaces/${namespace}/pods/${logs_pod}:12345/proxy/metrics" | rg '^otelcol_receiver_accepted_log_records_total\{.* [1-9]' || true)"
+  [ -n "${tailed}" ] && break
+  sleep 5
+done
+if [ -z "${tailed}" ]; then
+  echo "❌ alloy-logs accepted no pod log records" >&2
+  kubectl --context "k3d-${cluster_name}" get --raw "/api/v1/namespaces/${namespace}/pods/${logs_pod}:12345/proxy/metrics" | rg 'log_records|filelog' >&2 || true
+  exit 1
+fi
+echo "✅ alloy-logs tails pod logs"
 
 "${kc[@]}" port-forward service/aluminium-alloy-metrics :4318 >"${tmp}/forward.log" 2>&1 &
 forward_pid=$!

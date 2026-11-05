@@ -1,13 +1,16 @@
 serviceTree:
   cluster: lapras
 
-# Disabled: the ExternalSecret CRD is not installed in k3d.
+# The k3d emulated stack is unauthenticated and has no ExternalSecret CRD.
 secret:
   enabled: false
 
 upstream:
   cluster:
     name: lapras
+  destinations:
+    victoriametrics: { auth: { type: none }, secret: { embed: true } }
+    gigapipe: { auth: { type: none }, secret: { embed: true } }
   collectorCommon:
     alloy:
       labels: &lpsm
