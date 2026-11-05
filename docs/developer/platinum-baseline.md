@@ -46,8 +46,8 @@ refuses when the kgateway labels differ from the LPSM set.
 | Certificate ×2             | `platinum-certprimary`, `platinum-certbackup` | registered fleet only                                |
 
 `platinum-edge` selects the proxy by `gateway.networking.k8s.io/gateway-name: platinum-shared`.
-kgateway binds listener ports below 1024 at port + 8000, so 80/443 target 8080/8443; the k3d tier
-checks that against the generated proxy Service.
+The proxy listens on the listener ports themselves (80/443); the k3d tier checks the edge
+targetPorts against kgateway's generated proxy Service.
 
 ## Fixed-IP LoadBalancer annotations
 

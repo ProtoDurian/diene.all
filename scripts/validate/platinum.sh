@@ -85,7 +85,7 @@ edge() { json "$1" | jq 'map(select(.kind == "Service" and .metadata.name == "pl
 assert_lb() { # assert_lb <render> <provider>
   edge "$1" | need_jq "platinum-edge is not a LoadBalancer exposing 80/443 on the generated proxy" '
     .spec.type == "LoadBalancer" and .spec.selector == {"gateway.networking.k8s.io/gateway-name": "platinum-shared"} and
-    ([.spec.ports[] | [.port, .targetPort]] | sort) == [[80, 8080], [443, 8443]] and ([.spec.ports[] | has("nodePort")] | any | not)' || return 1
+    ([.spec.ports[] | [.port, .targetPort]] | sort) == [[80, 80], [443, 443]] and ([.spec.ports[] | has("nodePort")] | any | not)' || return 1
   case "$2" in
   aws) edge "$1" | need_jq "AWS overlay lost its NLB Elastic IP annotations" '.metadata.annotations as $a |
       ($a["service.beta.kubernetes.io/aws-load-balancer-eip-allocations"] // "" | split(",") | map(select(. != "")) | length) as $e |

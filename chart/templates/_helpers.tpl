@@ -76,12 +76,6 @@ annotations:
   {{- include "platinum.annotations" . | nindent 2 }}
 {{- end -}}
 
-{{/* kgateway binds listener ports below 1024 at port+8000 on the proxy. */}}
-{{- define "platinum.proxyPort" -}}
-{{- $port := int . -}}
-{{- if lt $port 1024 }}{{ add $port 8000 }}{{ else }}{{ $port }}{{ end -}}
-{{- end -}}
-
 {{- define "platinum.listeners" -}}
 - name: http
   protocol: HTTP

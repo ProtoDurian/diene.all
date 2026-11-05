@@ -27,10 +27,10 @@ spec:
   ports:
     - name: http
       port: {{ .Values.gateway.port }}
-      targetPort: {{ include "platinum.proxyPort" .Values.gateway.port }}
+      targetPort: {{ .Values.gateway.port }}
       protocol: TCP
     - name: https
       port: {{ .Values.gateway.tlsPort }}
-      targetPort: {{ include "platinum.proxyPort" .Values.gateway.tlsPort }}
+      targetPort: {{ .Values.gateway.tlsPort }}
       protocol: TCP
 {{- end }}

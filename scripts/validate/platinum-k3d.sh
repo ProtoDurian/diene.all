@@ -142,7 +142,7 @@ EOF
 gateway_snapshot() { k -n "${ns}" get gateway platinum-shared -o json | jq -c '{generation: .metadata.generation, spec}'; }
 cert_snapshot() {
   {
-    k -n entei-fixture get certificate fixture1-instance -o json | jq -c '{uid: .metadata.uid, rv: .metadata.resourceVersion, spec}'
+    k -n entei-fixture get certificate fixture1-instance -o json | jq -c '{uid: .metadata.uid, generation: .metadata.generation, notAfter: .status.notAfter, spec}'
     k -n entei-fixture get secret fixture1-instance -o jsonpath='{.data.tls\.crt}' | sha256sum
   }
 }
