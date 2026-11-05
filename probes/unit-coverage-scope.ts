@@ -20,7 +20,7 @@ export default {
       description: 'A lib source the profile never measures must turn the unit ledger red.',
       kind: 'mutation',
       async run(repo: any) {
-        // A statement-free declaration keeps the percentage at 100 and never reaches the profile, so only a derived source set sees it.
+        // No statements: only the derived source set can catch it.
         const planted = await plantGoFile(repo, 'lib/**/*.go', 'probe_uncovered.go', 'type ProbeUncovered struct{}');
         try {
           await expectRedWithDiagnostic(repo, gate, 'unit-coverage-scope', /unit coverage is missing 'lib\/.*\.go'/);
