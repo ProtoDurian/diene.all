@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# R12: Knip configuration carries no ignore/exclude entries, negated globs or
-# disabled rules (knip.json may switch off devDependencies only), at any depth,
-# in any of the four configs.
+# R12: the four knip configs carry no ignore/exclude entries, negated globs or
+# disabled/warn-only rules at any depth (knip.json may switch off devDependencies
+# only), and the knip hooks pass no exclusion flags.
 
 tree="$(git write-tree)"
 mapfile -t configs < <(git -c core.quotePath=false ls-tree --name-only "${tree}" | grep -E '^knip(\.production)?(\.llm)?\.json$' || true)
@@ -25,12 +25,18 @@ for config in "${configs[@]}"; do
     echo "❌ ${config} negates globs: ${negated}" >&2
     failed=1
   fi
-  off="$(git show "${tree}:${config}" | jq -r --arg c "${config}" '[(.rules // {}) | to_entries[] | select(.value == "off") | .key | select(($c == "knip.json" and . == "devDependencies") | not)] | join(", ")')"
+  off="$(git show "${tree}:${config}" | jq -r --arg c "${config}" '[(.rules // {}) | to_entries[] | select(.value != "error") | .key | select(($c == "knip.json" and . == "devDependencies") | not)] | join(", ")')"
   if [[ -n ${off} ]]; then
-    echo "❌ ${config} switches rules off: ${off}" >&2
+    echo "❌ ${config} switches rules off or to warn: ${off}" >&2
     failed=1
   fi
 done
+
+flags="$(git show "${tree}:nix/pre-commit.nix" | grep -E 'node_modules/\.bin/knip' | grep -oE -- '--(exclude|include|no-exit-code|treat-config-hints-as-errors=false|max-issues)[^ "]*' || true)"
+if [[ -n ${flags} ]]; then
+  echo "❌ nix/pre-commit.nix knip hooks pass exclusion flags: $(tr '\n' ' ' <<<"${flags}")" >&2
+  failed=1
+fi
 
 if [[ ${failed} -ne 0 ]]; then
   exit 1

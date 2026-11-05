@@ -60,6 +60,10 @@ if grep -qF "@atomicloud/diene.interfaces" dist/index.js; then
   echo "❌ dist/index.js must not self-import the interfaces package" >&2
   exit 1
 fi
+if grep -nE '\bclass PortError\b|\binterface (System|VirtualFileSystem|Terminal|LoggerSink|MetricsCollector)\b|\btype (PortErrorCode|PortName)\b' dist/test-helper.js dist/test-helper.cjs dist/test-helper.d.ts; then
+  echo "❌ the helper bundle re-declares a root type; it must import it from the root package" >&2
+  exit 1
+fi
 
 echo "🏃 Verifying ESM and CJS runtime exports and shared PortError identity..."
 node --input-type=module -e "import { PortError, portError } from './dist/index.js'; const e = portError('vfs', 'not-found', 'readFile', 'missing'); if (!(e instanceof PortError) || e.port !== 'vfs' || e._tag !== 'PortError') process.exit(1)"
