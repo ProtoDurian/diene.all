@@ -21,7 +21,12 @@ export default {
       kind: 'mutation',
       async run(repo: any) {
         await flipMetaAssertion(repo);
-        await expectRedWithDiagnostic(repo, gate, 'go-lib-meta-tests', /--- FAIL: TestMemoryStoreServesTheService/);
+        await expectRedWithDiagnostic(
+          repo,
+          gate,
+          'go-lib-meta-tests',
+          /FAIL: tests\/meta\/testhelper TestMemoryStoreServesTheService/,
+        );
       },
     },
   ],

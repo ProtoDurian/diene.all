@@ -18,7 +18,7 @@ deadcode -test ./... | (! grep .)
 govulncheck -version >/dev/null
 golangci-lint version >/dev/null
 gorelease -base=none -version=v0.1.0 | grep -q 'v0.1.0 is a valid semantic version'
-zip -q inventory.zip go.mod && zip -T inventory.zip >/dev/null
+zip -q inventory.zip go.mod && zip -sf inventory.zip | grep -q go.mod
 echo "go-lib toolchain invocations passed"
 `;
 
