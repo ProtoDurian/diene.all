@@ -20,36 +20,29 @@ let
           ;
       }
     );
-    nix-unstable = (with pkgs-unstable; { });
+
     nix-2605 = (
       with pkgs-2605;
       {
         inherit
           actionlint
           git
-          gitlint
           go-task
           infisical
           nix
           pre-commit
           shellcheck
           treefmt
-          # Wrapper toolchain. The parent trimmed these out of the shared list
-          # along with its docker strip; this node's own gates still name them
-          # (`nix/pre-commit.nix` validator-runtime, `scripts/validate/helm-wrapper.sh`,
-          # `scripts/local/latest-chart-upstreams.sh`), so they stay.
-          bash
-          jq
-          kubeconform
-          kubernetes-helm
-          kyverno
-          ripgrep
-          skopeo
-          yq-go
           ;
+      }
+    );
+
+    nix-unstable = (
+      with pkgs-unstable;
+      {
       }
     );
   };
 in
 with all;
-nix-2605 // nix-unstable // atomipkgs
+atomipkgs // nix-2605 // nix-unstable
