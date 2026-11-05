@@ -2,7 +2,6 @@
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
-# index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"
 failed=0
 

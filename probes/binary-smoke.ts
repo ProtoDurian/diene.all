@@ -78,6 +78,10 @@ actionlint "$tmp/workflow.yaml"
 
 dlint exec-bits >/dev/null
 
+helm-docs --version >/dev/null
+
+helm version --short >/dev/null
+
 infisical --version >/dev/null
 git -C "$tmp" init -q
 git -C "$tmp" config user.email smoke@example.invalid

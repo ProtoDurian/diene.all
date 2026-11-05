@@ -2,7 +2,6 @@
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
-# index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"
 work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
@@ -46,19 +45,21 @@ show() { git show "${tree}:$1"; }
 [[ "$(show .github/workflows/ci.yaml | yq '[.jobs[] | select(.uses // "" | test("helm"))] | length')" == 0 ]] || fail "ci.yaml still calls a helm workflow"
 [[ "$(show Taskfile.yaml | yq 'has("includes")')" == false ]] || fail "Taskfile.yaml still has includes"
 [[ "$(show .github/dependabot.yml | yq '[.updates[] | select(.package-ecosystem == "helm")] | length')" == 0 ]] || fail "dependabot.yml still has a helm entry"
-[[ "$(show dlint.yaml | yq '[.checks["toolchain-smoke"].binaries[] | select(test("^(helm|helm-docs|kubeconform|kyverno)( |$)"))] | length')" == 0 ]] || fail "dlint.yaml still smokes an H binary"
 [[ "$(show dlint.yaml | yq '.checks["ci-wiring"].orchestrators')" == "$(printf -- '- .github/workflows/ci.yaml\n- .github/workflows/release.yaml')" ]] || fail "dlint.yaml ci-wiring orchestrators are not exactly ci.yaml + release.yaml"
 [[ "$(show probes/features.json | jq '[.[] | select(.name | test("helm"))] | length')" == 0 ]] || fail "features.json still has a helm row"
 if show CLAUDE.md | grep -qi '^# helm'; then fail "CLAUDE.md still has a Helm section"; fi
-if show probes/binary-smoke.ts | grep -Eq '^(helm|helm-docs) '; then fail "binary-smoke.ts still smokes helm"; fi
 if show nix/pre-commit.nix | grep -q 'helm'; then fail "nix/pre-commit.nix still has a helm hook"; fi
 
-# Positive control: retained CI, secrets and release surface is intact.
+# Positive control: retained CI, secrets, release and helm-toolchain smoke surface is intact.
 for j in precommit named-checks; do
   [[ "$(show .github/workflows/ci.yaml | yq ".jobs | has(\"${j}\")")" == true ]] || fail "ci.yaml lost its ${j} job"
 done
 show nix/pre-commit.nix | grep -q 'a-infisical = {' || fail "pre-commit lost a-infisical"
 [[ -n "$(git ls-tree --name-only "${tree}" -- .github/workflows/release.yaml)" ]] || fail "release.yaml missing"
+[[ "$(show dlint.yaml | yq '[.checks["toolchain-smoke"].binaries[] | select(. == "helm version" or . == "helm-docs" or . == "kubeconform -v" or . == "kyverno version")] | length')" == 4 ]] || fail "dlint.yaml lost a helm-toolchain smoke"
+for l in 'helm-docs --version >/dev/null' 'helm version --short >/dev/null' 'kubeconform -v >/dev/null' 'kyverno version >/dev/null'; do
+  show probes/binary-smoke.ts | grep -qxF "${l}" || fail "binary-smoke.ts lost: ${l}"
+done
 
 for f in .github/workflows/ci.yaml .github/dependabot.yml Taskfile.yaml dlint.yaml; do
   yq e '.' "${f}" >/dev/null 2>&1 || fail "${f} is not valid YAML"
@@ -75,4 +76,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ helm-absence: no H path, reference or entry; retained CI/secrets/release surface intact; edited files valid"
+echo "✅ helm-absence: no H path, reference or entry; retained surface and helm-toolchain smokes intact; edited files valid"

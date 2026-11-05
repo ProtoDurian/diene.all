@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# HEAD == shared-wo-docker's .3 tree + the H ledger below, byte for byte (content and mode),
-# ignoring only this directory. The ledger is workspace's apply_H plus its DH set edits
-# (.github/named-checks/workspace/removal-points.sh), since the parent already dropped D.
+# Ledger = workspace removal-points.sh apply_H + DH set edits; helm binaries stay smoked (nix unchanged).
 
 H_PATHS=(
   infra/root_chart
@@ -39,12 +37,10 @@ rm_paths() {
   done
 }
 
-# rm_empty_dir <dir>: the axis emptied it.
 rm_empty_dir() {
   rmdir -- "$1" 2>/dev/null || fail "ledger dir $1 missing or not empty after the strip"
 }
 
-# edit <file> <cmd...>: the file must change.
 edit() {
   local file="$1"
   shift
@@ -64,7 +60,6 @@ sed_e() { sed -i "$1" "$2"; }
 sed_z() { sed -i -z "$1" "$2"; }
 drop_section() { awk -v h="$1" '$0 == h { skip = 1; next } /^# / { skip = 0 } !skip' "$2" >"${2}.new" && mv "${2}.new" "$2"; }
 drop_nix_block() { awk -v s="$1" '$0 == s { skip = 1 } skip { if ($0 ~ /^    };$/) { skip = 0; eat = 1 } next } eat && $0 == "" { eat = 0; next } { eat = 0; print }' "$2" >"${2}.new" && mv "${2}.new" "$2"; }
-# drop_yaml_job <key line>: the job, its deeper-indented body and the blank line before it.
 drop_yaml_job() {
   awk -v k="$1" '
     { line[NR] = $0 }
@@ -73,7 +68,7 @@ drop_yaml_job() {
       for (i = 1; i <= NR; i++) {
         if (line[i] == k) {
           if (n > 0 && out[n] == "") n--
-          for (i++; i <= NR && (line[i] == "" || line[i] ~ /^    /); i++) {}
+          for (i++; i <= NR && line[i] ~ /^    /; i++) {}
           i--
           continue
         }
@@ -82,8 +77,6 @@ drop_yaml_job() {
       for (j = 1; j <= n; j++) print out[j]
     }' "$2" >"${2}.new" && mv "${2}.new" "$2"
 }
-# drop_lines <first regex> <last regex>: that line range and the blank line after it.
-drop_lines() { awk -v a="$1" -v b="$2" 'skip == 0 && $0 ~ a { skip = 1 } skip == 1 { if ($0 ~ b) skip = 2; next } skip == 2 && $0 == "" { skip = 0; next } { if (skip == 2) skip = 0; print }' "$3" >"${3}.new" && mv "${3}.new" "$3"; }
 
 apply_H() {
   rm_paths "${H_PATHS[@]}" .github/workflows/cd.yaml
@@ -93,10 +86,9 @@ apply_H() {
   edit Taskfile.yaml sed_z 's#includes:\n  helm: tasks/Taskfile\.helm\.yaml\n\n##'
   edit .github/dependabot.yml sed_z "s#  - package-ecosystem: helm\n    directory: /infra/root_chart\n    schedule:\n      interval: weekly\n    groups:\n      all:\n        patterns:\n          - '\*'\n    open-pull-requests-limit: 2\n##"
   edit dlint.yaml sed_e '/^      - \.github\/workflows\/cd\.yaml$/d'
-  edit dlint.yaml sed_e '/^      - helm version$/d;/^      - helm-docs$/d;/^      - kubeconform -v$/d;/^      - kyverno version$/d'
   edit CLAUDE.md drop_section '# Helm charts and publishing'
   edit probes/features.json sed_z 's#  {\n    "template": "diene/workspace",\n    "name": "helm-lint",\n[^}]*},\n##;s#  {\n    "template": "diene/workspace",\n    "name": "helm-render",\n[^}]*},\n##;s#  {\n    "template": "diene/workspace",\n    "name": "hook-helm-lint",\n[^}]*},\n##'
-  edit probes/binary-smoke.ts drop_lines '^helm-docs --version' '^helm template diene-workspace infra/root_chart'
+  edit probes/binary-smoke.ts sed_e '/^helm-docs --dry-run --chart-search-root infra\/root_chart /d;/^helm template diene-workspace infra\/root_chart /d'
   edit nix/pre-commit.nix drop_nix_block '    a-helm-lint = {'
   edit nix/pre-commit.nix sed_e '/"\^infra\/root_chart\/"/d'
   edit nix/fmt.nix sed_e '/"infra\/root_chart\/\*\*"/d'
