@@ -27,14 +27,20 @@ name. Every CEL expression is object-only (no `oldObject`, `authorizer` or `para
 resource rule lists `CREATE` and `UPDATE`. Params are rendered into the CEL as literals, so the
 definitions evaluate offline with `kyverno apply`.
 
-- **LPSM policies** match Deployments, StatefulSets, DaemonSets, Jobs, CronJobs and Services.
-  A missing key is only `requireLabels` / `requireAnnotations`'s concern, so each policy fails on
-  its own.
+- **LPSM policies** match Deployments, StatefulSets, DaemonSets, Jobs, CronJobs and Services, plus
+  bare Pods and ReplicaSets (no `ownerReferences`; owned ones inherit their controller's check).
+  A CronJob is also checked on `spec.jobTemplate.metadata`, because the Jobs it spawns get only
+  that metadata. A missing key is only `requireLabels` / `requireAnnotations`'s concern, so each
+  policy fails on its own.
 - **Pod-security policies** (PSS baseline + the restricted escalation, non-root and volume rules) match Pods (including `pods/ephemeralcontainers`), ReplicaSets and the
   same controllers. They read the pod spec from `spec`, `spec.template.spec` or
   `spec.jobTemplate.spec.template.spec`. They cover init containers and, where the PSS check
   applies to them, ephemeral containers. `requireResources` skips ephemeral containers because the
   API forbids resources on them.
+- `restrictAppArmor` checks the `appArmorProfile` field and the legacy
+  `container.apparmor.security.beta.kubernetes.io/*` annotation on the Pod or pod template.
+- `disallowLatest` admits `tag@sha256:<digest>`, including `:latest@sha256:`, by design: the
+  digest pins the image.
 
 ## Audit to enforce
 
@@ -44,7 +50,15 @@ compliance feed). A landscape overlay sets `enforcement: deny` to bind every pol
 
 A per-policy `actions` list overrides the landscape posture for that policy. In an audit landscape
 an override can never include `Deny`: the render is refused. `Deny` with `Warn` is refused
-everywhere (the API rejects it).
+everywhere (the API rejects it). `Audit` without `Warn` is refused too: Warn is the compliance feed.
+
+Before a landscape flips to `deny`, the cluster bootstrap must label `kube-system` (and any other
+controller namespace) with the exemption label. This is a required step owned by the cluster
+bootstrap, not by this chart; without it, those controllers' next create or update is denied.
+
+The policies match `UPDATE` and are object-only, so in a `deny` landscape an object that already
+violates a policy cannot be updated at all, even metadata-only (finalizer removal, GC ownerRef
+patches). Fix or exempt such objects before flipping to `deny`.
 
 ## Exemptions
 
@@ -123,9 +137,12 @@ dashboards are not this chart's to prove. trivy-operator stays dropped and is no
 ## Tests
 
 - `task test:unit` (`scripts/ci/vanadium.sh`): schema, lint, render, LPSM labels, names, parity,
-  the inherited rendered-manifest stage, per-policy conformance over `tests/vap/`, audit/enforce,
-  the exemption pair, and the publish dry-runs.
-- `task test:int` (`scripts/ci/vanadium-k3d.sh`): k3d install, Warn + metric, Deny, exempt namespace.
+  structural checks on the render, per-policy conformance over `tests/vap/`, audit/enforce, the
+  exemption pair, and the publish dry-runs. `conformance` is the Q-G20 stage for this chart:
+  helm template → kubeconform → `kyverno apply` of the rendered VAP definitions on the fixtures.
+- `task test:int` (`scripts/ci/vanadium-k3d.sh`): k3d install, Warn + metric (good fixtures draw
+  no warning), Deny (good fixtures and a Job created from the good CronJob admitted), exempt
+  namespace.
 - `tests/vap/good/*.yaml` must pass every policy. Each `tests/vap/bad/<policy key>/*.yaml` must fail
   exactly that policy, which keeps every policy independently regressable.
 - k3d skips the fixtures the API rejects before admission runs (ephemeral containers on create,

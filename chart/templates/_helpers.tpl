@@ -70,6 +70,9 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- if and (has "Deny" $actions) (ne $root.Values.enforcement "deny") -}}
 {{- fail (printf "policies.%s binds Deny in an audit landscape (enforcement %q)" .name $root.Values.enforcement) -}}
 {{- end -}}
+{{- if and (has "Audit" $actions) (not (has "Warn" $actions)) -}}
+{{- fail (printf "policies.%s.actions has Audit without Warn; Warn is the compliance feed" .name) -}}
+{{- end -}}
 {{- toJson $actions -}}
 {{- end -}}
 
@@ -80,17 +83,15 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
   operations: [CREATE, UPDATE]
   resources: [services]
 {{- end }}
-{{- if eq . "pods" }}
+{{- if ne . "services" }}
 - apiGroups: ['']
   apiVersions: [v1]
   operations: [CREATE, UPDATE]
-  resources: [pods, pods/ephemeralcontainers]
+  resources: {{ ternary "[pods, pods/ephemeralcontainers]" "[pods]" (eq . "pods") }}
 - apiGroups: [apps]
   apiVersions: [v1]
   operations: [CREATE, UPDATE]
   resources: [replicasets]
-{{- end }}
-{{- if ne . "services" }}
 - apiGroups: [apps]
   apiVersions: [v1]
   operations: [CREATE, UPDATE]
@@ -116,6 +117,28 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
   expression: >-
     variables.containers +
     (has(variables.spec.ephemeralContainers) ? variables.spec.ephemeralContainers : [])
+- name: podAnnotations
+  expression: >-
+    object.kind == 'Pod' ? (has(object.metadata.annotations) ? object.metadata.annotations : {}) :
+    object.kind == 'CronJob' ? (has(object.spec.jobTemplate.spec.template.metadata) &&
+    has(object.spec.jobTemplate.spec.template.metadata.annotations) ?
+    object.spec.jobTemplate.spec.template.metadata.annotations : {}) :
+    has(object.spec.template.metadata) && has(object.spec.template.metadata.annotations) ?
+    object.spec.template.metadata.annotations : {}
+{{- end -}}
+
+{{- /* Owned Pods and ReplicaSets inherit their controller's checks; a CronJob's Jobs get only jobTemplate.metadata. */ -}}
+{{- define "vanadium.lpsmVariables" -}}
+- name: metas
+  expression: >-
+    object.kind in ['Pod', 'ReplicaSet'] && has(object.metadata.ownerReferences) &&
+    size(object.metadata.ownerReferences) > 0 ? [] :
+    object.kind == 'CronJob' && has(object.spec.jobTemplate.metadata) ?
+    [object.metadata, object.spec.jobTemplate.metadata] :
+    [object.metadata]
+- name: jobTemplateMeta
+  expression: >-
+    object.kind != 'CronJob' || has(object.spec.jobTemplate.metadata)
 {{- end -}}
 
 {{- define "vanadium.lpsmKeys" -}}
@@ -126,24 +149,25 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- /* metaValue <root> <key> <accepted CEL list>: label and annotation, where present, are in the list. */ -}}
 {{- define "vanadium.metaValue" -}}
 {{- $k := printf "%s/%s" (include "vanadium.labelPrefix" .root) .key -}}
-(!has(object.metadata.labels) || !('{{ $k }}' in object.metadata.labels) || object.metadata.labels['{{ $k }}'] in {{ .list }}) &&
-(!has(object.metadata.annotations) || !('{{ $k }}' in object.metadata.annotations) || object.metadata.annotations['{{ $k }}'] in {{ .list }})
+variables.metas.all(m,
+(!has(m.labels) || !('{{ $k }}' in m.labels) || m.labels['{{ $k }}'] in {{ .list }}) &&
+(!has(m.annotations) || !('{{ $k }}' in m.annotations) || m.annotations['{{ $k }}'] in {{ .list }}))
 {{- end -}}
 
 {{- define "vanadium.policy.requireLabels" -}}
 rules: lpsm
-message: Workloads and services must carry every LPSM label (landscape, platform, service, module, layer).
+message: Workloads, services, bare Pods/ReplicaSets and CronJob jobTemplates must carry every LPSM label (landscape, platform, service, module, layer).
 expression: >-
-  has(object.metadata.labels) &&
-  {{ include "vanadium.lpsmKeys" . }}.all(k, k in object.metadata.labels)
+  variables.jobTemplateMeta && variables.metas.all(m, has(m.labels) &&
+  {{ include "vanadium.lpsmKeys" . }}.all(k, k in m.labels))
 {{- end -}}
 
 {{- define "vanadium.policy.requireAnnotations" -}}
 rules: lpsm
-message: Workloads and services must carry every LPSM annotation (landscape, platform, service, module, layer).
+message: Workloads, services, bare Pods/ReplicaSets and CronJob jobTemplates must carry every LPSM annotation (landscape, platform, service, module, layer).
 expression: >-
-  has(object.metadata.annotations) &&
-  {{ include "vanadium.lpsmKeys" . }}.all(k, k in object.metadata.annotations)
+  variables.jobTemplateMeta && variables.metas.all(m, has(m.annotations) &&
+  {{ include "vanadium.lpsmKeys" . }}.all(k, k in m.annotations))
 {{- end -}}
 
 {{- define "vanadium.policy.landscapeMatch" -}}
@@ -289,11 +313,13 @@ expression: >-
 
 {{- define "vanadium.policy.restrictAppArmor" -}}
 rules: pods
-message: AppArmor profiles must be RuntimeDefault or Localhost.
+message: AppArmor profiles (field or annotation) must be RuntimeDefault or Localhost.
 expression: >-
   ([variables.spec] + variables.allContainers).all(x, !has(x.securityContext) ||
   !has(x.securityContext.appArmorProfile) ||
-  x.securityContext.appArmorProfile.type in ['RuntimeDefault', 'Localhost'])
+  x.securityContext.appArmorProfile.type in ['RuntimeDefault', 'Localhost']) &&
+  variables.podAnnotations.all(k, !k.startsWith('container.apparmor.security.beta.kubernetes.io/') ||
+  variables.podAnnotations[k] == 'runtime/default' || variables.podAnnotations[k].startsWith('localhost/'))
 {{- end -}}
 
 {{- define "vanadium.policy.restrictSELinux" -}}

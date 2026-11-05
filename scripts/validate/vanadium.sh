@@ -177,14 +177,13 @@ parity)
   rg -q '^## Workload escape hatch$' "${doc}" || { echo "❌ workload-level escape hatch is not documented" >&2 && exit 1; }
   ;;
 rendered-manifests)
-  # The inherited Q-G20 stage: helm template -> kubeconform -> kyverno apply (definitions only).
+  # Structural checks on the render, which holds only VAPs and bindings; the Q-G20 stage is `conformance`.
   index=0
   for stack in "${stacks[@]}"; do
     index=$((index + 1))
     render "${stack}" >"${tmp}/rendered-${index}.yaml"
     definitions "${tmp}/rendered-${index}.yaml" "${tmp}/defs-${index}.yaml"
     kubeconform -strict -summary -schema-location default "${tmp}/rendered-${index}.yaml"
-    kyverno apply "${tmp}/defs-${index}.yaml" --resource "${tmp}/rendered-${index}.yaml" --detailed-results --remove-color
     json "${tmp}/defs-${index}.yaml" | jq -e 'length > 0 and all(.[];
         .spec.paramKind == null and
         all(.spec.matchConstraints.resourceRules[]; (.operations | index("CREATE")) != null and (.operations | index("UPDATE")) != null))' >/dev/null ||
@@ -195,6 +194,7 @@ rendered-manifests)
   done
   ;;
 conformance)
+  # The Q-G20 stage: helm template -> kubeconform -> kyverno apply of the VAP definitions on the fixtures.
   render "${stacks[0]}" >"${tmp}/rendered.yaml"
   definitions "${tmp}/rendered.yaml" "${tmp}/defs.yaml"
   mapfile -t all < <(find "${fixtures}" -name '*.yaml' | LC_ALL=C sort)
@@ -228,6 +228,7 @@ audit-enforce)
   expect_red 'binds Deny in an audit landscape' render "${stacks[0]}" --set 'policies.disallowLatest.actions={Deny}'
   expect_red 'binds Deny in an audit landscape' render "" --set serviceTree.landscape=example --set 'policies.requireLabels.actions={Deny,Audit}'
   expect_red 'cannot combine Deny and Warn' render "${stacks[2]}" --set 'policies.disallowLatest.actions={Deny,Warn}'
+  expect_red 'has Audit without Warn' render "${stacks[0]}" --set 'policies.disallowLatest.actions={Audit}'
   render "${stacks[2]}" --set 'policies.disallowLatest.actions={Warn,Audit}' | yq -o=json eval-all 'select(.kind == "ValidatingAdmissionPolicyBinding" and .metadata.name == "vanadium-disallowlatest") | .spec.validationActions' |
     jq -e '. == ["Warn", "Audit"]' >/dev/null || { echo "❌ a per-policy override does not apply in a deny landscape" >&2 && exit 1; }
   ;;

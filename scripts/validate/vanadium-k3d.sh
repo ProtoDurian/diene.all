@@ -109,8 +109,15 @@ for fixture in "${bad[@]}"; do
     miss "${fixture} returned no $(policy_of "${fixture}") warning"
   fi
 done
+for fixture in "${good[@]}"; do
+  if ! dry_run "${fixture}"; then
+    miss "audit landscape rejected good ${fixture}"
+  elif rg -q 'vanadium-' "${tmp}/out.txt"; then
+    miss "good ${fixture} drew a vanadium warning"
+  fi
+done
 phase_done warn
-echo "✅ warn: ${#bad[@]} violations each warned by their own policy"
+echo "✅ warn: ${#bad[@]} violations each warned by their own policy; ${#good[@]} good fixtures warning-free"
 
 # Deny landscape. kube-system is exempt by label (sodium's kube-system exclude).
 "${kc[@]}" label namespace kube-system atomi.cloud/policy-exempt=true --overwrite >/dev/null
@@ -128,16 +135,18 @@ for fixture in "${bad[@]}"; do
   fi
 done
 for fixture in "${good[@]}"; do
-  if ! dry_run "${serving}/${fixture#"${fixtures}/"}"; then
-    miss "deny landscape rejected good ${fixture}"
-  elif rg -q 'vanadium-' "${tmp}/out.txt"; then
-    miss "good ${fixture} drew a vanadium warning"
-  fi
+  dry_run "${serving}/${fixture#"${fixtures}/"}" || miss "deny landscape rejected good ${fixture}"
 done
+# The CronJob controller builds each Job from jobTemplate only; kubectl create job --from does the same.
+cron="${serving}/good/cronjob.yaml"
+"${kc[@]}" apply -f "${cron}" >/dev/null
+"${kc[@]}" -n "$(yq -r '.metadata.namespace' "${cron}")" create job vanadium-cron-probe --from="cronjob/$(yq -r '.metadata.name' "${cron}")" \
+  --dry-run=server -o name >/dev/null 2>"${tmp}/out.txt" || miss "a Job spawned from good ${cron#"${serving}/"} was denied"
+"${kc[@]}" delete -f "${cron}" --wait=false >/dev/null
 phase_done deny
 after="$(vap_check_total vanadium-disallowlatest deny)"
 [ "${after}" -gt "${before}" ] || { echo "❌ apiserver_validating_admission_policy_check_total{deny} did not increase" >&2 && exit 1; }
-echo "✅ deny: ${#bad[@]} violations each denied by their own policy; ${#good[@]} good fixtures admitted; deny metric ${before} -> ${after}"
+echo "✅ deny: ${#bad[@]} violations each denied by their own policy; ${#good[@]} good fixtures and a CronJob-spawned Job admitted; deny metric ${before} -> ${after}"
 
 # The same violating manifests, admitted once their namespace carries the exemption label.
 for ns in $(yq -N -r '.metadata.namespace' "${bad[@]}" | sort -u); do

@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo-pod-owned
+  namespace: sample
+  ownerReferences:
+    - apiVersion: apps/v1
+      kind: ReplicaSet
+      name: demo-api-6d4cf56db6
+      uid: 0b1d7c3e-5f2a-4e8b-9c6d-1a2b3c4d5e6f
+      controller: true
+      blockOwnerDeletion: true
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+  initContainers:
+    - name: init
+      image: docker.io/library/busybox:1.37.0
+      command: ['true']
+      resources:
+        requests: { cpu: 10m, memory: 16Mi }
+        limits: { cpu: 50m, memory: 32Mi }
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: { drop: [ALL] }
+  containers:
+    - name: api
+      image: ghcr.io/stefanprodan/podinfo:6.9.2
+      resources:
+        requests: { cpu: 10m, memory: 16Mi }
+        limits: { cpu: 50m, memory: 32Mi }
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: { drop: [ALL] }
+  volumes:
+    - name: config
+      configMap: { name: demo-config }
+    - name: scratch
+      emptyDir: {}

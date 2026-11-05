@@ -54,3 +54,16 @@ spec:
             - name: scratch
               emptyDir: {}
           restartPolicy: Never
+    metadata:
+      labels:
+        atomi.cloud/landscape: example
+        atomi.cloud/platform: sample
+        atomi.cloud/service: demo
+        atomi.cloud/module: api
+        atomi.cloud/layer: '2'
+      annotations:
+        atomi.cloud/landscape: example
+        atomi.cloud/platform: sample
+        atomi.cloud/service: demo
+        atomi.cloud/module: api
+        atomi.cloud/layer: '2'

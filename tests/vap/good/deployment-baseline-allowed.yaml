@@ -24,6 +24,8 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: demo-api
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/api: runtime/default
     spec:
       securityContext:
         runAsNonRoot: true
