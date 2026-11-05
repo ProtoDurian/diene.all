@@ -79,8 +79,8 @@ for f in .github/workflows/ci.yaml .github/workflows/cd.yaml .github/dependabot.
 done
 jq -e . probes/features.json >/dev/null 2>&1 || fail "probes/features.json is not valid JSON"
 actionlint -config-file .github/actionlint.yaml .github/workflows/*.y*ml >"${work}/actionlint.out" 2>&1 || fail "actionlint failed: $(head -5 "${work}/actionlint.out")"
-task --list-all >"${work}/task.out" 2>&1 || fail "task --list-all failed: $(head -5 "${work}/task.out")"
-grep -q '^\* helm:' "${work}/task.out" || fail "task --list-all shows no helm tasks"
+task --list-all --json >"${work}/task.out" 2>&1 || fail "task --list-all failed: $(head -5 "${work}/task.out")"
+[[ "$(jq '[.tasks[].name | select(startswith("helm:"))] | length' "${work}/task.out" 2>/dev/null)" -gt 0 ]] || fail "task --list-all shows no helm tasks"
 dlint ci-wiring >"${work}/dlint.out" 2>&1 || fail "dlint ci-wiring failed: $(head -5 "${work}/dlint.out")"
 
 if [[ ${failed} -ne 0 ]]; then

@@ -102,6 +102,9 @@ git -C "${root}" --work-tree="${copy}" add -A -f -- .
 got="$(git -C "${root}" write-tree)"
 unset GIT_INDEX_FILE
 
+self_files="$(git -C "${root}" ls-tree --name-only "${head_tree}" -- "${self_dir}/" | LC_ALL=C sort | tr '\n' ' ')"
+[[ ${self_files} == "${self_dir}/branch-ancestry.sh ${self_dir}/docker-absence.sh ${self_dir}/exact-diff.sh ${self_dir}/parent.sha " ]] || fail "${self_dir} holds files beyond the three checks and parent.sha: ${self_files}"
+
 if [[ ${got} != "${want}" ]]; then
   fail "HEAD differs from shared .3 ${parent_sha} + the D ledger (left: ledger, right: HEAD):"
   git -C "${root}" -c core.quotePath=false diff --no-renames --stat "${got}" "${want}" >&2
