@@ -61,10 +61,15 @@ chosen because it loads the API server.
 
 ## Workload escape hatch
 
-Exemptions are namespace-level in v1. A workload that needs its own exemption (the former sodium
-name-glob excludes) runs in its own namespace, and that namespace gets the exemption label. No
-workload uses it today. If one needs a per-object exemption, add an `objectSelector` on the same
-label to the bindings; that change is not part of v1.
+Exemptions are namespace-level in v1, and the workload-level escape hatch is documentation only. A
+workload that needs its own exemption (the former sodium name-glob excludes) would run in its own
+namespace, and that namespace gets the exemption label. A per-object exemption would add an
+`objectSelector` on the same label to the bindings; that change is not part of v1.
+
+alloy-logs (the former `*-container-logs-collector*` exclude) maps through this hatch. It runs as
+root to read `/var/log/pods`, and the carve-out covers only its hostPath, so `requireNonRoot`
+flags it. Under the default `[Warn, Audit]` that is a warning only. In a `deny` landscape
+alloy-logs would be denied until the hatch exists (or its namespace is exempt).
 
 ## Sodium parity
 
@@ -86,7 +91,7 @@ label-based exemption.
 | PSS restricted restrict-volume-types              | `restrictVolumeTypes`                                      | implemented           |
 | exclude namespace `kube-system`                   | label `kube-system` with `atomi.cloud/policy-exempt: true` | label exemption       |
 | exclude `*-cleanup-controller-*` workloads        | own namespace + exemption label (escape hatch above)       | workload escape hatch |
-| exclude `*-container-logs-collector*` workloads   | alloy-logs hostPath carve-out; else escape hatch above     | workload escape hatch |
+| exclude `*-container-logs-collector*` workloads   | alloy-logs: hostPath carve-out + escape hatch (non-root)   | workload escape hatch |
 | Kyverno engine (argon) and policy reports         | native VAP; apiserver VAP metrics + Warn feed              | dropped (replaced)    |
 | PSS baseline disallow-host-process                | `disallowHostProcess`                                      | implemented           |
 | PSS baseline disallow-host-namespaces             | `disallowHostNamespaces`                                   | implemented           |
