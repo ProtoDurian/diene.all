@@ -24,6 +24,7 @@ class PortError<P extends PortName = PortName> extends Error {
   readonly details: PortErrorDetails;
 
   static override [Symbol.hasInstance](value: unknown): boolean {
+    if (this !== PortError) return Function.prototype[Symbol.hasInstance].call(this, value);
     return (
       typeof value === 'object' &&
       value !== null &&

@@ -66,3 +66,46 @@ describe('PortError', () => {
     direct.details.should.eql({});
   });
 });
+
+describe('PortError subclasses', () => {
+  class FsError extends PortError<'vfs'> {}
+
+  it('should not treat a plain PortError as a subclass instance', () => {
+    // Arrange
+    const plain = portError('vfs', 'io', 'readFile', 'disk fault');
+
+    // Act
+    const actual = plain instanceof FsError;
+
+    // Assert
+    actual.should.be.false();
+  });
+
+  it('should treat a subclass instance as both the subclass and the base', () => {
+    // Arrange
+    const subject = new FsError('vfs', 'io', 'readFile', 'disk fault');
+
+    // Act
+    const asSubclass = subject instanceof FsError;
+    const asBase = subject instanceof PortError;
+
+    // Assert
+    asSubclass.should.be.true();
+    asBase.should.be.true();
+  });
+
+  it('should still accept a branded value from another copy of the package on the base', () => {
+    // Arrange
+    const crossCopy = Object.defineProperty({}, Symbol.for('AtomiCloud.Diene.Interfaces.PortError'), {
+      value: true,
+    });
+
+    // Act
+    const asBase = crossCopy instanceof PortError;
+    const asSubclass = crossCopy instanceof FsError;
+
+    // Assert
+    asBase.should.be.true();
+    asSubclass.should.be.false();
+  });
+});
