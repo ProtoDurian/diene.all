@@ -108,6 +108,7 @@ nix develop -i --keep HOME .#default -c bash -c '
 ' || fail "default shell docker/helm absence / kept-toolchain presence"
 
 # --- the many-owner files the strip edited still parse and lint ---------------------
+# Reads the working tree on purpose: these tools take paths, and CI checks out HEAD.
 for f in .github/workflows/ci.yaml .github/workflows/cd.yaml .github/dependabot.yml Taskfile.yaml dlint.yaml; do
   yq e '.' "${f}" >/dev/null 2>&1 || fail "${f} is not valid YAML"
 done

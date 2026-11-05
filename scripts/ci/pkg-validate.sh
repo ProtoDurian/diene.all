@@ -28,7 +28,7 @@ printf '%s\n' \
   'var subject = new NoteSummariser();' \
   'var note = new NoteRecord { Title = "Hello", Body = "world" };' \
   'subject.AssertSummary(note, 80, "Hello — world");' >"${scratch}/Program.cs"
-dotnet restore "${scratch}" --source "$(pwd)/${artifacts}" >/dev/null
+dotnet restore "${scratch}" --source "$(pwd)/${artifacts}" --packages "${scratch}/packages" >/dev/null
 dotnet build "${scratch}" -c Release --no-restore >/dev/null
 
 echo "✅ Package validation and scratch consumption passed"

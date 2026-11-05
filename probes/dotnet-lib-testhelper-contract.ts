@@ -1,5 +1,6 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/dotnet.ts';
+import { expectGreen } from './lib/dotnet.ts';
+import { expectRedBecause } from './lib/dotnet-package.ts';
 
 const UNIT = 'nix develop .#ci -c task test:unit';
 
@@ -21,7 +22,7 @@ export default defineGate({
         find: 'if (!string.Equals(actual, expected, StringComparison.Ordinal))',
         replace: 'if (actual is null)',
       });
-      await expectRed(repo, UNIT, 'dotnet-lib-testhelper-contract');
+      await expectRedBecause(repo, UNIT, 'dotnet-lib-testhelper-contract', ['NoteAssertions_AssertSummary']);
     },
   },
 });

@@ -17,7 +17,7 @@ failed=0
 while read -r sha subject; do
   version="${subject#release: }"
   releases=$((releases + 1))
-  if ! git diff-tree --no-commit-id --name-only -r "${sha}" | grep -qx Version.props; then
+  if ! git diff-tree --root --no-commit-id --name-only -r "${sha}" | grep -qx Version.props; then
     echo "❌ ${sha} (${subject}) does not commit Version.props" >&2
     failed=1
     continue

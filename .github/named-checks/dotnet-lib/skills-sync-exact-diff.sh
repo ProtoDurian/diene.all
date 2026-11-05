@@ -14,9 +14,12 @@ if [[ -n "$(git status --porcelain -- .claude/skills)" ]]; then
   echo "❌ skills-sync left changes under .claude/skills" >&2
   exit 1
 fi
-if [[ "$(yq '.runtimes // [] | length' skills-sync.yaml)" == 0 && -n "$(git ls-files -- .claude/skills/vendor)" ]]; then
-  echo "❌ skills-sync declares no runtime but .claude/skills/vendor tracks files" >&2
-  exit 1
+if [[ "$(yq '.runtimes // [] | length' skills-sync.yaml)" == 0 ]]; then
+  vendored="$(git ls-files -- .claude/skills/vendor ':!.claude/skills/vendor/.gitkeep' ':!.claude/skills/vendor/manifest.json')"
+  if [[ -n ${vendored} || "$(jq 'length' .claude/skills/vendor/manifest.json)" != 0 ]]; then
+    echo "❌ skills-sync declares no runtime but .claude/skills/vendor tracks vendored skills" >&2
+    exit 1
+  fi
 fi
 
 echo "✅ skills-sync-exact-diff: frozen sync is clean"

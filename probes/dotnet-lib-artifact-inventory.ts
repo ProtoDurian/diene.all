@@ -1,6 +1,6 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/dotnet.ts';
-import { PACKAGE_VALIDATE, packPackages } from './lib/dotnet-package.ts';
+import { expectGreen } from './lib/dotnet.ts';
+import { PACKAGE_VALIDATE, expectRedBecause, packPackages } from './lib/dotnet-package.ts';
 
 export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
@@ -21,7 +21,10 @@ export default defineGate({
       await repo.exec(
         'rm "$(find artifacts/package -maxdepth 1 -name \'AtomiCloud.Diene.Note.TestHelper.*.snupkg\' -print -quit)"',
       );
-      await expectRed(repo, `${PACKAGE_VALIDATE} inventory`, 'dotnet-lib-artifact-inventory');
+      await expectRedBecause(repo, `${PACKAGE_VALIDATE} inventory`, 'dotnet-lib-artifact-inventory', [
+        '❌ Missing AtomiCloud.Diene.Note.TestHelper.',
+        '.snupkg',
+      ]);
     },
   },
 });

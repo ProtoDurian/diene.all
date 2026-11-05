@@ -1,5 +1,6 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/dotnet.ts';
+import { expectGreen } from './lib/dotnet.ts';
+import { expectRedBecause } from './lib/dotnet-package.ts';
 
 export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
@@ -19,7 +20,9 @@ export default defineGate({
         'TestHelper/Note/MetaCoverageGap.cs',
         'namespace AtomiCloud.Diene.Note.TestHelper.Note;\n\npublic static class MetaCoverageGap\n{\n    public static int Uncovered() => 42;\n}\n',
       );
-      await expectRed(repo, 'nix develop .#ci -c task test:meta:coverage', 'dotnet-lib-testhelper-meta-ledger');
+      await expectRedBecause(repo, 'nix develop .#ci -c task test:meta:coverage', 'dotnet-lib-testhelper-meta-ledger', [
+        'line coverage is below the specified 100',
+      ]);
     },
   },
 });

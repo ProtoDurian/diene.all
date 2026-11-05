@@ -1,5 +1,6 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/dotnet.ts';
+import { expectGreen } from './lib/dotnet.ts';
+import { expectRedBecause } from './lib/dotnet-package.ts';
 
 // The 1.0.0 baseline package only exists after the library's own first release, so the
 // baseline is conditioned off while 1.0.0 itself is being built. Pack a post-1.0.0 version
@@ -22,17 +23,18 @@ export default defineGate({
   },
   mutation: {
     name: 'mutation-dotnet-lib-api-compatibility-caught',
-    description: 'Removing one public 1.0 interface member turns PackageValidation red.',
+    description: 'Removing one public 1.0 member that nothing in Lib calls turns PackageValidation red.',
     expectedImpact: [],
     async run(repo: any) {
-      await repo.patch('Lib/INoteRepository.cs', {
-        find: '\n    Task<NotePrincipal?> Find(string id, CancellationToken cancellationToken = default);',
+      await repo.patch('Lib/NoteService.cs', {
+        find: '    public Task<NotePrincipal> Create(NoteRecord record, CancellationToken cancellationToken = default) =>\n        notes.Save(record, cancellationToken);\n\n',
         replace: '',
       });
-      await expectRed(
+      await expectRedBecause(
         repo,
         `nix develop .#ci -c bash -c '${packAgainstPublishedBaseline}'`,
         'dotnet-lib-api-compatibility',
+        ['CP0002'],
       );
     },
   },

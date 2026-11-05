@@ -19,7 +19,7 @@ done
 settings="$(grep -E '(^|/)(\.editorconfig|[^/]+\.DotSettings|\.globalconfig)$' <<<"${files}" | grep -v '^\.claude/skills/vendor/' || true)"
 if [[ -n ${settings} ]]; then
   while IFS= read -r path; do
-    if git show "${tree}:${path}" | grep -niE 'resharper_[a-z_]+_highlighting|InspectionSeverities|severity *= *none'; then
+    if git show "${tree}:${path}" | grep -niE 'resharper_[a-z_]+_highlighting|InspectionSeverities|severity *= *(none|silent)'; then
       echo "❌ ${path} switches an inspection off" >&2
       failed=1
     fi
@@ -32,6 +32,13 @@ while IFS= read -r path; do
     failed=1
   fi
 done < <(grep -E '\.cs$' <<<"${files}" || true)
+
+while IFS= read -r path; do
+  if git show "${tree}:${path}" | grep -nE '<NoWarn>'; then
+    echo "❌ ${path} switches a diagnostic off" >&2
+    failed=1
+  fi
+done < <(grep -E '\.(csproj|props|targets)$' <<<"${files}" || true)
 
 if [[ ${failed} -ne 0 ]]; then
   exit 1

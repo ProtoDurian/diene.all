@@ -1,5 +1,6 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/dotnet.ts';
+import { expectGreen } from './lib/dotnet.ts';
+import { expectRedBecause } from './lib/dotnet-package.ts';
 
 const WIRING = 'nix develop .#ci -c dlint ci-wiring';
 
@@ -21,7 +22,9 @@ export default defineGate({
         find: 'uses: ./.github/workflows/⚡reusable-publish.yaml',
         replace: 'uses: ./.github/workflows/⚡missing-publish.yaml',
       });
-      await expectRed(repo, WIRING, 'dotnet-lib-publish-workflow-wiring');
+      await expectRedBecause(repo, WIRING, 'dotnet-lib-publish-workflow-wiring', [
+        'references missing reusable workflow',
+      ]);
     },
   },
 });

@@ -1,6 +1,19 @@
+import { expectRedBecause as expectRedBecauseWithin } from './helpers.ts';
 import { expectGreen } from './dotnet.ts';
 
 export const PACKAGE_VALIDATE = 'nix develop .#ci -c ./scripts/validate/dotnet-package.sh';
+
+// Same cap as ./dotnet.ts: a cold .NET restore and build runs past 240 s.
+const DOTNET_TIMEOUT_MS = 600000;
+
+export async function expectRedBecause(
+  repo: any,
+  command: string,
+  label: string,
+  reasons: readonly string[],
+): Promise<string> {
+  return expectRedBecauseWithin(repo, command, label, reasons, { timeoutMs: DOTNET_TIMEOUT_MS });
+}
 
 export async function packPackages(repo: any, label: string): Promise<void> {
   await expectGreen(

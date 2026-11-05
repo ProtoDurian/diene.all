@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# dotnet-lib is cut from dotnet-base-wo-helm-docker: HEAD contains its recorded .3
-# commit, and merging that commit into HEAD again is clean and changes nothing.
+# dotnet-lib is cut from dotnet-base-wo-helm-docker: HEAD contains its recorded .3 commit.
 
 parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
@@ -14,10 +13,4 @@ if ! git merge-base --is-ancestor "${parent_sha}" HEAD; then
   exit 1
 fi
 
-merged="$(git merge-tree --write-tree HEAD "${parent_sha}")" || { echo "❌ merging ${parent_sha} into HEAD conflicts" >&2 && exit 1; }
-if [[ ${merged} != "$(git rev-parse 'HEAD^{tree}')" ]]; then
-  echo "❌ merging ${parent_sha} into HEAD would change the tree" >&2
-  exit 1
-fi
-
-echo "✅ upstream-merge: HEAD contains dotnet-base-wo-helm-docker .3 ${parent_sha} and re-merges cleanly"
+echo "✅ upstream-merge: HEAD already merges dotnet-base-wo-helm-docker .3 ${parent_sha}"

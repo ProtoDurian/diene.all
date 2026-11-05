@@ -1,5 +1,6 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/dotnet.ts';
+import { expectGreen } from './lib/dotnet.ts';
+import { expectRedBecause } from './lib/dotnet-package.ts';
 
 const UNIT_COVERAGE = 'nix develop .#ci -c task test:unit:coverage';
 
@@ -21,7 +22,9 @@ export default defineGate({
         'Lib/ShippedCoverageGap.cs',
         'namespace AtomiCloud.Diene.Note;\n\npublic static class ShippedCoverageGap\n{\n    public static int Uncovered() => 42;\n}\n',
       );
-      await expectRed(repo, UNIT_COVERAGE, 'dotnet-lib-coverage-ledger');
+      await expectRedBecause(repo, UNIT_COVERAGE, 'dotnet-lib-coverage-ledger', [
+        'line coverage is below the specified 100',
+      ]);
     },
   },
 });

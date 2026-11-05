@@ -14,12 +14,9 @@ echo "📦 Packing release ${version}..."
 dotnet pack dotnet-base.slnx -c Release --output "${artifacts}"
 ./scripts/validate/dotnet-package.sh inventory "${artifacts}" "${version}"
 
+# dotnet nuget push uploads each package's sibling .snupkg with it.
 echo "🚀 Publishing packages and symbols with skip-duplicate..."
 for package in "${artifacts}"/*.nupkg; do
-  [[ ${package} == *.snupkg ]] && continue
-  dotnet nuget push "${package}" --api-key "${NUGET_API_KEY}" --source https://api.nuget.org/v3/index.json --skip-duplicate
-done
-for package in "${artifacts}"/*.snupkg; do
   dotnet nuget push "${package}" --api-key "${NUGET_API_KEY}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 done
 
