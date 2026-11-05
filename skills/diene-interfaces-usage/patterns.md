@@ -69,7 +69,7 @@ A test injects the in-memory double, fails one call, and checks the calls:
 
 ```ts
 import { PortError } from '@atomicloud/diene.interfaces';
-import { assertVfsCalls, InMemoryVirtualFileSystem } from '@atomicloud/diene.interfaces/test-helper';
+import { InMemoryVirtualFileSystem } from '@atomicloud/diene.interfaces/test-helper';
 
 it('should surface a disk fault from the store', async () => {
   // Arrange
@@ -83,7 +83,7 @@ it('should surface a disk fault from the store', async () => {
 
   // Assert
   error.code.should.equal('io');
-  assertVfsCalls(vfs, [
+  vfs.assertCalls([
     { method: 'createDirectory', options: { recursive: false }, path: '/reports', sequence: 0 },
     { contents: new TextEncoder().encode('hi'), method: 'writeFile', path: '/reports/a.txt', sequence: 1 },
   ]);
@@ -92,13 +92,13 @@ it('should surface a disk fault from the store', async () => {
 
 ## Double API
 
-| Double                      | Control                                                                       | Inspection         | Assertions                                  |
-| --------------------------- | ----------------------------------------------------------------------------- | ------------------ | ------------------------------------------- |
-| `InMemorySystem`            | outcomes in the constructor, `enqueue(outcome)`                               | `calls`            | `assertSystemCalls`                         |
-| `InMemoryVirtualFileSystem` | `failNext(error)`                                                             | `calls`, `files`   | `assertVfsCalls`, `assertVfsFiles`          |
-| `InMemoryTerminal`          | input lines in the constructor, `enqueue(line)`, `failNext(error)`, `close()` | `calls`            | `assertTerminalCalls`                       |
-| `InMemoryLoggerSink`        | `failNext(error)`                                                             | `calls`, `records` | `assertLoggerCalls`, `assertLogRecords`     |
-| `InMemoryMetricsCollector`  | `failNext(error)`                                                             | `calls`, `metrics` | `assertMetricsCalls`, `assertMetricRecords` |
+| Double                      | Control                                                                       | Inspection         | Assertion methods              |
+| --------------------------- | ----------------------------------------------------------------------------- | ------------------ | ------------------------------ |
+| `InMemorySystem`            | outcomes in the constructor, `enqueue(outcome)`                               | `calls`            | `assertCalls`                  |
+| `InMemoryVirtualFileSystem` | `failNext(error)`                                                             | `calls`, `files`   | `assertCalls`, `assertFiles`   |
+| `InMemoryTerminal`          | input lines in the constructor, `enqueue(line)`, `failNext(error)`, `close()` | `calls`            | `assertCalls`                  |
+| `InMemoryLoggerSink`        | `failNext(error)`                                                             | `calls`, `records` | `assertCalls`, `assertRecords` |
+| `InMemoryMetricsCollector`  | `failNext(error)`                                                             | `calls`, `metrics` | `assertCalls`, `assertMetrics` |
 
 - `failNext` fails the next call only.
 - `InMemorySystem` returns `unexpected-call` when no outcome is queued.

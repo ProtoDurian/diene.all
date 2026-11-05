@@ -105,6 +105,7 @@ class InterfaceAssertionError extends Error {
 class InMemorySystem implements System {
   private readonly recordedCalls: SystemCall[] = [];
   private readonly outcomes: Result<ProcessOutput, SystemError>[];
+  private readonly snapshot = new Snapshot();
   private sequence = 0;
 
   constructor(
@@ -142,6 +143,14 @@ class InMemorySystem implements System {
     return outcome.andThen(output => this.policy.validateOutput(output));
   }
 
+  assertCalls(expected: readonly ProcessRequest[]): void {
+    this.snapshot.assertEqual(
+      'System calls',
+      this.calls.map(call => call.request),
+      expected,
+    );
+  }
+
   private static cloneRequest(request: ProcessRequest): ProcessRequest {
     return Object.freeze({
       executable: request.executable,
@@ -158,6 +167,7 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
   private readonly nodes = new Map<string, MemoryNode>([['/', Object.freeze({ kind: 'directory' })]]);
   private readonly recordedCalls: VfsCall[] = [];
   private nextFailure: VfsError | undefined;
+  private readonly snapshot = new Snapshot();
   private sequence = 0;
 
   constructor(private readonly policy: VfsPolicy = new VfsPolicy()) {}
@@ -339,6 +349,14 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
       : new PortError('vfs', 'not-a-directory', operation, `Ancestor is not a directory: ${file}`, { ancestor: file });
   }
 
+  assertCalls(expected: readonly VfsCall[]): void {
+    this.snapshot.assertEqual('VFS calls', this.calls, expected);
+  }
+
+  assertFiles(expected: Readonly<Record<string, Uint8Array>>): void {
+    this.snapshot.assertEqual('VFS files', this.files, expected);
+  }
+
   private static parentPath(path: string): string {
     const index = path.lastIndexOf('/');
     return index === 0 ? '/' : path.slice(0, index);
@@ -353,6 +371,7 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
 class InMemoryTerminal implements Terminal {
   private readonly input: (string | null)[];
   private readonly recordedCalls: TerminalCall[] = [];
+  private readonly snapshot = new Snapshot();
   private closed = false;
   private nextFailure: TerminalError | undefined;
   private sequence = 0;
@@ -416,6 +435,10 @@ class InMemoryTerminal implements Terminal {
     return Ok(this.input.shift() ?? null);
   }
 
+  assertCalls(expected: readonly TerminalCall[]): void {
+    this.snapshot.assertEqual('Terminal calls', this.calls, expected);
+  }
+
   private static assertLine(line: unknown): asserts line is string | null {
     if (line !== null && typeof line !== 'string') {
       throw new TypeError('In-memory terminal input must contain only strings or null');
@@ -426,6 +449,7 @@ class InMemoryTerminal implements Terminal {
 class InMemoryLoggerSink implements LoggerSink {
   private readonly recordedCalls: LoggerCall[] = [];
   private readonly recordedRecords: Readonly<LogRecord>[] = [];
+  private readonly snapshot = new Snapshot();
   private nextFailure: LoggingError | undefined;
   private sequence = 0;
 
@@ -466,6 +490,14 @@ class InMemoryLoggerSink implements LoggerSink {
     return failure === undefined ? Ok(undefined) : Err(failure);
   }
 
+  assertCalls(expected: readonly LoggerCall[]): void {
+    this.snapshot.assertEqual('Logger calls', this.calls, expected);
+  }
+
+  assertRecords(expected: readonly LogRecord[]): void {
+    this.snapshot.assertEqual('Log records', this.records, expected);
+  }
+
   private static cloneRecord(record: Readonly<LogRecord>): Readonly<LogRecord> {
     return Object.freeze({
       ...record,
@@ -477,6 +509,7 @@ class InMemoryLoggerSink implements LoggerSink {
 class InMemoryMetricsCollector implements MetricsCollector {
   private readonly recordedCalls: MetricsCall[] = [];
   private readonly recordedMetrics: Readonly<MetricRecord>[] = [];
+  private readonly snapshot = new Snapshot();
   private nextFailure: MetricsError | undefined;
   private sequence = 0;
 
@@ -517,6 +550,14 @@ class InMemoryMetricsCollector implements MetricsCollector {
     return failure === undefined ? Ok(undefined) : Err(failure);
   }
 
+  assertCalls(expected: readonly MetricsCall[]): void {
+    this.snapshot.assertEqual('Metrics calls', this.calls, expected);
+  }
+
+  assertMetrics(expected: readonly MetricRecord[]): void {
+    this.snapshot.assertEqual('Metric records', this.metrics, expected);
+  }
+
   private static cloneRecord(metric: Readonly<MetricRecord>): Readonly<MetricRecord> {
     return Object.freeze({
       ...metric,
@@ -525,52 +566,8 @@ class InMemoryMetricsCollector implements MetricsCollector {
   }
 }
 
-function assertSystemCalls(subject: InMemorySystem, expected: readonly ProcessRequest[]): void {
-  new Snapshot().assertEqual(
-    'System calls',
-    subject.calls.map(call => call.request),
-    expected,
-  );
-}
-
-function assertVfsCalls(subject: InMemoryVirtualFileSystem, expected: readonly VfsCall[]): void {
-  new Snapshot().assertEqual('VFS calls', subject.calls, expected);
-}
-
-function assertTerminalCalls(subject: InMemoryTerminal, expected: readonly TerminalCall[]): void {
-  new Snapshot().assertEqual('Terminal calls', subject.calls, expected);
-}
-
-function assertLogRecords(subject: InMemoryLoggerSink, expected: readonly LogRecord[]): void {
-  new Snapshot().assertEqual('Log records', subject.records, expected);
-}
-
-function assertLoggerCalls(subject: InMemoryLoggerSink, expected: readonly LoggerCall[]): void {
-  new Snapshot().assertEqual('Logger calls', subject.calls, expected);
-}
-
-function assertMetricRecords(subject: InMemoryMetricsCollector, expected: readonly MetricRecord[]): void {
-  new Snapshot().assertEqual('Metric records', subject.metrics, expected);
-}
-
-function assertMetricsCalls(subject: InMemoryMetricsCollector, expected: readonly MetricsCall[]): void {
-  new Snapshot().assertEqual('Metrics calls', subject.calls, expected);
-}
-
-function assertVfsFiles(subject: InMemoryVirtualFileSystem, expected: Readonly<Record<string, Uint8Array>>): void {
-  new Snapshot().assertEqual('VFS files', subject.files, expected);
-}
-
 export type { LoggerCall, MetricsCall, SystemCall, TerminalCall, VfsCall };
 export {
-  assertLoggerCalls,
-  assertLogRecords,
-  assertMetricRecords,
-  assertMetricsCalls,
-  assertSystemCalls,
-  assertTerminalCalls,
-  assertVfsCalls,
-  assertVfsFiles,
   InMemoryLoggerSink,
   InMemoryMetricsCollector,
   InMemorySystem,

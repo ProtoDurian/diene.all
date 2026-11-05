@@ -1,14 +1,6 @@
 import { describe, it } from 'bun:test';
 import type { LogRecord, MetricRecord, ProcessRequest } from '@atomicloud/diene.interfaces';
 import {
-  assertLoggerCalls,
-  assertLogRecords,
-  assertMetricRecords,
-  assertMetricsCalls,
-  assertSystemCalls,
-  assertTerminalCalls,
-  assertVfsCalls,
-  assertVfsFiles,
   InMemoryLoggerSink,
   InMemoryMetricsCollector,
   InMemorySystem,
@@ -23,7 +15,7 @@ import { Ok } from '@atomicloud/diene.result';
 import 'should';
 import { expectAssertionError, expectNoThrow, expectOk } from './support/capture.js';
 
-describe('assertSystemCalls', () => {
+describe('InMemorySystem.assertCalls', () => {
   const arrange = async (): Promise<InMemorySystem> => {
     const subject = new InMemorySystem([Ok({ exitCode: 0, stdout: '', stderr: '' })]);
     await expectOk(subject.execute({ executable: 'ls', arguments: ['-a'] }));
@@ -36,7 +28,7 @@ describe('assertSystemCalls', () => {
     const subject = await arrange();
 
     // Act
-    const act = (): void => assertSystemCalls(subject, expected);
+    const act = (): void => subject.assertCalls(expected);
 
     // Assert
     expectNoThrow(act);
@@ -47,7 +39,7 @@ describe('assertSystemCalls', () => {
     const subject = await arrange();
 
     // Act
-    const error = expectAssertionError(() => assertSystemCalls(subject, [{ executable: 'other' }]));
+    const error = expectAssertionError(() => subject.assertCalls([{ executable: 'other' }]));
 
     // Assert
     error.label.should.eql('System calls');
@@ -57,7 +49,7 @@ describe('assertSystemCalls', () => {
   });
 });
 
-describe('assertVfsCalls', () => {
+describe('InMemoryVirtualFileSystem.assertCalls', () => {
   const arrange = async (): Promise<InMemoryVirtualFileSystem> => {
     const subject = new InMemoryVirtualFileSystem();
     await expectOk(subject.exists('/f'));
@@ -70,7 +62,7 @@ describe('assertVfsCalls', () => {
     const subject = await arrange();
 
     // Act
-    const act = (): void => assertVfsCalls(subject, expected);
+    const act = (): void => subject.assertCalls(expected);
 
     // Assert
     expectNoThrow(act);
@@ -81,9 +73,7 @@ describe('assertVfsCalls', () => {
     const subject = await arrange();
 
     // Act
-    const error = expectAssertionError(() =>
-      assertVfsCalls(subject, [{ method: 'exists', path: '/other', sequence: 0 }]),
-    );
+    const error = expectAssertionError(() => subject.assertCalls([{ method: 'exists', path: '/other', sequence: 0 }]));
 
     // Assert
     error.label.should.eql('VFS calls');
@@ -91,7 +81,7 @@ describe('assertVfsCalls', () => {
   });
 });
 
-describe('assertVfsFiles', () => {
+describe('InMemoryVirtualFileSystem.assertFiles', () => {
   const arrange = async (): Promise<InMemoryVirtualFileSystem> => {
     const subject = new InMemoryVirtualFileSystem();
     await expectOk(subject.writeFile('/f', new Uint8Array([1, 2])));
@@ -103,7 +93,7 @@ describe('assertVfsFiles', () => {
     const subject = await arrange();
 
     // Act
-    const act = (): void => assertVfsFiles(subject, { '/f': new Uint8Array([1, 2]) });
+    const act = (): void => subject.assertFiles({ '/f': new Uint8Array([1, 2]) });
 
     // Assert
     expectNoThrow(act);
@@ -114,14 +104,14 @@ describe('assertVfsFiles', () => {
     const subject = await arrange();
 
     // Act
-    const error = expectAssertionError(() => assertVfsFiles(subject, { '/f': new Uint8Array([9]) }));
+    const error = expectAssertionError(() => subject.assertFiles({ '/f': new Uint8Array([9]) }));
 
     // Assert
     error.label.should.eql('VFS files');
   });
 });
 
-describe('assertTerminalCalls', () => {
+describe('InMemoryTerminal.assertCalls', () => {
   const arrange = async (): Promise<InMemoryTerminal> => {
     const subject = new InMemoryTerminal();
     await expectOk(subject.write({ channel: 'stdout', text: 'hi' }));
@@ -136,7 +126,7 @@ describe('assertTerminalCalls', () => {
     const subject = await arrange();
 
     // Act
-    const act = (): void => assertTerminalCalls(subject, expected);
+    const act = (): void => subject.assertCalls(expected);
 
     // Assert
     expectNoThrow(act);
@@ -148,7 +138,7 @@ describe('assertTerminalCalls', () => {
 
     // Act
     const error = expectAssertionError(() =>
-      assertTerminalCalls(subject, [
+      subject.assertCalls([
         { method: 'write', output: { channel: 'stderr', text: 'hi', newline: false }, sequence: 0 },
       ]),
     );
@@ -158,7 +148,7 @@ describe('assertTerminalCalls', () => {
   });
 });
 
-describe('assertLogRecords', () => {
+describe('InMemoryLoggerSink.assertRecords', () => {
   const arrange = async (): Promise<InMemoryLoggerSink> => {
     const subject = new InMemoryLoggerSink();
     await expectOk(subject.emit({ level: 'info', message: 'hi' }));
@@ -171,7 +161,7 @@ describe('assertLogRecords', () => {
     const subject = await arrange();
 
     // Act
-    const act = (): void => assertLogRecords(subject, expected);
+    const act = (): void => subject.assertRecords(expected);
 
     // Assert
     expectNoThrow(act);
@@ -182,14 +172,14 @@ describe('assertLogRecords', () => {
     const subject = await arrange();
 
     // Act
-    const error = expectAssertionError(() => assertLogRecords(subject, [{ level: 'warn', message: 'hi' }]));
+    const error = expectAssertionError(() => subject.assertRecords([{ level: 'warn', message: 'hi' }]));
 
     // Assert
     error.label.should.eql('Log records');
   });
 });
 
-describe('assertLoggerCalls', () => {
+describe('InMemoryLoggerSink.assertCalls', () => {
   const arrange = async (): Promise<InMemoryLoggerSink> => {
     const subject = new InMemoryLoggerSink();
     await expectOk(subject.emit({ level: 'info', message: 'hi' }));
@@ -206,7 +196,7 @@ describe('assertLoggerCalls', () => {
     const subject = await arrange();
 
     // Act
-    const act = (): void => assertLoggerCalls(subject, expected);
+    const act = (): void => subject.assertCalls(expected);
 
     // Assert
     expectNoThrow(act);
@@ -217,7 +207,7 @@ describe('assertLoggerCalls', () => {
     const subject = await arrange();
 
     // Act
-    const error = expectAssertionError(() => assertLoggerCalls(subject, [{ method: 'flush', sequence: 0 }]));
+    const error = expectAssertionError(() => subject.assertCalls([{ method: 'flush', sequence: 0 }]));
 
     // Assert
     error.label.should.eql('Logger calls');
@@ -225,7 +215,7 @@ describe('assertLoggerCalls', () => {
   });
 });
 
-describe('assertMetricRecords', () => {
+describe('InMemoryMetricsCollector.assertMetrics', () => {
   const arrange = async (): Promise<InMemoryMetricsCollector> => {
     const subject = new InMemoryMetricsCollector();
     await expectOk(subject.record({ kind: 'counter', name: 'hits', value: 1 }));
@@ -238,7 +228,7 @@ describe('assertMetricRecords', () => {
     const subject = await arrange();
 
     // Act
-    const act = (): void => assertMetricRecords(subject, expected);
+    const act = (): void => subject.assertMetrics(expected);
 
     // Assert
     expectNoThrow(act);
@@ -249,14 +239,14 @@ describe('assertMetricRecords', () => {
     const subject = await arrange();
 
     // Act
-    const error = expectAssertionError(() => assertMetricRecords(subject, [{ kind: 'gauge', name: 'hits', value: 1 }]));
+    const error = expectAssertionError(() => subject.assertMetrics([{ kind: 'gauge', name: 'hits', value: 1 }]));
 
     // Assert
     error.label.should.eql('Metric records');
   });
 });
 
-describe('assertMetricsCalls', () => {
+describe('InMemoryMetricsCollector.assertCalls', () => {
   const arrange = async (): Promise<InMemoryMetricsCollector> => {
     const subject = new InMemoryMetricsCollector();
     await expectOk(subject.record({ kind: 'counter', name: 'hits', value: 1 }));
@@ -273,7 +263,7 @@ describe('assertMetricsCalls', () => {
     const subject = await arrange();
 
     // Act
-    const act = (): void => assertMetricsCalls(subject, expected);
+    const act = (): void => subject.assertCalls(expected);
 
     // Assert
     expectNoThrow(act);
@@ -284,7 +274,7 @@ describe('assertMetricsCalls', () => {
     const subject = await arrange();
 
     // Act
-    const error = expectAssertionError(() => assertMetricsCalls(subject, [{ method: 'flush', sequence: 0 }]));
+    const error = expectAssertionError(() => subject.assertCalls([{ method: 'flush', sequence: 0 }]));
 
     // Assert
     error.label.should.eql('Metrics calls');

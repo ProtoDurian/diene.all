@@ -28,6 +28,7 @@ function resolveThroughRequireTypes(): void {
   const metrics: MetricsCollector = new InMemoryMetricsCollector();
   const recordedCalls: readonly VfsCall[] = new InMemoryVirtualFileSystem().calls;
   const policy: VfsPolicy = new VfsPolicy();
+  new InMemoryVirtualFileSystem(policy).assertCalls([]);
 
   void [asError, system, vfs, terminal, logger, metrics, recordedCalls, policy];
 }

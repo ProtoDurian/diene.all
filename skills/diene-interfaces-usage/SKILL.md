@@ -11,7 +11,7 @@ concrete adapter.
 
 - **Contracts** import from the package root; both `import` and `require` resolve,
   and TypeScript picks up `.d.ts` (ESM) or `.d.cts` (CJS) automatically.
-- **Test doubles** (in-memory mocks and assertions) import from the
+- **Test doubles** (in-memory mocks with assertion methods) import from the
   `@atomicloud/diene.interfaces/test-helper` subpath and depend on no test framework.
 
 The root exports the `System`, `VirtualFileSystem`, `Terminal`, `LoggerSink`, and
@@ -19,9 +19,9 @@ The root exports the `System`, `VirtualFileSystem`, `Terminal`, `LoggerSink`, an
 (`SystemPolicy`, `VfsPolicy`, `TerminalPolicy`, `LoggingPolicy`, `MetricsPolicy`,
 `TelemetryPolicy`). The helper subpath exports the matching
 `InMemorySystem`, `InMemoryVirtualFileSystem`, `InMemoryTerminal`,
-`InMemoryLoggerSink`, and `InMemoryMetricsCollector` doubles, each taking its policy
-by constructor injection, plus ordered-call and
-captured-value assertions.
+`InMemoryLoggerSink`, and `InMemoryMetricsCollector` doubles; each takes its policy
+by constructor injection and carries ordered-call and captured-value assertion
+methods (`assertCalls`, `assertFiles`, `assertRecords`, `assertMetrics`).
 
 Every fallible port method returns the published `@atomicloud/diene.result`
 `Result` directly — ports never throw for normal control flow, so branch on the
