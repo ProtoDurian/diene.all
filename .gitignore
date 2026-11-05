@@ -2,6 +2,7 @@
 **/bin/
 **/obj/
 TestResults/
+reports/
 
 ### helm
 infra/root_chart/uploads/
