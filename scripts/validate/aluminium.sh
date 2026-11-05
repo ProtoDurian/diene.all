@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# ### aluminium-validate
-# #### source: aluminium
-# Ordinary testing pyramid (S30/Q-I27) for the aluminium k8s-monitoring wrapper.
-# Unit tier: lint/render/schema/static conformance + OTLP/log contracts. No probe
-# matrix (aluminium is a materialized product, not the helm-wrapper template).
 set -euo pipefail
 
 mode="${1:-}"
@@ -12,333 +7,283 @@ namespace="${NAMESPACE:-telemetry}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 
-chart_dir="chart"
-vap_dir="policies/vap"
-schema_location_default='default'
-schema_location_local='schemas/{{ .ResourceKind }}.json'
-
 [ -z "${mode}" ] && echo "❌ validation mode not set" >&2 && exit 1
 
+stacks=("" "--values chart/values.example.yaml" "--values chart/values.example.yaml --values chart/values.lapras.yaml")
+full=(--values chart/values.example.yaml --values chart/values.lapras.yaml)
+
 render() {
-  # Render the full stacked values (base -> example -> lapras). Extra args
-  # (e.g. --set for negative fixtures) are forwarded to helm.
-  helm template "${release}" "${chart_dir}" --namespace "${namespace}" \
-    --values "${chart_dir}/values.example.yaml" \
-    --values "${chart_dir}/values.lapras.yaml" "$@"
+  local chart="$1"
+  shift
+  helm template "${release}" "${chart}" --namespace "${namespace}" "$@"
+}
+
+json() { yq eval-all -o=json '.' "$1" | jq -s 'map(select(.kind != null))'; }
+
+config_text() { json "$1" | jq -r '[.[] | select(.kind == "ConfigMap") | (.data // {})[]] | join("\n")'; }
+
+# Runs a check that must fail on a sabotaged input; a pass means the check is blind.
+expect_red() {
+  local label="$1"
+  shift
+  if "$@" >/dev/null 2>&1; then
+    echo "❌ negative fixture '${label}' was not caught" >&2 && exit 1
+  fi
+}
+
+expect_refusal() {
+  local pattern="$1"
+  shift
+  if render chart "$@" >/dev/null 2>"${tmp}/refusal.txt"; then
+    echo "❌ accepted: $*" >&2 && exit 1
+  fi
+  rg -q -- "${pattern}" "${tmp}/refusal.txt" || { echo "❌ wrong refusal for $*" >&2 && cat "${tmp}/refusal.txt" >&2 && exit 1; }
+}
+
+copy_chart() {
+  mkdir -p "$1"
+  cp -a chart "$1/chart"
+}
+
+assert_topology() {
+  json "$1" | jq -e '
+    [.[] | select(.kind == "Alloy")] as $a |
+    ($a | map(.metadata.name) | sort) == ["aluminium-alloy-logs", "aluminium-alloy-metrics"] and
+    ($a[] | select(.metadata.name == "aluminium-alloy-metrics") |
+      .spec.controller.type == "statefulset" and .spec.alloy.clustering.enabled == true) and
+    ($a[] | select(.metadata.name == "aluminium-alloy-logs") |
+      .spec.controller.type == "daemonset" and (.spec.alloy.clustering.enabled // false) == false and
+      .spec.alloy.mounts.varlog == true)' >/dev/null
+}
+
+assert_otlp_receiver() {
+  json "$1" | jq -e '
+    [.[] | select(.kind == "Alloy")] as $a |
+    ($a[] | select(.metadata.name == "aluminium-alloy-metrics") | [.spec.alloy.extraPorts[]? | select(.port == 4318)]) ==
+      [{"appProtocol": "http", "name": "otlp-http", "port": 4318, "protocol": "TCP", "targetPort": 4318}] and
+    ($a[] | select(.metadata.name == "aluminium-alloy-metrics") | [.spec.alloy.extraPorts[]? | select(.port == 4317)] | length) == 0 and
+    ($a[] | select(.metadata.name == "aluminium-alloy-logs") | [.spec.alloy.extraPorts[]?] | length) == 0' >/dev/null || return 1
+  json "$1" | jq -r '.[] | select(.kind == "ConfigMap" and .metadata.name == "aluminium-alloy-metrics") | .data[]' >"${tmp}/metrics.alloy"
+  json "$1" | jq -r '.[] | select(.kind == "ConfigMap" and .metadata.name == "aluminium-alloy-logs") | .data[]' >"${tmp}/logs.alloy"
+  rg -q 'endpoint = "0\.0\.0\.0:4318"' "${tmp}/metrics.alloy" || return 1
+  if rg -q 'otelcol\.receiver\.otlp|grpc \{' "${tmp}/logs.alloy" || rg -q 'grpc \{' "${tmp}/metrics.alloy"; then return 1; fi
+}
+
+assert_features_off() {
+  local features
+  features="$(config_text "$1" | rg -o '^\s*// Feature: .*' | sed 's/^ *//' | LC_ALL=C sort -u)"
+  [ "${features}" = $'// Feature: Application Observability\n// Feature: Cluster Metrics\n// Feature: Pod Logs (OpenTelemetry)' ] || return 1
+  if config_text "$1" | rg -qi '// Self Reporting|kubernetes_monitoring_telemetry'; then return 1; fi
+  json "$1" | jq -e 'all(.[]; (.metadata.labels["app.kubernetes.io/name"] // "" | test("beyla|opencost|kepler|pyroscope"; "i") | not) and (.metadata.name | test("beyla|opencost|kepler"; "i") | not))' >/dev/null
+}
+
+assert_naming() {
+  if rg -n -i --glob '!chart/charts/**' 'q[r]yn' "$1/chart" "$1/Taskfile.yaml" "$1/scripts" "$1/.github/workflows" "$1/docs/developer" >&2; then return 1; fi
+  yq -o=json '.upstream.destinations' "$1/chart/values.yaml" |
+    jq -e '.gigapipe.type == "otlp" and .gigapipe.logs.enabled == true and .gigapipe.traces.enabled == true' >/dev/null
+}
+
+credential_keys='^(password|passphrase|token|bearerToken|apiKey|api[_-]?key|clientSecret|client[_-]?secret|secretKey|accessKey|privateKey|credentials?)$'
+
+assert_no_literal_secrets() {
+  yq eval-all -o=json '.' "$1"/values*.yaml | jq -s -e --arg keys "${credential_keys}" '
+    [.[] | .. | objects | to_entries[] | select((.key | test($keys; "i")) and .value != null and .value != "")] | length == 0' >/dev/null
+}
+
+assert_no_rendered_secret() { json "$1" | jq -e 'map(select(.kind == "Secret")) | length == 0' >/dev/null; }
+
+assert_otlp_everywhere() {
+  yq eval-all -o=json '.' "$1"/values*.yaml | jq -s -e '
+    map(.upstream.destinations // {}) | reduce .[] as $d ({}; . * $d) |
+    length > 0 and all(.[];
+      .type == "otlp" and .protocol == "http" and
+      all(.metrics, .logs, .traces; (. // {}) | keys - ["enabled"] == []))' >/dev/null || return 1
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    render "$1" ${stack} >"${tmp}/otlp-render.yaml" || return 1
+    config_text "${tmp}/otlp-render.yaml" >"${tmp}/otlp.alloy"
+    rg -q '^otelcol\.exporter\.otlphttp "' "${tmp}/otlp.alloy" || return 1
+    if rg -q '^(otelcol\.exporter\.otlp |prometheus\.remote_write |loki\.write |pyroscope\.write )' "${tmp}/otlp.alloy"; then return 1; fi
+  done
+}
+
+assert_lpsm() {
+  local prefix="$1" file="$2" landscape="$3" cluster="$4"
+  json "${file}" | jq -e --arg p "${prefix}" --arg l "${landscape}" --arg c "${cluster}" '
+    ({($p + "/platform"): "telemetry", ($p + "/service"): "aluminium", ($p + "/module"): "telemetry", ($p + "/layer"): "1"}
+      + (if $l == "" then {} else {($p + "/landscape"): $l} end)
+      + (if $c == "" then {} else {($p + "/cluster"): $c} end)) as $want |
+    [.[] | select(.kind == "Alloy")] as $a |
+    ($a | length) == 2 and
+    all($a[]; .metadata.labels == $want and .spec.controller.podLabels == $want) and
+    all(.[] | select(.kind == "ExternalSecret"); .metadata.labels as $l | all($want | to_entries[]; $l[.key] == .value))' >/dev/null
 }
 
 case "${mode}" in
 schema)
-  helm lint "${chart_dir}" --namespace "${namespace}" >/dev/null
-  helm lint "${chart_dir}" --namespace "${namespace}" --values "${chart_dir}/values.example.yaml" >/dev/null
-  helm lint "${chart_dir}" --namespace "${namespace}" --values "${chart_dir}/values.example.yaml" --values "${chart_dir}/values.lapras.yaml" >/dev/null
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    helm lint chart --namespace "${namespace}" ${stack} >"${tmp}/schema.txt" 2>&1 ||
+      { echo "❌ schema rejected the stack '${stack:-values.yaml}'" >&2 && cat "${tmp}/schema.txt" >&2 && exit 1; }
+  done
+  expect_red 'layer is not numeric' helm lint chart --namespace "${namespace}" --set-string serviceTree.layer=one
+  expect_red 'unknown secret store kind' helm lint chart --namespace "${namespace}" --set secret.store.kind=Vault
   ;;
-
 schema-drift)
   bash ./scripts/local/generate-chart-schema.sh "${tmp}/values.schema.json" >/dev/null
-  cmp "${chart_dir}/values.schema.json" "${tmp}/values.schema.json"
+  cmp chart/values.schema.json "${tmp}/values.schema.json"
   ;;
-
 lint)
-  helm lint "${chart_dir}" --namespace "${namespace}"
-  helm lint "${chart_dir}" --namespace "${namespace}" --values "${chart_dir}/values.example.yaml"
-  helm lint "${chart_dir}" --namespace "${namespace}" --values "${chart_dir}/values.example.yaml" --values "${chart_dir}/values.lapras.yaml"
+  helm lint chart --namespace "${namespace}"
+  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml
+  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml --values chart/values.lapras.yaml
   ;;
-
 render)
-  helm template "${release}" "${chart_dir}" --namespace "${namespace}" >/dev/null
-  helm template "${release}" "${chart_dir}" --namespace "${namespace}" --values "${chart_dir}/values.example.yaml" >/dev/null
-  render >/dev/null
-  ;;
-
-# Both collectors render from the stacked values with the required topology:
-# alloy-metrics = StatefulSet + clustering + the :4318 OTLP receiver;
-# alloy-logs = DaemonSet + scoped /var/log mount, no clustering.
-topology)
-  render >"${tmp}/rendered.yaml"
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" |
-    jq -s -e '[.[] | select(.kind == "Alloy")] | length == 2' >/dev/null
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" |
-    jq -s -e '[.[] | select(.kind == "Alloy" and (.metadata.name | endswith("alloy-metrics")))] | all(.[]; .spec.controller.type == "statefulset" and .spec.alloy.clustering.enabled == true and ([.spec.alloy.extraPorts[]? | select(.port == 4318 and .name == "otlp-http")] | length == 1))' >/dev/null
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" |
-    jq -s -e '[.[] | select(.kind == "Alloy" and (.metadata.name | endswith("alloy-logs")))] | all(.[]; .spec.controller.type == "daemonset" and .spec.alloy.mounts.varlog == true and ((.spec.alloy.clustering // {enabled: false}) | .enabled) == false)' >/dev/null
-  # Negative fixture: disable clustering on alloy-metrics; the topology check must fail.
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" |
-    jq -c '. | if (.kind == "Alloy" and (.metadata.name | endswith("alloy-metrics"))) then .spec.alloy.clustering.enabled = false else . end' >"${tmp}/sabotage.jsonl"
-  if jq -s -e '[.[] | select(.kind == "Alloy" and (.metadata.name | endswith("alloy-metrics")))] | all(.[]; .spec.alloy.clustering.enabled == true)' "${tmp}/sabotage.jsonl" >/dev/null 2>&1; then
-    echo "❌ clustering-off mutation was not caught" >&2
-    exit 1
-  fi
-  ;;
-
-# :4318 http/protobuf OTLP receiver contract (R14/R17). Negative: changed port -> red.
-otlp-contract)
-  render >"${tmp}/rendered.yaml"
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" |
-    jq -s -e '[.[] | select(.kind == "Alloy" and (.metadata.name | endswith("alloy-metrics")))] | all(.[]; ([.spec.alloy.extraPorts[] | select(.port == 4318)] | length == 1))' >/dev/null
-  # Receiver is wired http (not grpc) per the fleet OTLP contract.
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" |
-    jq -s -e '[.[] | select(.kind == "ConfigMap")] | map(.data // {}) | add | tostring | test("otelcol\\.receiver\\.otlp")' >/dev/null
-  # Negative fixture: move the receiver off 4318; the contract check must fail.
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" |
-    jq -c '. | if (.kind == "Alloy" and (.metadata.name | endswith("alloy-metrics"))) then (.spec.alloy.extraPorts[] | select(.port == 4318) | .port) = 4317 else . end' >"${tmp}/port.jsonl"
-  if jq -s -e '[.[] | select(.kind == "Alloy" and (.metadata.name | endswith("alloy-metrics")))] | all(.[]; ([.spec.alloy.extraPorts[] | select(.port == 4318)] | length == 1))' "${tmp}/port.jsonl" >/dev/null 2>&1; then
-    echo "❌ port-4317 mutation was not caught" >&2
-    exit 1
-  fi
-  ;;
-
-# Non-selected k8s-monitoring features stay OFF (events, beyla, profiling, cost,
-# selfReporting). Every negative invokes the same rendered-manifest checker as
-# the production render.
-features-off)
-  render >"${tmp}/rendered.yaml"
-  bash ./scripts/validate/aluminium-assert.sh features-off "${tmp}/rendered.yaml" >/dev/null
-
-  render --set 'upstream.selfReporting.enabled=true' >"${tmp}/self-reporting.yaml"
-  if bash ./scripts/validate/aluminium-assert.sh features-off "${tmp}/self-reporting.yaml" >/dev/null 2>&1; then
-    echo "❌ self-reporting mutation was not caught" >&2
-    exit 1
-  fi
-
-  render --set 'upstream.telemetryServices.beyla.deploy=true' >"${tmp}/beyla.yaml"
-  if bash ./scripts/validate/aluminium-assert.sh features-off "${tmp}/beyla.yaml" >/dev/null 2>&1; then
-    echo "❌ beyla mutation was not caught" >&2
-    exit 1
-  fi
-
-  render \
-    --set 'upstream.costMetrics.enabled=true' \
-    --set 'upstream.costMetrics.collector=alloy-metrics' \
-    --set 'upstream.telemetryServices.opencost.deploy=true' \
-    --set 'upstream.telemetryServices.opencost.opencost.exporter.defaultClusterId=lapras' \
-    --set 'upstream.telemetryServices.opencost.metricsSource=custom' >"${tmp}/cost.yaml"
-  if bash ./scripts/validate/aluminium-assert.sh features-off "${tmp}/cost.yaml" >/dev/null 2>&1; then
-    echo "❌ cost-metrics mutation was not caught" >&2
-    exit 1
-  fi
-  ;;
-
-# Destination naming uses gigapipe (never qryn — legacy Node repo) everywhere.
-# The negative mutates a copied chart and invokes the same product-input checker.
-gigapipe-naming)
-  bash ./scripts/validate/aluminium-assert.sh gigapipe-naming . >/dev/null
-  mkdir -p "${tmp}/qryn-product/scripts"
-  cp -a "${chart_dir}" "${tmp}/qryn-product/chart"
-  cp Taskfile.yaml "${tmp}/qryn-product/"
-  cp -a scripts/local scripts/ci "${tmp}/qryn-product/scripts/"
-  cp -a .github "${tmp}/qryn-product/"
-  yq eval -i '.upstream.destinations.qryn = .upstream.destinations.gigapipe | del(.upstream.destinations.gigapipe)' "${tmp}/qryn-product/chart/values.yaml"
-  if bash ./scripts/validate/aluminium-assert.sh gigapipe-naming "${tmp}/qryn-product" >/dev/null 2>&1; then
-    echo "❌ legacy-destination mutation was not caught" >&2
-    exit 1
-  fi
-  ;;
-
-# Backend creds via ESO only — no literal credentials in any values file.
-# Negative: a literal credential -> red.
-secret)
-  render --set secret.enabled=true >"${tmp}/secret.yaml"
-  yq eval-all -o=json '.' "${tmp}/secret.yaml" |
-    jq -s -e 'map(select(.kind == "ExternalSecret")) as $es | ($es | length == 1) and ($es[0].metadata.name == "aluminium-secrets") and (($es[0].spec.data // []) | length == 0) and ($es[0].spec.dataFrom | length >= 2) and ($es[0].spec.target.creationPolicy == "Owner")' >/dev/null
-  bash ./scripts/validate/aluminium-assert.sh literal-secrets "${chart_dir}" >/dev/null
-  mkdir -p "${tmp}/secret-chart"
-  cp "${chart_dir}"/values*.yaml "${tmp}/secret-chart/"
-  yq eval -i '.upstream.destinations.gigapipe.auth.password = "fixture-literal-credential"' "${tmp}/secret-chart/values.yaml"
-  if bash ./scripts/validate/aluminium-assert.sh literal-secrets "${tmp}/secret-chart" >/dev/null 2>&1; then
-    echo "❌ literal-credential mutation was not caught" >&2
-    exit 1
-  fi
-  ;;
-
-# OTLP-everywhere outbound (Q-I28): endpoints-only destination config, no
-# per-signal protocol selector exists.
-otlp-everywhere)
-  render >"${tmp}/rendered.yaml"
-  # Every configured destination speaks otlp/http.
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" |
-    jq -s -e '[.[] | select(.kind == "ConfigMap")] | map(.data // {}) | add | tostring | test("otelcol\\.exporter\\.otlphttp")' >/dev/null
-  bash ./scripts/validate/aluminium-assert.sh otlp-surface "${chart_dir}" >/dev/null
-  mkdir -p "${tmp}/protocol-chart"
-  cp "${chart_dir}"/values*.yaml "${tmp}/protocol-chart/"
-  yq eval -i '.upstream.destinations.gigapipe.logs.protocol = "grpc"' "${tmp}/protocol-chart/values.yaml"
-  if bash ./scripts/validate/aluminium-assert.sh otlp-surface "${tmp}/protocol-chart" >/dev/null 2>&1; then
-    echo "❌ per-signal protocol mutation was not caught" >&2
-    exit 1
-  fi
-  ;;
-
-# Both collectors carry LPSM labels via the upstream alloy.labels injection.
-lpsm-labels)
-  render --set secret.enabled=true >"${tmp}/labels-default.yaml"
-  bash ./scripts/validate/aluminium-assert.sh lpsm-labels "${tmp}/labels-default.yaml" atomi.cloud >/dev/null
-  render --set global.labelPrefix=example.test --set secret.enabled=true >"${tmp}/labels-custom.yaml"
-  bash ./scripts/validate/aluminium-assert.sh lpsm-labels "${tmp}/labels-custom.yaml" example.test >/dev/null
-  ;;
-
-# Inherited rendered-manifest validation stage (Q-G20): kubeconform over the full
-# render, Kyverno VAP evaluation of every matched native object, then the ONE
-# `:latest` wiring sabotage.
-rendered-manifests)
-  render >"${tmp}/rendered.yaml"
-  kubeconform -strict -summary -schema-location "${schema_location_default}" -schema-location "${schema_location_local}" "${tmp}/rendered.yaml"
-  # Collectors are configured conformant (resources + securityContext + labels).
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" |
-    jq -s -e '[.[] | select(.kind == "Alloy")] | all(.[]; (.spec.alloy.resources.requests.cpu // null) != null and (.spec.alloy.resources.limits.cpu // null) != null)' >/dev/null
-  # Kyverno's offline VAP evaluator cannot map unrelated CR GVRs. Feed it the
-  # exact native object kinds matched by the policy definitions.
-  yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "${tmp}/rendered.yaml" >"${tmp}/vap-resources.yaml"
-  kyverno apply "${vap_dir}" --resource "${tmp}/vap-resources.yaml" --detailed-results --remove-color >"${tmp}/kyverno-baseline.out"
-  # ONE wiring sabotage: a workload fixture carrying a `:latest` image MUST be
-  # caught by the VAP (proves the stage cannot silently stop matching). Every
-  # other baseline field is conformant, so :latest is the sole failure.
-  cat >"${tmp}/latest-fixture.yaml" <<'YAML'
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: aluminium-latest-sabotage
-  namespace: telemetry
-spec:
-  selector:
-    matchLabels:
-      app: aluminium-latest-sabotage
-  template:
-    metadata:
-      labels:
-        app: aluminium-latest-sabotage
-    spec:
-      securityContext:
-        runAsNonRoot: true
-      containers:
-        - name: sabotage
-          image: registry.example.invalid/sabotage:latest
-          resources:
-            requests: { cpu: 1m, memory: 1Mi }
-            limits: { cpu: 1m, memory: 1Mi }
-          securityContext:
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: [ALL]
-YAML
-  if kyverno apply "${vap_dir}" --resource "${tmp}/latest-fixture.yaml" --remove-color >"${tmp}/kyverno.out" 2>&1; then
-    echo "❌ :latest wiring sabotage was NOT caught" >&2
-    exit 1
-  fi
-  rg -qi 'latest' "${tmp}/kyverno.out"
-  ;;
-
-latest-semver)
-  ALUMINIUM_HELM_SEARCH_JSON='[{"name":"grafana/k8s-monitoring","version":"4.9.0"},{"name":"grafana/k8s-monitoring","version":"4.10.0"},{"name":"grafana/k8s-monitoring","version":"4.3.0"}]' \
-    ALUMINIUM_IMAGE_TAGS_JSON='{"Tags":["1.9.0","1.10.0","latest"]}' \
-    bash ./scripts/local/latest-chart-upstreams.sh >"${tmp}/latest.out"
-  rg -q '^📦 latest chart tag:  grafana/k8s-monitoring 4\.10\.0$' "${tmp}/latest.out"
-  rg -q '^📦 latest image tag:  grafana/alloy 1\.10\.0$' "${tmp}/latest.out"
-  ;;
-
-# Every path that runs `helm dependency build` must first register the upstream
-# grafana helm repository, or helm errors "no repository definition for
-# https://grafana.github.io/helm-charts". RB-266 covers the serialized k3d
-# proof; RB-278 covers the clean-CI build/publish path (scripts/ci/publish.sh).
-# Host-safe static checks + negative fixtures: no network, k3d, or provider
-# action.
-helm-repo)
-  for seam in ./scripts/validate/aluminium-k3d.sh ./scripts/ci/publish.sh; do
-    bash ./scripts/validate/aluminium-assert.sh helm-repo-resolution \
-      "${seam}" "${chart_dir}/Chart.yaml" >/dev/null
-    # Negative fixture: drop the repo registration -> the seam would hit
-    # "no repository definition" again; the assertion must catch it.
-    sed '\#helm repo add grafana https://grafana\.github\.io/helm-charts#d' \
-      "${seam}" >"${tmp}/no-repo-$(basename "${seam}").sh"
-    if bash ./scripts/validate/aluminium-assert.sh helm-repo-resolution \
-      "${tmp}/no-repo-$(basename "${seam}").sh" "${chart_dir}/Chart.yaml" >/dev/null 2>&1; then
-      echo "❌ missing helm repo registration in ${seam} was not caught" >&2
-      exit 1
-    fi
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    render chart ${stack} >/dev/null
   done
   ;;
-
-kubeconfig-isolation)
-  mkdir -p "${tmp}/fake-bin"
-  cat >"${tmp}/fake-bin/k3d" <<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
-{
-  printf 'kubeconfig=%s\t' "${KUBECONFIG:-}"
-  printf '%s' "${1:-}"
-  shift || true
-  printf ' %s' "$@"
-  printf '\n'
-} >>"${K3D_FAKE_LOG:?}"
-case "${1:-}" in
-list | create) exit 0 ;;
-*) exit 91 ;;
-esac
-SH
-  chmod +x "${tmp}/fake-bin/k3d"
-  local_kubeconfig="${tmp}/local-kubeconfig.yaml"
-  safe_log="${tmp}/safe-create.log"
-  PATH="${tmp}/fake-bin:${PATH}" \
-    K3D_FAKE_LOG="${safe_log}" \
-    KUBECONFIG="${local_kubeconfig}" \
-    K3D_CLUSTER_NAME=aluminium-fake \
-    K3D_REGISTRY_NAME=aluminium-fake-registry \
-    K3D_REGISTRY_PORT=25001 \
-    K3D_HTTP_PORT=35001 \
-    bash ./scripts/local/create-k3d-cluster.sh >/dev/null
-  bash ./scripts/validate/aluminium-assert.sh k3d-create-log "${safe_log}" "${local_kubeconfig}" >/dev/null
-
-  sed 's/--kubeconfig-update-default=false/--kubeconfig-update-default=true/' \
-    ./scripts/local/create-k3d-cluster.sh >"${tmp}/unsafe-create.sh"
-  unsafe_log="${tmp}/unsafe-create.log"
-  PATH="${tmp}/fake-bin:${PATH}" \
-    K3D_FAKE_LOG="${unsafe_log}" \
-    KUBECONFIG="${local_kubeconfig}" \
-    K3D_CLUSTER_NAME=aluminium-fake \
-    K3D_REGISTRY_NAME=aluminium-fake-registry \
-    K3D_REGISTRY_PORT=25001 \
-    K3D_HTTP_PORT=35001 \
-    bash "${tmp}/unsafe-create.sh" >/dev/null
-  if bash ./scripts/validate/aluminium-assert.sh k3d-create-log "${unsafe_log}" "${local_kubeconfig}" >/dev/null 2>&1; then
-    echo "❌ default-kubeconfig mutation was not caught" >&2
-    exit 1
-  fi
-
-  bash ./scripts/validate/aluminium-assert.sh k3d-proof-script ./scripts/validate/aluminium-k3d.sh >/dev/null
-  # shellcheck disable=SC2016 # The sabotage must match the literal shell expression.
-  sed 's/--kubeconfig "${kubeconfig}" //' \
-    ./scripts/validate/aluminium-k3d.sh >"${tmp}/unsafe-proof.sh"
-  if bash ./scripts/validate/aluminium-assert.sh k3d-proof-script "${tmp}/unsafe-proof.sh" >/dev/null 2>&1; then
-    echo "❌ missing local-kubeconfig propagation was not caught" >&2
-    exit 1
-  fi
+topology)
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/topology.yaml"
+    assert_topology "${tmp}/topology.yaml"
+  done
+  render chart "${full[@]}" --set 'upstream.collectors.alloy-metrics.presets={statefulset}' >"${tmp}/unclustered.yaml"
+  expect_red 'alloy-metrics without clustering' assert_topology "${tmp}/unclustered.yaml"
+  render chart "${full[@]}" --set 'upstream.collectors.alloy-logs.presets={daemonset,clustered}' >"${tmp}/clustered-logs.yaml"
+  expect_red 'alloy-logs with clustering' assert_topology "${tmp}/clustered-logs.yaml"
   ;;
-
+otlp-contract)
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/otlp.yaml"
+    assert_otlp_receiver "${tmp}/otlp.yaml"
+  done
+  render chart "${full[@]}" --set upstream.applicationObservability.receivers.otlp.http.port=4319 >"${tmp}/port.yaml"
+  expect_red 'receiver moved off 4318' assert_otlp_receiver "${tmp}/port.yaml"
+  render chart "${full[@]}" --set upstream.applicationObservability.collector=alloy-logs >"${tmp}/assignment.yaml"
+  expect_red 'receiver assigned to alloy-logs' assert_otlp_receiver "${tmp}/assignment.yaml"
+  render chart "${full[@]}" --set upstream.applicationObservability.receivers.otlp.grpc.enabled=true >"${tmp}/grpc.yaml"
+  expect_red 'grpc receiver enabled' assert_otlp_receiver "${tmp}/grpc.yaml"
+  ;;
+features-off)
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/features.yaml"
+    assert_features_off "${tmp}/features.yaml"
+  done
+  render chart "${full[@]}" --set upstream.selfReporting.enabled=true >"${tmp}/self.yaml"
+  expect_red 'selfReporting on' assert_features_off "${tmp}/self.yaml"
+  render chart "${full[@]}" --set upstream.telemetryServices.beyla.deploy=true >"${tmp}/beyla.yaml"
+  expect_red 'beyla on' assert_features_off "${tmp}/beyla.yaml"
+  render chart "${full[@]}" --set upstream.costMetrics.enabled=true --set upstream.costMetrics.collector=alloy-metrics \
+    --set upstream.telemetryServices.opencost.deploy=true --set upstream.telemetryServices.opencost.metricsSource=custom \
+    --set upstream.telemetryServices.opencost.opencost.exporter.defaultClusterId=lapras >"${tmp}/cost.yaml"
+  expect_red 'costMetrics on' assert_features_off "${tmp}/cost.yaml"
+  render chart "${full[@]}" --set upstream.clusterEvents.enabled=true --set upstream.clusterEvents.collector=alloy-metrics >"${tmp}/events.yaml"
+  expect_red 'clusterEvents on' assert_features_off "${tmp}/events.yaml"
+  ;;
+gigapipe-naming)
+  assert_naming .
+  mkdir -p "${tmp}/legacy"
+  cp -a chart Taskfile.yaml scripts docs .github "${tmp}/legacy/"
+  yq -i '.upstream.destinations.gigapipe.url = "http://q" + "ryn.telemetry.svc:3100"' "${tmp}/legacy/chart/values.yaml"
+  expect_red 'a legacy destination ref' assert_naming "${tmp}/legacy"
+  ;;
+secret)
+  render chart --values chart/values.example.yaml >"${tmp}/secret.yaml"
+  json "${tmp}/secret.yaml" | jq -e '
+    map(select(.kind == "ExternalSecret")) as $es | ($es | length) == 1 and $es[0].spec.data == null and
+    $es[0].metadata.name == "aluminium-secrets" and $es[0].spec.target.name == "aluminium-secrets" and
+    ($es[0].spec.dataFrom | map(.find.path)) == ["/shared", "/aluminium"] and
+    ($es[0].spec.dataFrom | map(.rewrite[0].regexp.target)) == ["SHARED_$1", "ALUMINIUM_$1"]' >/dev/null ||
+    { echo "❌ ExternalSecret shape or folder-derived prefixes are wrong" >&2 && exit 1; }
+  expect_refusal 'collide' --set secret.serviceFolder=/shared
+  expect_refusal 'yields an empty key prefix' --set secret.serviceFolder=/
+  assert_no_literal_secrets chart
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/secrets.yaml"
+    assert_no_rendered_secret "${tmp}/secrets.yaml"
+  done
+  copy_chart "${tmp}/literal"
+  yq -i '.upstream.destinations.gigapipe.auth = {"type": "basic", "username": "telemetry", "password": "fixture-literal"}' "${tmp}/literal/chart/values.yaml"
+  expect_red 'a literal credential in values' assert_no_literal_secrets "${tmp}/literal/chart"
+  render "${tmp}/literal/chart" "${full[@]}" >"${tmp}/literal.yaml"
+  expect_red 'a chart-rendered credential Secret' assert_no_rendered_secret "${tmp}/literal.yaml"
+  ;;
+otlp-everywhere)
+  assert_otlp_everywhere chart
+  copy_chart "${tmp}/knob"
+  yq -i '.upstream.destinations.gigapipe.logs.protocol = "grpc"' "${tmp}/knob/chart/values.yaml"
+  expect_red 'a per-signal protocol knob' assert_otlp_everywhere "${tmp}/knob/chart"
+  copy_chart "${tmp}/remote-write"
+  yq -i '.upstream.destinations.victoriametrics = {"type": "prometheus", "url": "http://victoriametrics.telemetry.svc:8428/api/v1/write"}' "${tmp}/remote-write/chart/values.yaml"
+  expect_red 'a non-OTLP destination' assert_otlp_everywhere "${tmp}/remote-write/chart"
+  ;;
+lpsm-labels)
+  render chart >"${tmp}/lpsm-base.yaml"
+  assert_lpsm atomi.cloud "${tmp}/lpsm-base.yaml" "" ""
+  render chart --values chart/values.example.yaml >"${tmp}/lpsm-example.yaml"
+  assert_lpsm atomi.cloud "${tmp}/lpsm-example.yaml" example ""
+  render chart "${full[@]}" --set secret.enabled=true >"${tmp}/lpsm-full.yaml"
+  assert_lpsm atomi.cloud "${tmp}/lpsm-full.yaml" example lapras
+  expect_refusal 'collectorCommon.alloy.labels must equal' "${full[@]}" --set labelPrefix=example.dev
+  expect_refusal 'collectorCommon.alloy.labels must equal' "${full[@]}" --set serviceTree.cluster=other
+  expect_refusal 'must equal release namespace' --namespace other
+  render chart "${full[@]}" --set 'upstream.collectors.alloy-logs.labels.atomi\.cloud/service=drift' >"${tmp}/lpsm-drift.yaml"
+  expect_red 'a per-collector label override' assert_lpsm atomi.cloud "${tmp}/lpsm-drift.yaml" example lapras
+  ;;
+rendered-manifests)
+  index=0
+  for stack in "${stacks[@]}"; do
+    index=$((index + 1))
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/rendered-${index}.yaml"
+    kubeconform -strict -summary -schema-location default -schema-location 'schemas/{{ .ResourceKind }}.json' "${tmp}/rendered-${index}.yaml"
+    yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "${tmp}/rendered-${index}.yaml" >"${tmp}/vap-resources-${index}.yaml"
+    kyverno apply policies/vap --resource "${tmp}/vap-resources-${index}.yaml" --detailed-results --remove-color
+  done
+  render chart "${full[@]}" --set upstream.alloy-operator.image.tag=latest >"${tmp}/latest.yaml"
+  yq eval-all 'select(.kind == "Deployment")' "${tmp}/latest.yaml" >"${tmp}/vap-latest.yaml"
+  if kyverno apply policies/vap --resource "${tmp}/vap-latest.yaml" --remove-color >"${tmp}/kyverno-latest.txt" 2>&1; then
+    echo "❌ the :latest wiring sabotage passed the VAP stage" >&2 && exit 1
+  fi
+  rg -q 'explicit non-latest tag' "${tmp}/kyverno-latest.txt"
+  ;;
+pin)
+  dep="$(yq -o=json '.dependencies[] | select(.name == "k8s-monitoring")' chart/Chart.yaml)"
+  version="$(jq -r .version <<<"${dep}")"
+  [[ ${version} =~ ^4\.[0-9]+\.[0-9]+$ ]] || { echo "❌ k8s-monitoring ${version} is not a pinned 4.x" >&2 && exit 1; }
+  [ "$(jq -r .alias <<<"${dep}")" = upstream ]
+  [ "$(yq -r '.dependencies[] | select(.name == "k8s-monitoring") | .version' chart/Chart.lock)" = "${version}" ]
+  [ "$(git ls-files 'chart/charts/*.tgz')" = "chart/charts/k8s-monitoring-${version}.tgz" ]
+  [ "$(yq -r .appVersion chart/Chart.yaml)" = "${version}" ]
+  ;;
 publish-git)
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/git" bash ./scripts/ci/publish.sh >/dev/null
-  [ ! -s "${tmp}/git/diene-charts-aluminium-0.1.0.tgz" ] && echo "❌ git chart package missing" >&2 && exit 1
+  [ ! -s "${tmp}/git/aluminium-0.1.0.tgz" ] && echo "❌ git chart package missing" >&2 && exit 1
   [ ! -s "${tmp}/git/index.yaml" ] && echo "❌ git chart index missing" >&2 && exit 1
   ;;
-
 publish-oci)
   PUBLISH_MODE=oci PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/oci" bash ./scripts/ci/publish.sh >/dev/null
-  [ ! -s "${tmp}/oci/diene-charts-aluminium-0.1.0.tgz" ] && echo "❌ OCI chart package missing" >&2 && exit 1
+  [ ! -s "${tmp}/oci/aluminium-0.1.0.tgz" ] && echo "❌ OCI chart package missing" >&2 && exit 1
   rg -q '^oci://registry.example.invalid/charts$' "${tmp}/oci/oci-ref.txt"
   ;;
-
 version)
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh >/dev/null
+  if PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v9.9.9 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh >/dev/null 2>&1; then
+    echo "❌ publish accepted a tag that differs from Chart.yaml" >&2 && exit 1
+  fi
   ;;
-
 presence)
   test -s docs/developer/aluminium-baseline.md
   test -s .claude/skills/aluminium/SKILL.md
   test -s policies/vap/workload-baseline.yaml
   test -s schemas/alloy.json
-  test -x scripts/validate/aluminium-assert.sh
   ;;
-
 *)
   echo "❌ unknown validation mode '${mode}'" >&2
   exit 1

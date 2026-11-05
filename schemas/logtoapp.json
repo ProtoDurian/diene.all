@@ -12,10 +12,10 @@
       "properties": {
         "identityRef": {
           "type": "object",
-          "required": ["platform", "vlandscape"],
+          "required": ["platform", "landscape"],
           "properties": {
-            "platform": { "type": "string" },
-            "vlandscape": { "type": "string" }
+            "platform": { "type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" },
+            "landscape": { "type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" }
           },
           "additionalProperties": false
         },

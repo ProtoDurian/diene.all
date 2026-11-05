@@ -1,7 +1,10 @@
-# ### aluminium-example
-# #### source: aluminium
-# example landscape overlay — local/Garden tier-1 emulated stack endpoints.
-# Destinations stay OTLP/HTTP (Q-I28); only the cluster identity changes here.
+serviceTree:
+  landscape: example
+
 upstream:
-  cluster:
-    name: example
+  collectorCommon:
+    alloy:
+      labels: &lpsm
+        atomi.cloud/landscape: example
+      controller:
+        podLabels: *lpsm

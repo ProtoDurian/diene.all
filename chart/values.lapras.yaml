@@ -1,6 +1,16 @@
-# ### aluminium-lapras
-# #### source: aluminium
-# lapras cluster overlay — cluster identity delta only.
+serviceTree:
+  cluster: lapras
+
+# Disabled: the ExternalSecret CRD is not installed in k3d.
+secret:
+  enabled: false
+
 upstream:
   cluster:
     name: lapras
+  collectorCommon:
+    alloy:
+      labels: &lpsm
+        atomi.cloud/cluster: lapras
+      controller:
+        podLabels: *lpsm

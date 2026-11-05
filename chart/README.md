@@ -1,8 +1,8 @@
-# diene-charts-aluminium
+# aluminium
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 4.3.0](https://img.shields.io/badge/AppVersion-4.3.0-informational?style=flat-square)
+![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 4.6.0](https://img.shields.io/badge/AppVersion-4.6.0-informational?style=flat-square)
 
-AtomiCloud wrapper around grafana/k8s-monitoring (Alloy Operator + alloy-metrics StatefulSet + alloy-logs DaemonSet)
+AtomiCloud wrapper around grafana/k8s-monitoring (Alloy Operator, alloy-metrics StatefulSet, alloy-logs DaemonSet)
 
 ## Requirements
 
@@ -10,98 +10,16 @@ Kubernetes: `>=1.27.0-0`
 
 | Repository | Name | Version |
 |------------|------|---------|
-| https://grafana.github.io/helm-charts | upstream(k8s-monitoring) | 4.3.0 |
+| oci://ghcr.io/grafana/helm-charts | upstream(k8s-monitoring) | 4.6.0 |
 
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| global.labelPrefix | string | `"atomi.cloud"` |  |
-| secret.enabled | bool | `false` |  |
-| secret.refreshInterval | string | `"1h"` |  |
-| secret.serviceFolder | string | `"/svc/aluminium"` |  |
-| secret.sharedFolder | string | `"/shared/aluminium"` |  |
-| secret.store.kind | string | `"ClusterSecretStore"` |  |
-| secret.store.name | string | `"platform-secret-store"` |  |
-| serviceTree.layer | string | `"1"` |  |
-| serviceTree.module | string | `"telemetry"` |  |
-| serviceTree.platform | string | `"telemetry"` |  |
-| serviceTree.service | string | `"aluminium"` |  |
-| upstream.alloy-operator.deploy | bool | `true` |  |
-| upstream.alloy-operator.resources.limits.cpu | string | `"200m"` |  |
-| upstream.alloy-operator.resources.limits.memory | string | `"128Mi"` |  |
-| upstream.alloy-operator.resources.requests.cpu | string | `"10m"` |  |
-| upstream.alloy-operator.resources.requests.memory | string | `"64Mi"` |  |
-| upstream.alloy-operator.securityContext.runAsNonRoot | bool | `true` |  |
-| upstream.alloy-operator.waitForAlloyRemoval.resources.limits.cpu | string | `"100m"` |  |
-| upstream.alloy-operator.waitForAlloyRemoval.resources.limits.memory | string | `"64Mi"` |  |
-| upstream.alloy-operator.waitForAlloyRemoval.resources.requests.cpu | string | `"10m"` |  |
-| upstream.alloy-operator.waitForAlloyRemoval.resources.requests.memory | string | `"32Mi"` |  |
-| upstream.applicationObservability.collector | string | `"alloy-metrics"` |  |
-| upstream.applicationObservability.destinations[0] | string | `"victoriametrics"` |  |
-| upstream.applicationObservability.destinations[1] | string | `"gigapipe"` |  |
-| upstream.applicationObservability.enabled | bool | `true` |  |
-| upstream.applicationObservability.receivers.otlp.grpc.enabled | bool | `false` |  |
-| upstream.applicationObservability.receivers.otlp.http.enabled | bool | `true` |  |
-| upstream.applicationObservability.receivers.otlp.http.port | int | `4318` |  |
-| upstream.cluster.name | string | `"local"` |  |
-| upstream.clusterMetrics.collector | string | `"alloy-metrics"` |  |
-| upstream.clusterMetrics.enabled | bool | `true` |  |
-| upstream.collectors.alloy-logs.alloy.labels.layer | string | `"1"` |  |
-| upstream.collectors.alloy-logs.alloy.labels.module | string | `"telemetry"` |  |
-| upstream.collectors.alloy-logs.alloy.labels.platform | string | `"telemetry"` |  |
-| upstream.collectors.alloy-logs.alloy.labels.service | string | `"aluminium"` |  |
-| upstream.collectors.alloy-logs.alloy.mounts.varlog | bool | `true` |  |
-| upstream.collectors.alloy-logs.alloy.resources.limits.cpu | string | `"250m"` |  |
-| upstream.collectors.alloy-logs.alloy.resources.limits.memory | string | `"256Mi"` |  |
-| upstream.collectors.alloy-logs.alloy.resources.requests.cpu | string | `"50m"` |  |
-| upstream.collectors.alloy-logs.alloy.resources.requests.memory | string | `"64Mi"` |  |
-| upstream.collectors.alloy-logs.alloy.stabilityLevel | string | `"public-preview"` |  |
-| upstream.collectors.alloy-logs.controller.type | string | `"daemonset"` |  |
-| upstream.collectors.alloy-metrics.alloy.clustering.enabled | bool | `true` |  |
-| upstream.collectors.alloy-metrics.alloy.labels.layer | string | `"1"` |  |
-| upstream.collectors.alloy-metrics.alloy.labels.module | string | `"telemetry"` |  |
-| upstream.collectors.alloy-metrics.alloy.labels.platform | string | `"telemetry"` |  |
-| upstream.collectors.alloy-metrics.alloy.labels.service | string | `"aluminium"` |  |
-| upstream.collectors.alloy-metrics.alloy.resources.limits.cpu | string | `"500m"` |  |
-| upstream.collectors.alloy-metrics.alloy.resources.limits.memory | string | `"512Mi"` |  |
-| upstream.collectors.alloy-metrics.alloy.resources.requests.cpu | string | `"100m"` |  |
-| upstream.collectors.alloy-metrics.alloy.resources.requests.memory | string | `"128Mi"` |  |
-| upstream.collectors.alloy-metrics.controller.replicas | int | `1` |  |
-| upstream.collectors.alloy-metrics.controller.type | string | `"statefulset"` |  |
-| upstream.destinations.gigapipe.auth.type | string | `"none"` |  |
-| upstream.destinations.gigapipe.logs.enabled | bool | `true` |  |
-| upstream.destinations.gigapipe.metrics.enabled | bool | `false` |  |
-| upstream.destinations.gigapipe.protocol | string | `"http"` |  |
-| upstream.destinations.gigapipe.traces.enabled | bool | `true` |  |
-| upstream.destinations.gigapipe.type | string | `"otlp"` |  |
-| upstream.destinations.gigapipe.url | string | `"http://gigapipe:4318"` |  |
-| upstream.destinations.victoriametrics.auth.type | string | `"none"` |  |
-| upstream.destinations.victoriametrics.logs.enabled | bool | `false` |  |
-| upstream.destinations.victoriametrics.metrics.enabled | bool | `true` |  |
-| upstream.destinations.victoriametrics.protocol | string | `"http"` |  |
-| upstream.destinations.victoriametrics.traces.enabled | bool | `false` |  |
-| upstream.destinations.victoriametrics.type | string | `"otlp"` |  |
-| upstream.destinations.victoriametrics.url | string | `"http://victoriametrics:4318"` |  |
-| upstream.podLogsViaOpenTelemetry.collector | string | `"alloy-logs"` |  |
-| upstream.podLogsViaOpenTelemetry.destinations[0] | string | `"gigapipe"` |  |
-| upstream.podLogsViaOpenTelemetry.enabled | bool | `true` |  |
-| upstream.selfReporting.enabled | bool | `false` |  |
-| upstream.telemetryServices.kube-state-metrics.containerSecurityContext.runAsNonRoot | bool | `true` |  |
-| upstream.telemetryServices.kube-state-metrics.deploy | bool | `true` |  |
-| upstream.telemetryServices.kube-state-metrics.resources.limits.cpu | string | `"100m"` |  |
-| upstream.telemetryServices.kube-state-metrics.resources.limits.memory | string | `"128Mi"` |  |
-| upstream.telemetryServices.kube-state-metrics.resources.requests.cpu | string | `"10m"` |  |
-| upstream.telemetryServices.kube-state-metrics.resources.requests.memory | string | `"32Mi"` |  |
-| upstream.telemetryServices.node-exporter.containerSecurityContext.allowPrivilegeEscalation | bool | `false` |  |
-| upstream.telemetryServices.node-exporter.containerSecurityContext.capabilities.drop[0] | string | `"ALL"` |  |
-| upstream.telemetryServices.node-exporter.containerSecurityContext.readOnlyRootFilesystem | bool | `true` |  |
-| upstream.telemetryServices.node-exporter.containerSecurityContext.runAsNonRoot | bool | `true` |  |
-| upstream.telemetryServices.node-exporter.deploy | bool | `true` |  |
-| upstream.telemetryServices.node-exporter.resources.limits.cpu | string | `"100m"` |  |
-| upstream.telemetryServices.node-exporter.resources.limits.memory | string | `"64Mi"` |  |
-| upstream.telemetryServices.node-exporter.resources.requests.cpu | string | `"10m"` |  |
-| upstream.telemetryServices.node-exporter.resources.requests.memory | string | `"32Mi"` |  |
+| labelPrefix | string | `"atomi.cloud"` | Prefix used by every service-tree label and annotation. |
+| secret | object | `{"enabled":true,"refreshInterval":"1h","serviceFolder":"/aluminium","sharedFolder":"/shared","store":{"kind":"SecretStore","name":"platform-store"}}` | One service-scoped ExternalSecret with folder-prefix rewrites; the only path for backend credentials. |
+| serviceTree | object | `{"layer":"1","module":"telemetry","platform":"telemetry","service":"aluminium"}` | Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays. |
+| upstream | object | `{"alloy-operator":{"deploy":true,"resources":{"limits":{"cpu":"200m","memory":"128Mi"},"requests":{"cpu":"10m","memory":"64Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsNonRoot":true},"waitForAlloyRemoval":{"enabled":false}},"applicationObservability":{"collector":"alloy-metrics","destinations":["victoriametrics","gigapipe"],"enabled":true,"receivers":{"otlp":{"grpc":{"enabled":false},"http":{"enabled":true,"port":4318}}}},"cluster":{"name":"local"},"clusterMetrics":{"collector":"alloy-metrics","destinations":["victoriametrics"],"enabled":true},"collectorCommon":{"alloy":{"controller":{"podLabels":{"atomi.cloud/layer":"1","atomi.cloud/module":"telemetry","atomi.cloud/platform":"telemetry","atomi.cloud/service":"aluminium"}},"labels":{"atomi.cloud/layer":"1","atomi.cloud/module":"telemetry","atomi.cloud/platform":"telemetry","atomi.cloud/service":"aluminium"}}},"collectors":{"alloy-logs":{"alloy":{"mounts":{"varlog":true},"resources":{"limits":{"cpu":"250m","memory":"256Mi"},"requests":{"cpu":"50m","memory":"64Mi"}},"stabilityLevel":"public-preview"},"presets":["daemonset"]},"alloy-metrics":{"alloy":{"resources":{"limits":{"cpu":"500m","memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}},"presets":["statefulset","clustered"]}},"destinations":{"gigapipe":{"logs":{"enabled":true},"metrics":{"enabled":false},"protocol":"http","traces":{"enabled":true},"type":"otlp","url":"http://gigapipe.telemetry.svc:3100"},"victoriametrics":{"logs":{"enabled":false},"metrics":{"enabled":true},"protocol":"http","traces":{"enabled":false},"type":"otlp","url":"http://victoriametrics.telemetry.svc:8428/opentelemetry"}},"podLogsViaOpenTelemetry":{"collector":"alloy-logs","destinations":["gigapipe"],"enabled":true},"selfReporting":{"enabled":false},"telemetryServices":{"kube-state-metrics":{"containerSecurityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsNonRoot":true},"deploy":true,"resources":{"limits":{"cpu":"100m","memory":"128Mi"},"requests":{"cpu":"10m","memory":"32Mi"}}},"node-exporter":{"containerSecurityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsNonRoot":true},"deploy":true,"resources":{"limits":{"cpu":"100m","memory":"64Mi"},"requests":{"cpu":"10m","memory":"32Mi"}}}}}` | grafana/k8s-monitoring values: two collectors, OTLP destinations (endpoints only), feature assignment. |
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)

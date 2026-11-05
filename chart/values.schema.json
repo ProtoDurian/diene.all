@@ -4,15 +4,14 @@
     "description": "Generated schema for the diene aluminium k8s-monitoring wrapper.",
     "type": "object",
     "properties": {
-        "global": {
-            "type": "object",
-            "properties": {
-                "labelPrefix": {
-                    "type": "string"
-                }
-            }
+        "labelPrefix": {
+            "description": "Prefix used by every service-tree label and annotation.",
+            "type": "string",
+            "pattern": "^[a-z0-9.-]+$",
+            "minLength": 1
         },
         "secret": {
+            "description": "One service-scoped ExternalSecret with folder-prefix rewrites; the only path for backend credentials.",
             "type": "object",
             "properties": {
                 "enabled": {
@@ -31,7 +30,11 @@
                     "type": "object",
                     "properties": {
                         "kind": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                                "SecretStore",
+                                "ClusterSecretStore"
+                            ]
                         },
                         "name": {
                             "type": "string"
@@ -41,23 +44,35 @@
             }
         },
         "serviceTree": {
+            "description": "Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays.",
             "type": "object",
+            "required": [
+                "platform",
+                "service",
+                "module",
+                "layer"
+            ],
             "properties": {
                 "layer": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^[0-9]+$"
                 },
                 "module": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+$"
                 },
                 "platform": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+$"
                 },
                 "service": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+$"
                 }
             }
         },
         "upstream": {
+            "description": "grafana/k8s-monitoring values: two collectors, OTLP destinations (endpoints only), feature assignment.",
             "type": "object",
             "properties": {
                 "alloy-operator": {
@@ -96,6 +111,23 @@
                         "securityContext": {
                             "type": "object",
                             "properties": {
+                                "allowPrivilegeEscalation": {
+                                    "type": "boolean"
+                                },
+                                "capabilities": {
+                                    "type": "object",
+                                    "properties": {
+                                        "drop": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                },
+                                "readOnlyRootFilesystem": {
+                                    "type": "boolean"
+                                },
                                 "runAsNonRoot": {
                                     "type": "boolean"
                                 }
@@ -104,32 +136,8 @@
                         "waitForAlloyRemoval": {
                             "type": "object",
                             "properties": {
-                                "resources": {
-                                    "type": "object",
-                                    "properties": {
-                                        "limits": {
-                                            "type": "object",
-                                            "properties": {
-                                                "cpu": {
-                                                    "type": "string"
-                                                },
-                                                "memory": {
-                                                    "type": "string"
-                                                }
-                                            }
-                                        },
-                                        "requests": {
-                                            "type": "object",
-                                            "properties": {
-                                                "cpu": {
-                                                    "type": "string"
-                                                },
-                                                "memory": {
-                                                    "type": "string"
-                                                }
-                                            }
-                                        }
-                                    }
+                                "enabled": {
+                                    "type": "boolean"
                                 }
                             }
                         }
@@ -195,8 +203,47 @@
                         "collector": {
                             "type": "string"
                         },
+                        "destinations": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
                         "enabled": {
                             "type": "boolean"
+                        }
+                    }
+                },
+                "collectorCommon": {
+                    "type": "object",
+                    "properties": {
+                        "alloy": {
+                            "type": "object",
+                            "properties": {
+                                "controller": {
+                                    "type": "object",
+                                    "properties": {
+                                        "podLabels": {}
+                                    }
+                                },
+                                "labels": {
+                                    "type": "object",
+                                    "properties": {
+                                        "atomi.cloud/layer": {
+                                            "type": "string"
+                                        },
+                                        "atomi.cloud/module": {
+                                            "type": "string"
+                                        },
+                                        "atomi.cloud/platform": {
+                                            "type": "string"
+                                        },
+                                        "atomi.cloud/service": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 },
@@ -209,23 +256,6 @@
                                 "alloy": {
                                     "type": "object",
                                     "properties": {
-                                        "labels": {
-                                            "type": "object",
-                                            "properties": {
-                                                "layer": {
-                                                    "type": "string"
-                                                },
-                                                "module": {
-                                                    "type": "string"
-                                                },
-                                                "platform": {
-                                                    "type": "string"
-                                                },
-                                                "service": {
-                                                    "type": "string"
-                                                }
-                                            }
-                                        },
                                         "mounts": {
                                             "type": "object",
                                             "properties": {
@@ -266,12 +296,10 @@
                                         }
                                     }
                                 },
-                                "controller": {
-                                    "type": "object",
-                                    "properties": {
-                                        "type": {
-                                            "type": "string"
-                                        }
+                                "presets": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
                                     }
                                 }
                             }
@@ -282,31 +310,6 @@
                                 "alloy": {
                                     "type": "object",
                                     "properties": {
-                                        "clustering": {
-                                            "type": "object",
-                                            "properties": {
-                                                "enabled": {
-                                                    "type": "boolean"
-                                                }
-                                            }
-                                        },
-                                        "labels": {
-                                            "type": "object",
-                                            "properties": {
-                                                "layer": {
-                                                    "type": "string"
-                                                },
-                                                "module": {
-                                                    "type": "string"
-                                                },
-                                                "platform": {
-                                                    "type": "string"
-                                                },
-                                                "service": {
-                                                    "type": "string"
-                                                }
-                                            }
-                                        },
                                         "resources": {
                                             "type": "object",
                                             "properties": {
@@ -336,15 +339,10 @@
                                         }
                                     }
                                 },
-                                "controller": {
-                                    "type": "object",
-                                    "properties": {
-                                        "replicas": {
-                                            "type": "integer"
-                                        },
-                                        "type": {
-                                            "type": "string"
-                                        }
+                                "presets": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
                                     }
                                 }
                             }
@@ -357,14 +355,6 @@
                         "gigapipe": {
                             "type": "object",
                             "properties": {
-                                "auth": {
-                                    "type": "object",
-                                    "properties": {
-                                        "type": {
-                                            "type": "string"
-                                        }
-                                    }
-                                },
                                 "logs": {
                                     "type": "object",
                                     "properties": {
@@ -403,14 +393,6 @@
                         "victoriametrics": {
                             "type": "object",
                             "properties": {
-                                "auth": {
-                                    "type": "object",
-                                    "properties": {
-                                        "type": {
-                                            "type": "string"
-                                        }
-                                    }
-                                },
                                 "logs": {
                                     "type": "object",
                                     "properties": {
@@ -482,6 +464,23 @@
                                 "containerSecurityContext": {
                                     "type": "object",
                                     "properties": {
+                                        "allowPrivilegeEscalation": {
+                                            "type": "boolean"
+                                        },
+                                        "capabilities": {
+                                            "type": "object",
+                                            "properties": {
+                                                "drop": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "readOnlyRootFilesystem": {
+                                            "type": "boolean"
+                                        },
                                         "runAsNonRoot": {
                                             "type": "boolean"
                                         }
@@ -581,7 +580,8 @@
                         }
                     }
                 }
-            }
+            },
+            "additionalProperties": true
         }
     }
 }

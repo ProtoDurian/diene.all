@@ -1,113 +1,50 @@
-# ### aluminium-root
-# #### source: aluminium
-# AtomiCloud aluminium — thin wrapper around grafana/k8s-monitoring.
-# The wrapper surface is intentionally ~40 lines of upstream values: the two
-# collectors (alloy-metrics StatefulSet clustered, alloy-logs DaemonSet), the
-# OTLP-everywhere destination map, and the feature -> collector assignment that
-# pins the fleet OTLP receiver on :4318. No raw river config is shipped.
+# @schema pattern:^[a-z0-9.-]+$;minLength:1
+# -- Prefix used by every service-tree label and annotation.
+labelPrefix: atomi.cloud
 
-# Single configurable LPSM label/annotation prefix (R16). Helm propagates
-# global values into dependencies, so the wrapper helpers and the upstream
-# collector rendering consume this same value.
-global:
-  labelPrefix: atomi.cloud
-
-# Service-tree projection. platform is stamped from the release namespace by the
-# validateServiceTree helper; cluster.name is overlay-owned.
+# -- Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays.
 serviceTree:
+  # @schema pattern:^[a-z0-9]+$;required:true
   platform: telemetry
+  # @schema pattern:^[a-z0-9]+$;required:true
   service: aluminium
+  # @schema pattern:^[a-z0-9]+$;required:true
   module: telemetry
+  # @schema pattern:^[0-9]+$;required:true
   layer: '1'
 
-# aluminium's own ExternalSecret (backend creds via ESO, SoS chain). Local and
-# Garden run auth: none against the emulated stack; this template is the prod
-# path and is disabled by default. No literal credentials are ever inlined.
+# -- One service-scoped ExternalSecret with folder-prefix rewrites; the only path for backend credentials.
 secret:
-  enabled: false
+  enabled: true
   refreshInterval: 1h
   store:
-    kind: ClusterSecretStore
-    name: platform-secret-store
-  sharedFolder: /shared/aluminium
-  serviceFolder: /svc/aluminium
+    kind: SecretStore # @schema enum:[SecretStore, ClusterSecretStore]
+    name: platform-store
+  sharedFolder: /shared
+  serviceFolder: /aluminium
 
-# grafana/k8s-monitoring v4.x (aliased `upstream`). Destinations are OTLP/HTTP
-# only (Q-I28): one protocol, no per-signal selector. Endpoints are overlay
-# owned (local/Garden = emulated stack; prod supplied by Primordial).
+# @schema additionalProperties:true
+# -- grafana/k8s-monitoring values: two collectors, OTLP destinations (endpoints only), feature assignment.
 upstream:
-  alloy-operator:
-    deploy: true
-    resources:
-      requests: { cpu: 10m, memory: 64Mi }
-      limits: { cpu: 200m, memory: 128Mi }
-    securityContext:
-      runAsNonRoot: true
-    waitForAlloyRemoval:
-      resources:
-        requests: { cpu: 10m, memory: 32Mi }
-        limits: { cpu: 100m, memory: 64Mi }
-
   cluster:
-    # Default cluster identity; overlays (values.<landscape>.yaml,
-    # values.<cluster>.yaml) specialize it per landing.
     name: local
 
   destinations:
     victoriametrics:
       type: otlp
       protocol: http
-      url: http://victoriametrics:4318
+      url: http://victoriametrics.telemetry.svc:8428/opentelemetry
       metrics: { enabled: true }
       logs: { enabled: false }
       traces: { enabled: false }
-      auth: { type: none }
     gigapipe:
       type: otlp
       protocol: http
-      url: http://gigapipe:4318
+      url: http://gigapipe.telemetry.svc:3100
       metrics: { enabled: false }
       logs: { enabled: true }
       traces: { enabled: true }
-      auth: { type: none }
 
-  # Metric sources for clusterMetrics. node-exporter is a privileged host-level
-  # DaemonSet; its scoped hostPath/hostNetwork allowance is owned by vanadium's
-  # VAP policy set (recorded in docs/developer/aluminium-baseline.md).
-  telemetryServices:
-    kube-state-metrics:
-      deploy: true
-      resources:
-        requests: { cpu: 10m, memory: 32Mi }
-        limits: { cpu: 100m, memory: 128Mi }
-      containerSecurityContext:
-        runAsNonRoot: true
-    node-exporter:
-      deploy: true
-      resources:
-        requests: { cpu: 10m, memory: 32Mi }
-        limits: { cpu: 100m, memory: 64Mi }
-      containerSecurityContext:
-        runAsNonRoot: true
-        allowPrivilegeEscalation: false
-        readOnlyRootFilesystem: true
-        capabilities:
-          drop: [ALL]
-
-  selfReporting:
-    enabled: false
-
-  podLogsViaOpenTelemetry:
-    enabled: true
-    collector: alloy-logs
-    destinations: [gigapipe]
-
-  clusterMetrics:
-    enabled: true
-    collector: alloy-metrics
-
-  # Fleet OTLP contract: diene apps push metrics+traces+logs to :4318, served by
-  # alloy-metrics. Receiver is http/protobuf on 4318 (R14/R17).
   applicationObservability:
     enabled: true
     collector: alloy-metrics
@@ -117,31 +54,77 @@ upstream:
         grpc: { enabled: false }
         http: { enabled: true, port: 4318 }
 
+  clusterMetrics:
+    enabled: true
+    collector: alloy-metrics
+    destinations: [victoriametrics]
+
+  podLogsViaOpenTelemetry:
+    enabled: true
+    collector: alloy-logs
+    destinations: [gigapipe]
+
+  selfReporting:
+    enabled: false
+
+  telemetryServices:
+    kube-state-metrics:
+      deploy: true
+      resources:
+        requests: { cpu: 10m, memory: 32Mi }
+        limits: { cpu: 100m, memory: 128Mi }
+      containerSecurityContext:
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: { drop: [ALL] }
+    node-exporter:
+      deploy: true
+      resources:
+        requests: { cpu: 10m, memory: 32Mi }
+        limits: { cpu: 100m, memory: 64Mi }
+      containerSecurityContext:
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: { drop: [ALL] }
+
+  alloy-operator:
+    deploy: true
+    resources:
+      requests: { cpu: 10m, memory: 64Mi }
+      limits: { cpu: 200m, memory: 128Mi }
+    securityContext:
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities: { drop: [ALL] }
+    # Its hook Jobs expose no pod securityContext, so they cannot meet the workload VAP.
+    waitForAlloyRemoval:
+      enabled: false
+
+  collectorCommon:
+    alloy:
+      labels: &lpsm
+        atomi.cloud/platform: telemetry
+        atomi.cloud/service: aluminium
+        atomi.cloud/module: telemetry
+        atomi.cloud/layer: '1'
+      controller:
+        podLabels: *lpsm
+
   collectors:
-    # alloy-metrics: StatefulSet + clustering; hosts the :4318 OTLP receiver.
     alloy-metrics:
-      controller: { type: statefulset, replicas: 1 }
+      presets: [statefulset, clustered]
       alloy:
-        clustering: { enabled: true }
-        labels:
-          platform: telemetry
-          service: aluminium
-          module: telemetry
-          layer: '1'
         resources:
           requests: { cpu: 100m, memory: 128Mi }
           limits: { cpu: 500m, memory: 512Mi }
-    # alloy-logs: DaemonSet, no clustering; scoped /var/log mount.
     alloy-logs:
-      controller: { type: daemonset }
+      presets: [daemonset]
       alloy:
         stabilityLevel: public-preview
         mounts: { varlog: true }
-        labels:
-          platform: telemetry
-          service: aluminium
-          module: telemetry
-          layer: '1'
         resources:
           requests: { cpu: 50m, memory: 64Mi }
           limits: { cpu: 250m, memory: 256Mi }
