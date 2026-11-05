@@ -6,7 +6,7 @@ export default defineSmoke({
   baseline: {
     name: 'baseline-wrapper-lpsm-hostnames-green',
     description:
-      'Generic ordinary/instance dotted derivation, inverse parsing, normalization, and collision checks pass.',
+      'Ordinary, localhost, Boron and ENTEI hostname vectors, inverse parsing, opaque-instance and identity-issuer refusals, normalization and collision checks pass.',
     async run(repo: any) {
       await expectGreen(repo, 'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh lpsm', 'wrapper-lpsm-hostnames');
     },

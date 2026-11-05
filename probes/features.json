@@ -251,7 +251,17 @@
   },
   {
     "template": "diene/helm-wrapper",
-    "name": "wrapper-gitlint-types",
+    "name": "wrapper-release-config",
+    "class": "gate"
+  },
+  {
+    "template": "diene/helm-wrapper",
+    "name": "wrapper-release-vocabulary",
+    "class": "gate"
+  },
+  {
+    "template": "diene/helm-wrapper",
+    "name": "wrapper-release-lint-types",
     "class": "gate"
   },
   {

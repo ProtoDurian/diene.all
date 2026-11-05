@@ -24,6 +24,7 @@ checks:
       - gomplate
       - helm version
       - helm-docs
+      - helm-schema --help
       - infisical
       - jq
       - k3d

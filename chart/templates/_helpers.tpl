@@ -1,14 +1,11 @@
-{{/* Stable chart identity. */}}
 {{- define "diene-helm-wrapper.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{/* The one and only service-tree label/annotation prefix. */}}
 {{- define "diene-helm-wrapper.labelPrefix" -}}
 {{- required "labelPrefix is required" .Values.labelPrefix | trimSuffix "/" -}}
 {{- end -}}
 
-{{/* Validate the base LPSM projection without requiring overlay-owned fields. */}}
 {{- define "diene-helm-wrapper.validateServiceTree" -}}
 {{- $platform := required "serviceTree.platform is required" .Values.serviceTree.platform -}}
 {{- $service := required "serviceTree.service is required" .Values.serviceTree.service -}}
@@ -19,7 +16,6 @@
 {{- end -}}
 {{- end -}}
 
-{{/* Normalize an arbitrary physical instance id into one DNS-1123 label. */}}
 {{- define "diene-helm-wrapper.instanceLabel" -}}
 {{- $original := required "physical instance id is required" . -}}
 {{- $normalized := regexReplaceAll "[^a-z0-9-]+" (lower $original) "-" -}}
@@ -36,7 +32,6 @@
 {{- end -}}
 {{- end -}}
 
-{{/* Build an exactly-one-dash resource name from service + fused token. */}}
 {{- define "diene-helm-wrapper.resourceName" -}}
 {{- $root := .root -}}
 {{- $service := required "serviceTree.service is required" $root.Values.serviceTree.service | lower -}}
@@ -51,7 +46,6 @@
 {{- printf "%s-%s" $service $token -}}
 {{- end -}}
 
-{{/* The primary workload must explicitly use fullnameOverride. */}}
 {{- define "diene-helm-wrapper.primaryName" -}}
 {{- $expected := include "diene-helm-wrapper.resourceName" (dict "root" . "token" "api") -}}
 {{- if ne .Values.fullnameOverride $expected -}}
@@ -60,13 +54,11 @@
 {{- $expected -}}
 {{- end -}}
 
-{{/* Common selector labels. */}}
 {{- define "diene-helm-wrapper.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "diene-helm-wrapper.primaryName" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
-{{/* Service-tree labels; every key uses labelPrefix. */}}
 {{- define "diene-helm-wrapper.labels" -}}
 {{- $prefix := include "diene-helm-wrapper.labelPrefix" . -}}
 helm.sh/chart: {{ include "diene-helm-wrapper.chart" . }}
@@ -78,7 +70,6 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
-{{/* Service-tree and reversible instance metadata annotations. */}}
 {{- define "diene-helm-wrapper.annotations" -}}
 {{- $prefix := include "diene-helm-wrapper.labelPrefix" . -}}
 {{- range $key, $value := .Values.serviceTree }}
@@ -90,14 +81,12 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 {{- end -}}
 
-{{/* Reloader is opt-in at the controller and default-on in this wrapper. */}}
 {{- define "diene-helm-wrapper.reloaderAnnotations" -}}
 {{- if .enabled }}
 reloader.stakater.com/auto: 'true'
 {{- end }}
 {{- end -}}
 
-{{/* Derive ordinary or instance-qualified dotted hostnames. Platform always comes from namespace. */}}
 {{- define "diene-helm-wrapper.hostname" -}}
 {{- $root := .root -}}
 {{- $module := required "hostname module is required" .module | lower -}}
@@ -105,15 +94,15 @@ reloader.stakater.com/auto: 'true'
 {{- $landscape := required "hostname landscape is required" .landscape | lower -}}
 {{- $zone := required "hostname zone is required" .zone | lower | trimPrefix "." -}}
 {{- $platform := $root.Release.Namespace | lower -}}
-{{- $instance := default "" .instance | lower -}}
 {{- range $label := list $module $service $platform $landscape }}
 {{- if not (regexMatch "^[a-z0-9-]+$" $label) -}}
 {{- fail (printf "hostname label %q is not DNS-compatible" $label) -}}
 {{- end -}}
 {{- end -}}
-{{- if $instance -}}
-{{- if not (regexMatch "^[a-z0-9-]+$" $instance) -}}
-{{- fail (printf "hostname instance %q is not DNS-compatible" $instance) -}}
+{{- if hasKey . "instance" -}}
+{{- $instance := .instance -}}
+{{- if not (and (kindIs "string" $instance) (le (len $instance) 63) (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $instance)) -}}
+{{- fail (printf "hostname instance %q must be one lowercase DNS-1123 label of at most 63 bytes" (toString $instance)) -}}
 {{- end -}}
 {{- printf "%s.%s.%s.%s.%s.%s" $module $service $platform $instance $landscape $zone -}}
 {{- else -}}
@@ -121,7 +110,20 @@ reloader.stakater.com/auto: 'true'
 {{- end -}}
 {{- end -}}
 
-{{/* Parse a hostname back into the unchanged four-slot LPSM coordinate plus instance. */}}
+{{- define "diene-helm-wrapper.identityIssuer" -}}
+{{- $landscape := required "identity landscape is required" .landscape -}}
+{{- if not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $landscape) -}}
+{{- fail (printf "identity landscape %q must be one lowercase DNS-1123 label" $landscape) -}}
+{{- end -}}
+{{- if eq $landscape .root.Release.Namespace -}}
+{{- fail (printf "identity landscape %q is the consumer platform; only a concrete landscape selects an issuer" $landscape) -}}
+{{- end -}}
+{{- if eq $landscape (toString .root.Values.primordial.vlandscape) -}}
+{{- fail (printf "identity landscape %q is a virtual landscape; only a concrete landscape selects an issuer" $landscape) -}}
+{{- end -}}
+{{- printf "api.lithium.aldehyde.%s.cluster.atomi.cloud" $landscape -}}
+{{- end -}}
+
 {{- define "diene-helm-wrapper.parseHostname" -}}
 {{- $hostname := required "hostname is required" .hostname | lower -}}
 {{- $zone := required "zone is required" .zone | lower | trimPrefix "." -}}

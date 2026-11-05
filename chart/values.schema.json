@@ -26,9 +26,12 @@
                 "lpsm": {
                     "type": "object",
                     "properties": {
-                        "instance": {
+                        "identityLandscape": {
                             "type": "string",
                             "pattern": "^[a-z0-9-]+$"
+                        },
+                        "instance": {
+                            "type": "string"
                         },
                         "instanceZone": {
                             "type": "string"
@@ -254,6 +257,12 @@
                         "extraRedirectUris": {
                             "type": "array",
                             "uniqueItems": true,
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "landscapes": {
+                            "type": "array",
                             "items": {
                                 "type": "string"
                             }

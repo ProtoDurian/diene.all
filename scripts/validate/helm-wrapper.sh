@@ -11,6 +11,31 @@ trap 'rm -rf "${tmp}"' EXIT
 
 bash ./scripts/local/vendor-chart-config.sh >/dev/null
 
+render_contracts() {
+  local ns="$1"
+  shift
+  helm template "${release}" chart --namespace "${ns}" --values chart/values.example.yaml --set "serviceTree.platform=${ns}" "$@" |
+    yq -o=json 'select(.kind == "ConfigMap" and .metadata.name == "wrapper-contracts") | .data'
+}
+
+expect_vector() {
+  local key="$1" host="$2" parsed_key="$3" coordinate="$4"
+  shift 4
+  render_contracts nitroso "$@" >"${tmp}/vector.json"
+  jq -e --arg key "${key}" --arg host "${host}" --arg parsed "${parsed_key}" --argjson want "${coordinate}" \
+    '.[$key] == $host and (.[$parsed] | fromjson) == $want' "${tmp}/vector.json" >/dev/null ||
+    { echo "❌ LPSM vector ${host} mismatch" >&2 && cat "${tmp}/vector.json" >&2 && exit 1; }
+}
+
+expect_refusal() {
+  local pattern="$1" ns="$2"
+  shift 2
+  if helm template "${release}" chart --namespace "${ns}" --values chart/values.example.yaml --set "serviceTree.platform=${ns}" "$@" >/dev/null 2>"${tmp}/refusal.txt"; then
+    echo "❌ accepted: $*" >&2 && exit 1
+  fi
+  rg -q -- "${pattern}" "${tmp}/refusal.txt" || { echo "❌ wrong refusal for $*" >&2 && cat "${tmp}/refusal.txt" >&2 && exit 1; }
+}
+
 case "${mode}" in
 schema)
   helm lint chart --namespace "${namespace}" >/dev/null
@@ -57,26 +82,53 @@ fullname)
   yq -e '.upstream.fullnameOverride | test("^[a-z0-9]+-[a-z0-9]+$")' chart/values.yaml >/dev/null
   ;;
 primordial)
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --set primordial.enabled=true >"${tmp}/primordial.yaml"
+  helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --set primordial.enabled=true --set 'primordial.logtoApp.landscapes={example,serving}' >"${tmp}/primordial.yaml"
   kubeconform -strict -summary -schema-location default -schema-location 'schemas/{{ .ResourceKind }}.json' "${tmp}/primordial.yaml"
   yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "PlatformDependency"))[0].spec as $spec | [$spec.database, $spec.kv, $spec.cache, $spec.store] | map(. // {}) | add | to_entries | all(.[]; (.value.engine | keys) == [.value.type])' >/dev/null
+  yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "LogtoApp")) | map(.metadata.name) == ["wrapper-identityexample", "wrapper-identityserving"] and map(.spec.identityRef) == [{platform: "sample", landscape: "example"}, {platform: "sample", landscape: "serving"}] and map(.metadata.annotations["atomi.cloud/identity-issuer"]) == ["api.lithium.aldehyde.example.cluster.atomi.cloud", "api.lithium.aldehyde.serving.cluster.atomi.cloud"] and map(.metadata.annotations["atomi.cloud/credential-destination"]) == ["example:/wrapper", "serving:/wrapper"]' >/dev/null
+  yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "Problem")) | length == 1 and .[0].spec.module == "api" and .[0].metadata.name == "wrapper-problemsapi"' >/dev/null
   ! rg -n '(^|[[:space:]])(share|sharedVia|redirectUris|desiredVersion):' "${tmp}/primordial.yaml"
+  expect_refusal 'repeats "example"' "${namespace}" --set 'primordial.logtoApp.landscapes={example,serving,example}'
+  expect_refusal 'repeats "serv-ing"' "${namespace}" --set 'primordial.logtoApp.landscapes={serving,serv-ing}'
+  expect_refusal 'is the consumer platform' "${namespace}" --set 'primordial.logtoApp.landscapes={example,sample}'
+  expect_refusal 'is a virtual landscape' "${namespace}" --set 'primordial.logtoApp.landscapes={example-vlandscape}'
+  expect_refusal 'at least one concrete landscape' "${namespace}" --set 'primordial.logtoApp.landscapes=null'
   ;;
 lpsm)
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml >"${tmp}/lpsm.yaml"
-  ordinary="$(yq -r 'select(.kind == "ConfigMap" and .metadata.name == "wrapper-contracts") | .data."lpsm.ordinaryHostname"' "${tmp}/lpsm.yaml")"
-  instance="$(yq -r 'select(.kind == "ConfigMap" and .metadata.name == "wrapper-contracts") | .data."lpsm.instanceHostname"' "${tmp}/lpsm.yaml")"
-  parsed="$(yq -r 'select(.kind == "ConfigMap" and .metadata.name == "wrapper-contracts") | .data."lpsm.parsed"' "${tmp}/lpsm.yaml")"
-  [ "${ordinary}" != "api.wrapper.sample.example.cluster.atomi.cloud" ] && echo "❌ ordinary LPSM hostname mismatch" >&2 && exit 1
-  [ "${instance}" != "api.wrapper.sample.run001.example.local.example.invalid" ] && echo "❌ instance LPSM hostname mismatch" >&2 && exit 1
-  jq -e '.landscape == "example" and .platform == "sample" and .service == "wrapper" and .module == "api" and .instance == "run001"' <<<"${parsed}" >/dev/null
-  label_a="$(helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --set-string instance.physicalId=repository-a:pr-123 | yq -r 'select(.kind == "ConfigMap" and .metadata.name == "wrapper-contracts") | .data."instance.label"')"
-  label_b="$(helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --set-string instance.physicalId=repository-b:pr-123 | yq -r 'select(.kind == "ConfigMap" and .metadata.name == "wrapper-contracts") | .data."instance.label"')"
+  expect_vector lpsm.ordinaryHostname api.zinc.nitroso.serving.cluster.atomi.cloud lpsm.ordinaryParsed \
+    '{"landscape":"serving","platform":"nitroso","service":"zinc","module":"api","instance":""}' \
+    --set contracts.lpsm.service=zinc --set contracts.lpsm.landscape=serving
+  expect_vector lpsm.instanceHostname api.zinc.nitroso.raichu.serving.cluster.atomi.cloud lpsm.parsed \
+    '{"landscape":"serving","platform":"nitroso","service":"zinc","module":"api","instance":"raichu"}' \
+    --set contracts.lpsm.service=zinc --set contracts.lpsm.landscape=serving --set contracts.lpsm.instance=raichu --set contracts.lpsm.instanceZone=cluster.atomi.cloud
+  expect_vector lpsm.instanceHostname api.zinc.nitroso.run42.absol.localhost lpsm.parsed \
+    '{"landscape":"absol","platform":"nitroso","service":"zinc","module":"api","instance":"run42"}' \
+    --set contracts.lpsm.service=zinc --set contracts.lpsm.landscape=absol --set contracts.lpsm.instance=run42 --set contracts.lpsm.instanceZone=localhost
+  expect_vector lpsm.instanceHostname api.lithium.nitroso.kirin.lapras.admin.atomi.cloud lpsm.parsed \
+    '{"landscape":"lapras","platform":"nitroso","service":"lithium","module":"api","instance":"kirin"}' \
+    --set contracts.lpsm.service=lithium --set contracts.lpsm.landscape=lapras --set contracts.lpsm.instance=kirin --set contracts.lpsm.instanceZone=admin.atomi.cloud
+  expect_vector lpsm.instanceHostname api.zinc.nitroso.otter-beats-potato.castform.host.example.invalid lpsm.parsed \
+    '{"landscape":"castform","platform":"nitroso","service":"zinc","module":"api","instance":"otter-beats-potato"}' \
+    --set contracts.lpsm.service=zinc --set contracts.lpsm.landscape=castform --set contracts.lpsm.instance=otter-beats-potato --set contracts.lpsm.instanceZone=host.example.invalid
+  render_contracts other --set contracts.lpsm.service=zinc --set contracts.lpsm.landscape=serving | jq -e '."lpsm.ordinaryHostname" == "api.zinc.other.serving.cluster.atomi.cloud"' >/dev/null
+  expect_refusal 'must equal release namespace' nitroso --set serviceTree.platform=other
+  expect_refusal 'canonical dotted LPSM form' nitroso --set contracts.lpsm.instanceZone=localhost --set-string contracts.lpsm.parseHostname=api-zinc-nitroso-run42-absol.localhost
+  expect_refusal 'canonical dotted LPSM form' "${namespace}" --set-string contracts.lpsm.parseHostname=api-wrapper-sample-run001-example.local.example.invalid
+  label_63="$(printf 'a%.0s' {1..63})"
+  render_contracts nitroso --set-string contracts.lpsm.instance="${label_63}" | jq -e --arg host "api.wrapper.nitroso.${label_63}.example.local.example.invalid" '."lpsm.instanceHostname" == $host' >/dev/null
+  for bad in run.42 Run42 RUN42 '' -run42 run42- "${label_63}a" 'run_42'; do
+    expect_refusal 'must be one lowercase DNS-1123 label of at most 63 bytes' nitroso --set-string contracts.lpsm.instance="${bad}"
+  done
+  render_contracts nitroso --set contracts.lpsm.identityLandscape=serving | jq -e '."identity.issuer" == "api.lithium.aldehyde.serving.cluster.atomi.cloud"' >/dev/null
+  expect_refusal 'is the consumer platform' nitroso --set contracts.lpsm.identityLandscape=nitroso
+  expect_refusal 'is a virtual landscape' nitroso --set contracts.lpsm.identityLandscape=example-vlandscape
+  label_a="$(render_contracts "${namespace}" --set-string instance.physicalId=repository-a:pr-123 | jq -r '."instance.label"')"
+  label_b="$(render_contracts "${namespace}" --set-string instance.physicalId=repository-b:pr-123 | jq -r '."instance.label"')"
   [ "${label_a}" = "${label_b}" ] && echo "❌ repository-qualified instance labels collided" >&2 && exit 1
   long_id="$(printf 'repository-%080d' 1)"
-  long_label="$(helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --set-string instance.physicalId="${long_id}" | yq -r 'select(.kind == "ConfigMap" and .metadata.name == "wrapper-contracts") | .data."instance.label"')"
-  [ "${#long_label}" -gt 63 ] && echo "❌ normalized instance label exceeds DNS-1123 length" >&2 && exit 1
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --set-string contracts.lpsm.parseHostname=api-wrapper-sample-run001-example.local.example.invalid >/dev/null 2>&1 && echo "❌ dash-fused hostname was accepted" >&2 && exit 1
+  render_contracts "${namespace}" --set-string instance.physicalId="${long_id}" |
+    jq -e --arg id "${long_id}" '."instance.original" == $id and (."instance.label" | length <= 63 and test("^repository-0+-[0-9a-f]{8}$"))' >/dev/null ||
+    { echo "❌ long physical id did not normalize to a hashed DNS-1123 label with its original recorded" >&2 && exit 1; }
   ;;
 lb)
   helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml --set gateway.provider=digitalocean >"${tmp}/do.yaml"
@@ -88,10 +140,7 @@ lb)
   ! rg -n 'nodePort:|hostPort:' "${tmp}/do.yaml" "${tmp}/oci.yaml" "${tmp}/aws.yaml"
   ;;
 task-surface)
-  task --list-all | rg -q 'example:lapras:debug'
-  task --list-all | rg -q 'example:lapras:template'
-  task --list-all | rg -q 'example:lapras:install'
-  task --list-all | rg -q 'example:lapras:remove'
+  task --list-all --json | jq -e '[.tasks[].name] as $names | ["debug", "template", "install", "remove"] | all(("example:lapras:" + .) | IN($names[]))' >/dev/null
   ;;
 rendered-manifests)
   helm template "${release}" chart --namespace "${namespace}" --values chart/values.example.yaml >"${tmp}/rendered.yaml"

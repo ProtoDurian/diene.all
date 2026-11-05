@@ -103,10 +103,11 @@ contracts:
     landscape: example # @schema pattern:^[a-z0-9-]+$
     module: api # @schema pattern:^[a-z0-9-]+$
     service: wrapper # @schema pattern:^[a-z0-9-]+$
-    instance: run001 # @schema pattern:^[a-z0-9-]+$
+    instance: run001
     ordinaryZone: cluster.atomi.cloud
     instanceZone: local.example.invalid
     parseHostname: ''
+    identityLandscape: example # @schema pattern:^[a-z0-9-]+$
 
 # -- Optional Gateway API route scaffold for a webhook receiver.
 webhookRoute:
@@ -179,6 +180,7 @@ primordial:
     paths: [/auth/callback]
     extraRedirectUris: [] # @schema item:string;uniqueItems:true
     resourceRefs: [wrapper-api] # @schema item:string;uniqueItems:true
+    landscapes: [example] # @schema item:string
   problem:
     enabled: true
     version: 0.1.0

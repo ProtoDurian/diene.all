@@ -5,7 +5,8 @@ export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
   baseline: {
     name: 'baseline-wrapper-primordial-crs-green',
-    description: 'All five primordial helpers validate against the frozen local T3 shape schemas.',
+    description:
+      'All five primordial helpers validate against the local T3 shape schemas, with one LogtoApp per landscape.',
     async run(repo: any) {
       await expectGreen(
         repo,

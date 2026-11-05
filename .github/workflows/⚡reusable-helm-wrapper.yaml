@@ -1,5 +1,3 @@
-# ### helm-wrapper-reusable-ci
-# #### source: helm-wrapper
 name: ⚡ Reusable Helm Wrapper
 
 on:
@@ -9,10 +7,23 @@ jobs:
   validate:
     name: Validate Helm Wrapper
     runs-on:
-      - nscloud-ubuntu-22.04-amd64-4x8-with-cache
-      - nscloud-cache-size-50gb
-      - nscloud-cache-tag-atomi-nix-store-cache-linux-amd64
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
       - name: Run wrapper validation
         run: nix develop .#ci -c ./scripts/ci/helm-wrapper.sh
+
+  install:
+    name: Install Helm Wrapper
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Install on k3s and round-trip the chart over OCI
+        run: nix develop .#ci -c ./scripts/ci/helm-wrapper-k3d.sh

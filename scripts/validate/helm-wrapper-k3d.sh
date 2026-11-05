@@ -17,7 +17,7 @@ trap 'bash ./scripts/local/delete-k3d-cluster.sh >/dev/null 2>&1 || true; rm -rf
 bash ./scripts/local/create-k3d-cluster.sh
 bash ./scripts/local/vendor-chart-config.sh
 helm dependency build chart
-helm upgrade --install helm-wrapper chart --namespace sample --create-namespace --values chart/values.example.yaml --values chart/values.lapras.yaml --wait --timeout 5m
+helm upgrade --install helm-wrapper chart --kube-context "k3d-${cluster_name}" --namespace sample --create-namespace --values chart/values.example.yaml --values chart/values.lapras.yaml --wait --timeout 5m
 kubectl --context "k3d-${cluster_name}" --namespace sample wait --for=condition=Available deployment/wrapper-api --timeout=3m
 kubectl --context "k3d-${cluster_name}" --namespace sample get pods -l app.kubernetes.io/name=wrapper-api -o json | jq -e '[.items[] | select(.metadata.labels["batch.kubernetes.io/job-name"] == null)] | length > 0 and all(.[]; .status.phase == "Running")' >/dev/null
 

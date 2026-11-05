@@ -36,31 +36,46 @@ spec:
 ---
 {{- end }}
 {{- if .Values.primordial.logtoApp.enabled }}
-apiVersion: {{ .Values.primordial.apiVersions.identity }}
+{{- if empty .Values.primordial.logtoApp.landscapes -}}
+{{- fail "primordial.logtoApp.landscapes must list at least one concrete landscape" -}}
+{{- end -}}
+{{- $prefix := include "diene-helm-wrapper.labelPrefix" . -}}
+{{- $seen := dict -}}
+{{- range $landscape := .Values.primordial.logtoApp.landscapes }}
+{{- $issuer := include "diene-helm-wrapper.identityIssuer" (dict "root" $ "landscape" $landscape) -}}
+{{- $name := include "diene-helm-wrapper.resourceName" (dict "root" $ "token" (printf "identity%s" $landscape)) -}}
+{{- if hasKey $seen $name -}}
+{{- fail (printf "primordial.logtoApp.landscapes repeats %q; one LogtoApp per app and landscape" $landscape) -}}
+{{- end -}}
+{{- $_ := set $seen $name true }}
+apiVersion: {{ $.Values.primordial.apiVersions.identity }}
 kind: LogtoApp
 metadata:
-  name: {{ include "diene-helm-wrapper.resourceName" (dict "root" . "token" "identity") }}
+  name: {{ $name }}
   labels:
-    {{- include "diene-helm-wrapper.labels" . | nindent 4 }}
+    {{- include "diene-helm-wrapper.labels" $ | nindent 4 }}
   annotations:
-    {{- include "diene-helm-wrapper.annotations" . | nindent 4 }}
+    {{- include "diene-helm-wrapper.annotations" $ | nindent 4 }}
+    {{ printf "%s/identity-issuer" $prefix }}: {{ $issuer | quote }}
+    {{ printf "%s/credential-destination" $prefix }}: {{ printf "%s:/%s" $landscape $.Values.serviceTree.service | quote }}
 spec:
   identityRef:
-    platform: {{ .Release.Namespace }}
-    vlandscape: {{ .Values.primordial.vlandscape }}
+    platform: {{ $.Release.Namespace }}
+    landscape: {{ $landscape }}
   paths:
-    {{- toYaml .Values.primordial.logtoApp.paths | nindent 4 }}
+    {{- toYaml $.Values.primordial.logtoApp.paths | nindent 4 }}
   extraRedirectUris:
-    {{- toYaml .Values.primordial.logtoApp.extraRedirectUris | nindent 4 }}
+    {{- toYaml $.Values.primordial.logtoApp.extraRedirectUris | nindent 4 }}
   resourceRefs:
-    {{- toYaml .Values.primordial.logtoApp.resourceRefs | nindent 4 }}
+    {{- toYaml $.Values.primordial.logtoApp.resourceRefs | nindent 4 }}
 ---
+{{- end }}
 {{- end }}
 {{- if .Values.primordial.problem.enabled }}
 apiVersion: {{ .Values.primordial.apiVersions.fleet }}
 kind: Problem
 metadata:
-  name: {{ include "diene-helm-wrapper.resourceName" (dict "root" . "token" "problems") }}
+  name: {{ include "diene-helm-wrapper.resourceName" (dict "root" . "token" (printf "problems%s" .Values.serviceTree.module)) }}
   labels:
     {{- include "diene-helm-wrapper.labels" . | nindent 4 }}
   annotations:
@@ -68,6 +83,7 @@ metadata:
 spec:
   platform: {{ .Release.Namespace }}
   service: {{ .Values.serviceTree.service }}
+  module: {{ .Values.serviceTree.module }}
   landscape: {{ .Values.primordial.targetLandscape }}
   version: {{ .Values.primordial.problem.version | quote }}
   problems:

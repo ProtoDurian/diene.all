@@ -21,6 +21,8 @@ bash ./scripts/validate/helm-wrapper.sh version
 bash ./scripts/validate/helm-wrapper.sh presence
 bash ./scripts/validate/helm-wrapper.sh gateway-webhook-presence
 bash ./scripts/validate/helm-wrapper.sh tokenization-presence
-bash ./scripts/validate/gitlint-types.sh
+bash ./scripts/validate/release-lint.sh parse
+bash ./scripts/validate/release-lint.sh vocabulary
+bash ./scripts/validate/release-lint.sh types
 
 echo "✅ Helm wrapper CI validation complete"

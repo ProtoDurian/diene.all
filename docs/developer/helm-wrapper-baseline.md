@@ -20,6 +20,8 @@ Run `task build`, `task example:lapras:template`, or `task test:unit`. `task tes
 - LPSM remains `{landscape, platform, service, module}`. The platform hostname slot always comes from the release namespace; a values file cannot stamp another platform.
 - Ordinary hostnames are `<module>.<service>.<namespace>.<landscape>.<zone>`.
 - Optional physical-instance hostnames are `<module>.<service>.<namespace>.<instance>.<landscape>.<zone>`. Instance is returned separately by the parser and never becomes an LPSM slot.
+- `instance` is opaque: the helper accepts only one lowercase DNS-1123 label of at most 63 bytes and refuses dots, uppercase, an explicit empty string and longer values. An absent instance gives the ordinary form.
+- The fleet identity endpoint is `api.lithium.aldehyde.<landscape>.cluster.atomi.cloud` for a concrete landscape. The `identityIssuer` helper refuses the consumer platform (release namespace) and `primordial.vlandscape`.
 - Physical ids are repository-qualified before normalization. DNS-1123 labels longer than 63 characters are shortened with a stable hash, while original and normalized values are stored together as annotations.
 - Resource names use `<service>-<token>` with exactly one dash. Tokens fuse components (`main-cache` → `maincache`). Every enabled dependency receives an explicit conforming `fullnameOverride`.
 
@@ -65,7 +67,9 @@ The sample renders the frozen current shapes for `PlatformDependency`, `VirtualL
 - dependency delivery is exactly `external | local | replicated`;
 - a v-landscape target has one writer plus `placement.preferredHost` and no sharing fields;
 - VLS carries no free-form hostname;
+- LogtoApp renders one CR per `primordial.logtoApp.landscapes` entry, each with `identityRef: {platform, landscape}`; the issuer and the credential destination (`<landscape>:/<service>`) are recorded as annotations because T3 derives them and defines no spec field for them; a repeated or name-colliding landscape, the consumer platform or the v-landscape refuses;
 - LogtoApp declares paths, `extraRedirectUris`, and `resourceRefs`, never per-row redirects;
+- Problem carries `spec.module` and fuses the module into its name;
 - CloudflareDeploy uses `desiredVersionFrom.tag`, never a hand-pinned version id.
 
 These are helper contracts, not CRD ownership. The T3/operator nodes own final API groups, controllers, and installed CRDs.
@@ -80,7 +84,7 @@ The gateway Service is always `type: LoadBalancer`:
 
 NodePort and hostPort are absent. TLS terminates at the gateway platform, not this Service.
 
-Every gateway exposes `/healthz` and must return a 2xx response. Webhook receivers use `/internal/webhooks/{provider}` and respond `200` for processed, `421` for the wrong landscape owner, and another 4xx/5xx for a retryable error. The checked-in HTTPRoute is a scaffold only; product handlers implement the protocol.
+Every gateway exposes `/healthz` and must return a 2xx response. Webhook receivers use `/internal/webhooks/{provider}`. Mercury probes every candidate: exactly one `200` (the owner) and `421` from every other candidate (a non-owner disclaiming, nothing else). Any other response is a real delivery failure. The contracts ConfigMap records this as `webhook.owner`, `webhook.nonOwner` and `webhook.other`. The checked-in HTTPRoute is a scaffold only; product handlers implement the protocol.
 
 ## Publishing
 
