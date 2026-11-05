@@ -43,7 +43,6 @@ async function runSnapshotIsolationContract(driver: SnapshotDriver): Promise<voi
   (first === second).should.be.false();
   first.should.eql(second);
   first.length.should.be.aboveOrEqual(1);
-  // Entries are frozen; the array wrapper need not be.
   Object.isFrozen(first[0]).should.be.true();
 }
 

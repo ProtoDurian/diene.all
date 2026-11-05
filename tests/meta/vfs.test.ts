@@ -1,6 +1,7 @@
 import { describe, it } from 'bun:test';
 import { portError, type VfsError } from '@atomicloud/diene.interfaces';
 import { InMemoryVirtualFileSystem } from '@atomicloud/diene.interfaces/test-helper';
+import type { Result } from '@atomicloud/diene.result';
 import 'should';
 import { runFailInjectionContract, runSequenceContract, runSnapshotIsolationContract } from './contract/behaviours.js';
 import { expectErr, expectOk } from './support/capture.js';
@@ -110,7 +111,7 @@ describe('InMemoryVirtualFileSystem writeFile', () => {
     const error = await expectErr(vfs().writeFile('/missing/f', bytes(1)));
 
     // Assert
-    error.code.should.eql('not-a-directory');
+    error.code.should.eql('not-found');
   });
 
   it('should store a frozen defensive copy detached from the caller', async () => {
@@ -124,6 +125,59 @@ describe('InMemoryVirtualFileSystem writeFile', () => {
 
     // Assert
     Array.from(await expectOk(subject.readFile('/f'))).should.eql([1, 2]);
+  });
+});
+
+describe('InMemoryVirtualFileSystem under a file ancestor', () => {
+  const underFile = (): InMemoryVirtualFileSystem => {
+    const subject = vfs();
+    subject.writeFile('/f', bytes(1));
+    return subject;
+  };
+
+  it.each<[string, (subject: InMemoryVirtualFileSystem) => Result<unknown, VfsError>]>([
+    ['readFile', subject => subject.readFile('/f/x')],
+    ['writeFile', subject => subject.writeFile('/f/x', bytes(1))],
+    ['stat', subject => subject.stat('/f/x/y')],
+    ['list', subject => subject.list('/f/x')],
+    ['createDirectory', subject => subject.createDirectory('/f/x')],
+    ['remove', subject => subject.remove('/f/x', { recursive: true })],
+  ])('should surface not-a-directory from %s', async (operation, call) => {
+    // Arrange
+    const subject = underFile();
+
+    // Act
+    const error = await expectErr(call(subject));
+
+    // Assert
+    error.code.should.eql('not-a-directory');
+    error.operation.should.eql(operation);
+    error.details.should.eql({ ancestor: '/f' });
+  });
+
+  it('should report absence from exists rather than fail', async () => {
+    // Arrange
+    const subject = underFile();
+
+    // Act
+    const actual = await expectOk(subject.exists('/f/x'));
+
+    // Assert
+    actual.should.be.false();
+  });
+
+  it('should leave no partial directories when a recursive create fails', async () => {
+    // Arrange
+    const subject = vfs();
+    await expectOk(subject.createDirectory('/a'));
+    await expectOk(subject.writeFile('/a/f', bytes(1)));
+
+    // Act
+    const error = await expectErr(subject.createDirectory('/a/f/x/y', { recursive: true }));
+
+    // Assert
+    error.code.should.eql('not-a-directory');
+    (await expectOk(subject.list('/a'))).should.eql([{ kind: 'file', name: 'f' }]);
   });
 });
 
@@ -322,16 +376,20 @@ describe('InMemoryVirtualFileSystem createDirectory', () => {
     error.code.should.eql('io');
   });
 
-  it('should refuse to create a directory where a file exists', async () => {
+  it.each([
+    ['non-recursive', false],
+    ['recursive', true],
+  ])('should surface already-exists where a file exists (%s)', async (_label, recursive) => {
     // Arrange
     const subject = vfs();
     await expectOk(subject.writeFile('/f', bytes(1)));
 
     // Act
-    const error = await expectErr(subject.createDirectory('/f'));
+    const error = await expectErr(subject.createDirectory('/f', { recursive }));
 
     // Assert
-    error.code.should.eql('not-a-directory');
+    error.code.should.eql('already-exists');
+    (await expectOk(subject.stat('/f'))).kind.should.eql('file');
   });
 
   it('should be idempotent on an existing directory only when recursive', async () => {
@@ -367,7 +425,7 @@ describe('InMemoryVirtualFileSystem createDirectory', () => {
     const error = await expectErr(vfs().createDirectory('/x/y'));
 
     // Assert
-    error.code.should.eql('not-a-directory');
+    error.code.should.eql('not-found');
   });
 
   it('should create a directory under an existing parent', async () => {

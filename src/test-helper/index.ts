@@ -178,7 +178,7 @@ class InMemorySystem implements System {
 class InMemoryVirtualFileSystem implements VirtualFileSystem {
   private readonly nodes = new Map<string, MemoryNode>([['/', Object.freeze({ kind: 'directory' })]]);
   private readonly recordedCalls: VfsCall[] = [];
-  private readonly failures: VfsError[] = [];
+  private nextFailure: VfsError | undefined;
   private sequence = 0;
 
   get calls(): readonly VfsCall[] {
@@ -201,7 +201,7 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
   }
 
   failNext(error: VfsError): void {
-    this.failures.splice(0, this.failures.length, error);
+    this.nextFailure = error;
   }
 
   readFile(path: string): Result<Uint8Array, VfsError> {
@@ -209,7 +209,7 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
     if (!checked.ok) return Err(checked.error);
     const validPath = checked.value;
     this.recordedCalls.push(Object.freeze({ method: 'readFile', path: validPath, sequence: this.sequence++ }));
-    const failure = this.failures.shift();
+    const failure = this.takeFailure() ?? this.fileAncestorError('readFile', validPath);
     if (failure !== undefined) return Err(failure);
     const node = this.nodes.get(validPath);
     if (node === undefined) return Err(portError('vfs', 'not-found', 'readFile', `File not found: ${validPath}`));
@@ -233,14 +233,13 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
         sequence: this.sequence++,
       }),
     );
-    const failure = this.failures.shift();
+    const failure = this.takeFailure() ?? this.fileAncestorError('writeFile', validPath);
     if (failure !== undefined) return Err(failure);
-    const existing = this.nodes.get(validPath);
-    if (existing?.kind === 'directory') {
+    if (this.nodes.get(validPath)?.kind === 'directory') {
       return Err(portError('vfs', 'not-a-file', 'writeFile', `Path is not a file: ${validPath}`));
     }
-    if (this.nodes.get(parentPath(validPath))?.kind !== 'directory') {
-      return Err(portError('vfs', 'not-a-directory', 'writeFile', `Parent directory does not exist: ${validPath}`));
+    if (!this.nodes.has(parentPath(validPath))) {
+      return Err(portError('vfs', 'not-found', 'writeFile', `Parent directory does not exist: ${validPath}`));
     }
     this.nodes.set(validPath, Object.freeze({ contents: new Uint8Array(validContents), kind: 'file' }));
     return Ok(undefined);
@@ -251,7 +250,7 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
     if (!checked.ok) return Err(checked.error);
     const validPath = checked.value;
     this.recordedCalls.push(Object.freeze({ method: 'exists', path: validPath, sequence: this.sequence++ }));
-    const failure = this.failures.shift();
+    const failure = this.takeFailure();
     return failure === undefined ? Ok(this.nodes.has(validPath)) : Err(failure);
   }
 
@@ -260,7 +259,7 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
     if (!checked.ok) return Err(checked.error);
     const validPath = checked.value;
     this.recordedCalls.push(Object.freeze({ method: 'stat', path: validPath, sequence: this.sequence++ }));
-    const failure = this.failures.shift();
+    const failure = this.takeFailure() ?? this.fileAncestorError('stat', validPath);
     if (failure !== undefined) return Err(failure);
     const node = this.nodes.get(validPath);
     if (node === undefined) return Err(portError('vfs', 'not-found', 'stat', `Path not found: ${validPath}`));
@@ -272,7 +271,7 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
     if (!checked.ok) return Err(checked.error);
     const validPath = checked.value;
     this.recordedCalls.push(Object.freeze({ method: 'list', path: validPath, sequence: this.sequence++ }));
-    const failure = this.failures.shift();
+    const failure = this.takeFailure() ?? this.fileAncestorError('list', validPath);
     if (failure !== undefined) return Err(failure);
     const node = this.nodes.get(validPath);
     if (node === undefined) return Err(portError('vfs', 'not-found', 'list', `Directory not found: ${validPath}`));
@@ -304,33 +303,20 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
         sequence: this.sequence++,
       }),
     );
-    const failure = this.failures.shift();
+    const failure = this.takeFailure() ?? this.fileAncestorError('createDirectory', validPath);
     if (failure !== undefined) return Err(failure);
     const existing = this.nodes.get(validPath);
     if (existing !== undefined) {
-      if (existing.kind !== 'directory') {
-        return Err(portError('vfs', 'not-a-directory', 'createDirectory', `Path is not a directory: ${validPath}`));
-      }
-      return normalizedOptions.recursive
+      return existing.kind === 'directory' && normalizedOptions.recursive
         ? Ok(undefined)
-        : Err(portError('vfs', 'already-exists', 'createDirectory', `Directory already exists: ${validPath}`));
+        : Err(portError('vfs', 'already-exists', 'createDirectory', `Path already exists: ${validPath}`));
     }
-    if (normalizedOptions.recursive) {
-      for (const ancestor of [...ancestors(validPath), validPath]) {
-        const ancestorNode = this.nodes.get(ancestor);
-        if (ancestorNode?.kind === 'file') {
-          return Err(portError('vfs', 'not-a-directory', 'createDirectory', `Path is not a directory: ${ancestor}`));
-        }
-        this.nodes.set(ancestor, Object.freeze({ kind: 'directory' }));
-      }
-      return Ok(undefined);
+    if (!normalizedOptions.recursive && !this.nodes.has(parentPath(validPath))) {
+      return Err(portError('vfs', 'not-found', 'createDirectory', `Parent directory does not exist: ${validPath}`));
     }
-    if (this.nodes.get(parentPath(validPath))?.kind !== 'directory') {
-      return Err(
-        portError('vfs', 'not-a-directory', 'createDirectory', `Parent directory does not exist: ${validPath}`),
-      );
+    for (const directory of [...ancestors(validPath), validPath]) {
+      if (!this.nodes.has(directory)) this.nodes.set(directory, Object.freeze({ kind: 'directory' }));
     }
-    this.nodes.set(validPath, Object.freeze({ kind: 'directory' }));
     return Ok(undefined);
   }
 
@@ -344,7 +330,7 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
     this.recordedCalls.push(
       Object.freeze({ method: 'remove', options: normalizedOptions, path: validPath, sequence: this.sequence++ }),
     );
-    const failure = this.failures.shift();
+    const failure = this.takeFailure() ?? this.fileAncestorError('remove', validPath);
     if (failure !== undefined) return Err(failure);
     if (validPath === '/') return Err(portError('vfs', 'unsupported', 'remove', 'The VFS root cannot be removed'));
     const node = this.nodes.get(validPath);
@@ -357,6 +343,19 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
     for (const descendant of descendants) this.nodes.delete(descendant);
     this.nodes.delete(validPath);
     return Ok(undefined);
+  }
+
+  private takeFailure(): VfsError | undefined {
+    const failure = this.nextFailure;
+    this.nextFailure = undefined;
+    return failure;
+  }
+
+  private fileAncestorError(operation: string, path: string): VfsError | undefined {
+    const file = ancestors(path).find(ancestor => this.nodes.get(ancestor)?.kind === 'file');
+    return file === undefined
+      ? undefined
+      : portError('vfs', 'not-a-directory', operation, `Ancestor is not a directory: ${file}`, { ancestor: file });
   }
 }
 
