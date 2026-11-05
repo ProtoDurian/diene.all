@@ -6,8 +6,6 @@ set -euo pipefail
 version="${GITHUB_REF_NAME#v}"
 [ -z "${NUGET_API_KEY:-}" ] && echo "❌ NUGET_API_KEY must be set from the org secret" >&2 && exit 1
 
-./scripts/ci/setup.sh
-
 artifacts="artifacts/publish"
 rm -rf "${artifacts}"
 mkdir -p "${artifacts}"

@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-./scripts/ci/setup.sh
-
 version="$(xmlstarlet sel -t -v '/Project/PropertyGroup/Version' Version.props)"
 artifacts="artifacts/package"
 

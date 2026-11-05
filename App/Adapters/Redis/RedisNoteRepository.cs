@@ -4,7 +4,6 @@ using StackExchange.Redis;
 
 namespace AtomiCloud.DotnetBase.App.Adapters.Redis;
 
-/// <summary>Redis-backed persistence adapter for notes.</summary>
 public class RedisNoteRepository(IConnectionMultiplexer redis) : INoteRepository
 {
     private const string KeyPrefix = "note:";

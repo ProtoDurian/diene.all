@@ -1,4 +1,4 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRed } from './lib/dotnet.ts';
 import { flipAssertion } from './lib/mutations.ts';
 
 export default {
@@ -19,7 +19,10 @@ export default {
       kind: 'mutation',
       expectedImpact: ['dotnet-unit-coverage', 'dotnet-multi-project-coverage'],
       async run(repo: any) {
-        await flipAssertion(repo, { globs: ['UnitTest*/**/*.cs'] });
+        await flipAssertion(repo, {
+          globs: ['UnitTest*/**/*.cs'],
+          replacements: [{ find: /\.Should\(\)\.Be\(/, replace: '.Should().NotBe(' }],
+        });
         await expectRed(repo, 'nix develop .#ci -c task test:unit', 'dotnet-unit-tests', 600000);
       },
     },

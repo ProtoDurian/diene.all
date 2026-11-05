@@ -1,5 +1,5 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRed } from './lib/dotnet.ts';
 
 export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
@@ -7,24 +7,19 @@ export default defineGate({
     name: 'baseline-dotnet-lib-testhelper-meta-ledger-green',
     description: 'The independent meta tier confines coverage to *.TestHelper assemblies at 100%.',
     async run(repo: any) {
-      await expectGreen(
-        repo,
-        'nix develop .#ci -c pls test:meta:coverage',
-        'dotnet-lib-testhelper-meta-ledger',
-        600000,
-      );
+      await expectGreen(repo, 'nix develop .#ci -c task test:meta:coverage', 'dotnet-lib-testhelper-meta-ledger');
     },
   },
   mutation: {
     name: 'mutation-dotnet-lib-testhelper-meta-ledger-caught',
     description: 'One uncovered public helper member turns the meta ledger red.',
-    expectedImpact: ['dotnet-deadcode-all', 'dotnet-deadcode-production'],
+    expectedImpact: [],
     async run(repo: any) {
       await repo.write(
         'TestHelper/Note/MetaCoverageGap.cs',
         'namespace AtomiCloud.Diene.Note.TestHelper.Note;\n\npublic static class MetaCoverageGap\n{\n    public static int Uncovered() => 42;\n}\n',
       );
-      await expectRed(repo, 'nix develop .#ci -c pls test:meta:coverage', 'dotnet-lib-testhelper-meta-ledger', 600000);
+      await expectRed(repo, 'nix develop .#ci -c task test:meta:coverage', 'dotnet-lib-testhelper-meta-ledger');
     },
   },
 });

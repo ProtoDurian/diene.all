@@ -1,5 +1,5 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRed } from './lib/dotnet.ts';
 
 // The 1.0.0 baseline package only exists after the library's own first release, so the
 // baseline is conditioned off while 1.0.0 itself is being built. Pack a post-1.0.0 version
@@ -17,7 +17,6 @@ export default defineGate({
         repo,
         `nix develop .#ci -c bash -c '${packAgainstPublishedBaseline}'`,
         'dotnet-lib-api-compatibility',
-        600000,
       );
     },
   },
@@ -34,7 +33,6 @@ export default defineGate({
         repo,
         `nix develop .#ci -c bash -c '${packAgainstPublishedBaseline}'`,
         'dotnet-lib-api-compatibility',
-        600000,
       );
     },
   },

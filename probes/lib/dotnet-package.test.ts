@@ -40,6 +40,7 @@ describe('packPackages helper', () => {
     expect(repo.commands).toHaveLength(1);
     expect(repo.commands[0]).toContain('dotnet pack dotnet-base.slnx -c Release');
     expect(repo.commands[0]).toContain('--output artifacts/package');
+    expect(repo.timeouts[0]).toBe(600000);
   });
 
   test('restores before packing rather than reusing the stale --no-restore flag', async () => {
@@ -48,5 +49,11 @@ describe('packPackages helper', () => {
     // The accepted CI repair removed --no-restore from `dotnet pack`; the probe
     // helper must match so the three package probes restore before packing.
     expect(repo.commands[0]).not.toContain('--no-restore');
+  });
+
+  test('does not call the deleted CI setup script', async () => {
+    const repo = new RecordingRepo();
+    await packPackages(repo, 'pack-label');
+    expect(repo.commands[0]).not.toContain('scripts/ci/setup.sh');
   });
 });

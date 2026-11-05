@@ -2,7 +2,6 @@ using AtomiCloud.Diene.Note;
 
 namespace AtomiCloud.DotnetBase.App.Adapters.Redis;
 
-/// <summary>Maps between Redis storage data and the domain note representation.</summary>
 internal static class NoteDataMapper
 {
     public static NoteData ToData(this NotePrincipal principal) => new()
