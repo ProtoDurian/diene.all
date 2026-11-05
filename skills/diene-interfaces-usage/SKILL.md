@@ -15,9 +15,12 @@ concrete adapter.
   `@atomicloud/diene.interfaces/test-helper` subpath and depend on no test framework.
 
 The root exports the `System`, `VirtualFileSystem`, `Terminal`, `LoggerSink`, and
-`MetricsCollector` contracts. The helper subpath exports the matching
+`MetricsCollector` contracts and a stateless validation policy class per port
+(`SystemPolicy`, `VfsPolicy`, `TerminalPolicy`, `LoggingPolicy`, `MetricsPolicy`,
+`TelemetryPolicy`). The helper subpath exports the matching
 `InMemorySystem`, `InMemoryVirtualFileSystem`, `InMemoryTerminal`,
-`InMemoryLoggerSink`, and `InMemoryMetricsCollector` doubles plus ordered-call and
+`InMemoryLoggerSink`, and `InMemoryMetricsCollector` doubles, each taking its policy
+by constructor injection, plus ordered-call and
 captured-value assertions.
 
 Every fallible port method returns the published `@atomicloud/diene.result`

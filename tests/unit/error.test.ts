@@ -1,5 +1,5 @@
 import { describe, it } from 'bun:test';
-import { PortError, type PortErrorDetails, portError } from '@atomicloud/diene.interfaces';
+import { PortError, type PortErrorDetails } from '@atomicloud/diene.interfaces';
 import 'should';
 
 describe('PortError', () => {
@@ -8,7 +8,7 @@ describe('PortError', () => {
     const details: PortErrorDetails = { field: 'executable', attempts: 2 };
 
     // Act
-    const subject = portError('system', 'invalid-input', 'execute', 'boom', details);
+    const subject = new PortError('system', 'invalid-input', 'execute', 'boom', details);
 
     // Assert
     subject.should.be.instanceOf(Error);
@@ -27,7 +27,7 @@ describe('PortError', () => {
     const expected = 'disk full';
 
     // Act
-    const actual = portError('vfs', 'io', 'writeFile', expected).message;
+    const actual = new PortError('vfs', 'io', 'writeFile', expected).message;
 
     // Assert
     actual.should.equal(expected);
@@ -38,7 +38,7 @@ describe('PortError', () => {
     const source: Record<string, unknown> = { field: 'name' };
 
     // Act
-    const subject = portError('metrics', 'io', 'record', 'msg', source);
+    const subject = new PortError('metrics', 'io', 'record', 'msg', source);
     source.field = 'mutated';
 
     // Assert
@@ -48,14 +48,14 @@ describe('PortError', () => {
 
   it('should default details to an empty frozen record when omitted', () => {
     // Act
-    const subject = portError('vfs', 'not-found', 'readFile', 'missing');
+    const subject = new PortError('vfs', 'not-found', 'readFile', 'missing');
 
     // Assert
     Object.isFrozen(subject.details).should.be.true();
     subject.details.should.eql({});
   });
 
-  it('should construct directly with the same identity as the factory', () => {
+  it('should satisfy instanceof through the brand when constructed directly', () => {
     // Act
     const direct = new PortError('terminal', 'closed', 'write', 'closed stream');
 
@@ -72,7 +72,7 @@ describe('PortError subclasses', () => {
 
   it('should not treat a plain PortError as a subclass instance', () => {
     // Arrange
-    const plain = portError('vfs', 'io', 'readFile', 'disk fault');
+    const plain = new PortError('vfs', 'io', 'readFile', 'disk fault');
 
     // Act
     const actual = plain instanceof FsError;

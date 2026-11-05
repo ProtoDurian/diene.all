@@ -1,5 +1,5 @@
 import { describe, it } from 'bun:test';
-import { type ProcessOutput, type ProcessRequest, portError } from '@atomicloud/diene.interfaces';
+import { PortError, type ProcessOutput, type ProcessRequest } from '@atomicloud/diene.interfaces';
 import { InMemorySystem } from '@atomicloud/diene.interfaces/test-helper';
 import { Err, Ok, type Result } from '@atomicloud/diene.result';
 import 'should';
@@ -55,7 +55,7 @@ describe('InMemorySystem', () => {
 
   it('should pass a queued error outcome straight through', async () => {
     // Arrange
-    const failure = portError('system', 'io', 'execute', 'spawn failed');
+    const failure = new PortError('system', 'io', 'execute', 'spawn failed');
     const subject = new InMemorySystem([Err(failure)]);
 
     // Act

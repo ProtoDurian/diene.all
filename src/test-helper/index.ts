@@ -1,34 +1,30 @@
 import {
   type CreateDirectoryOptions,
-  checkFileContents,
-  checkLogRecord,
-  checkMetricRecord,
-  checkProcessRequest,
-  checkRecursiveOptions,
-  checkTerminalRead,
-  checkTerminalWrite,
-  checkVfsPath,
   type LoggerSink,
   type LoggingError,
+  LoggingPolicy,
   type LogRecord,
   type MetricRecord,
   type MetricsCollector,
   type MetricsError,
+  MetricsPolicy,
+  PortError,
   type ProcessOutput,
   type ProcessRequest,
-  portError,
   type RemoveOptions,
   type System,
   type SystemError,
+  SystemPolicy,
   type Terminal,
   type TerminalError,
+  TerminalPolicy,
   type TerminalRead,
   type TerminalWrite,
   type VfsEntry,
   type VfsError,
+  VfsPolicy,
   type VfsStat,
   type VirtualFileSystem,
-  validateProcessOutput,
 } from '@atomicloud/diene.interfaces';
 import { Err, Ok, type Result } from '@atomicloud/diene.result';
 
@@ -68,56 +64,29 @@ type MetricsCall =
 
 type MemoryNode = { readonly kind: 'directory' } | { readonly contents: Uint8Array; readonly kind: 'file' };
 
-function cloneProcessRequest(request: ProcessRequest): ProcessRequest {
-  return Object.freeze({
-    executable: request.executable,
-    ...(request.arguments === undefined ? {} : { arguments: Object.freeze([...request.arguments]) }),
-    ...(request.cwd === undefined ? {} : { cwd: request.cwd }),
-    ...(request.environment === undefined ? {} : { environment: Object.freeze({ ...request.environment }) }),
-    ...(request.stdin === undefined ? {} : { stdin: request.stdin }),
-    ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
-  });
-}
-
-function cloneLogRecord(record: Readonly<LogRecord>): Readonly<LogRecord> {
-  return Object.freeze({
-    ...record,
-    ...(record.attributes === undefined ? {} : { attributes: Object.freeze({ ...record.attributes }) }),
-  });
-}
-
-function cloneMetricRecord(metric: Readonly<MetricRecord>): Readonly<MetricRecord> {
-  return Object.freeze({
-    ...metric,
-    ...(metric.attributes === undefined ? {} : { attributes: Object.freeze({ ...metric.attributes }) }),
-  });
-}
-
-function parentPath(path: string): string {
-  const index = path.lastIndexOf('/');
-  return index === 0 ? '/' : path.slice(0, index);
-}
-
-function ancestors(path: string): readonly string[] {
-  const segments = path.split('/').filter(Boolean);
-  return segments.slice(0, -1).map((_, index) => `/${segments.slice(0, index + 1).join('/')}`);
-}
-
-function comparable(value: unknown): unknown {
-  if (value instanceof Uint8Array) {
-    return { bytes: Array.from(value) };
+class Snapshot {
+  comparable(value: unknown): unknown {
+    if (value instanceof Uint8Array) {
+      return { bytes: Array.from(value) };
+    }
+    if (Array.isArray(value)) {
+      return value.map(entry => this.comparable(entry));
+    }
+    if (typeof value === 'object' && value !== null) {
+      return Object.fromEntries(
+        Object.entries(value)
+          .sort(([left], [right]) => (left === right ? 0 : left < right ? -1 : 1))
+          .map(([key, entry]) => [key, this.comparable(entry)]),
+      );
+    }
+    return value;
   }
-  if (Array.isArray(value)) {
-    return value.map(comparable);
+
+  assertEqual(label: string, actual: unknown, expected: unknown): void {
+    if (JSON.stringify(this.comparable(actual)) !== JSON.stringify(this.comparable(expected))) {
+      throw new InterfaceAssertionError(label, expected, actual);
+    }
   }
-  if (typeof value === 'object' && value !== null) {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => (left === right ? 0 : left < right ? -1 : 1))
-        .map(([key, entry]) => [key, comparable(entry)]),
-    );
-  }
-  return value;
 }
 
 class InterfaceAssertionError extends Error {
@@ -127,15 +96,9 @@ class InterfaceAssertionError extends Error {
     readonly actual: unknown,
   ) {
     super(
-      `${label} mismatch\nExpected: ${JSON.stringify(comparable(expected))}\nActual: ${JSON.stringify(comparable(actual))}`,
+      `${label} mismatch\nExpected: ${JSON.stringify(new Snapshot().comparable(expected))}\nActual: ${JSON.stringify(new Snapshot().comparable(actual))}`,
     );
     this.name = 'InterfaceAssertionError';
-  }
-}
-
-function assertEqual(label: string, actual: unknown, expected: unknown): void {
-  if (JSON.stringify(comparable(actual)) !== JSON.stringify(comparable(expected))) {
-    throw new InterfaceAssertionError(label, expected, actual);
   }
 }
 
@@ -144,12 +107,17 @@ class InMemorySystem implements System {
   private readonly outcomes: Result<ProcessOutput, SystemError>[];
   private sequence = 0;
 
-  constructor(outcomes: readonly Result<ProcessOutput, SystemError>[] = []) {
+  constructor(
+    outcomes: readonly Result<ProcessOutput, SystemError>[] = [],
+    private readonly policy: SystemPolicy = new SystemPolicy(),
+  ) {
     this.outcomes = [...outcomes];
   }
 
   get calls(): readonly SystemCall[] {
-    return this.recordedCalls.map(call => Object.freeze({ ...call, request: cloneProcessRequest(call.request) }));
+    return this.recordedCalls.map(call =>
+      Object.freeze({ ...call, request: InMemorySystem.cloneRequest(call.request) }),
+    );
   }
 
   enqueue(outcome: Result<ProcessOutput, SystemError>): void {
@@ -157,21 +125,32 @@ class InMemorySystem implements System {
   }
 
   execute(request: ProcessRequest): Result<ProcessOutput, SystemError> {
-    const checked = checkProcessRequest(request);
+    const checked = this.policy.checkRequest(request);
     if (!checked.ok) return Err(checked.error);
     const validated = checked.value;
     this.recordedCalls.push(
-      Object.freeze({ method: 'execute', request: cloneProcessRequest(validated), sequence: this.sequence++ }),
+      Object.freeze({ method: 'execute', request: InMemorySystem.cloneRequest(validated), sequence: this.sequence++ }),
     );
     const outcome = this.outcomes.shift();
     if (outcome === undefined) {
       return Err(
-        portError('system', 'unexpected-call', 'execute', 'No process outcome was queued', {
+        new PortError('system', 'unexpected-call', 'execute', 'No process outcome was queued', {
           executable: validated.executable,
         }),
       );
     }
-    return outcome.andThen(validateProcessOutput);
+    return outcome.andThen(output => this.policy.validateOutput(output));
+  }
+
+  private static cloneRequest(request: ProcessRequest): ProcessRequest {
+    return Object.freeze({
+      executable: request.executable,
+      ...(request.arguments === undefined ? {} : { arguments: Object.freeze([...request.arguments]) }),
+      ...(request.cwd === undefined ? {} : { cwd: request.cwd }),
+      ...(request.environment === undefined ? {} : { environment: Object.freeze({ ...request.environment }) }),
+      ...(request.stdin === undefined ? {} : { stdin: request.stdin }),
+      ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+    });
   }
 }
 
@@ -180,6 +159,8 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
   private readonly recordedCalls: VfsCall[] = [];
   private nextFailure: VfsError | undefined;
   private sequence = 0;
+
+  constructor(private readonly policy: VfsPolicy = new VfsPolicy()) {}
 
   get calls(): readonly VfsCall[] {
     return this.recordedCalls.map(call =>
@@ -205,23 +186,23 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
   }
 
   readFile(path: string): Result<Uint8Array, VfsError> {
-    const checked = checkVfsPath(path, 'readFile');
+    const checked = this.policy.checkPath(path, 'readFile');
     if (!checked.ok) return Err(checked.error);
     const validPath = checked.value;
     this.recordedCalls.push(Object.freeze({ method: 'readFile', path: validPath, sequence: this.sequence++ }));
     const failure = this.takeFailure() ?? this.fileAncestorError('readFile', validPath);
     if (failure !== undefined) return Err(failure);
     const node = this.nodes.get(validPath);
-    if (node === undefined) return Err(portError('vfs', 'not-found', 'readFile', `File not found: ${validPath}`));
+    if (node === undefined) return Err(new PortError('vfs', 'not-found', 'readFile', `File not found: ${validPath}`));
     if (node.kind !== 'file')
-      return Err(portError('vfs', 'not-a-file', 'readFile', `Path is not a file: ${validPath}`));
+      return Err(new PortError('vfs', 'not-a-file', 'readFile', `Path is not a file: ${validPath}`));
     return Ok(new Uint8Array(node.contents));
   }
 
   writeFile(path: string, contents: Uint8Array): Result<void, VfsError> {
-    const checkedPath = checkVfsPath(path, 'writeFile');
+    const checkedPath = this.policy.checkPath(path, 'writeFile');
     if (!checkedPath.ok) return Err(checkedPath.error);
-    const checkedContents = checkFileContents(contents);
+    const checkedContents = this.policy.checkContents(contents);
     if (!checkedContents.ok) return Err(checkedContents.error);
     const validPath = checkedPath.value;
     const validContents = checkedContents.value;
@@ -236,17 +217,17 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
     const failure = this.takeFailure() ?? this.fileAncestorError('writeFile', validPath);
     if (failure !== undefined) return Err(failure);
     if (this.nodes.get(validPath)?.kind === 'directory') {
-      return Err(portError('vfs', 'not-a-file', 'writeFile', `Path is not a file: ${validPath}`));
+      return Err(new PortError('vfs', 'not-a-file', 'writeFile', `Path is not a file: ${validPath}`));
     }
-    if (!this.nodes.has(parentPath(validPath))) {
-      return Err(portError('vfs', 'not-found', 'writeFile', `Parent directory does not exist: ${validPath}`));
+    if (!this.nodes.has(InMemoryVirtualFileSystem.parentPath(validPath))) {
+      return Err(new PortError('vfs', 'not-found', 'writeFile', `Parent directory does not exist: ${validPath}`));
     }
     this.nodes.set(validPath, Object.freeze({ contents: new Uint8Array(validContents), kind: 'file' }));
     return Ok(undefined);
   }
 
   exists(path: string): Result<boolean, VfsError> {
-    const checked = checkVfsPath(path, 'exists');
+    const checked = this.policy.checkPath(path, 'exists');
     if (!checked.ok) return Err(checked.error);
     const validPath = checked.value;
     this.recordedCalls.push(Object.freeze({ method: 'exists', path: validPath, sequence: this.sequence++ }));
@@ -255,28 +236,28 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
   }
 
   stat(path: string): Result<VfsStat, VfsError> {
-    const checked = checkVfsPath(path, 'stat');
+    const checked = this.policy.checkPath(path, 'stat');
     if (!checked.ok) return Err(checked.error);
     const validPath = checked.value;
     this.recordedCalls.push(Object.freeze({ method: 'stat', path: validPath, sequence: this.sequence++ }));
     const failure = this.takeFailure() ?? this.fileAncestorError('stat', validPath);
     if (failure !== undefined) return Err(failure);
     const node = this.nodes.get(validPath);
-    if (node === undefined) return Err(portError('vfs', 'not-found', 'stat', `Path not found: ${validPath}`));
+    if (node === undefined) return Err(new PortError('vfs', 'not-found', 'stat', `Path not found: ${validPath}`));
     return Ok(Object.freeze({ kind: node.kind, size: node.kind === 'file' ? node.contents.byteLength : 0 }));
   }
 
   list(path: string): Result<readonly VfsEntry[], VfsError> {
-    const checked = checkVfsPath(path, 'list');
+    const checked = this.policy.checkPath(path, 'list');
     if (!checked.ok) return Err(checked.error);
     const validPath = checked.value;
     this.recordedCalls.push(Object.freeze({ method: 'list', path: validPath, sequence: this.sequence++ }));
     const failure = this.takeFailure() ?? this.fileAncestorError('list', validPath);
     if (failure !== undefined) return Err(failure);
     const node = this.nodes.get(validPath);
-    if (node === undefined) return Err(portError('vfs', 'not-found', 'list', `Directory not found: ${validPath}`));
+    if (node === undefined) return Err(new PortError('vfs', 'not-found', 'list', `Directory not found: ${validPath}`));
     if (node.kind !== 'directory') {
-      return Err(portError('vfs', 'not-a-directory', 'list', `Path is not a directory: ${validPath}`));
+      return Err(new PortError('vfs', 'not-a-directory', 'list', `Path is not a directory: ${validPath}`));
     }
     const prefix = validPath === '/' ? '/' : `${validPath}/`;
     const entries = [...this.nodes.entries()]
@@ -289,9 +270,9 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
   }
 
   createDirectory(path: string, options: CreateDirectoryOptions = {}): Result<void, VfsError> {
-    const checkedPath = checkVfsPath(path, 'createDirectory');
+    const checkedPath = this.policy.checkPath(path, 'createDirectory');
     if (!checkedPath.ok) return Err(checkedPath.error);
-    const checkedOptions = checkRecursiveOptions(options, 'createDirectory');
+    const checkedOptions = this.policy.checkCreateDirectoryOptions(options);
     if (!checkedOptions.ok) return Err(checkedOptions.error);
     const validPath = checkedPath.value;
     const normalizedOptions = checkedOptions.value;
@@ -309,21 +290,21 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
     if (existing !== undefined) {
       return existing.kind === 'directory' && normalizedOptions.recursive
         ? Ok(undefined)
-        : Err(portError('vfs', 'already-exists', 'createDirectory', `Path already exists: ${validPath}`));
+        : Err(new PortError('vfs', 'already-exists', 'createDirectory', `Path already exists: ${validPath}`));
     }
-    if (!normalizedOptions.recursive && !this.nodes.has(parentPath(validPath))) {
-      return Err(portError('vfs', 'not-found', 'createDirectory', `Parent directory does not exist: ${validPath}`));
+    if (!normalizedOptions.recursive && !this.nodes.has(InMemoryVirtualFileSystem.parentPath(validPath))) {
+      return Err(new PortError('vfs', 'not-found', 'createDirectory', `Parent directory does not exist: ${validPath}`));
     }
-    for (const directory of [...ancestors(validPath), validPath]) {
+    for (const directory of [...InMemoryVirtualFileSystem.ancestors(validPath), validPath]) {
       if (!this.nodes.has(directory)) this.nodes.set(directory, Object.freeze({ kind: 'directory' }));
     }
     return Ok(undefined);
   }
 
   remove(path: string, options: RemoveOptions = {}): Result<void, VfsError> {
-    const checkedPath = checkVfsPath(path, 'remove');
+    const checkedPath = this.policy.checkPath(path, 'remove');
     if (!checkedPath.ok) return Err(checkedPath.error);
-    const checkedOptions = checkRecursiveOptions(options, 'remove');
+    const checkedOptions = this.policy.checkRemoveOptions(options);
     if (!checkedOptions.ok) return Err(checkedOptions.error);
     const validPath = checkedPath.value;
     const normalizedOptions = checkedOptions.value;
@@ -332,13 +313,13 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
     );
     const failure = this.takeFailure() ?? this.fileAncestorError('remove', validPath);
     if (failure !== undefined) return Err(failure);
-    if (validPath === '/') return Err(portError('vfs', 'unsupported', 'remove', 'The VFS root cannot be removed'));
+    if (validPath === '/') return Err(new PortError('vfs', 'unsupported', 'remove', 'The VFS root cannot be removed'));
     const node = this.nodes.get(validPath);
-    if (node === undefined) return Err(portError('vfs', 'not-found', 'remove', `Path not found: ${validPath}`));
+    if (node === undefined) return Err(new PortError('vfs', 'not-found', 'remove', `Path not found: ${validPath}`));
     const prefix = `${validPath}/`;
     const descendants = [...this.nodes.keys()].filter(candidate => candidate.startsWith(prefix));
     if (node.kind === 'directory' && descendants.length > 0 && !normalizedOptions.recursive) {
-      return Err(portError('vfs', 'directory-not-empty', 'remove', `Directory is not empty: ${validPath}`));
+      return Err(new PortError('vfs', 'directory-not-empty', 'remove', `Directory is not empty: ${validPath}`));
     }
     for (const descendant of descendants) this.nodes.delete(descendant);
     this.nodes.delete(validPath);
@@ -352,16 +333,20 @@ class InMemoryVirtualFileSystem implements VirtualFileSystem {
   }
 
   private fileAncestorError(operation: string, path: string): VfsError | undefined {
-    const file = ancestors(path).find(ancestor => this.nodes.get(ancestor)?.kind === 'file');
+    const file = InMemoryVirtualFileSystem.ancestors(path).find(ancestor => this.nodes.get(ancestor)?.kind === 'file');
     return file === undefined
       ? undefined
-      : portError('vfs', 'not-a-directory', operation, `Ancestor is not a directory: ${file}`, { ancestor: file });
+      : new PortError('vfs', 'not-a-directory', operation, `Ancestor is not a directory: ${file}`, { ancestor: file });
   }
-}
 
-function assertTerminalLine(line: unknown): asserts line is string | null {
-  if (line !== null && typeof line !== 'string') {
-    throw new TypeError('In-memory terminal input must contain only strings or null');
+  private static parentPath(path: string): string {
+    const index = path.lastIndexOf('/');
+    return index === 0 ? '/' : path.slice(0, index);
+  }
+
+  private static ancestors(path: string): readonly string[] {
+    const segments = path.split('/').filter(Boolean);
+    return segments.slice(0, -1).map((_, index) => `/${segments.slice(0, index + 1).join('/')}`);
   }
 }
 
@@ -375,6 +360,7 @@ class InMemoryTerminal implements Terminal {
   constructor(
     input: readonly (string | null)[] = [],
     readonly interactive = false,
+    private readonly policy: TerminalPolicy = new TerminalPolicy(),
   ) {
     if (!Array.isArray(input)) {
       throw new TypeError('In-memory terminal input must be an array');
@@ -382,7 +368,7 @@ class InMemoryTerminal implements Terminal {
     if (typeof interactive !== 'boolean') {
       throw new TypeError('In-memory terminal interactive must be a boolean');
     }
-    for (const line of input) assertTerminalLine(line);
+    for (const line of input) InMemoryTerminal.assertLine(line);
     this.input = [...input];
   }
 
@@ -399,7 +385,7 @@ class InMemoryTerminal implements Terminal {
   }
 
   enqueue(line: string | null): void {
-    assertTerminalLine(line);
+    InMemoryTerminal.assertLine(line);
     this.input.push(line);
   }
 
@@ -408,26 +394,32 @@ class InMemoryTerminal implements Terminal {
   }
 
   write(output: TerminalWrite): Result<void, TerminalError> {
-    const checked = checkTerminalWrite(output);
+    const checked = this.policy.checkWrite(output);
     if (!checked.ok) return Err(checked.error);
     const validated = checked.value;
     this.recordedCalls.push(Object.freeze({ method: 'write', output: validated, sequence: this.sequence++ }));
-    if (this.closed) return Err(portError('terminal', 'closed', 'write', 'Terminal is closed'));
+    if (this.closed) return Err(new PortError('terminal', 'closed', 'write', 'Terminal is closed'));
     const failure = this.nextFailure;
     this.nextFailure = undefined;
     return failure === undefined ? Ok(undefined) : Err(failure);
   }
 
   readLine(input: TerminalRead = {}): Result<string | null, TerminalError> {
-    const checked = checkTerminalRead(input);
+    const checked = this.policy.checkRead(input);
     if (!checked.ok) return Err(checked.error);
     const validated = checked.value;
     this.recordedCalls.push(Object.freeze({ input: validated, method: 'readLine', sequence: this.sequence++ }));
-    if (this.closed) return Err(portError('terminal', 'closed', 'readLine', 'Terminal is closed'));
+    if (this.closed) return Err(new PortError('terminal', 'closed', 'readLine', 'Terminal is closed'));
     const failure = this.nextFailure;
     this.nextFailure = undefined;
     if (failure !== undefined) return Err(failure);
     return Ok(this.input.shift() ?? null);
+  }
+
+  private static assertLine(line: unknown): asserts line is string | null {
+    if (line !== null && typeof line !== 'string') {
+      throw new TypeError('In-memory terminal input must contain only strings or null');
+    }
   }
 }
 
@@ -437,16 +429,18 @@ class InMemoryLoggerSink implements LoggerSink {
   private nextFailure: LoggingError | undefined;
   private sequence = 0;
 
+  constructor(private readonly policy: LoggingPolicy = new LoggingPolicy()) {}
+
   get calls(): readonly LoggerCall[] {
     return this.recordedCalls.map(call =>
       call.method === 'emit'
-        ? Object.freeze({ ...call, record: cloneLogRecord(call.record) })
+        ? Object.freeze({ ...call, record: InMemoryLoggerSink.cloneRecord(call.record) })
         : Object.freeze({ ...call }),
     );
   }
 
   get records(): readonly Readonly<LogRecord>[] {
-    return this.recordedRecords.map(cloneLogRecord);
+    return this.recordedRecords.map(record => InMemoryLoggerSink.cloneRecord(record));
   }
 
   failNext(error: LoggingError): void {
@@ -454,9 +448,9 @@ class InMemoryLoggerSink implements LoggerSink {
   }
 
   emit(record: LogRecord): Result<void, LoggingError> {
-    const checked = checkLogRecord(record);
+    const checked = this.policy.checkRecord(record);
     if (!checked.ok) return Err(checked.error);
-    const snapshot = cloneLogRecord(checked.value);
+    const snapshot = InMemoryLoggerSink.cloneRecord(checked.value);
     this.recordedCalls.push(Object.freeze({ method: 'emit', record: snapshot, sequence: this.sequence++ }));
     const failure = this.nextFailure;
     this.nextFailure = undefined;
@@ -471,6 +465,13 @@ class InMemoryLoggerSink implements LoggerSink {
     this.nextFailure = undefined;
     return failure === undefined ? Ok(undefined) : Err(failure);
   }
+
+  private static cloneRecord(record: Readonly<LogRecord>): Readonly<LogRecord> {
+    return Object.freeze({
+      ...record,
+      ...(record.attributes === undefined ? {} : { attributes: Object.freeze({ ...record.attributes }) }),
+    });
+  }
 }
 
 class InMemoryMetricsCollector implements MetricsCollector {
@@ -479,16 +480,18 @@ class InMemoryMetricsCollector implements MetricsCollector {
   private nextFailure: MetricsError | undefined;
   private sequence = 0;
 
+  constructor(private readonly policy: MetricsPolicy = new MetricsPolicy()) {}
+
   get calls(): readonly MetricsCall[] {
     return this.recordedCalls.map(call =>
       call.method === 'record'
-        ? Object.freeze({ ...call, metric: cloneMetricRecord(call.metric) })
+        ? Object.freeze({ ...call, metric: InMemoryMetricsCollector.cloneRecord(call.metric) })
         : Object.freeze({ ...call }),
     );
   }
 
   get metrics(): readonly Readonly<MetricRecord>[] {
-    return this.recordedMetrics.map(cloneMetricRecord);
+    return this.recordedMetrics.map(metric => InMemoryMetricsCollector.cloneRecord(metric));
   }
 
   failNext(error: MetricsError): void {
@@ -496,9 +499,9 @@ class InMemoryMetricsCollector implements MetricsCollector {
   }
 
   record(metric: MetricRecord): Result<void, MetricsError> {
-    const checked = checkMetricRecord(metric);
+    const checked = this.policy.checkRecord(metric);
     if (!checked.ok) return Err(checked.error);
-    const snapshot = cloneMetricRecord(checked.value);
+    const snapshot = InMemoryMetricsCollector.cloneRecord(checked.value);
     this.recordedCalls.push(Object.freeze({ method: 'record', metric: snapshot, sequence: this.sequence++ }));
     const failure = this.nextFailure;
     this.nextFailure = undefined;
@@ -513,10 +516,17 @@ class InMemoryMetricsCollector implements MetricsCollector {
     this.nextFailure = undefined;
     return failure === undefined ? Ok(undefined) : Err(failure);
   }
+
+  private static cloneRecord(metric: Readonly<MetricRecord>): Readonly<MetricRecord> {
+    return Object.freeze({
+      ...metric,
+      ...(metric.attributes === undefined ? {} : { attributes: Object.freeze({ ...metric.attributes }) }),
+    });
+  }
 }
 
 function assertSystemCalls(subject: InMemorySystem, expected: readonly ProcessRequest[]): void {
-  assertEqual(
+  new Snapshot().assertEqual(
     'System calls',
     subject.calls.map(call => call.request),
     expected,
@@ -524,31 +534,31 @@ function assertSystemCalls(subject: InMemorySystem, expected: readonly ProcessRe
 }
 
 function assertVfsCalls(subject: InMemoryVirtualFileSystem, expected: readonly VfsCall[]): void {
-  assertEqual('VFS calls', subject.calls, expected);
+  new Snapshot().assertEqual('VFS calls', subject.calls, expected);
 }
 
 function assertTerminalCalls(subject: InMemoryTerminal, expected: readonly TerminalCall[]): void {
-  assertEqual('Terminal calls', subject.calls, expected);
+  new Snapshot().assertEqual('Terminal calls', subject.calls, expected);
 }
 
 function assertLogRecords(subject: InMemoryLoggerSink, expected: readonly LogRecord[]): void {
-  assertEqual('Log records', subject.records, expected);
+  new Snapshot().assertEqual('Log records', subject.records, expected);
 }
 
 function assertLoggerCalls(subject: InMemoryLoggerSink, expected: readonly LoggerCall[]): void {
-  assertEqual('Logger calls', subject.calls, expected);
+  new Snapshot().assertEqual('Logger calls', subject.calls, expected);
 }
 
 function assertMetricRecords(subject: InMemoryMetricsCollector, expected: readonly MetricRecord[]): void {
-  assertEqual('Metric records', subject.metrics, expected);
+  new Snapshot().assertEqual('Metric records', subject.metrics, expected);
 }
 
 function assertMetricsCalls(subject: InMemoryMetricsCollector, expected: readonly MetricsCall[]): void {
-  assertEqual('Metrics calls', subject.calls, expected);
+  new Snapshot().assertEqual('Metrics calls', subject.calls, expected);
 }
 
 function assertVfsFiles(subject: InMemoryVirtualFileSystem, expected: Readonly<Record<string, Uint8Array>>): void {
-  assertEqual('VFS files', subject.files, expected);
+  new Snapshot().assertEqual('VFS files', subject.files, expected);
 }
 
 export type { LoggerCall, MetricsCall, SystemCall, TerminalCall, VfsCall };

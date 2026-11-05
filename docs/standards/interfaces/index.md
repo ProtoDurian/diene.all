@@ -80,18 +80,30 @@ it.** Parity between real and fake is a property of shared code, not of careful 
 
 ### Result and Checked validation
 
-Each rule ships in two forms. Both return the same error.
+The rules live on stateless policy classes, one per port module. Each rule has two methods, and
+both return the same error.
 
 - `validate*` returns a `Result`. Use it in code that already works with `Result`.
 - `check*` returns `Checked`: `{ ok: true, value }` or `{ ok: false, error }`. Use it when you
   must branch synchronously, as an adapter or double does before it records a call.
 
 `Checked` exists because `@atomicloud/diene.result` inspects a `Result` asynchronously
-(`isOk()` returns a `Promise`). The functions are `checkProcessRequest`, `checkProcessOutput`,
-`checkVfsPath`, `checkFileContents`, `checkRecursiveOptions`, `checkTerminalWrite`,
-`checkTerminalRead`, `checkLogRecord`, `checkMetricRecord` and `checkTelemetryAttributes`. Each
-has a `validate*` twin. `checkVfsPath` and `validateVfsPath` take the VFS operation name, so the
-error names the operation that failed.
+(`isOk()` returns a `Promise`). Each rule below is a `check*` / `validate*` pair, for example
+`checkRequest` and `validateRequest`:
+
+| Policy            | Rules                                                                             |
+| ----------------- | --------------------------------------------------------------------------------- |
+| `SystemPolicy`    | `Request`, `Output`                                                               |
+| `VfsPolicy`       | `Path`, `Contents`, `RecursiveOptions`, `CreateDirectoryOptions`, `RemoveOptions` |
+| `TerminalPolicy`  | `Write`, `Read`                                                                   |
+| `LoggingPolicy`   | `Record`                                                                          |
+| `MetricsPolicy`   | `Record`                                                                          |
+| `TelemetryPolicy` | `Attributes` (takes the port and operation name)                                  |
+
+`VfsPolicy` `Path` and `RecursiveOptions` take the VFS operation name, so the error names the
+operation that failed. `LoggingPolicy` and `MetricsPolicy` take a `TelemetryPolicy` in their
+constructor. Each double takes its policy as its last constructor argument; the default is a new
+instance.
 
 These are helpers, not port operations. Every port method still returns a `Result`.
 
@@ -237,14 +249,14 @@ already tracks the real contract.
 A test for the `ReportStore` above:
 
 ```ts
-import { portError } from '@atomicloud/diene.interfaces';
+import { PortError } from '@atomicloud/diene.interfaces';
 import { assertVfsCalls, InMemoryVirtualFileSystem } from '@atomicloud/diene.interfaces/test-helper';
 
 it('should surface a disk fault from the store', async () => {
   // Arrange
   const vfs = new InMemoryVirtualFileSystem();
   vfs.createDirectory('/reports');
-  vfs.failNext(portError('vfs', 'io', 'writeFile', 'disk full'));
+  vfs.failNext(new PortError('vfs', 'io', 'writeFile', 'disk full'));
   const store = new ReportStore(vfs);
 
   // Act

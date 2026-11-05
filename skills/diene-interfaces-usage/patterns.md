@@ -68,14 +68,14 @@ class ReportStore {
 A test injects the in-memory double, fails one call, and checks the calls:
 
 ```ts
-import { portError } from '@atomicloud/diene.interfaces';
+import { PortError } from '@atomicloud/diene.interfaces';
 import { assertVfsCalls, InMemoryVirtualFileSystem } from '@atomicloud/diene.interfaces/test-helper';
 
 it('should surface a disk fault from the store', async () => {
   // Arrange
   const vfs = new InMemoryVirtualFileSystem();
   vfs.createDirectory('/reports');
-  vfs.failNext(portError('vfs', 'io', 'writeFile', 'disk full'));
+  vfs.failNext(new PortError('vfs', 'io', 'writeFile', 'disk full'));
   const store = new ReportStore(vfs);
 
   // Act
@@ -109,8 +109,10 @@ it('should surface a disk fault from the store', async () => {
 
 ## Shared validation
 
-Adapters reuse the package's rules. `validate*` returns a `Result`. `check*`
-returns `Checked` (`{ ok, value }` or `{ ok, error }`) for synchronous branching,
-because `Result` inspection is async. Both return the same error. The interfaces
-standard lists every function, the VFS failure codes, and the System timeout and
-signal rules.
+Adapters reuse the package's rules through its stateless policy classes:
+`SystemPolicy`, `VfsPolicy`, `TerminalPolicy`, `LoggingPolicy`, `MetricsPolicy` and
+`TelemetryPolicy`. Each rule is a method pair. `validate*` returns a `Result`.
+`check*` returns `Checked` (`{ ok, value }` or `{ ok, error }`) for synchronous
+branching, because `Result` inspection is async. Both return the same error. Take
+the policy by constructor injection, as each double does. The interfaces standard
+lists every rule, the VFS failure codes, and the System timeout and signal rules.

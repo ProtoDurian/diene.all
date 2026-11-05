@@ -1,11 +1,11 @@
 import { describe, it } from 'bun:test';
-import { portError, type TerminalChannel, type TerminalError } from '@atomicloud/diene.interfaces';
+import { PortError, type TerminalChannel, type TerminalError } from '@atomicloud/diene.interfaces';
 import { InMemoryTerminal } from '@atomicloud/diene.interfaces/test-helper';
 import 'should';
 import { runFailInjectionContract, runSequenceContract, runSnapshotIsolationContract } from './contract/behaviours.js';
 import { expectErr, expectOk } from './support/capture.js';
 
-const ioError = (operation: string): TerminalError => portError('terminal', 'io', operation, 'boom');
+const ioError = (operation: string): TerminalError => new PortError('terminal', 'io', operation, 'boom');
 const write = { channel: 'stdout', text: 'hi' } as const;
 
 describe('InMemoryTerminal write', () => {

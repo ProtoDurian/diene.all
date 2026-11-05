@@ -1,11 +1,11 @@
 import { describe, it } from 'bun:test';
-import { type LoggingError, type LogRecord, portError } from '@atomicloud/diene.interfaces';
+import { type LoggingError, type LogRecord, PortError } from '@atomicloud/diene.interfaces';
 import { InMemoryLoggerSink } from '@atomicloud/diene.interfaces/test-helper';
 import 'should';
 import { runFailInjectionContract, runSequenceContract, runSnapshotIsolationContract } from './contract/behaviours.js';
 import { expectErr, expectOk } from './support/capture.js';
 
-const ioError = (): LoggingError => portError('logging', 'io', 'emit', 'transport down');
+const ioError = (): LoggingError => new PortError('logging', 'io', 'emit', 'transport down');
 const record: LogRecord = { level: 'info', message: 'hello', attributes: { b: 2, a: 1 } };
 
 describe('InMemoryLoggerSink', () => {

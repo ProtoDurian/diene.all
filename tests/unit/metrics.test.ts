@@ -1,14 +1,24 @@
 import { describe, it } from 'bun:test';
-import { type MetricKind, type MetricRecord, validateMetricRecord } from '@atomicloud/diene.interfaces';
+import {
+  type Checked,
+  type MetricKind,
+  type MetricRecord,
+  MetricsPolicy,
+  PortError,
+  type TelemetryAttributes,
+  TelemetryPolicy,
+} from '@atomicloud/diene.interfaces';
 import 'should';
 import { expectErr, expectOk } from './support/result.js';
 
-describe('validateMetricRecord', () => {
+const policy = new MetricsPolicy();
+
+describe('MetricsPolicy.validateRecord', () => {
   it.each<MetricKind>(['counter', 'gauge', 'histogram'])(
     'should accept a valid %s metric and freeze it',
     async kind => {
       // Act
-      const actual = await expectOk(validateMetricRecord({ kind, name: 'http.requests', value: 3 }));
+      const actual = await expectOk(policy.validateRecord({ kind, name: 'http.requests', value: 3 }));
 
       // Assert
       actual.kind.should.eql(kind);
@@ -22,7 +32,7 @@ describe('validateMetricRecord', () => {
   it('should retain a valid unit and sorted attributes', async () => {
     // Act
     const actual = await expectOk(
-      validateMetricRecord({
+      policy.validateRecord({
         kind: 'histogram',
         name: 'latency',
         value: 12.5,
@@ -38,7 +48,7 @@ describe('validateMetricRecord', () => {
 
   it('should omit the unit key entirely when unit is undefined', async () => {
     // Act
-    const actual = await expectOk(validateMetricRecord({ kind: 'gauge', name: 'temp', value: -4 }));
+    const actual = await expectOk(policy.validateRecord({ kind: 'gauge', name: 'temp', value: -4 }));
 
     // Assert
     Object.hasOwn(actual, 'unit').should.be.false();
@@ -47,8 +57,8 @@ describe('validateMetricRecord', () => {
 
   it.each<MetricKind>(['counter', 'histogram'])('should allow zero but reject a negative %s', async kind => {
     // Act
-    const zero = await expectOk(validateMetricRecord({ kind, name: 'hits', value: 0 }));
-    const error = await expectErr(validateMetricRecord({ kind, name: 'hits', value: -1 }));
+    const zero = await expectOk(policy.validateRecord({ kind, name: 'hits', value: 0 }));
+    const error = await expectErr(policy.validateRecord({ kind, name: 'hits', value: -1 }));
 
     // Assert
     zero.value.should.eql(0);
@@ -61,7 +71,7 @@ describe('validateMetricRecord', () => {
     ['a primitive', 9 as unknown as MetricRecord],
   ])('should reject a non-object metric (%s)', async (_label, metric) => {
     // Act
-    const error = await expectErr(validateMetricRecord(metric));
+    const error = await expectErr(policy.validateRecord(metric));
 
     // Assert
     error.port.should.eql('metrics');
@@ -72,7 +82,7 @@ describe('validateMetricRecord', () => {
   it('should reject an invalid kind', async () => {
     // Act
     const error = await expectErr(
-      validateMetricRecord({ kind: 'summary' as unknown as MetricKind, name: 'x', value: 1 }),
+      policy.validateRecord({ kind: 'summary' as unknown as MetricKind, name: 'x', value: 1 }),
     );
 
     // Assert
@@ -86,7 +96,7 @@ describe('validateMetricRecord', () => {
     ['illegal char', 'has space'],
   ])('should reject an invalid instrument name (%s)', async (_label, name) => {
     // Act
-    const error = await expectErr(validateMetricRecord({ kind: 'counter', name, value: 1 }));
+    const error = await expectErr(policy.validateRecord({ kind: 'counter', name, value: 1 }));
 
     // Assert
     error.details.should.eql({ field: 'name' });
@@ -98,7 +108,7 @@ describe('validateMetricRecord', () => {
     ['Infinity', Number.POSITIVE_INFINITY],
   ])('should reject a non-finite value (%s)', async (_label, value) => {
     // Act
-    const error = await expectErr(validateMetricRecord({ kind: 'gauge', name: 'x', value }));
+    const error = await expectErr(policy.validateRecord({ kind: 'gauge', name: 'x', value }));
 
     // Assert
     error.details.should.eql({ field: 'value' });
@@ -110,7 +120,7 @@ describe('validateMetricRecord', () => {
     ['blank', '   '],
   ])('should reject an invalid unit (%s)', async (_label, unit) => {
     // Act
-    const error = await expectErr(validateMetricRecord({ kind: 'gauge', name: 'x', value: 1, unit }));
+    const error = await expectErr(policy.validateRecord({ kind: 'gauge', name: 'x', value: 1, unit }));
 
     // Assert
     error.details.should.eql({ field: 'unit' });
@@ -119,7 +129,7 @@ describe('validateMetricRecord', () => {
   it('should propagate telemetry validation failure for bad attributes', async () => {
     // Act
     const error = await expectErr(
-      validateMetricRecord({
+      policy.validateRecord({
         kind: 'counter',
         name: 'x',
         value: 1,
@@ -130,5 +140,28 @@ describe('validateMetricRecord', () => {
     // Assert
     error.port.should.eql('metrics');
     error.message.should.match(/name/i);
+  });
+});
+
+describe('MetricsPolicy telemetry injection', () => {
+  it('should delegate attribute checks to the injected telemetry policy', async () => {
+    // Arrange
+    class RejectingTelemetry extends TelemetryPolicy {
+      override checkAttributes<P extends 'logging' | 'metrics'>(
+        _attributes: TelemetryAttributes | undefined,
+        port: P,
+        operation: string,
+      ): Checked<TelemetryAttributes | undefined, PortError<P>> {
+        return { error: new PortError(port, 'invalid-input', operation, 'injected'), ok: false };
+      }
+    }
+    const subject = new MetricsPolicy(new RejectingTelemetry());
+
+    // Act
+    const error = await expectErr(subject.validateRecord({ kind: 'gauge', name: 'temp', value: 1 }));
+
+    // Assert
+    error.message.should.eql('injected');
+    error.port.should.eql('metrics');
   });
 });

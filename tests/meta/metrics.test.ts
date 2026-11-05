@@ -1,11 +1,11 @@
 import { describe, it } from 'bun:test';
-import { type MetricRecord, type MetricsError, portError } from '@atomicloud/diene.interfaces';
+import { type MetricRecord, type MetricsError, PortError } from '@atomicloud/diene.interfaces';
 import { InMemoryMetricsCollector } from '@atomicloud/diene.interfaces/test-helper';
 import 'should';
 import { runFailInjectionContract, runSequenceContract, runSnapshotIsolationContract } from './contract/behaviours.js';
 import { expectErr, expectOk } from './support/capture.js';
 
-const ioError = (): MetricsError => portError('metrics', 'io', 'record', 'sink down');
+const ioError = (): MetricsError => new PortError('metrics', 'io', 'record', 'sink down');
 const metric: MetricRecord = { kind: 'counter', name: 'hits', value: 3, attributes: { b: 2, a: 1 } };
 
 describe('InMemoryMetricsCollector', () => {

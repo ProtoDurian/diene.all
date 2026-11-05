@@ -1,6 +1,6 @@
 import type { Result } from '@atomicloud/diene.result';
-import { portError, type VfsError } from './error.js';
-import { accepted, type Checked, rejected, resultFromChecked } from './validation.js';
+import { PortError, type VfsError } from './error.js';
+import { type Checked, PortPolicy } from './validation.js';
 
 type VfsEntryKind = 'directory' | 'file';
 
@@ -32,77 +32,93 @@ interface VirtualFileSystem {
   remove(path: string, options?: RemoveOptions): Result<void, VfsError>;
 }
 
-function invalidVfsInput(operation: string, field: string, message: string): Checked<never, VfsError> {
-  return rejected(portError('vfs', 'invalid-input', operation, message, { field }));
-}
-
-function checkVfsPath(path: string, operation: string): Checked<string, VfsError> {
-  if (typeof path !== 'string' || path === '' || path.includes('\0')) {
-    return invalidVfsInput(operation, 'path', 'VFS path must be a non-empty NUL-free string');
+class VfsPolicy extends PortPolicy {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun counts an implicit constructor as an uncovered function
+  constructor() {
+    super();
   }
-  if (!path.startsWith('/')) {
-    return invalidVfsInput(operation, 'path', 'VFS path must be absolute');
-  }
-  if (path !== '/' && (path.endsWith('/') || path.includes('//'))) {
-    return invalidVfsInput(operation, 'path', 'VFS path must be canonical');
-  }
-  if (path.split('/').some(segment => segment === '.' || segment === '..')) {
-    return invalidVfsInput(operation, 'path', 'VFS path must not contain dot segments');
-  }
-  return accepted(path);
-}
 
-function checkFileContents(contents: Uint8Array): Checked<Uint8Array, VfsError> {
-  if (!(contents instanceof Uint8Array)) {
-    return invalidVfsInput('writeFile', 'contents', 'VFS file contents must be Uint8Array bytes');
+  checkPath(path: string, operation: string): Checked<string, VfsError> {
+    if (typeof path !== 'string' || path === '' || path.includes('\0')) {
+      return this.invalid(operation, 'path', 'VFS path must be a non-empty NUL-free string');
+    }
+    if (!path.startsWith('/')) {
+      return this.invalid(operation, 'path', 'VFS path must be absolute');
+    }
+    if (path !== '/' && (path.endsWith('/') || path.includes('//'))) {
+      return this.invalid(operation, 'path', 'VFS path must be canonical');
+    }
+    if (path.split('/').some(segment => segment === '.' || segment === '..')) {
+      return this.invalid(operation, 'path', 'VFS path must not contain dot segments');
+    }
+    return this.accept(path);
   }
-  return accepted(new Uint8Array(contents));
-}
 
-function checkRecursiveOptions(
-  options: CreateDirectoryOptions | RemoveOptions | undefined,
-  operation: 'createDirectory' | 'remove',
-): Checked<Required<CreateDirectoryOptions>, VfsError> {
-  if (options === undefined) return accepted(Object.freeze({ recursive: false }));
-  if (
-    typeof options !== 'object' ||
-    options === null ||
-    Array.isArray(options) ||
-    ![Object.prototype, null].includes(Object.getPrototypeOf(options))
-  ) {
-    return invalidVfsInput(operation, 'options', 'VFS options must be an object');
+  checkContents(contents: Uint8Array): Checked<Uint8Array, VfsError> {
+    if (!(contents instanceof Uint8Array)) {
+      return this.invalid('writeFile', 'contents', 'VFS file contents must be Uint8Array bytes');
+    }
+    return this.accept(new Uint8Array(contents));
   }
-  if (options.recursive !== undefined && typeof options.recursive !== 'boolean') {
-    return invalidVfsInput(operation, 'recursive', 'recursive must be a boolean');
+
+  checkRecursiveOptions(
+    options: CreateDirectoryOptions | RemoveOptions | undefined,
+    operation: 'createDirectory' | 'remove',
+  ): Checked<Required<CreateDirectoryOptions>, VfsError> {
+    if (options === undefined) return this.accept(Object.freeze({ recursive: false }));
+    if (
+      typeof options !== 'object' ||
+      options === null ||
+      Array.isArray(options) ||
+      ![Object.prototype, null].includes(Object.getPrototypeOf(options))
+    ) {
+      return this.invalid(operation, 'options', 'VFS options must be an object');
+    }
+    if (options.recursive !== undefined && typeof options.recursive !== 'boolean') {
+      return this.invalid(operation, 'recursive', 'recursive must be a boolean');
+    }
+    return this.accept(Object.freeze({ recursive: options.recursive ?? false }));
   }
-  return accepted(Object.freeze({ recursive: options.recursive ?? false }));
-}
 
-function validateVfsPath(path: string, operation: string): Result<string, VfsError> {
-  return resultFromChecked(checkVfsPath(path, operation));
-}
+  checkCreateDirectoryOptions(
+    options: CreateDirectoryOptions | undefined,
+  ): Checked<Required<CreateDirectoryOptions>, VfsError> {
+    return this.checkRecursiveOptions(options, 'createDirectory');
+  }
 
-function validateFileContents(contents: Uint8Array): Result<Uint8Array, VfsError> {
-  return resultFromChecked(checkFileContents(contents));
-}
+  checkRemoveOptions(options: RemoveOptions | undefined): Checked<Required<RemoveOptions>, VfsError> {
+    return this.checkRecursiveOptions(options, 'remove');
+  }
 
-function validateCreateDirectoryOptions(
-  options: CreateDirectoryOptions | undefined,
-): Result<Required<CreateDirectoryOptions>, VfsError> {
-  return resultFromChecked(checkRecursiveOptions(options, 'createDirectory'));
-}
+  validatePath(path: string, operation: string): Result<string, VfsError> {
+    return this.toResult(this.checkPath(path, operation));
+  }
 
-function validateRemoveOptions(options: RemoveOptions | undefined): Result<Required<RemoveOptions>, VfsError> {
-  return resultFromChecked(checkRecursiveOptions(options, 'remove'));
+  validateContents(contents: Uint8Array): Result<Uint8Array, VfsError> {
+    return this.toResult(this.checkContents(contents));
+  }
+
+  validateRecursiveOptions(
+    options: CreateDirectoryOptions | RemoveOptions | undefined,
+    operation: 'createDirectory' | 'remove',
+  ): Result<Required<CreateDirectoryOptions>, VfsError> {
+    return this.toResult(this.checkRecursiveOptions(options, operation));
+  }
+
+  validateCreateDirectoryOptions(
+    options: CreateDirectoryOptions | undefined,
+  ): Result<Required<CreateDirectoryOptions>, VfsError> {
+    return this.toResult(this.checkCreateDirectoryOptions(options));
+  }
+
+  validateRemoveOptions(options: RemoveOptions | undefined): Result<Required<RemoveOptions>, VfsError> {
+    return this.toResult(this.checkRemoveOptions(options));
+  }
+
+  private invalid(operation: string, field: string, message: string): Checked<never, VfsError> {
+    return this.reject(new PortError('vfs', 'invalid-input', operation, message, { field }));
+  }
 }
 
 export type { CreateDirectoryOptions, RemoveOptions, VfsEntry, VfsEntryKind, VfsStat, VirtualFileSystem };
-export {
-  checkFileContents,
-  checkRecursiveOptions,
-  checkVfsPath,
-  validateCreateDirectoryOptions,
-  validateFileContents,
-  validateRemoveOptions,
-  validateVfsPath,
-};
+export { VfsPolicy };

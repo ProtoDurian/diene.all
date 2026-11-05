@@ -3,20 +3,21 @@ import {
   type TerminalChannel,
   type TerminalRead,
   type TerminalWrite,
-  validateTerminalRead,
-  validateTerminalWrite,
+  TerminalPolicy,
 } from '@atomicloud/diene.interfaces';
 import 'should';
 import { expectErr, expectOk } from './support/result.js';
 
-describe('validateTerminalWrite', () => {
+const policy = new TerminalPolicy();
+
+describe('TerminalPolicy.validateWrite', () => {
   it.each([
     ['explicit true', true, true],
     ['explicit false', false, false],
     ['omitted defaults to false', undefined, false],
   ])('should normalize newline (%s)', async (_label, newline, expected) => {
     // Act
-    const actual = await expectOk(validateTerminalWrite({ channel: 'stdout', text: 'hi', newline } as TerminalWrite));
+    const actual = await expectOk(policy.validateWrite({ channel: 'stdout', text: 'hi', newline } as TerminalWrite));
 
     // Assert
     actual.should.eql({ channel: 'stdout', text: 'hi', newline: expected });
@@ -25,7 +26,7 @@ describe('validateTerminalWrite', () => {
 
   it('should accept the stderr channel', async () => {
     // Act
-    const actual = await expectOk(validateTerminalWrite({ channel: 'stderr', text: '' }));
+    const actual = await expectOk(policy.validateWrite({ channel: 'stderr', text: '' }));
 
     // Assert
     actual.channel.should.eql('stderr');
@@ -36,7 +37,7 @@ describe('validateTerminalWrite', () => {
     ['a primitive', 2 as unknown as TerminalWrite],
   ])('should reject a non-object output (%s)', async (_label, output) => {
     // Act
-    const error = await expectErr(validateTerminalWrite(output));
+    const error = await expectErr(policy.validateWrite(output));
 
     // Assert
     error.port.should.eql('terminal');
@@ -46,9 +47,7 @@ describe('validateTerminalWrite', () => {
 
   it('should reject an invalid channel', async () => {
     // Act
-    const error = await expectErr(
-      validateTerminalWrite({ channel: 'stdlog' as unknown as TerminalChannel, text: 'x' }),
-    );
+    const error = await expectErr(policy.validateWrite({ channel: 'stdlog' as unknown as TerminalChannel, text: 'x' }));
 
     // Assert
     error.details.should.eql({ field: 'channel' });
@@ -56,7 +55,7 @@ describe('validateTerminalWrite', () => {
 
   it('should reject non-string text', async () => {
     // Act
-    const error = await expectErr(validateTerminalWrite({ channel: 'stdout', text: 5 as unknown as string }));
+    const error = await expectErr(policy.validateWrite({ channel: 'stdout', text: 5 as unknown as string }));
 
     // Assert
     error.details.should.eql({ field: 'text' });
@@ -65,7 +64,7 @@ describe('validateTerminalWrite', () => {
   it('should reject a non-boolean newline', async () => {
     // Act
     const error = await expectErr(
-      validateTerminalWrite({ channel: 'stdout', text: 'x', newline: 'yes' as unknown as boolean }),
+      policy.validateWrite({ channel: 'stdout', text: 'x', newline: 'yes' as unknown as boolean }),
     );
 
     // Assert
@@ -73,10 +72,10 @@ describe('validateTerminalWrite', () => {
   });
 });
 
-describe('validateTerminalRead', () => {
+describe('TerminalPolicy.validateRead', () => {
   it('should default to an empty read when called with no argument', async () => {
     // Act
-    const actual = await expectOk(validateTerminalRead());
+    const actual = await expectOk(policy.validateRead());
 
     // Assert
     actual.should.eql({});
@@ -85,7 +84,7 @@ describe('validateTerminalRead', () => {
 
   it('should retain a provided prompt', async () => {
     // Act
-    const actual = await expectOk(validateTerminalRead({ prompt: 'name?' }));
+    const actual = await expectOk(policy.validateRead({ prompt: 'name?' }));
 
     // Assert
     actual.should.eql({ prompt: 'name?' });
@@ -96,7 +95,7 @@ describe('validateTerminalRead', () => {
     ['a primitive', 2 as unknown as TerminalRead],
   ])('should reject a non-object input (%s)', async (_label, input) => {
     // Act
-    const error = await expectErr(validateTerminalRead(input));
+    const error = await expectErr(policy.validateRead(input));
 
     // Assert
     error.operation.should.eql('readLine');
@@ -105,7 +104,7 @@ describe('validateTerminalRead', () => {
 
   it('should reject a non-string prompt', async () => {
     // Act
-    const error = await expectErr(validateTerminalRead({ prompt: 5 as unknown as string }));
+    const error = await expectErr(policy.validateRead({ prompt: 5 as unknown as string }));
 
     // Assert
     error.details.should.eql({ field: 'prompt' });

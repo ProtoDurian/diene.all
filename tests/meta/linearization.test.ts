@@ -1,5 +1,5 @@
 import { describe, it } from 'bun:test';
-import { portError } from '@atomicloud/diene.interfaces';
+import { PortError } from '@atomicloud/diene.interfaces';
 import {
   InMemoryLoggerSink,
   InMemoryTerminal,
@@ -47,7 +47,7 @@ describe('mock linearization', () => {
 
     // Act
     const pending = subject.exists('/f');
-    subject.failNext(portError('vfs', 'io', 'exists', 'late fault'));
+    subject.failNext(new PortError('vfs', 'io', 'exists', 'late fault'));
 
     // Assert
     (await expectOk(pending)).should.be.true();
@@ -60,7 +60,7 @@ describe('mock linearization', () => {
 
     // Act
     const pending = subject.emit({ level: 'info', message: 'm' });
-    subject.failNext(portError('logging', 'io', 'emit', 'late fault'));
+    subject.failNext(new PortError('logging', 'io', 'emit', 'late fault'));
 
     // Assert
     subject.calls.should.have.length(1);

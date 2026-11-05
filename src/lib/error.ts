@@ -52,16 +52,6 @@ type TerminalError = PortError<'terminal'>;
 type LoggingError = PortError<'logging'>;
 type MetricsError = PortError<'metrics'>;
 
-function portError<P extends PortName>(
-  port: P,
-  code: PortErrorCode,
-  operation: string,
-  message: string,
-  details: PortErrorDetails = {},
-): PortError<P> {
-  return new PortError(port, code, operation, message, details);
-}
-
 export type {
   LoggingError,
   MetricsError,
@@ -72,4 +62,4 @@ export type {
   TerminalError,
   VfsError,
 };
-export { PortError, portError };
+export { PortError };

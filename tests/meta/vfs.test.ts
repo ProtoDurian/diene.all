@@ -1,5 +1,5 @@
 import { describe, it } from 'bun:test';
-import { portError, type VfsError } from '@atomicloud/diene.interfaces';
+import { PortError, type VfsError } from '@atomicloud/diene.interfaces';
 import { InMemoryVirtualFileSystem } from '@atomicloud/diene.interfaces/test-helper';
 import type { Result } from '@atomicloud/diene.result';
 import 'should';
@@ -8,7 +8,7 @@ import { expectErr, expectOk } from './support/capture.js';
 
 const bytes = (...values: number[]): Uint8Array => new Uint8Array(values);
 const vfs = (): InMemoryVirtualFileSystem => new InMemoryVirtualFileSystem();
-const ioError = (operation: string): VfsError => portError('vfs', 'io', operation, 'disk fault');
+const ioError = (operation: string): VfsError => new PortError('vfs', 'io', operation, 'disk fault');
 
 describe('InMemoryVirtualFileSystem readFile', () => {
   it('should reject an invalid path', async () => {

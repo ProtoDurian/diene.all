@@ -55,17 +55,17 @@ terminal.write({ channel: 'stdout', text: 'x' }).unwrapErr().then((failure) => {
 });
 JS
 cat >"${work}/types-esm.mts" <<TS
-import { portError, type Terminal, type TerminalError } from '${name}';
+import { PortError, type Terminal, type TerminalError } from '${name}';
 import { InMemoryTerminal } from '${name}/test-helper';
 const terminal: Terminal = new InMemoryTerminal();
-const failure: TerminalError = portError('terminal', 'closed', 'write', 'consumer');
+const failure: TerminalError = new PortError('terminal', 'closed', 'write', 'consumer');
 export { failure, terminal };
 TS
 cat >"${work}/types-cjs.cts" <<TS
-import { portError, type Terminal, type TerminalError } from '${name}';
+import { PortError, type Terminal, type TerminalError } from '${name}';
 import { InMemoryTerminal } from '${name}/test-helper';
 const terminal: Terminal = new InMemoryTerminal();
-const failure: TerminalError = portError('terminal', 'closed', 'write', 'consumer');
+const failure: TerminalError = new PortError('terminal', 'closed', 'write', 'consumer');
 export { failure, terminal };
 TS
 

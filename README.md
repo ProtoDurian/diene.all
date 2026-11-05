@@ -52,7 +52,7 @@ import { InMemorySystem, InMemoryTerminal } from '@atomicloud/diene.interfaces/t
 
 ```js
 // CommonJS
-const { PortError, portError } = require('@atomicloud/diene.interfaces');
+const { PortError, VfsPolicy } = require('@atomicloud/diene.interfaces');
 ```
 
 Tracing is not part of this package: trace and span contracts are owned by the
