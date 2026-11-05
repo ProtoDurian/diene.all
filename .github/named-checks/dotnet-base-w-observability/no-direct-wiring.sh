@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Observability arrives only by merging its .3; no commit on this branch authors it.
-
 here="$(dirname "$0")"
 own_pattern='^\.github/named-checks/dotnet-base-w-observability/[^/]+$'
 
