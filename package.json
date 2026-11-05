@@ -28,6 +28,13 @@
       }
     }
   },
+  "typesVersions": {
+    "*": {
+      "test-helper": [
+        "./dist/test-helper.d.ts"
+      ]
+    }
+  },
   "files": [
     "dist",
     "skills"

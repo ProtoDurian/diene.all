@@ -20,7 +20,7 @@ rules remain in `docs/standards/`.
   `task test:int:coverage` write scoped LCOV artifacts.
 - `task test:watch` watches the unit tier.
 - `task build` bundles `src/index.ts` to `dist/index.js`.
-- `task deadcode` runs the two non-blocking LLM-review Knip configurations.
+- `task deadcode` runs the two non-blocking LLM Knip views.
 - `task run -- <args>` executes the source entry point.
 - `task preview -- <args>` rebuilds and executes the bundled artifact.
 
@@ -31,10 +31,13 @@ dependency through Testcontainers.
 ## Quality gates
 
 Biome is lint-only; treefmt owns formatting. TypeScript uses strict no-emit
-typechecking. Knip runs twice as blocking hooks: the repository view includes
-tests, while the production view starts at `src/index.ts` and catches files
-used only by tests. The LLM Knip variants are review-only and never suppress
-strict findings.
+typechecking. Knip has four dead-code modes, none with ignore or exclude lists:
+
+- `knip.json`: blocking hook over source and tests, so dead test code fails too.
+- `knip.production.json`: blocking `--production` hook from `src/index.ts`
+  that ignores test usage, so a file only tests use fails.
+- `knip.llm.json`: non-blocking repository review for LLMs.
+- `knip.production.llm.json`: non-blocking production review for LLMs.
 
 ## Test and coverage tiers
 
@@ -43,21 +46,23 @@ strict findings.
   and cover only `src/adapters/**`.
 - Both CI entry points require an LCOV artifact, reject paths outside their
   tier ledger, and require every ledger line to be hit.
-- Codecov is informational and uploads the independent `unit` and `int` flags
-  with carryforward enabled.
+- Each tier writes its own LCOV file: `reports/unit/lcov.info` and
+  `reports/integration/lcov.info`.
 
-Tests use `bun:test`, `describe`/`it`, AAA comments, and `should` assertions.
+Tests use `bun:test`, `describe`/`it`, `// Arrange` / `// Act` / `// Assert`
+blocks, and prototype `should` assertions.
 Container images are version-pinned without digests.
 
 ## Build and runtime
 
-The local build and CI build share `scripts/local/build.sh`. The sample prints
-a composed key by default; `REDIS_HOST` plus `REDIS_PORT` enable a Redis round
-trip.
+The local build and CI build share `scripts/local/build.sh`.
+The sample is stateless classes wired in `src/index.ts`: the domain in
+`src/lib/sample/`, pino and Redis in `src/adapters/`. It prints a composed key
+by default; `REDIS_HOST` plus `REDIS_PORT` enable a Redis round trip.
 
-Application descendants use pino JSON logging with trace-context injection
-from `@atomicloud/diene.otel`. That application logging layer is intentionally
-not duplicated in this toolchain sample before the shared library is consumed.
+The sample logs pino JSON only. Trace-context injection belongs to the
+observability payload, which descendants add; this node declares no
+`@atomicloud/diene.*` dependency.
 
 ## TypeScript standards
 
@@ -74,14 +79,13 @@ Read the TypeScript variants alongside their shared standards:
 
 ## External service / compute cost
 
-- Codecov upload runs only in CI and is best-effort.
-- Integration tests and Docker image builds require a Docker runtime.
-- Unit, integration, build, and Docker are separate CI jobs.
+- Integration tests require a Docker runtime.
+- Unit, integration, and build are separate CI jobs.
 
 ## Template maintenance boundary
 
-Downstream templates may adapt package identity, coverage thresholds, badges,
-and the fenced illustrative `src/` plus `tests/` sample. They should not fork
-the inherited task, workflow, release, Nix, lint,
+Downstream templates may adapt package identity, coverage thresholds,
+badges, and the fenced illustrative `src/` plus `tests/`
+sample. They should not fork the inherited task, workflow, release, Nix, lint,
 or standards machinery. Shared fixes land at the earliest owning branch and
 merge down.

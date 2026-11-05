@@ -21,10 +21,6 @@ export default {
       kind: 'mutation',
       expectedImpact: ['fmt-prettier', 'precommit-treefmt-prettier'],
       async run(repo: any) {
-        // The fixture is any thin trigger this node still ships; the subject is
-        // the gate, not the topic. It moved off `authorization` when that segment
-        // left for the .NET layer — a mutation arm whose target no longer exists
-        // lands in `broken` on the venue, and `broken` voids the whole run.
         const path = '.claude/skills/datetime/SKILL.md';
         const original = await repo.read(path);
         try {

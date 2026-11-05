@@ -1,20 +1,11 @@
 version: '3'
 
 includes:
-  # ### bun-base-test-includes
-  # #### source: bun-base
   unit:
     taskfile: tasks/Taskfile.test.yaml
     vars:
       MODE: unit
       CONFIG: bunfig.unit.toml
-  int:
-    taskfile: tasks/Taskfile.test.yaml
-    vars:
-      MODE: int
-      CONFIG: bunfig.int.toml
-  # ### bun-lib-test-includes
-  # #### source: bun-lib
   meta:
     taskfile: tasks/Taskfile.test.yaml
     vars:
@@ -26,16 +17,11 @@ tasks:
     desc: Set up the workspace
     cmds:
       - ./scripts/local/setup.sh
-      # ### bun-interfaces-setup
-      # #### source: lib/bun/interfaces
-      - ./scripts/local/skills-sync.sh
 
   lint:
     desc: Run all repository gates
     cmds:
       - pre-commit run --all-files
-  # ### bun-base-tasks
-  # #### source: bun-base
   clean:
     desc: Remove Bun build, dependency, and coverage artifacts
     cmds:
@@ -48,12 +34,12 @@ tasks:
       - ./scripts/local/build.sh
 
   deadcode:
-    desc: Review strict and LLM-assisted dead-code findings
+    desc: Review dead code with the LLM Knip views
     cmds:
       - ./scripts/local/deadcode.sh
 
   test:
-    desc: Run unit and conditional meta suites without coverage
+    desc: Run unit and meta suites without coverage
     cmds:
       - task: unit:default
       - task: meta:default
@@ -64,19 +50,17 @@ tasks:
       - task: unit:default
 
   test:int:
-    desc: Confirm that this adapter-free library has no integration tier
+    desc: Confirm that this dependency-free library has no integration tier
     cmds:
-      - echo "⏭️ No integration tier (this package ships ports and test helpers only, with no adapters)"
+      - echo "⏭️ No integration tier (this package has no adapters or external dependencies)"
 
-  # ### bun-lib-meta-tasks
-  # #### source: bun-lib
   test:meta:
     desc: Run the TestHelper meta suite when a TestHelper exists
     cmds:
       - task: meta:default
 
   test:coverage:
-    desc: Run unit and conditional meta suites with coverage
+    desc: Run unit and meta suites with coverage
     cmds:
       - task: unit:coverage
       - task: meta:coverage
@@ -87,9 +71,9 @@ tasks:
       - task: unit:coverage
 
   test:int:coverage:
-    desc: Confirm that this adapter-free library has no integration coverage ledger
+    desc: Confirm that this dependency-free library has no integration coverage ledger
     cmds:
-      - echo "⏭️ No integration coverage ledger (this package ships ports and test helpers only, with no adapters)"
+      - echo "⏭️ No integration coverage ledger (this package has no adapters or external dependencies)"
 
   test:meta:coverage:
     desc: Run the TestHelper meta suite with coverage when a TestHelper exists

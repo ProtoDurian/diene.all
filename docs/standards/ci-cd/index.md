@@ -22,10 +22,9 @@ their trigger block:
   block to see when.
 - **Reusable workflows** — `on.workflow_call` only, named with a `⚡` prefix.
   Each owns runner selection and setup and ends in a `run:` line of the form
-  `nix develop .#<shell> -c ./scripts/ci/<script>.sh`. The pre-commit workflow
-  additionally runs `skills-sync sync --tier ci` as an explicit step before its
-  script: the hook uses the warning tier, so running the hook in CI cannot stand
-  in for the guarantee tier.
+  `nix develop .#<shell> -c ./scripts/ci/<script>.sh`. The pre-commit script runs
+  every hook, including `a-skills-sync` (`skills-sync sync --frozen`), so CI
+  enforces the vendored skills without a separate step.
 
 Callers grant permissions, pass only repository-specific values, and use
 `secrets: inherit`. The `a-workflows` gate enforces that every orchestrator job
@@ -62,18 +61,30 @@ Nix store cache.
 
 ## Runners and cache labels
 
-These are plain workflow configuration. Nothing validates them, so read the
-existing `runs-on:` blocks and copy the shape.
+Every job that runs a script uses the same runner labels, written as the same
+literal in every reusable workflow:
 
-Selection is 26.04-first: GitHub-hosted jobs take `ubuntu-26.04`, Namespace jobs
-take `nscloud-ubuntu-26.04-amd64-16x32-with-cache` plus `nscloud-cache-size-50gb`
-and the shared store-cache tag `nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64`.
-The 24.04 equivalents are the fallbacks. A lane that must **not** share the store
-uses the bare `nscloud-ubuntu-26.04-amd64-16x32` with no cache labels at all — a
-bare label cannot attach a cache volume, which is the point of using it. The cache
-is shared per OS and architecture, carries no organization, platform or service
-name, and changing the OS rotates the tag and costs one cold build before warm
-reuse resumes.
+```yaml
+runs-on:
+  - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+  - nscloud-cache-size-20gb
+  - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+```
+
+This is one template value with a default. The runner and the Nix store cache
+tag are chosen once, when a repository is generated from the template, and the
+answer is written into every workflow identically. Reusable workflows take no
+runner or cache inputs and callers never pass them, so there is one value to
+change, and every workflow changes with it.
+
+Selection is 26.04-first; the 24.04 equivalents are the fallbacks. A lane that
+must **not** share the store uses the bare `nscloud-ubuntu-26.04-amd64-4x8` with
+no cache labels at all — a bare label cannot attach a cache volume, which is the
+point of using it. The cache tag
+is shared per OS and architecture: it carries no organization, platform or
+service name, and changing the OS rotates the tag and costs one cold build before
+warm reuse resumes. The merge gatekeeper is a poller with no Nix, so it stays on
+GitHub-hosted `ubuntu-26.04`.
 
 ## Dependency materialisation
 
@@ -91,13 +102,13 @@ Run the same entry point the lane runs. Take the `run:` line from the reusable
 workflow you want to reproduce and run it verbatim, for example:
 
 ```bash
-nix develop .#ci -c skills-sync sync --tier ci
 nix develop .#ci -c ./scripts/ci/pre-commit.sh
 ```
 
-Run both lines, in that order, to reproduce the pre-commit workflow. A downstream
-runtime restores its dependencies before the skills step; workspace declares
-`runtime: none`, so the generic call is deliberately inert here.
+That line reproduces the pre-commit workflow. Workspace names no runtime, so its
+`a-skills-sync` hook is deliberately inert here.
+
+## Artifact publishing
 
 Release execution runs the real tool: `⚡reusable-release.yaml` enters the
 `releaser` shell and calls `scripts/ci/release.sh`, which invokes

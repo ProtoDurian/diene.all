@@ -6,9 +6,9 @@ cd "${root_dir}"
 
 mode="${1:-all}"
 case "${mode}" in
-content | publint | attw | all) ;;
+content | publint | attw | consumer | all) ;;
 *)
-  echo "❌ mode must be 'content', 'publint', 'attw', or 'all'" >&2
+  echo "❌ mode must be 'content', 'publint', 'attw', 'consumer', or 'all'" >&2
   exit 1
   ;;
 esac
@@ -51,9 +51,14 @@ fi
 
 if [[ ${mode} == "attw" || ${mode} == "all" ]]; then
   echo "🔎 Checking type resolvability (attw)..."
-  ./node_modules/.bin/attw pkg.tgz --profile node16
-  echo "🔎 Checking root and test-helper type identity (Node16 consumer)..."
+  ./node_modules/.bin/attw pkg.tgz
+  echo "🔎 Checking root and TestHelper type identity..."
   ./node_modules/.bin/tsc -p fixtures/package-consumer/tsconfig.json
+fi
+
+if [[ ${mode} == "consumer" || ${mode} == "all" ]]; then
+  echo "🔎 Consuming the tarball (consumer fixture)..."
+  ./scripts/ci/consumer-smoke.sh
 fi
 
 echo "✅ Package validation (${mode}) passed"
