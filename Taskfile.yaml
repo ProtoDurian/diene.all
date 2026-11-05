@@ -6,7 +6,7 @@ includes:
     taskfile: tasks/Taskfile.cluster.yaml
     vars:
       RELEASE_NAME: sulfur
-      NAMESPACE: cert-manager
+      NAMESPACE: certs
       LANDSCAPE: example
       CLUSTER: lapras
 
@@ -22,34 +22,29 @@ tasks:
       - pre-commit run --all-files
 
   build:
-    desc: Vendor and build the pinned cert-manager dependency
+    desc: Build chart dependencies
     cmds:
-      - ./scripts/local/vendor-cert-manager.sh build
+      - helm dependency build chart
 
   update:
     desc: Refresh the pinned upstream chart dependency
     cmds:
-      - ./scripts/local/vendor-cert-manager.sh update
+      - helm dependency update chart
 
   latest:
     desc: Resolve the latest real upstream chart and image tags
     cmds:
       - ./scripts/local/latest-chart-upstreams.sh
 
-  test:
-    desc: Run the sulfur unit/static tier
-    cmds:
-      - ./scripts/ci/sulfur.sh
-
   test:unit:
-    desc: Run schema, lint, render, policy, gateway, boundary, and upgrade validation
+    desc: Run schema, lint, render, policy, and contract validation
     cmds:
       - ./scripts/ci/sulfur.sh
 
   test:int:
-    desc: Run the k3d integration tier (engine health + self-signed Certificate)
+    desc: Run the local k3d installation proof
     cmds:
-      - ./scripts/validate/sulfur-k3d.sh
+      - ./scripts/ci/sulfur-k3d.sh
 
   start:cluster:
     desc: Start the local k3d lapras proof cluster

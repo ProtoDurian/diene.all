@@ -1,6 +1,7 @@
-# Independent cluster overlay for the local lapras/k3d substrate. Thin: it
-# contributes only cluster identity; the landscape overlay owns the landscape
-# label. cert-manager stays fully enabled — the engine installs everywhere.
-global:
-  serviceTree:
-    cluster: lapras
+serviceTree:
+  cluster: lapras
+
+upstream:
+  global:
+    commonLabels:
+      atomi.cloud/cluster: lapras
