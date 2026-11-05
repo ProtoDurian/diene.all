@@ -6,13 +6,13 @@ import { expectErr } from './support/capture.js';
 
 describe('runtime identity across root and test-helper', () => {
   it('should recognize a test-helper-produced PortError as a root PortError instance', async () => {
-    // Arrange - drive a mock into its own error branch
+    // Arrange
     const subject = new InMemorySystem();
 
     // Act
     const error = await expectErr(subject.execute({ executable: 'ls' }));
 
-    // Assert - single source-mode module: instanceof holds against the root class
+    // Assert
     error.should.be.instanceOf(PortError);
     (error instanceof PortError).should.be.true();
     error.should.be.instanceOf(Error);
@@ -37,7 +37,7 @@ describe('InterfaceAssertionError', () => {
   });
 
   it('should render Uint8Array payloads through the byte-normalizing comparator', () => {
-    // Act - exercises the Uint8Array branch of the internal comparator
+    // Act
     const error = new InterfaceAssertionError('Bytes', new Uint8Array([1, 2]), new Uint8Array([3]));
 
     // Assert

@@ -10,18 +10,26 @@ const record: LogRecord = { level: 'info', message: 'hello', attributes: { b: 2,
 
 describe('InMemoryLoggerSink', () => {
   it('should validate, normalize, and retain an emitted record', async () => {
+    // Arrange
     const subject = new InMemoryLoggerSink();
+
+    // Act
     await expectOk(subject.emit(record));
 
+    // Assert
     subject.records.should.have.length(1);
-    // attributes normalized to a sorted, frozen record
     Object.keys(subject.records[0]?.attributes ?? {}).should.eql(['a', 'b']);
     subject.calls[0]?.method.should.eql('emit');
   });
 
   it('should reject an invalid record without retaining it', async () => {
+    // Arrange
     const subject = new InMemoryLoggerSink();
+
+    // Act
     const error = await expectErr(subject.emit({ level: 'nope' as never, message: 'x' }));
+
+    // Assert
     error.details.should.eql({ field: 'level' });
     subject.records.should.have.length(0);
     subject.calls.should.have.length(0);
@@ -35,7 +43,7 @@ describe('InMemoryLoggerSink', () => {
     // Act
     const error = await expectErr(subject.emit({ level: 'warn', message: 'x' }));
 
-    // Assert - the call is logged for inspection, the record is not retained
+    // Assert
     error.code.should.eql('io');
     subject.calls.should.have.length(1);
     subject.calls[0]?.method.should.eql('emit');
@@ -43,36 +51,46 @@ describe('InMemoryLoggerSink', () => {
   });
 
   it('should record flush calls and surface flush failures once', async () => {
+    // Arrange
     const subject = new InMemoryLoggerSink();
+
+    // Act
     await expectOk(subject.flush());
     subject.failNext(ioError());
-    (await expectErr(subject.flush())).code.should.eql('io');
+    const failed = await expectErr(subject.flush());
     await expectOk(subject.flush());
 
+    // Assert
+    failed.code.should.eql('io');
     subject.calls.map(call => call.method).should.eql(['flush', 'flush', 'flush']);
   });
 
   it('should hand back frozen, independent record and call snapshots', async () => {
+    // Arrange
     const subject = new InMemoryLoggerSink();
     await expectOk(subject.emit(record));
 
+    // Act
     const records = subject.records;
+    const firstCallsRead = subject.calls;
+    const secondCallsRead = subject.calls;
+
+    // Assert
     Object.isFrozen(records[0]).should.be.true();
     Object.isFrozen(records[0]?.attributes).should.be.true();
     (subject.records[0] === records[0]).should.be.false();
-    // each getter read returns a fresh snapshot — two reads are never identical
-    const firstCallsRead = subject.calls;
-    const secondCallsRead = subject.calls;
     (firstCallsRead[0] === secondCallsRead[0]).should.be.false();
   });
 
   it('should satisfy the sequence contract across emit and flush', async () => {
+    // Arrange
     const subject = new InMemoryLoggerSink();
     let toggle = 0;
+
+    // Assert
     await runSequenceContract({
       label: 'InMemoryLoggerSink',
       record: async () => {
-        // alternate emit/flush so both recorded-call shapes are exercised
         if (toggle++ % 2 === 0) await subject.emit({ level: 'debug', message: 'm' });
         else await subject.flush();
       },
@@ -81,7 +99,10 @@ describe('InMemoryLoggerSink', () => {
   });
 
   it('should satisfy the one-shot fault-injection contract', async () => {
+    // Arrange
     const subject = new InMemoryLoggerSink();
+
+    // Assert
     await runFailInjectionContract({
       label: 'InMemoryLoggerSink',
       makeError: () => ioError(),
@@ -91,7 +112,10 @@ describe('InMemoryLoggerSink', () => {
   });
 
   it('should satisfy the snapshot isolation contract', async () => {
+    // Arrange
     const subject = new InMemoryLoggerSink();
+
+    // Assert
     await runSnapshotIsolationContract({
       label: 'InMemoryLoggerSink',
       produce: async () => {

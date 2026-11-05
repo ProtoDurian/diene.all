@@ -10,7 +10,7 @@ describe('validateLogRecord', () => {
       // Act
       const actual = await expectOk(validateLogRecord({ level, message: 'hello' }));
 
-      // Assert - attributes key is omitted entirely when none are supplied
+      // Assert
       actual.level.should.eql(level);
       actual.message.should.eql('hello');
       Object.hasOwn(actual, 'attributes').should.be.false();
@@ -72,7 +72,7 @@ describe('validateLogRecord', () => {
       }),
     );
 
-    // Assert - error surfaced under the logging port/emit operation
+    // Assert
     error.port.should.eql('logging');
     error.operation.should.eql('emit');
     error.message.should.match(/finite primitives/);

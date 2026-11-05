@@ -30,7 +30,7 @@ describe('PortError', () => {
     const subject = portError('metrics', 'io', 'record', 'msg', source);
     source.field = 'mutated';
 
-    // Assert - snapshot is frozen and detached from the caller's object
+    // Assert
     Object.isFrozen(subject.details).should.be.true();
     subject.details.should.eql({ field: 'name' });
   });
@@ -48,7 +48,7 @@ describe('PortError', () => {
     // Act
     const direct = new PortError('terminal', 'closed', 'write', 'closed stream');
 
-    // Assert - source-mode single-module identity: instanceof holds both ways
+    // Assert
     direct.should.be.instanceOf(PortError);
     (direct instanceof PortError).should.be.true();
     direct.port.should.eql('terminal');

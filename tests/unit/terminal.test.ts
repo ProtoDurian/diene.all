@@ -24,7 +24,10 @@ describe('validateTerminalWrite', () => {
   });
 
   it('should accept the stderr channel', async () => {
+    // Act
     const actual = await expectOk(validateTerminalWrite({ channel: 'stderr', text: '' }));
+
+    // Assert
     actual.channel.should.eql('stderr');
   });
 
@@ -32,28 +35,40 @@ describe('validateTerminalWrite', () => {
     ['null', null as unknown as TerminalWrite],
     ['a primitive', 2 as unknown as TerminalWrite],
   ])('should reject a non-object output (%s)', async (_label, output) => {
+    // Act
     const error = await expectErr(validateTerminalWrite(output));
+
+    // Assert
     error.port.should.eql('terminal');
     error.operation.should.eql('write');
     error.details.should.eql({ field: 'output' });
   });
 
   it('should reject an invalid channel', async () => {
+    // Act
     const error = await expectErr(
       validateTerminalWrite({ channel: 'stdlog' as unknown as TerminalChannel, text: 'x' }),
     );
+
+    // Assert
     error.details.should.eql({ field: 'channel' });
   });
 
   it('should reject non-string text', async () => {
+    // Act
     const error = await expectErr(validateTerminalWrite({ channel: 'stdout', text: 5 as unknown as string }));
+
+    // Assert
     error.details.should.eql({ field: 'text' });
   });
 
   it('should reject a non-boolean newline', async () => {
+    // Act
     const error = await expectErr(
       validateTerminalWrite({ channel: 'stdout', text: 'x', newline: 'yes' as unknown as boolean }),
     );
+
+    // Assert
     error.details.should.eql({ field: 'newline' });
   });
 });
@@ -69,7 +84,10 @@ describe('validateTerminalRead', () => {
   });
 
   it('should retain a provided prompt', async () => {
+    // Act
     const actual = await expectOk(validateTerminalRead({ prompt: 'name?' }));
+
+    // Assert
     actual.should.eql({ prompt: 'name?' });
   });
 
@@ -77,13 +95,19 @@ describe('validateTerminalRead', () => {
     ['null', null as unknown as TerminalRead],
     ['a primitive', 2 as unknown as TerminalRead],
   ])('should reject a non-object input (%s)', async (_label, input) => {
+    // Act
     const error = await expectErr(validateTerminalRead(input));
+
+    // Assert
     error.operation.should.eql('readLine');
     error.details.should.eql({ field: 'input' });
   });
 
   it('should reject a non-string prompt', async () => {
+    // Act
     const error = await expectErr(validateTerminalRead({ prompt: 5 as unknown as string }));
+
+    // Assert
     error.details.should.eql({ field: 'prompt' });
   });
 });

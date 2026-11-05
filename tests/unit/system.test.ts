@@ -13,7 +13,7 @@ describe('validateProcessRequest', () => {
     // Act
     const actual = await expectOk(validateProcessRequest({ executable: 'ls' }));
 
-    // Assert - no optional keys are serialized when absent
+    // Assert
     actual.should.eql({ executable: 'ls' });
     Object.isFrozen(actual).should.be.true();
   });
@@ -34,7 +34,7 @@ describe('validateProcessRequest', () => {
     // Act
     const actual = await expectOk(validateProcessRequest(request));
 
-    // Assert - detached, frozen copies
+    // Assert
     actual.should.eql(request);
     Object.isFrozen(actual.arguments).should.be.true();
     Object.isFrozen(actual.environment).should.be.true();
@@ -46,7 +46,10 @@ describe('validateProcessRequest', () => {
     ['null', null as unknown as ProcessRequest],
     ['a primitive', 4 as unknown as ProcessRequest],
   ])('should reject a non-object request (%s)', async (_label, request) => {
+    // Act
     const error = await expectErr(validateProcessRequest(request));
+
+    // Assert
     error.port.should.eql('system');
     error.operation.should.eql('execute');
     error.details.should.eql({ field: 'request' });
@@ -57,13 +60,19 @@ describe('validateProcessRequest', () => {
     ['blank', '   '],
     ['empty', ''],
   ])('should reject a blank executable (%s)', async (_label, executable) => {
+    // Act
     const error = await expectErr(validateProcessRequest({ executable }));
+
+    // Assert
     error.details.should.eql({ field: 'executable' });
     error.message.should.match(/must not be blank/);
   });
 
   it('should reject an executable containing NUL', async () => {
+    // Act
     const error = await expectErr(validateProcessRequest({ executable: 'ls\0rm' }));
+
+    // Assert
     error.details.should.eql({ field: 'executable' });
     error.message.should.match(/must not contain NUL/);
   });
@@ -73,7 +82,10 @@ describe('validateProcessRequest', () => {
     ['non-string element', [1] as unknown as string[]],
     ['NUL element', ['a\0b']],
   ])('should reject invalid arguments (%s)', async (_label, args) => {
+    // Act
     const error = await expectErr(validateProcessRequest({ executable: 'ls', arguments: args }));
+
+    // Assert
     error.details.should.eql({ field: 'arguments' });
   });
 
@@ -82,7 +94,10 @@ describe('validateProcessRequest', () => {
     ['empty', ''],
     ['NUL', '/a\0b'],
   ])('should reject an invalid cwd (%s)', async (_label, cwd) => {
+    // Act
     const error = await expectErr(validateProcessRequest({ executable: 'ls', cwd }));
+
+    // Assert
     error.details.should.eql({ field: 'cwd' });
   });
 
@@ -93,7 +108,10 @@ describe('validateProcessRequest', () => {
     ['a Date', new Date() as unknown as Record<string, string>],
     ['a class instance', new (class Env {})() as unknown as Record<string, string>],
   ])('should reject a non-record environment (%s)', async (_label, environment) => {
+    // Act
     const error = await expectErr(validateProcessRequest({ executable: 'ls', environment }));
+
+    // Assert
     error.details.should.eql({ field: 'environment' });
     error.message.should.match(/must be a string record/);
   });
@@ -105,13 +123,19 @@ describe('validateProcessRequest', () => {
     ['non-string value', { A: 1 as unknown as string }],
     ['value with NUL', { A: 'v\0' }],
   ])('should reject invalid environment entries (%s)', async (_label, environment) => {
+    // Act
     const error = await expectErr(validateProcessRequest({ executable: 'ls', environment }));
+
+    // Assert
     error.details.should.eql({ field: 'environment' });
     error.message.should.match(/entries must be valid/);
   });
 
   it('should reject a non-string stdin', async () => {
+    // Act
     const error = await expectErr(validateProcessRequest({ executable: 'ls', stdin: 5 as unknown as string }));
+
+    // Assert
     error.details.should.eql({ field: 'stdin' });
   });
 
@@ -120,7 +144,10 @@ describe('validateProcessRequest', () => {
     ['zero', 0],
     ['negative', -1],
   ])('should reject an invalid timeoutMs (%s)', async (_label, timeoutMs) => {
+    // Act
     const error = await expectErr(validateProcessRequest({ executable: 'ls', timeoutMs }));
+
+    // Assert
     error.details.should.eql({ field: 'timeoutMs' });
   });
 });
@@ -136,7 +163,10 @@ describe('validateProcessOutput', () => {
   });
 
   it('should accept a non-zero exit code as an ordinary value', async () => {
+    // Act
     const actual = await expectOk(validateProcessOutput({ exitCode: 127, stdout: '', stderr: 'not found' }));
+
+    // Assert
     actual.exitCode.should.eql(127);
   });
 
@@ -146,7 +176,10 @@ describe('validateProcessOutput', () => {
     ['non-string stdout', { exitCode: 0, stdout: 1 as unknown as string, stderr: '' }],
     ['non-string stderr', { exitCode: 0, stdout: '', stderr: 1 as unknown as string }],
   ])('should reject malformed output (%s)', async (_label, output) => {
+    // Act
     const error = await expectErr(validateProcessOutput(output as ProcessOutput));
+
+    // Assert
     error.port.should.eql('system');
     error.message.should.match(/integer exit code and text streams/);
   });

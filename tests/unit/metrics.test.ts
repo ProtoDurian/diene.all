@@ -10,7 +10,7 @@ describe('validateMetricRecord', () => {
       // Act
       const actual = await expectOk(validateMetricRecord({ kind, name: 'http.requests', value: 3 }));
 
-      // Assert - attributes key is omitted entirely when none are supplied
+      // Assert
       actual.kind.should.eql(kind);
       actual.name.should.eql('http.requests');
       actual.value.should.eql(3);
@@ -40,7 +40,7 @@ describe('validateMetricRecord', () => {
     // Act
     const actual = await expectOk(validateMetricRecord({ kind: 'gauge', name: 'temp', value: -4 }));
 
-    // Assert - gauge may be negative; absent unit is not serialized
+    // Assert
     Object.hasOwn(actual, 'unit').should.be.false();
     actual.value.should.eql(-4);
   });

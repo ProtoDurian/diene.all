@@ -17,7 +17,7 @@ describe('validateTelemetryAttributes', () => {
   });
 
   it('should accept and sort finite primitive attributes into a frozen record', async () => {
-    // Arrange - deliberately unsorted keys and every primitive value kind
+    // Arrange
     const input = { zebra: 'z', alpha: 1, mid: true } as TelemetryAttributes;
 
     // Act
@@ -93,7 +93,7 @@ describe('checkTelemetryAttributes', () => {
     // Act
     const checked = checkTelemetryAttributes({ a: 1 }, 'metrics', 'record');
 
-    // Assert - the check* variant returns the discriminated Checked, not a Result
+    // Assert
     checked.ok.should.be.true();
     if (checked.ok) {
       (checked.value === undefined).should.be.false();

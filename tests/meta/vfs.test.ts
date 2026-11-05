@@ -11,141 +11,255 @@ const ioError = (operation: string): VfsError => portError('vfs', 'io', operatio
 
 describe('InMemoryVirtualFileSystem readFile', () => {
   it('should reject an invalid path', async () => {
+    // Act
     const error = await expectErr(vfs().readFile('relative'));
+
+    // Assert
     error.code.should.eql('invalid-input');
   });
 
   it('should read back written bytes as an independent copy', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.writeFile('/f', bytes(1, 2, 3)));
+
+    // Act
     const read = await expectOk(subject.readFile('/f'));
     read[0] = 9;
+
+    // Assert
     Array.from(await expectOk(subject.readFile('/f'))).should.eql([1, 2, 3]);
   });
 
   it('should surface not-found for a missing file', async () => {
-    (await expectErr(vfs().readFile('/missing'))).code.should.eql('not-found');
+    // Act
+    const error = await expectErr(vfs().readFile('/missing'));
+
+    // Assert
+    error.code.should.eql('not-found');
   });
 
   it('should surface not-a-file for a directory', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.createDirectory('/d'));
-    (await expectErr(subject.readFile('/d'))).code.should.eql('not-a-file');
+
+    // Act
+    const error = await expectErr(subject.readFile('/d'));
+
+    // Assert
+    error.code.should.eql('not-a-file');
   });
 
   it('should surface an injected failure before touching the node', async () => {
+    // Arrange
     const subject = vfs();
     subject.failNext(ioError('readFile'));
-    (await expectErr(subject.readFile('/whatever'))).code.should.eql('io');
+
+    // Act
+    const error = await expectErr(subject.readFile('/whatever'));
+
+    // Assert
+    error.code.should.eql('io');
   });
 });
 
 describe('InMemoryVirtualFileSystem writeFile', () => {
   it('should reject an invalid path', async () => {
-    (await expectErr(vfs().writeFile('bad', bytes(1)))).code.should.eql('invalid-input');
+    // Act
+    const error = await expectErr(vfs().writeFile('bad', bytes(1)));
+
+    // Assert
+    error.code.should.eql('invalid-input');
   });
 
   it('should reject non-Uint8Array contents', async () => {
+    // Act
     const error = await expectErr(vfs().writeFile('/f', [1] as unknown as Uint8Array));
+
+    // Assert
     error.details.should.eql({ field: 'contents' });
   });
 
   it('should surface an injected failure', async () => {
+    // Arrange
     const subject = vfs();
     subject.failNext(ioError('writeFile'));
-    (await expectErr(subject.writeFile('/f', bytes(1)))).code.should.eql('io');
+
+    // Act
+    const error = await expectErr(subject.writeFile('/f', bytes(1)));
+
+    // Assert
+    error.code.should.eql('io');
   });
 
   it('should refuse to overwrite a directory with a file', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.createDirectory('/d'));
-    (await expectErr(subject.writeFile('/d', bytes(1)))).code.should.eql('not-a-file');
+
+    // Act
+    const error = await expectErr(subject.writeFile('/d', bytes(1)));
+
+    // Assert
+    error.code.should.eql('not-a-file');
   });
 
   it('should require an existing parent directory', async () => {
-    (await expectErr(vfs().writeFile('/missing/f', bytes(1)))).code.should.eql('not-a-directory');
+    // Act
+    const error = await expectErr(vfs().writeFile('/missing/f', bytes(1)));
+
+    // Assert
+    error.code.should.eql('not-a-directory');
   });
 
   it('should store a frozen defensive copy detached from the caller', async () => {
+    // Arrange
     const subject = vfs();
     const source = bytes(1, 2);
+
+    // Act
     await expectOk(subject.writeFile('/f', source));
     source[0] = 9;
+
+    // Assert
     Array.from(await expectOk(subject.readFile('/f'))).should.eql([1, 2]);
   });
 });
 
 describe('InMemoryVirtualFileSystem exists', () => {
   it('should reject an invalid path', async () => {
-    (await expectErr(vfs().exists('bad'))).code.should.eql('invalid-input');
+    // Act
+    const error = await expectErr(vfs().exists('bad'));
+
+    // Assert
+    error.code.should.eql('invalid-input');
   });
 
   it('should report presence and absence', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.writeFile('/f', bytes(1)));
-    (await expectOk(subject.exists('/f'))).should.be.true();
-    (await expectOk(subject.exists('/nope'))).should.be.false();
+
+    // Act
+    const present = await expectOk(subject.exists('/f'));
+    const absent = await expectOk(subject.exists('/nope'));
+
+    // Assert
+    present.should.be.true();
+    absent.should.be.false();
   });
 
   it('should surface an injected failure', async () => {
+    // Arrange
     const subject = vfs();
     subject.failNext(ioError('exists'));
-    (await expectErr(subject.exists('/f'))).code.should.eql('io');
+
+    // Act
+    const error = await expectErr(subject.exists('/f'));
+
+    // Assert
+    error.code.should.eql('io');
   });
 });
 
 describe('InMemoryVirtualFileSystem stat', () => {
   it('should reject an invalid path', async () => {
-    (await expectErr(vfs().stat('bad'))).code.should.eql('invalid-input');
+    // Act
+    const error = await expectErr(vfs().stat('bad'));
+
+    // Assert
+    error.code.should.eql('invalid-input');
   });
 
   it('should surface an injected failure', async () => {
+    // Arrange
     const subject = vfs();
     subject.failNext(ioError('stat'));
-    (await expectErr(subject.stat('/')).then(e => e.code)).should.eql('io');
+
+    // Act
+    const code = await expectErr(subject.stat('/')).then(e => e.code);
+
+    // Assert
+    code.should.eql('io');
   });
 
   it('should surface not-found for a missing path', async () => {
-    (await expectErr(vfs().stat('/missing'))).code.should.eql('not-found');
+    // Act
+    const error = await expectErr(vfs().stat('/missing'));
+
+    // Assert
+    error.code.should.eql('not-found');
   });
 
   it('should report file size and zero-size directories', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.writeFile('/f', bytes(1, 2, 3, 4)));
-    (await expectOk(subject.stat('/f'))).should.eql({ kind: 'file', size: 4 });
-    (await expectOk(subject.stat('/'))).should.eql({ kind: 'directory', size: 0 });
+
+    // Act
+    const file = await expectOk(subject.stat('/f'));
+    const root = await expectOk(subject.stat('/'));
+
+    // Assert
+    file.should.eql({ kind: 'file', size: 4 });
+    root.should.eql({ kind: 'directory', size: 0 });
   });
 });
 
 describe('InMemoryVirtualFileSystem list', () => {
   it('should reject an invalid path', async () => {
-    (await expectErr(vfs().list('bad'))).code.should.eql('invalid-input');
+    // Act
+    const error = await expectErr(vfs().list('bad'));
+
+    // Assert
+    error.code.should.eql('invalid-input');
   });
 
   it('should surface an injected failure', async () => {
+    // Arrange
     const subject = vfs();
     subject.failNext(ioError('list'));
-    (await expectErr(subject.list('/'))).code.should.eql('io');
+
+    // Act
+    const error = await expectErr(subject.list('/'));
+
+    // Assert
+    error.code.should.eql('io');
   });
 
   it('should surface not-found for a missing directory', async () => {
-    (await expectErr(vfs().list('/missing'))).code.should.eql('not-found');
+    // Act
+    const error = await expectErr(vfs().list('/missing'));
+
+    // Assert
+    error.code.should.eql('not-found');
   });
 
   it('should surface not-a-directory for a file', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.writeFile('/f', bytes(1)));
-    (await expectErr(subject.list('/f'))).code.should.eql('not-a-directory');
+
+    // Act
+    const error = await expectErr(subject.list('/f'));
+
+    // Assert
+    error.code.should.eql('not-a-directory');
   });
 
   it('should list only direct children, sorted, excluding deeper descendants', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.createDirectory('/a'));
     await expectOk(subject.createDirectory('/a/sub'));
     await expectOk(subject.writeFile('/a/file', bytes(1)));
     await expectOk(subject.writeFile('/a/sub/deep', bytes(1)));
 
+    // Act
     const entries = await expectOk(subject.list('/a'));
+
+    // Assert
     entries.should.eql([
       { kind: 'file', name: 'file' },
       { kind: 'directory', name: 'sub' },
@@ -153,119 +267,204 @@ describe('InMemoryVirtualFileSystem list', () => {
   });
 
   it('should list children of the root using the root prefix', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.writeFile('/top', bytes(1)));
+
+    // Act
     const entries = await expectOk(subject.list('/'));
+
+    // Assert
     entries.should.eql([{ kind: 'file', name: 'top' }]);
   });
 
   it('should sort many children written in reverse order', async () => {
-    // Arrange - three children inserted out of order forces real comparator work
+    // Arrange
     const subject = vfs();
     await expectOk(subject.writeFile('/zed', bytes(1)));
     await expectOk(subject.writeFile('/mid', bytes(1)));
     await expectOk(subject.writeFile('/abc', bytes(1)));
 
-    // Act / Assert
-    (await expectOk(subject.list('/'))).map(entry => entry.name).should.eql(['abc', 'mid', 'zed']);
+    // Act
+    const entries = await expectOk(subject.list('/'));
+
+    // Assert
+    entries.map(entry => entry.name).should.eql(['abc', 'mid', 'zed']);
   });
 });
 
 describe('InMemoryVirtualFileSystem createDirectory', () => {
   it('should reject an invalid path', async () => {
-    (await expectErr(vfs().createDirectory('bad'))).code.should.eql('invalid-input');
+    // Act
+    const error = await expectErr(vfs().createDirectory('bad'));
+
+    // Assert
+    error.code.should.eql('invalid-input');
   });
 
   it('should reject a non-boolean recursive option', async () => {
+    // Act
     const error = await expectErr(vfs().createDirectory('/d', { recursive: 'x' as unknown as boolean }));
+
+    // Assert
     error.details.should.eql({ field: 'recursive' });
   });
 
   it('should surface an injected failure', async () => {
+    // Arrange
     const subject = vfs();
     subject.failNext(ioError('createDirectory'));
-    (await expectErr(subject.createDirectory('/d'))).code.should.eql('io');
+
+    // Act
+    const error = await expectErr(subject.createDirectory('/d'));
+
+    // Assert
+    error.code.should.eql('io');
   });
 
   it('should refuse to create a directory where a file exists', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.writeFile('/f', bytes(1)));
-    (await expectErr(subject.createDirectory('/f'))).code.should.eql('not-a-directory');
+
+    // Act
+    const error = await expectErr(subject.createDirectory('/f'));
+
+    // Assert
+    error.code.should.eql('not-a-directory');
   });
 
   it('should be idempotent on an existing directory only when recursive', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.createDirectory('/d'));
+
+    // Act
     await expectOk(subject.createDirectory('/d', { recursive: true }));
-    (await expectErr(subject.createDirectory('/d'))).code.should.eql('already-exists');
+    const error = await expectErr(subject.createDirectory('/d'));
+
+    // Assert
+    error.code.should.eql('already-exists');
   });
 
   it('should create ancestors recursively but stop at a file ancestor', async () => {
+    // Arrange
     const subject = vfs();
-    await expectOk(subject.createDirectory('/a/b/c', { recursive: true }));
-    (await expectOk(subject.stat('/a/b'))).kind.should.eql('directory');
 
+    // Act
+    await expectOk(subject.createDirectory('/a/b/c', { recursive: true }));
+    const ancestor = await expectOk(subject.stat('/a/b'));
     await expectOk(subject.writeFile('/file', bytes(1)));
-    (await expectErr(subject.createDirectory('/file/x', { recursive: true }))).code.should.eql('not-a-directory');
+    const error = await expectErr(subject.createDirectory('/file/x', { recursive: true }));
+
+    // Assert
+    ancestor.kind.should.eql('directory');
+    error.code.should.eql('not-a-directory');
   });
 
   it('should require an existing parent when non-recursive', async () => {
-    (await expectErr(vfs().createDirectory('/x/y'))).code.should.eql('not-a-directory');
+    // Act
+    const error = await expectErr(vfs().createDirectory('/x/y'));
+
+    // Assert
+    error.code.should.eql('not-a-directory');
   });
 
   it('should create a directory under an existing parent', async () => {
+    // Arrange
     const subject = vfs();
+
+    // Act
     await expectOk(subject.createDirectory('/z'));
+
+    // Assert
     (await expectOk(subject.stat('/z'))).kind.should.eql('directory');
   });
 });
 
 describe('InMemoryVirtualFileSystem remove', () => {
   it('should reject an invalid path', async () => {
-    (await expectErr(vfs().remove('bad'))).code.should.eql('invalid-input');
+    // Act
+    const error = await expectErr(vfs().remove('bad'));
+
+    // Assert
+    error.code.should.eql('invalid-input');
   });
 
   it('should reject a non-boolean recursive option', async () => {
+    // Act
     const error = await expectErr(vfs().remove('/d', { recursive: 'x' as unknown as boolean }));
+
+    // Assert
     error.details.should.eql({ field: 'recursive' });
   });
 
   it('should surface an injected failure', async () => {
+    // Arrange
     const subject = vfs();
     subject.failNext(ioError('remove'));
-    (await expectErr(subject.remove('/d'))).code.should.eql('io');
+
+    // Act
+    const error = await expectErr(subject.remove('/d'));
+
+    // Assert
+    error.code.should.eql('io');
   });
 
   it('should refuse to remove the root', async () => {
-    (await expectErr(vfs().remove('/'))).code.should.eql('unsupported');
+    // Act
+    const error = await expectErr(vfs().remove('/'));
+
+    // Assert
+    error.code.should.eql('unsupported');
   });
 
   it('should surface not-found for a missing path', async () => {
-    (await expectErr(vfs().remove('/missing'))).code.should.eql('not-found');
+    // Act
+    const error = await expectErr(vfs().remove('/missing'));
+
+    // Assert
+    error.code.should.eql('not-found');
   });
 
   it('should refuse to remove a non-empty directory without recursive', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.createDirectory('/d'));
     await expectOk(subject.writeFile('/d/f', bytes(1)));
-    (await expectErr(subject.remove('/d'))).code.should.eql('directory-not-empty');
+
+    // Act
+    const error = await expectErr(subject.remove('/d'));
+
+    // Assert
+    error.code.should.eql('directory-not-empty');
   });
 
   it('should remove a directory tree recursively', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.createDirectory('/d'));
     await expectOk(subject.writeFile('/d/f', bytes(1)));
+
+    // Act
     await expectOk(subject.remove('/d', { recursive: true }));
+
+    // Assert
     (await expectOk(subject.exists('/d'))).should.be.false();
     (await expectOk(subject.exists('/d/f'))).should.be.false();
   });
 
   it('should remove a file and an empty directory', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.writeFile('/f', bytes(1)));
+
+    // Act
     await expectOk(subject.remove('/f'));
     await expectOk(subject.createDirectory('/e'));
     await expectOk(subject.remove('/e'));
+
+    // Assert
     (await expectOk(subject.exists('/f'))).should.be.false();
     (await expectOk(subject.exists('/e'))).should.be.false();
   });
@@ -273,14 +472,18 @@ describe('InMemoryVirtualFileSystem remove', () => {
 
 describe('InMemoryVirtualFileSystem recorded state', () => {
   it('should clone writeFile contents in the calls getter', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.writeFile('/f', bytes(1, 2)));
     await expectOk(subject.exists('/f'));
 
+    // Act
     const calls = subject.calls;
     const writeCall = calls[0];
     if (writeCall?.method !== 'writeFile') throw new Error('expected writeFile call');
     writeCall.contents[0] = 9;
+
+    // Assert
     const reread = subject.calls[0];
     if (reread?.method !== 'writeFile') throw new Error('expected writeFile call');
     Array.from(reread.contents).should.eql([1, 2]);
@@ -288,21 +491,27 @@ describe('InMemoryVirtualFileSystem recorded state', () => {
   });
 
   it('should expose files in code-unit order with independent byte copies', async () => {
-    // Arrange - keys whose locale order (a, B, Z) differs from code-unit order (B, Z, a)
+    // Arrange
+    // Locale order (a, B, Z) must differ from code-unit order (B, Z, a).
     const subject = vfs();
     await expectOk(subject.writeFile('/a', bytes(1)));
     await expectOk(subject.writeFile('/Z', bytes(2)));
     await expectOk(subject.writeFile('/B', bytes(3)));
 
-    // Assert - deterministic, locale-independent code-unit ordering: 'B'(66) < 'Z'(90) < 'a'(97)
+    // Act
     const files = subject.files;
-    Object.keys(files).should.eql(['/B', '/Z', '/a']);
     (files['/a'] as Uint8Array)[0] = 9;
+
+    // Assert
+    Object.keys(files).should.eql(['/B', '/Z', '/a']);
     Array.from(subject.files['/a'] as Uint8Array).should.eql([1]);
   });
 
   it('should satisfy the sequence contract across mixed calls', async () => {
+    // Arrange
     const subject = vfs();
+
+    // Assert
     await runSequenceContract({
       label: 'InMemoryVirtualFileSystem',
       record: async () => {
@@ -313,8 +522,11 @@ describe('InMemoryVirtualFileSystem recorded state', () => {
   });
 
   it('should satisfy the one-shot fault-injection contract', async () => {
+    // Arrange
     const subject = vfs();
     await expectOk(subject.writeFile('/f', bytes(1)));
+
+    // Assert
     await runFailInjectionContract({
       label: 'InMemoryVirtualFileSystem',
       makeError: () => ioError('exists'),
@@ -324,7 +536,10 @@ describe('InMemoryVirtualFileSystem recorded state', () => {
   });
 
   it('should satisfy the snapshot isolation contract', async () => {
+    // Arrange
     const subject = vfs();
+
+    // Assert
     await runSnapshotIsolationContract({
       label: 'InMemoryVirtualFileSystem',
       produce: async () => {

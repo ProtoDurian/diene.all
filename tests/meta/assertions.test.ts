@@ -23,10 +23,6 @@ import { Ok } from '@atomicloud/diene.result';
 import 'should';
 import { expectAssertionError, expectNoThrow, expectOk } from './support/capture.js';
 
-// Assert-the-asserter: every shipped assertion must pass on a known-good
-// interaction and throw InterfaceAssertionError, with useful fields, on a
-// known-bad one.
-
 describe('assertSystemCalls', () => {
   const arrange = async (): Promise<InMemorySystem> => {
     const subject = new InMemorySystem([Ok({ exitCode: 0, stdout: '', stderr: '' })]);
@@ -36,13 +32,24 @@ describe('assertSystemCalls', () => {
   const expected: readonly ProcessRequest[] = [{ executable: 'ls', arguments: ['-a'] }];
 
   it('should pass on a matching sequence', async () => {
+    // Arrange
     const subject = await arrange();
-    expectNoThrow(() => assertSystemCalls(subject, expected));
+
+    // Act
+    const act = (): void => assertSystemCalls(subject, expected);
+
+    // Assert
+    expectNoThrow(act);
   });
 
   it('should throw a described InterfaceAssertionError on a mismatch', async () => {
+    // Arrange
     const subject = await arrange();
+
+    // Act
     const error = expectAssertionError(() => assertSystemCalls(subject, [{ executable: 'other' }]));
+
+    // Assert
     error.label.should.eql('System calls');
     error.message.should.match(/System calls mismatch/);
     (error.expected as readonly ProcessRequest[]).should.eql([{ executable: 'other' }]);
@@ -59,15 +66,26 @@ describe('assertVfsCalls', () => {
   const expected: readonly VfsCall[] = [{ method: 'exists', path: '/f', sequence: 0 }];
 
   it('should pass on a matching sequence', async () => {
+    // Arrange
     const subject = await arrange();
-    expectNoThrow(() => assertVfsCalls(subject, expected));
+
+    // Act
+    const act = (): void => assertVfsCalls(subject, expected);
+
+    // Assert
+    expectNoThrow(act);
   });
 
   it('should throw on a mismatch', async () => {
+    // Arrange
     const subject = await arrange();
+
+    // Act
     const error = expectAssertionError(() =>
       assertVfsCalls(subject, [{ method: 'exists', path: '/other', sequence: 0 }]),
     );
+
+    // Assert
     error.label.should.eql('VFS calls');
     error.message.should.match(/mismatch/);
   });
@@ -81,13 +99,24 @@ describe('assertVfsFiles', () => {
   };
 
   it('should pass on matching file bytes', async () => {
+    // Arrange
     const subject = await arrange();
-    expectNoThrow(() => assertVfsFiles(subject, { '/f': new Uint8Array([1, 2]) }));
+
+    // Act
+    const act = (): void => assertVfsFiles(subject, { '/f': new Uint8Array([1, 2]) });
+
+    // Assert
+    expectNoThrow(act);
   });
 
   it('should throw on differing bytes', async () => {
+    // Arrange
     const subject = await arrange();
+
+    // Act
     const error = expectAssertionError(() => assertVfsFiles(subject, { '/f': new Uint8Array([9]) }));
+
+    // Assert
     error.label.should.eql('VFS files');
   });
 });
@@ -103,17 +132,28 @@ describe('assertTerminalCalls', () => {
   ];
 
   it('should pass on a matching sequence', async () => {
+    // Arrange
     const subject = await arrange();
-    expectNoThrow(() => assertTerminalCalls(subject, expected));
+
+    // Act
+    const act = (): void => assertTerminalCalls(subject, expected);
+
+    // Assert
+    expectNoThrow(act);
   });
 
   it('should throw on a mismatch', async () => {
+    // Arrange
     const subject = await arrange();
+
+    // Act
     const error = expectAssertionError(() =>
       assertTerminalCalls(subject, [
         { method: 'write', output: { channel: 'stderr', text: 'hi', newline: false }, sequence: 0 },
       ]),
     );
+
+    // Assert
     error.label.should.eql('Terminal calls');
   });
 });
@@ -127,13 +167,24 @@ describe('assertLogRecords', () => {
   const expected: readonly LogRecord[] = [{ level: 'info', message: 'hi' }];
 
   it('should pass on matching records', async () => {
+    // Arrange
     const subject = await arrange();
-    expectNoThrow(() => assertLogRecords(subject, expected));
+
+    // Act
+    const act = (): void => assertLogRecords(subject, expected);
+
+    // Assert
+    expectNoThrow(act);
   });
 
   it('should throw on a mismatch', async () => {
+    // Arrange
     const subject = await arrange();
+
+    // Act
     const error = expectAssertionError(() => assertLogRecords(subject, [{ level: 'warn', message: 'hi' }]));
+
+    // Assert
     error.label.should.eql('Log records');
   });
 });
@@ -151,13 +202,24 @@ describe('assertLoggerCalls', () => {
   ];
 
   it('should pass on a matching call log', async () => {
+    // Arrange
     const subject = await arrange();
-    expectNoThrow(() => assertLoggerCalls(subject, expected));
+
+    // Act
+    const act = (): void => assertLoggerCalls(subject, expected);
+
+    // Assert
+    expectNoThrow(act);
   });
 
   it('should throw on a mismatch', async () => {
+    // Arrange
     const subject = await arrange();
+
+    // Act
     const error = expectAssertionError(() => assertLoggerCalls(subject, [{ method: 'flush', sequence: 0 }]));
+
+    // Assert
     error.label.should.eql('Logger calls');
     error.message.should.match(/Logger calls mismatch/);
   });
@@ -172,13 +234,24 @@ describe('assertMetricRecords', () => {
   const expected: readonly MetricRecord[] = [{ kind: 'counter', name: 'hits', value: 1 }];
 
   it('should pass on matching metrics', async () => {
+    // Arrange
     const subject = await arrange();
-    expectNoThrow(() => assertMetricRecords(subject, expected));
+
+    // Act
+    const act = (): void => assertMetricRecords(subject, expected);
+
+    // Assert
+    expectNoThrow(act);
   });
 
   it('should throw on a mismatch', async () => {
+    // Arrange
     const subject = await arrange();
+
+    // Act
     const error = expectAssertionError(() => assertMetricRecords(subject, [{ kind: 'gauge', name: 'hits', value: 1 }]));
+
+    // Assert
     error.label.should.eql('Metric records');
   });
 });
@@ -196,13 +269,24 @@ describe('assertMetricsCalls', () => {
   ];
 
   it('should pass on a matching call log', async () => {
+    // Arrange
     const subject = await arrange();
-    expectNoThrow(() => assertMetricsCalls(subject, expected));
+
+    // Act
+    const act = (): void => assertMetricsCalls(subject, expected);
+
+    // Assert
+    expectNoThrow(act);
   });
 
   it('should throw on a mismatch', async () => {
+    // Arrange
     const subject = await arrange();
+
+    // Act
     const error = expectAssertionError(() => assertMetricsCalls(subject, [{ method: 'flush', sequence: 0 }]));
+
+    // Assert
     error.label.should.eql('Metrics calls');
     error.message.should.match(/Metrics calls mismatch/);
   });

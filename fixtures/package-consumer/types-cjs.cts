@@ -18,11 +18,9 @@ import {
 } from '@atomicloud/diene.interfaces/test-helper';
 
 function resolveThroughRequireTypes(): void {
-  // Root entry: types and the PortError value resolve through the require condition.
   const failure: PortError<'vfs'> = portError('vfs', 'not-found', 'readFile', 'node16-cjs');
   const asError: VfsError = failure;
 
-  // test-helper entry: the in-memory doubles satisfy the root port contracts.
   const system: System = new InMemorySystem();
   const vfs: VirtualFileSystem = new InMemoryVirtualFileSystem();
   const terminal: Terminal = new InMemoryTerminal();

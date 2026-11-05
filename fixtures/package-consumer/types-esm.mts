@@ -17,11 +17,9 @@ import {
   type VfsCall,
 } from '@atomicloud/diene.interfaces/test-helper';
 
-// Root entry: types and the PortError value resolve through the import condition.
 const failure: PortError<'vfs'> = portError('vfs', 'not-found', 'readFile', 'node16-esm');
 const asError: VfsError = failure;
 
-// test-helper entry: the in-memory doubles satisfy the root port contracts.
 const system: System = new InMemorySystem();
 const vfs: VirtualFileSystem = new InMemoryVirtualFileSystem();
 const terminal: Terminal = new InMemoryTerminal();

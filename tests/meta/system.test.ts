@@ -13,7 +13,7 @@ const okOutcome = (over: Partial<ProcessOutput> = {}): Result<ProcessOutput, nev
 
 describe('InMemorySystem', () => {
   it('should return the queued outcome and record the validated request', async () => {
-    // Arrange - outcomes provided via the constructor
+    // Arrange
     const subject = new InMemorySystem([okOutcome({ exitCode: 2, stdout: 'hi' })]);
     const request: ProcessRequest = { executable: 'ls', arguments: ['-a'] };
 
@@ -35,7 +35,7 @@ describe('InMemorySystem', () => {
     // Act
     const error = await expectErr(subject.execute({ executable: '' }));
 
-    // Assert - validation rejection happens before the call is recorded
+    // Assert
     error.code.should.eql('invalid-input');
     subject.calls.should.have.length(0);
   });
@@ -47,7 +47,7 @@ describe('InMemorySystem', () => {
     // Act
     const error = await expectErr(subject.execute({ executable: 'ls' }));
 
-    // Assert - the call is still recorded even though it had no scripted outcome
+    // Assert
     error.code.should.eql('unexpected-call');
     error.details.should.eql({ executable: 'ls' });
     subject.calls.should.have.length(1);
@@ -66,7 +66,7 @@ describe('InMemorySystem', () => {
   });
 
   it('should validate a queued success outcome and reject a malformed one', async () => {
-    // Arrange - a structurally invalid ProcessOutput is queued
+    // Arrange
     const subject = new InMemorySystem([okOutcome({ exitCode: 1.5 })]);
 
     // Act
@@ -101,14 +101,17 @@ describe('InMemorySystem', () => {
     // Act
     const snapshot = subject.calls;
 
-    // Assert - each read is a fresh frozen copy
+    // Assert
     Object.isFrozen(snapshot[0]).should.be.true();
     Object.isFrozen(snapshot[0]?.request).should.be.true();
     (subject.calls[0] === snapshot[0]).should.be.false();
   });
 
   it('should satisfy the deterministic sequence contract', async () => {
+    // Arrange
     const subject = new InMemorySystem();
+
+    // Assert
     await runSequenceContract({
       label: 'InMemorySystem',
       record: async () => {
@@ -120,7 +123,10 @@ describe('InMemorySystem', () => {
   });
 
   it('should satisfy the snapshot isolation contract', async () => {
+    // Arrange
     const subject = new InMemorySystem([okOutcome()]);
+
+    // Assert
     await runSnapshotIsolationContract({
       label: 'InMemorySystem',
       produce: async () => {

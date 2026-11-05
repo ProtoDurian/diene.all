@@ -2,10 +2,6 @@ import { InterfaceAssertionError } from '@atomicloud/diene.interfaces/test-helpe
 import type { Result } from '@atomicloud/diene.result';
 import 'should';
 
-// Framework-free capture helpers for the meta tier. The shipped assertions throw
-// `InterfaceAssertionError` on a bad interaction and return nothing on a good one,
-// so "assert-the-asserter" tests need to observe both the throw and the no-throw.
-
 function capture(fn: () => void): unknown {
   try {
     fn();
