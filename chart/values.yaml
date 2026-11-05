@@ -22,6 +22,9 @@ store:
   hostAPI: https://secrets.atomi.cloud
   # @schema pattern:^[a-z0-9-]+$;required:true
   project: sos
+  # @schema pattern:^[A-Za-z0-9._-]+$;required:true
+  # -- Only namespaces labelled `<labelPrefix>/sos-reader=<readerLabel>` may use the store; carbon sets it on its platform namespace.
+  readerLabel: "true"
   # @schema additionalProperties:false
   # -- SoS bootstrap credential, written into the cluster by T3 provisioning. References only.
   credentials:
@@ -37,6 +40,10 @@ store:
 # -- external-secrets 2.7.0 values: upstream defaults plus LPSM labels, Reloader, pod non-root and limits.
 upstream:
   fullnameOverride: cobalt-eso
+  crds:
+    annotations:
+      helm.sh/resource-policy: keep
+      argocd.argoproj.io/sync-options: ServerSideApply=true
   commonLabels:
     atomi.cloud/platform: secrets
     atomi.cloud/service: cobalt

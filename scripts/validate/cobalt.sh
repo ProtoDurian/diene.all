@@ -24,14 +24,12 @@ render() {
 
 json() { yq eval-all -o=json '.' "$1" | jq -s 'map(select(.kind != null))'; }
 
-# need_jq <reason> <jq args...>: a failed check names its reason so negative fixtures can match it.
 need_jq() {
   local reason="$1"
   shift
   jq -e "$@" >/dev/null || { echo "❌ ${reason}" >&2 && return 1; }
 }
 
-# expect_red <label> <pattern> <cmd...>: the check must fail, and fail for the expected reason.
 expect_red() {
   local label="$1" pattern="$2"
   shift 2
@@ -77,12 +75,29 @@ assert_store_scope() {
     $s[0].spec.provider.infisical.secretsScope == {"projectSlug": "sos", "environmentSlug": $l, "secretsPath": "/", "recursive": true}'
 }
 
+assert_store_readers() {
+  json "$1" | need_jq "the store is not limited to namespaces labelled $2/sos-reader" --arg k "$2/sos-reader" '
+    map(select(.kind == "ClusterSecretStore")) as $s | ($s | length) == 1 and
+    $s[0].spec.conditions == [{"namespaceSelector": {"matchLabels": {($k): "true"}}}]'
+}
+
+assert_store_hook() {
+  json "$1" | need_jq "the store is not a post-install/post-upgrade hook" '
+    map(select(.kind == "ClusterSecretStore")) as $s | ($s | length) == 1 and
+    $s[0].metadata.annotations["helm.sh/hook"] == "post-install,post-upgrade" and
+    $s[0].metadata.annotations["helm.sh/hook-delete-policy"] == "before-hook-creation"'
+}
+
 assert_crds() {
   local actual="${tmp}/crds-actual.txt"
   json "$1" | jq -r '.[] | select(.kind == "CustomResourceDefinition") | .metadata.name' | LC_ALL=C sort -u >"${actual}"
   diff -u "${crd_list}" "${actual}" >&2 || { echo "❌ rendered ESO CRD lifecycle set differs from ${crd_list}" >&2 && return 1; }
   json "$1" | need_jq 'an ESO CRD is a hook, not a normal template' '
-    all(.[] | select(.kind == "CustomResourceDefinition"); (.metadata.annotations // {}) | has("helm.sh/hook") | not)'
+    all(.[] | select(.kind == "CustomResourceDefinition"); (.metadata.annotations // {}) | has("helm.sh/hook") | not)' || return 1
+  json "$1" | need_jq 'an ESO CRD is not kept on uninstall' '
+    all(.[] | select(.kind == "CustomResourceDefinition"); .metadata.annotations["helm.sh/resource-policy"] == "keep")' || return 1
+  json "$1" | need_jq 'an ESO CRD is not server-side applied by ArgoCD' '
+    all(.[] | select(.kind == "CustomResourceDefinition"); .metadata.annotations["argocd.argoproj.io/sync-options"] == "ServerSideApply=true")'
 }
 
 assert_v1_only() {
@@ -117,7 +132,6 @@ assert_reloader() {
     all($d[]; .spec.template.metadata.annotations["reloader.stakater.com/auto"] == $want)'
 }
 
-# The inherited rendered-manifest stage: template -> kubeconform -> kyverno VAP.
 vap_stage() {
   mkdir -p "${tmp}/schemas"
   cp schemas/*.json "${tmp}/schemas/"
@@ -134,11 +148,6 @@ vap_stage() {
 
 case "${mode}" in
 schema)
-  for stack in "${lint_stacks[@]}"; do
-    # shellcheck disable=SC2086
-    helm lint chart --namespace "${namespace}" ${stack} >"${tmp}/schema.txt" 2>&1 ||
-      { echo "❌ schema rejected the stack '${stack:-values.yaml}'" >&2 && cat "${tmp}/schema.txt" >&2 && exit 1; }
-  done
   expect_red 'layer is not numeric' "serviceTree/layer.*does not match pattern|at '/serviceTree/layer'" helm lint chart --namespace "${namespace}" --set-string serviceTree.layer=one
   expect_red 'plain-http Infisical host' "store/hostAPI.*does not match pattern|at '/store/hostAPI'" helm lint chart --namespace "${namespace}" --set store.hostAPI=http://secrets.atomi.cloud
   ;;
@@ -149,7 +158,8 @@ schema-drift)
 lint)
   for stack in "${lint_stacks[@]}"; do
     # shellcheck disable=SC2086
-    helm lint chart --namespace "${namespace}" ${stack}
+    helm lint chart --namespace "${namespace}" ${stack} >"${tmp}/schema.txt" 2>&1 ||
+      { echo "❌ schema rejected the stack '${stack:-values.yaml}'" >&2 && cat "${tmp}/schema.txt" >&2 && exit 1; }
   done
   ;;
 render)
@@ -195,6 +205,11 @@ store-scope)
   sed -i 's#environmentSlug: {{ .Values.serviceTree.landscape | quote }}#environmentSlug: "serving"#' "${tmp}/wide/chart/templates/clustersecretstore.yaml"
   render "${tmp}/wide/chart" "${full[@]}" >"${tmp}/wide.yaml"
   expect_red 'store environment widened past the landscape' 'not scoped to SoS project \+ landscape example' assert_store_scope "${tmp}/wide.yaml" example
+  assert_store_readers "${tmp}/scope.yaml" atomi.cloud
+  copy_tree "${tmp}/open"
+  sed -i '/^  conditions:$/,/sos-reader/d' "${tmp}/open/chart/templates/clustersecretstore.yaml"
+  render "${tmp}/open/chart" "${full[@]}" >"${tmp}/open.yaml"
+  expect_red 'store open to every namespace' 'not limited to namespaces labelled' assert_store_readers "${tmp}/open.yaml" atomi.cloud
   render chart "${full[@]}" --set store.project=platform >"${tmp}/project.yaml"
   expect_red 'store bound to another project' 'not scoped to SoS project' assert_store_scope "${tmp}/project.yaml" example
   copy_tree "${tmp}/org"
@@ -212,8 +227,25 @@ crd-lifecycle)
   done
   render chart "${full[@]}" --set upstream.crds.createClusterSecretStore=false >"${tmp}/no-css.yaml"
   expect_red 'the ClusterSecretStore CRD removed' 'CRD lifecycle set differs' assert_crds "${tmp}/no-css.yaml"
-  render chart "${full[@]}" --set upstream.installCRDs=false --set store.name=infisical >"${tmp}/no-crds.yaml"
+  render chart "${full[@]}" --set upstream.installCRDs=false >"${tmp}/no-crds.yaml"
   expect_red 'CRD installation disabled' 'CRD lifecycle set differs' assert_crds "${tmp}/no-crds.yaml"
+  copy_tree "${tmp}/keep"
+  yq -i 'del(.upstream.crds.annotations["helm.sh/resource-policy"])' "${tmp}/keep/chart/values.yaml"
+  render "${tmp}/keep/chart" "${full[@]}" >"${tmp}/no-keep.yaml"
+  expect_red 'CRD keep policy dropped' 'not kept on uninstall' assert_crds "${tmp}/no-keep.yaml"
+  copy_tree "${tmp}/ssa"
+  yq -i 'del(.upstream.crds.annotations["argocd.argoproj.io/sync-options"])' "${tmp}/ssa/chart/values.yaml"
+  render "${tmp}/ssa/chart" "${full[@]}" >"${tmp}/no-ssa.yaml"
+  expect_red 'CRD server-side apply dropped' 'not server-side applied' assert_crds "${tmp}/no-ssa.yaml"
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/hook.yaml"
+    assert_store_hook "${tmp}/hook.yaml"
+  done
+  copy_tree "${tmp}/nohook"
+  sed -i '/helm.sh\/hook/d' "${tmp}/nohook/chart/templates/clustersecretstore.yaml"
+  render "${tmp}/nohook/chart" "${full[@]}" >"${tmp}/nohook.yaml"
+  expect_red 'store rendered as a normal resource' 'not a post-install/post-upgrade hook' assert_store_hook "${tmp}/nohook.yaml"
   ;;
 v1-only)
   assert_v1_only .
@@ -295,8 +327,6 @@ version)
 presence)
   test -s docs/developer/cobalt-baseline.md
   test -s .claude/skills/cobalt/SKILL.md
-  test -s policies/vap/workload-baseline.yaml
-  test -s "${crd_list}"
   ;;
 *)
   echo "❌ unknown validation mode '${mode}'" >&2

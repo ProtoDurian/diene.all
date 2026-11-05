@@ -15,7 +15,6 @@ fail() {
 git archive "${tree}" | tar -x -C "${work}"
 files="$(git -c core.quotePath=false ls-tree -r --name-only "${tree}")"
 ACTIVE=(':!.github/named-checks/**' ':!Changelog.md' ':!chart/charts/**' ':!*.md' ':!docs/**' ':!.gitignore')
-# scan <pathspec> <git-grep args...>; a grep error is a failure, not an empty result.
 scan() {
   local where="$1" rc=0
   shift
@@ -23,8 +22,8 @@ scan() {
   [[ ${rc} -le 1 ]] || { echo "❌ git grep failed (${rc}) for $*" >&2 && exit 2; }
 }
 
-hits="$(scan chart/templates -E 'argocd\.argoproj\.io/hook:|helm\.sh/hook:')"
-[[ -z ${hits} ]] || fail "cobalt templates declare hooks:"$'\n'"${hits}"
+hits="$(scan chart/templates -E 'argocd\.argoproj\.io/hook: *PreSync|helm\.sh/hook:.*pre-(install|upgrade)')"
+[[ -z ${hits} ]] || fail "cobalt templates declare a pre-sync hook:"$'\n'"${hits}"
 stacks=("--values chart/values.example.yaml" "--values chart/values.example.yaml --values chart/values.lapras.yaml")
 for stack in "${stacks[@]}"; do
   # shellcheck disable=SC2086

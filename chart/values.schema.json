@@ -44,7 +44,8 @@
             "required": [
                 "name",
                 "hostAPI",
-                "project"
+                "project",
+                "readerLabel"
             ],
             "properties": {
                 "credentials": {
@@ -87,6 +88,11 @@
                 "project": {
                     "type": "string",
                     "pattern": "^[a-z0-9-]+$"
+                },
+                "readerLabel": {
+                    "description": "Only namespaces labelled `\u003clabelPrefix\u003e/sos-reader=\u003creaderLabel\u003e` may use the store; carbon sets it on its platform namespace.",
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]+$"
                 }
             },
             "additionalProperties": false
@@ -149,6 +155,22 @@
                         },
                         "atomi.cloud/service": {
                             "type": "string"
+                        }
+                    }
+                },
+                "crds": {
+                    "type": "object",
+                    "properties": {
+                        "annotations": {
+                            "type": "object",
+                            "properties": {
+                                "argocd.argoproj.io/sync-options": {
+                                    "type": "string"
+                                },
+                                "helm.sh/resource-policy": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
                 },

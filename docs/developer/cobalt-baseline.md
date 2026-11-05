@@ -12,9 +12,11 @@ testing pyramid, no `probes/`.
   - provider Infisical, `hostAPI: https://secrets.atomi.cloud`;
   - `secretsScope`: `projectSlug: sos`, `environmentSlug` = `serviceTree.landscape`, `secretsPath: /`, `recursive: true`.
     It reads every SoS token of the cluster's landscape and nothing else.
+  - `conditions`: only namespaces labelled `<labelPrefix>/sos-reader: "true"` (`store.readerLabel`) may use it. Carbon sets
+    that label on its platform namespace.
   - auth: `universalAuthCredentials` that reference the SoS bootstrap Secret (`store.credentials`: name, namespace, keys).
     T3's cluster provisioning writes that Secret; cobalt never creates it and never holds a literal.
-- No PushSecret, no ExternalSecret, no hook Job, no config vendoring, no docker axis. Cobalt is pull-only.
+- No PushSecret, no ExternalSecret, no pre-sync hook or hook Job, no config vendoring, no docker axis. Cobalt is pull-only.
 
 ## Values
 
@@ -32,20 +34,22 @@ same key to `"false"` to opt out.
 ## CRDs and API version
 
 - The ESO CRDs are normal Helm templates (`installCRDs: true`), so `helm upgrade` carries CRD updates. There is no CRD-apply
-  step. `scripts/validate/cobalt-expected-crds.txt` pins the rendered CRD set; refresh it on a dependency bump.
+  step. They carry `helm.sh/resource-policy: keep` (an uninstall or prune never deletes every ExternalSecret in the cluster)
+  and `argocd.argoproj.io/sync-options: ServerSideApply=true` (two CRDs exceed the client-side apply annotation limit).
+- `scripts/validate/cobalt-expected-crds.txt` pins the rendered CRD set; refresh it on a dependency bump.
 - Everything cobalt authors is `external-secrets.io/v1`. `crds.unsafeServeV1Beta1` stays upstream `false`.
-- A first install cannot hold a CR of a CRD the same release creates. ArgoCD handles it through
-  `SkipDryRunOnMissingResource=true` on the store. Plain Helm needs an install without the store first (the k3d test uses a
-  post-renderer), then an upgrade.
+- The store is a `post-install,post-upgrade` hook (`before-hook-creation`), so Helm builds it after the CRDs exist. One plain
+  `helm install` works on a fresh cluster. ArgoCD maps it to PostSync; `SkipDryRunOnMissingResource=true` covers its dry run.
 
 ## Tests
 
 - Unit: `scripts/ci/cobalt.sh` runs every `scripts/validate/cobalt.sh` mode. Each contract has negative fixtures in the same
   mode that must fail for the expected reason. `rendered-manifests` is the inherited stage: `helm template` → kubeconform (the
   store against its CRD's v1 schema) → `kyverno apply policies/vap` on the three ESO Deployments and the webhook Service.
-- Integration: `scripts/ci/cobalt-k3d.sh` installs on k3d. It checks that the ESO pods are healthy, that the store is
-  applied by Helm, that the API server rejects a malformed store, and that `v1beta1` is not served. Then it round-trips the
-  chart through a local OCI registry. Ready is not asserted, because it needs a live Infisical.
+- Integration: `scripts/ci/cobalt-k3d.sh` runs one plain `helm install` on a fresh k3d cluster. It checks that the ESO pods
+  are healthy and the store is applied, then that `helm upgrade` re-applies it. It also checks that the API server rejects a
+  malformed store and that `v1beta1` is not served. Then it round-trips the chart through a local OCI registry. Ready is not
+  asserted, because it needs a live Infisical.
 - `task latest` prints the newest upstream chart and image tags.
 
 ## Publishing
