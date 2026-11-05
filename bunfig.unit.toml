@@ -1,7 +1,7 @@
 [test]
 root = "tests/unit"
 coverageReporter = ["text", "lcov"]
-coverageDir = "coverage/unit"
+coverageDir = "reports/unit"
 coverageSkipTestFiles = true
 coveragePathIgnorePatterns = ["bin/**", "src/adapters/**", "tests/**"]
 
