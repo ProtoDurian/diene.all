@@ -47,3 +47,70 @@ dependency, so any runner can use them.
 The concrete contract names are `System`, `VirtualFileSystem`, `Terminal`,
 `LoggerSink`, and `MetricsCollector`. Their matching doubles are prefixed with
 `InMemory` and live only on `/test-helper`; root remains the production entry.
+
+## Example
+
+A service takes the port in its constructor:
+
+```ts
+import type { VfsError, VirtualFileSystem } from '@atomicloud/diene.interfaces';
+import type { Result } from '@atomicloud/diene.result';
+
+class ReportStore {
+  constructor(private readonly vfs: VirtualFileSystem) {}
+
+  save(name: string, body: string): Result<void, VfsError> {
+    return this.vfs.writeFile(`/reports/${name}`, new TextEncoder().encode(body));
+  }
+}
+```
+
+A test injects the in-memory double, fails one call, and checks the calls:
+
+```ts
+import { portError } from '@atomicloud/diene.interfaces';
+import { assertVfsCalls, InMemoryVirtualFileSystem } from '@atomicloud/diene.interfaces/test-helper';
+
+it('should surface a disk fault from the store', async () => {
+  // Arrange
+  const vfs = new InMemoryVirtualFileSystem();
+  vfs.createDirectory('/reports');
+  vfs.failNext(portError('vfs', 'io', 'writeFile', 'disk full'));
+  const store = new ReportStore(vfs);
+
+  // Act
+  const error = await store.save('a.txt', 'hi').unwrapErr();
+
+  // Assert
+  error.code.should.equal('io');
+  assertVfsCalls(vfs, [
+    { method: 'createDirectory', options: { recursive: false }, path: '/reports', sequence: 0 },
+    { contents: new TextEncoder().encode('hi'), method: 'writeFile', path: '/reports/a.txt', sequence: 1 },
+  ]);
+});
+```
+
+## Double API
+
+| Double                      | Control                                                                       | Inspection         | Assertions                                  |
+| --------------------------- | ----------------------------------------------------------------------------- | ------------------ | ------------------------------------------- |
+| `InMemorySystem`            | outcomes in the constructor, `enqueue(outcome)`                               | `calls`            | `assertSystemCalls`                         |
+| `InMemoryVirtualFileSystem` | `failNext(error)`                                                             | `calls`, `files`   | `assertVfsCalls`, `assertVfsFiles`          |
+| `InMemoryTerminal`          | input lines in the constructor, `enqueue(line)`, `failNext(error)`, `close()` | `calls`            | `assertTerminalCalls`                       |
+| `InMemoryLoggerSink`        | `failNext(error)`                                                             | `calls`, `records` | `assertLoggerCalls`, `assertLogRecords`     |
+| `InMemoryMetricsCollector`  | `failNext(error)`                                                             | `calls`, `metrics` | `assertMetricsCalls`, `assertMetricRecords` |
+
+- `failNext` fails the next call only.
+- `InMemorySystem` returns `unexpected-call` when no outcome is queued.
+- Every recorded call has a `sequence`, starting at `0` per double. Put it in the
+  calls you expect.
+- A failed assertion throws `InterfaceAssertionError` with `label`, `expected` and
+  `actual`.
+
+## Shared validation
+
+Adapters reuse the package's rules. `validate*` returns a `Result`. `check*`
+returns `Checked` (`{ ok, value }` or `{ ok, error }`) for synchronous branching,
+because `Result` inspection is async. Both return the same error. The interfaces
+standard lists every function, the VFS failure codes, and the System timeout and
+signal rules.

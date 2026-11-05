@@ -28,6 +28,6 @@ returned value instead of using `try`/`catch`.
 the OTel package (RB-19); `LoggerSink` and `MetricsCollector` are plain effect
 seams that OTel composes with.
 
-Read [patterns.md](patterns.md) for the do's, don'ts, wiring guidance, and how to
-use the test-helper doubles. Read the interfaces standard for the full ownership,
-Result-failure, and adapters-vs-contracts-vs-OTel boundary.
+Read [patterns.md](patterns.md) for the do's, don'ts, a wiring and test example,
+and the control API of each test-helper double. Read the interfaces standard for
+the full ownership, Result-failure, and adapters-vs-contracts-vs-OTel boundary.

@@ -19,7 +19,7 @@ error-handling conventions; and adapters are constructor-injected against these 
 
 | Port                  | Concern                                           |
 | --------------------- | ------------------------------------------------- |
-| **System**            | process execution and the process environment     |
+| **System**            | process execution                                 |
 | **VirtualFileSystem** | file and directory access                         |
 | **Terminal**          | terminal input and output (stdin, stdout, stderr) |
 | **LoggerSink**        | structured, level-based log emission              |
@@ -78,6 +78,68 @@ branch rather than a thrown exception. Representative rules the ports enforce:
 The rule for anyone adding an implementation: **reuse the shared validation; never re-derive
 it.** Parity between real and fake is a property of shared code, not of careful duplication.
 
+### Result and Checked validation
+
+Each rule ships in two forms. Both return the same error.
+
+- `validate*` returns a `Result`. Use it in code that already works with `Result`.
+- `check*` returns `Checked`: `{ ok: true, value }` or `{ ok: false, error }`. Use it when you
+  must branch synchronously, as an adapter or double does before it records a call.
+
+`Checked` exists because `@atomicloud/diene.result` inspects a `Result` asynchronously
+(`isOk()` returns a `Promise`). The functions are `checkProcessRequest`, `checkProcessOutput`,
+`checkVfsPath`, `checkFileContents`, `checkRecursiveOptions`, `checkTerminalWrite`,
+`checkTerminalRead`, `checkLogRecord`, `checkMetricRecord` and `checkTelemetryAttributes`. Each
+has a `validate*` twin. `checkVfsPath` and `validateVfsPath` take the VFS operation name, so the
+error names the operation that failed.
+
+These are helpers, not port operations. Every port method still returns a `Result`.
+
+### System semantics
+
+- `environment` replaces the parent environment. It is not an overlay. Pass every variable the
+  child needs.
+- A run that takes longer than `timeoutMs` is `Err` with code `timeout`. The adapter stops
+  the child.
+- A child killed by a signal has no exit code. The adapter returns `Err` with code `io` and
+  `details.signal` set to the signal name, for example `{ signal: 'SIGKILL' }`.
+- Any exit code, zero or not, is `Ok`.
+
+`InMemorySystem` does not run anything, so it ignores `timeoutMs`. To test the timeout path,
+enqueue an `Err` with code `timeout`.
+
+### VFS failure codes
+
+Every VFS implementation returns these codes. The file-ancestor row is checked first.
+
+| Operation         | Failure                                | Code                  |
+| ----------------- | -------------------------------------- | --------------------- |
+| any               | invalid path, contents or options      | `invalid-input`       |
+| any but `exists`  | an ancestor of the path is a file      | `not-a-directory`     |
+| `exists`          | the path is missing or under a file    | none: `Ok(false)`     |
+| `readFile`        | the path is missing                    | `not-found`           |
+| `readFile`        | the path is a directory                | `not-a-file`          |
+| `writeFile`       | the path is a directory                | `not-a-file`          |
+| `writeFile`       | the parent is missing                  | `not-found`           |
+| `stat`            | the path is missing                    | `not-found`           |
+| `list`            | the path is missing                    | `not-found`           |
+| `list`            | the path is a file                     | `not-a-directory`     |
+| `createDirectory` | the path is a file                     | `already-exists`      |
+| `createDirectory` | the path is a directory, not recursive | `already-exists`      |
+| `createDirectory` | the parent is missing, not recursive   | `not-found`           |
+| `remove`          | the path is the root                   | `unsupported`         |
+| `remove`          | the path is missing                    | `not-found`           |
+| `remove`          | a non-empty directory, not recursive   | `directory-not-empty` |
+
+A filesystem adapter maps `ENOENT` to `not-found`, `ENOTDIR` to `not-a-directory`, `EEXIST` to
+`already-exists`, `EISDIR` to `not-a-file`, `ENOTEMPTY` to `directory-not-empty`, and `EACCES` or
+`EPERM` to `permission-denied`. Anything else is `io`.
+
+Two results are adapter-defined:
+
+- `list` order is unspecified. Sort the entries if order matters. The double sorts by name.
+- `stat(...).size` of a directory is adapter-defined. The double reports `0`.
+
 ---
 
 ## Adapters vs contracts vs OTel
@@ -114,6 +176,21 @@ oblivious to which one they got:
 - Obtain trace-aware logging from the OTel package when you need it — it layers on top of these
   seams; it is not a second logging contract.
 
+A service takes the port in its constructor and returns the port's `Result`:
+
+```ts
+import type { VfsError, VirtualFileSystem } from '@atomicloud/diene.interfaces';
+import type { Result } from '@atomicloud/diene.result';
+
+class ReportStore {
+  constructor(private readonly vfs: VirtualFileSystem) {}
+
+  save(name: string, body: string): Result<void, VfsError> {
+    return this.vfs.writeFile(`/reports/${name}`, new TextEncoder().encode(body));
+  }
+}
+```
+
 The published package installs `@atomicloud/diene.result` as a runtime dependency, so the
 `Result` type resolves for both ESM and CommonJS consumers without extra setup.
 
@@ -139,3 +216,45 @@ helpers live in the OTel package**, consistent with the boundary above. When you
 `System`, `VirtualFileSystem`, `Terminal`, `LoggerSink`, or `MetricsCollector` in a consumer
 test, import it from the test-helper subpath instead of hand-rolling one — the shipped double
 already tracks the real contract.
+
+### Controlling and inspecting a double
+
+| Double                      | Control                                                                       | Inspection         | Assertions                                  |
+| --------------------------- | ----------------------------------------------------------------------------- | ------------------ | ------------------------------------------- |
+| `InMemorySystem`            | outcomes in the constructor, `enqueue(outcome)`                               | `calls`            | `assertSystemCalls`                         |
+| `InMemoryVirtualFileSystem` | `failNext(error)`                                                             | `calls`, `files`   | `assertVfsCalls`, `assertVfsFiles`          |
+| `InMemoryTerminal`          | input lines in the constructor, `enqueue(line)`, `failNext(error)`, `close()` | `calls`            | `assertTerminalCalls`                       |
+| `InMemoryLoggerSink`        | `failNext(error)`                                                             | `calls`, `records` | `assertLoggerCalls`, `assertLogRecords`     |
+| `InMemoryMetricsCollector`  | `failNext(error)`                                                             | `calls`, `metrics` | `assertMetricsCalls`, `assertMetricRecords` |
+
+- `failNext` fails the next call only. A second `failNext` replaces the first.
+- `InMemorySystem` returns `unexpected-call` when no outcome is queued.
+- Each recorded call has a `sequence` number. It starts at `0` for each double. Put it in the
+  calls you expect.
+- An assertion throws `InterfaceAssertionError` on a mismatch. The error has `label`,
+  `expected` and `actual` fields.
+
+A test for the `ReportStore` above:
+
+```ts
+import { portError } from '@atomicloud/diene.interfaces';
+import { assertVfsCalls, InMemoryVirtualFileSystem } from '@atomicloud/diene.interfaces/test-helper';
+
+it('should surface a disk fault from the store', async () => {
+  // Arrange
+  const vfs = new InMemoryVirtualFileSystem();
+  vfs.createDirectory('/reports');
+  vfs.failNext(portError('vfs', 'io', 'writeFile', 'disk full'));
+  const store = new ReportStore(vfs);
+
+  // Act
+  const error = await store.save('a.txt', 'hi').unwrapErr();
+
+  // Assert
+  error.code.should.equal('io');
+  assertVfsCalls(vfs, [
+    { method: 'createDirectory', options: { recursive: false }, path: '/reports', sequence: 0 },
+    { contents: new TextEncoder().encode('hi'), method: 'writeFile', path: '/reports/a.txt', sequence: 1 },
+  ]);
+});
+```
