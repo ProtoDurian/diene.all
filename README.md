@@ -50,6 +50,10 @@ illustrative Note sample. Go variants accompany the shared standards for
 
 # Go library template
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/ProtoDurian/diene.go-lib.svg)](https://pkg.go.dev/github.com/ProtoDurian/diene.go-lib)
+[![CI](https://github.com/ProtoDurian/diene.go-lib/actions/workflows/ci.yaml/badge.svg)](https://github.com/ProtoDurian/diene.go-lib/actions/workflows/ci.yaml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 This module is `github.com/ProtoDurian/diene.go-lib`. See the
 [Go library baseline](docs/developer/go-lib-baseline.md) for the library shape,
 the TestHelper tier, the library gates (`task validate`) and tag-based

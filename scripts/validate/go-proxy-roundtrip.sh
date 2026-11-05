@@ -9,7 +9,7 @@ trap 'chmod -R u+w "${tmp}" 2>/dev/null || true; rm -rf "${tmp}"' EXIT
 
 ./scripts/validate/go-publish-guard.sh "${tag}"
 cd "${tmp}"
-export GOPATH="${tmp}/gopath" GOMODCACHE="${tmp}/modcache" GOPROXY="${proxy}" GOSUMDB=sum.golang.org GOFLAGS=-mod=mod
+export GOENV=off GOWORK=off GOPRIVATE='' GONOPROXY='' GONOSUMDB='' GOPATH="${tmp}/gopath" GOMODCACHE="${tmp}/modcache" GOPROXY="${proxy}" GOSUMDB=sum.golang.org GOFLAGS=-mod=mod
 go mod init example.invalid/go-lib-consumer >/dev/null 2>&1
 go get "${module}@${tag}"
 printf 'package main\n\nimport (\n\t"fmt"\n\n\t"%s/lib/note"\n)\n\nfunc main() { fmt.Println(note.NewKeyComposer("notes").Slug("Proxy Round Trip")) }\n' "${module}" >main.go

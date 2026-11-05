@@ -42,7 +42,7 @@ tasks:
   validate:
     desc: Run the library gates (module path, vet, API compatibility, export docs, examples)
     cmds:
-      - ./scripts/ci/pkg-validate.sh
+      - ./scripts/local/pkg-validate.sh {{.CLI_ARGS}}
 
   up:
     desc: Start all local dependencies, detached

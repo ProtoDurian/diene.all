@@ -3,7 +3,8 @@
 This template publishes the Go module `github.com/ProtoDurian/diene.go-lib`. The
 module path is the mirror repository path. A library generated from it replaces
 the final `go-lib` token with its own name in `go.mod`, `.config/go-lib.yaml`,
-imports, the API baseline fixture and this document. Mirrors are single-module
+imports, `README.md` (text and badges), the API baseline fixture,
+`tests/fixtures/deadcode-consumer.go.txt` and this document. Mirrors are single-module
 unless a library proves it needs more.
 
 It builds on [the Go baseline](go-baseline.md), minus the binary: there is no
@@ -19,8 +20,12 @@ system-integration tier.
 - Every exported symbol has a doc comment (`task validate`, export-docs mode).
 - `Example*` functions in the package directory are the living usage docs; they
   compile and their `// Output:` is checked.
+- Tests are table-driven where a function has more than one case.
 - Every test is a black-box `package <pkg>_test`; `export_test.go` is forbidden
   (pre-commit hook `a-go-black-box`).
+
+The README's library section carries one badge block: pkg.go.dev reference, the mirror's `CI`
+workflow status and the license.
 
 The `lib/note` sample and the `adapters/kv` Redis adapter sit between
 `DOMAIN WIRING` fences for wholesale replacement.
@@ -39,8 +44,8 @@ in its own meta tests. A library with no `testhelper` package skips the meta tie
 
 ## Library gates
 
-`task validate` runs `scripts/ci/pkg-validate.sh` (CI job `Package Validation`);
-each mode can run alone:
+`task validate` runs `scripts/local/pkg-validate.sh` (CI job `Package Validation`);
+each mode can run alone (`task validate -- vet`):
 
 | Mode          | Gate                                                                  |
 | ------------- | --------------------------------------------------------------------- |

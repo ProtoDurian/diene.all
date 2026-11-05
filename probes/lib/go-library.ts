@@ -1,32 +1,17 @@
 import type { ProbeRepo } from '@cyanprint/contracts';
-
-function directory(path: string): string {
-  return path.slice(0, path.lastIndexOf('/'));
-}
-
-function packageName(source: string): string {
-  const name = source.match(/^package\s+([A-Za-z0-9_]+)/m)?.[1];
-  if (!name) {
-    throw new Error('could not infer Go package');
-  }
-  return name;
-}
+import { plantGoFile } from './go.ts';
 
 async function sources(repo: ProbeRepo, glob: string): Promise<string[]> {
   return (await repo.glob(glob)).filter(path => !path.endsWith('_test.go')).sort();
 }
 
 export async function plantVetMisuse(repo: ProbeRepo): Promise<string> {
-  const [path] = await sources(repo, 'lib/**/*.go');
-  if (!path) {
-    throw new Error('no Go library source found');
-  }
-  const target = `${directory(path)}/probe_vet.go`;
-  await repo.write(
-    target,
-    `package ${packageName(await repo.read(path))}\n\nimport "fmt"\n\n// ProbeVet misuses a format verb.\nfunc ProbeVet() string { return fmt.Sprintf("%d", "not-an-integer") }\n`,
+  return plantGoFile(
+    repo,
+    'lib/**/*.go',
+    'probe_vet.go',
+    'import "fmt"\n\n// ProbeVet misuses a format verb.\nfunc ProbeVet() string { return fmt.Sprintf("%d", "not-an-integer") }',
   );
-  return target;
 }
 
 export async function renameExportedFunction(repo: ProbeRepo): Promise<string> {
@@ -76,14 +61,10 @@ export async function flipMetaAssertion(repo: ProbeRepo): Promise<string> {
 }
 
 export async function plantUncoveredTestHelper(repo: ProbeRepo): Promise<string> {
-  const [path] = await sources(repo, 'testhelper/**/*.go');
-  if (!path) {
-    throw new Error('no testhelper source found');
-  }
-  const target = `${directory(path)}/probe_uncovered.go`;
-  await repo.write(
-    target,
-    `package ${packageName(await repo.read(path))}\n\n// ProbeUncovered is never exercised by a meta test.\nfunc ProbeUncovered() bool { return true }\n`,
+  return plantGoFile(
+    repo,
+    'testhelper/**/*.go',
+    'probe_uncovered.go',
+    '// ProbeUncovered is never exercised by a meta test.\nfunc ProbeUncovered() bool { return true }',
   );
-  return target;
 }
