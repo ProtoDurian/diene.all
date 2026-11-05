@@ -55,5 +55,5 @@ spec:
           emptyDir: {}
         - name: varlog
           hostPath:
-            path: /var/log/../../etc
+            path: /var/logs-evil
       serviceAccountName: aluminium-alloy-logs

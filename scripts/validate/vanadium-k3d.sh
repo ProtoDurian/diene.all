@@ -16,8 +16,8 @@ namespace=admission
 fixtures=tests/vap
 kc=(kubectl --context "${context}")
 tmp="$(mktemp -d)"
-# Rejected by API validation before any admission policy runs, so not provable here.
-api_invalid='pod-ephemeral-|container-host-process|disallowPrivileged/'
+# The API rejects or strips these before admission runs, so only the unit tier proves them.
+api_invalid='pod-ephemeral-|container-host-process|disallowPrivileged/|disallowProcMount/'
 cleanup() {
   local status=$?
   if [ "${status}" -ne 0 ]; then

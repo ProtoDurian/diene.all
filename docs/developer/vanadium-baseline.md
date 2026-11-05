@@ -124,7 +124,8 @@ dashboards are not this chart's to prove. trivy-operator stays dropped and is no
 - `tests/vap/good/*.yaml` must pass every policy. Each `tests/vap/bad/<policy key>/*.yaml` must fail
   exactly that policy, which keeps every policy independently regressable.
 - k3d skips the fixtures the API rejects before admission runs (ephemeral containers on create,
-  HostProcess on Linux, privileged with `allowPrivilegeEscalation: false`). The unit tier still proves
+  HostProcess on Linux, privileged with `allowPrivilegeEscalation: false`, `procMount: Unmasked`, which
+  k3s 1.31 strips). The unit tier still proves
   them.
 
 ## Tokenization surface
