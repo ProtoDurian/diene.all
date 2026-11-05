@@ -3,7 +3,6 @@ import { expectGreen, expectRedWithDiagnostic, plantProductionOnlySymbol } from 
 
 const gate = 'nix develop .#ci -c ./scripts/local/deadcode-production.sh';
 
-// The component reports findings as deadcode's own JSON, so the fixture is proven by its entry, not by a bare name match.
 const productionOnlyFinding = /"Name": "ProbeProductionOnly",[\s\S]*?"File": "[^"]*probe_production_only\.go"/;
 
 export default {
