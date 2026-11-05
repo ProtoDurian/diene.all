@@ -10,13 +10,14 @@ cd "${root_dir}"
 bun install --frozen-lockfile
 
 config="bunfig.${mode}.toml"
-coverage_file="coverage/${mode}/lcov.info"
+report_dir="reports/unit"
 scope="src/lib/"
-[[ ${mode} == "int" ]] && scope="src/adapters/"
-[[ ${mode} == "meta" ]] && scope="src/test-helper/"
+[[ ${mode} == "int" ]] && report_dir="reports/integration" && scope="src/adapters/"
+[[ ${mode} == "meta" ]] && report_dir="reports/meta" && scope="src/test-helper/"
+coverage_file="${report_dir}/lcov.info"
 
 echo "🧪 Running ${mode} tests with coverage..."
-rm -rf "coverage/${mode}"
+rm -rf "${report_dir}"
 
 if [[ ${mode} == "meta" ]]; then
   ./scripts/local/test-meta.sh "${config}" coverage

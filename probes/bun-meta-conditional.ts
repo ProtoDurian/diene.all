@@ -13,7 +13,7 @@ export default {
       kind: 'baseline',
       async run(repo: any) {
         await expectBunGreen(repo, command, 'bun-meta-conditional');
-        await assertScopedLcov(repo, 'coverage/meta/lcov.info', 'src/test-helper/');
+        await assertScopedLcov(repo, 'reports/meta/lcov.info', 'src/test-helper/');
       },
     },
     {
