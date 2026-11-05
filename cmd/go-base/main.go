@@ -25,14 +25,14 @@ func Execute(args []string, stdout io.Writer, stderr io.Writer) int {
 			_, _ = fmt.Fprintln(stderr, Usage)
 			return 2
 		}
-		_, _ = fmt.Fprintln(stdout, note.Slug(args[1]))
+		_, _ = fmt.Fprintln(stdout, note.NewKeyComposer("notes").Slug(args[1]))
 		return 0
 	case "key":
 		if len(args) != 3 {
 			_, _ = fmt.Fprintln(stderr, Usage)
 			return 2
 		}
-		_, _ = fmt.Fprintln(stdout, note.NamespacedKey(args[1], args[2]))
+		_, _ = fmt.Fprintln(stdout, note.NewKeyComposer(args[1]).Compose(args[2]))
 		return 0
 	case "note":
 		if len(args) != 4 {
@@ -40,9 +40,9 @@ func Execute(args []string, stdout io.Writer, stderr io.Writer) int {
 			return 2
 		}
 		store := kv.NewRedisStore(args[1])
-		service := note.NewService(store)
-		value := note.New(args[2], args[3])
-		if err := service.Save(context.Background(), value); err != nil {
+		service := note.NewService(store, note.NewKeyComposer("notes"))
+		value, err := service.Create(context.Background(), args[2], args[3])
+		if err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
 			_ = store.Close()
 			return 1

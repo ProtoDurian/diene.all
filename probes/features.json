@@ -41,11 +41,6 @@
   },
   {
     "template": "diene/workspace",
-    "name": "direnv",
-    "class": "smoke"
-  },
-  {
-    "template": "diene/workspace",
     "name": "fmt-actionlint",
     "class": "gate"
   },
@@ -103,11 +98,6 @@
     "template": "diene/workspace",
     "name": "secret-login-guard",
     "class": "smoke"
-  },
-  {
-    "template": "diene/workspace",
-    "name": "skills-sync",
-    "class": "gate"
   },
   {
     "template": "diene/workspace",
@@ -263,10 +253,5 @@
     "template": "diene/go-base",
     "name": "system-integration-tests",
     "class": "smoke"
-  },
-  {
-    "template": "diene/go-base",
-    "name": "codecov-config",
-    "class": "presence"
   }
 ]

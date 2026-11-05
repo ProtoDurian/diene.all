@@ -1,6 +1,6 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic } from './lib/go.ts';
 
-// The whole-repository staticcheck component, invoked directly rather than through the composite dispatcher.
 const gate = 'nix develop .#ci -c ./scripts/local/staticcheck-whole.sh';
 
 // A discarded pure result is invisible to deadcode and to a pass that skips tests, so only `staticcheck -tests=true` catches it.

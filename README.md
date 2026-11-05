@@ -1,39 +1,54 @@
-# Diene Go language base
-
-[![CI](https://github.com/AtomiCloud/diene.go-base/actions/workflows/ci.yaml/badge.svg)](https://github.com/AtomiCloud/diene.go-base/actions/workflows/ci.yaml)
-[![Unit coverage](https://codecov.io/gh/AtomiCloud/diene.go-base/branch/main/graph/badge.svg?flag=unit)](https://codecov.io/gh/AtomiCloud/diene.go-base)
-[![Integration coverage](https://codecov.io/gh/AtomiCloud/diene.go-base/branch/main/graph/badge.svg?flag=int)](https://codecov.io/gh/AtomiCloud/diene.go-base)
-[![Commit activity](https://img.shields.io/github/commit-activity/m/AtomiCloud/diene.go-base)](https://github.com/AtomiCloud/diene.go-base/commits/main)
-
-Diene's reproducible development environment is managed by Nix. Run `direnv allow` once, then use `task` tasks from the loaded shell.
-
-This repository inherits the all-features workspace baseline: split CI/CD, secrets,
-release configuration, validators, standards, and vendored agent-skill
-synchronization.
-
-## Commands
+# Commands
 
 Run `task --list` for every available task and its description. The task set is
 declared in [`Taskfile.yaml`](Taskfile.yaml), whose `includes:` block maps each
 namespace to a file under [`tasks/`](tasks); a task shown as `<namespace>:<task>`
-is that key in the included file. See [the Taskfile standard](docs/standards/taskfile/index.md)
-for the conventions.
+is that key in the included file. See
+[the Taskfile standard](docs/standards/taskfile/index.md) for the conventions.
 
-## Go commands
+# Development Environment
 
-- `task build` — create `dist/go-base`.
-- `task typecheck` — compile every source package without running tests.
-- `task test` — run the unit, integration, and system integration tiers.
-- `task test:coverage` — enforce the scoped unit and integration coverage ledgers.
-- `task deadcode` — run strict whole-repository and production passes plus the LLM-lax report.
-- `task run -- slug "Hello World"` — execute from source.
-- `task preview -- slug "Hello World"` — execute the compiled artifact.
-- `task up` / `task down` — start or stop local Redis.
+All binaries, tools, and PATH are managed by **Nix**. Do not install tools manually or modify PATH outside of the nix configuration.
 
-See the [Go baseline](docs/developer/go-baseline.md) for the language contract and
-template-maintenance boundary.
+## Prerequisites
 
-## Standards
+1. **[Nix](https://nixos.org/download)** — package manager
+2. **[Docker](https://docs.docker.com/get-docker)** — container runtime
+3. **[direnv](https://direnv.net/docs/installation.html)** — auto-loads the nix shell on `cd`
+
+## Getting Started
+
+```bash
+direnv allow    # first time only — loads the nix dev shell
+```
+
+Once allowed, direnv automatically loads the development environment whenever you enter the project directory.
+
+## Nix Configuration
+
+See [docs/standards/nix/index.md](docs/standards/nix/index.md) for the full guide on:
+
+- File structure (`flake.nix`, `nix/`, `.envrc`)
+- Adding/removing packages
+- Environment groups and shells
+- Formatters and pre-commit hooks
+- Adding registries
+
+# Go base template
+
+See the [Go baseline](docs/developer/go-baseline.md) for the language-specific
+toolchain, task surface, test tiers, coverage ledgers, dead-code passes and the
+illustrative Note sample. Go variants accompany the shared standards for
+[date/time](docs/standards/datetime/languages/go.md),
+[domain-driven design](docs/standards/domain-driven-design/languages/go.md),
+[functional practices](docs/standards/functional-practices/languages/go.md),
+[SOLID](docs/standards/solid-principles/languages/go.md),
+[stateless OOP/DI](docs/standards/stateless-oop-di/languages/go.md),
+[testing](docs/standards/testing/languages/go.md),
+[utilities](docs/standards/utilities/languages/go.md), and
+[validation](docs/standards/validation/languages/go.md).
+
+# Standards
 
 The conventions this repository follows live under
 [`docs/standards/`](docs/standards). Read the standard for the surface you are
@@ -41,16 +56,6 @@ changing before you change it. [`CLAUDE.md`](CLAUDE.md) links the ones an agent
 reaches for most often; it is a convenience, not a required index, and nothing
 checks that it names every surface.
 
-Domain-specific architecture and behavior belongs under
-[`docs/domain/`](docs/domain/README.md), not under `docs/standards/`.
+# Workspace baseline
 
-## Go language variants
-
-- [Date and time](docs/standards/datetime/languages/go.md)
-- [Domain-driven design](docs/standards/domain-driven-design/languages/go.md)
-- [Functional practices](docs/standards/functional-practices/languages/go.md)
-- [SOLID principles](docs/standards/solid-principles/languages/go.md)
-- [Stateless OOP and dependency injection](docs/standards/stateless-oop-di/languages/go.md)
-- [Testing](docs/standards/testing/languages/go.md)
-- [Utilities](docs/standards/utilities/languages/go.md)
-- [Validation](docs/standards/validation/languages/go.md)
+This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, Docker, Helm, secrets, release configuration, validators, and standards.

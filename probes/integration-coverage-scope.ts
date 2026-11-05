@@ -1,5 +1,5 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
-import { plantGoFile } from './lib/go.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic, plantGoFile } from './lib/go.ts';
 
 const gate = 'nix develop .#ci -c task test:int:coverage';
 
