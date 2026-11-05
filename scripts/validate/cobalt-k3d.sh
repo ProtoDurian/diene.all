@@ -65,8 +65,15 @@ done
   { echo "❌ ESO pods are not all running and ready" >&2 && exit 1; }
 echo "✅ ESO controller, webhook and cert-controller healthy"
 
-"${k[@]}" get clustersecretstore infisical -o json >"${tmp}/store.json"
-jq -e '.apiVersion == "external-secrets.io/v1" and .spec.provider.infisical.secretsScope == {"projectSlug": "sos", "environmentSlug": "example", "secretsPath": "/", "recursive": true} and
+reconciled=false
+for _ in $(seq 1 30); do
+  "${k[@]}" get clustersecretstore infisical -o json >"${tmp}/store.json"
+  jq -e '[.status.conditions[]? | select(.type == "Ready")] | length == 1' "${tmp}/store.json" >/dev/null && reconciled=true && break
+  sleep 2
+done
+[ "${reconciled}" = true ] || { echo "❌ the ESO controller never reconciled the store" >&2 && exit 1; }
+# The API server defaults expandSecretReferences.
+jq -e '.apiVersion == "external-secrets.io/v1" and (.spec.provider.infisical.secretsScope | del(.expandSecretReferences)) == {"projectSlug": "sos", "environmentSlug": "example", "secretsPath": "/", "recursive": true} and
   .spec.provider.infisical.auth.universalAuthCredentials.clientSecret == {"name": "cobalt-sos-bootstrap", "namespace": "secrets", "key": "clientSecret"}' "${tmp}/store.json" >/dev/null ||
   { echo "❌ the applied ClusterSecretStore differs from the chart" >&2 && cat "${tmp}/store.json" >&2 && exit 1; }
 helm get manifest cobalt "${helm_k[@]}" | yq -e 'select(.kind == "ClusterSecretStore") | .metadata.name == "infisical"' >/dev/null ||
@@ -74,12 +81,12 @@ helm get manifest cobalt "${helm_k[@]}" | yq -e 'select(.kind == "ClusterSecretS
 
 # Schema-valid: the API server (strict field validation) and the ESO webhook must reject a bad store.
 jq '.spec.provider.infisical.secretsScope.unknownField = "x" | del(.metadata.resourceVersion, .metadata.uid, .metadata.managedFields, .status)' "${tmp}/store.json" >"${tmp}/bad-field.json"
-if "${k[@]}" apply --dry-run=server --validate=strict -f "${tmp}/bad-field.json" >"${tmp}/bad-field.txt" 2>&1; then
+if "${k[@]}" replace --dry-run=server --validate=strict -f "${tmp}/bad-field.json" >"${tmp}/bad-field.txt" 2>&1; then
   echo "❌ the API server accepted a store with an unknown field" >&2 && exit 1
 fi
 rg -q 'unknown field' "${tmp}/bad-field.txt" || { cat "${tmp}/bad-field.txt" >&2 && echo "❌ the bad store was rejected for another reason" >&2 && exit 1; }
 jq 'del(.spec.provider.infisical.secretsScope.environmentSlug) | del(.metadata.resourceVersion, .metadata.uid, .metadata.managedFields, .status)' "${tmp}/store.json" >"${tmp}/no-env.json"
-if "${k[@]}" apply --dry-run=server -f "${tmp}/no-env.json" >"${tmp}/no-env.txt" 2>&1; then
+if "${k[@]}" replace --dry-run=server -f "${tmp}/no-env.json" >"${tmp}/no-env.txt" 2>&1; then
   echo "❌ the API server accepted a store without environmentSlug" >&2 && exit 1
 fi
 echo "✅ ClusterSecretStore infisical applied by helm and schema-valid (Ready needs a live Infisical)"
