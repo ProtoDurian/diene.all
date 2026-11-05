@@ -8,14 +8,23 @@ const plants = [
   {
     name: 'mutation-go-black-box-hook-caught',
     description: 'A white-box Go test package must turn the golangci-lint hook red.',
+    glob: 'lib/**/*.go',
     filename: 'probe_white_box_test.go',
     declaration: 'import "testing"\n\nfunc TestProbeWhiteBox(t *testing.T) { t.Helper() }',
   },
   {
     name: 'mutation-go-export-test-caught',
     description: 'An export_test.go backdoor must turn the golangci-lint hook red.',
+    glob: 'lib/**/*.go',
     filename: 'export_test.go',
     declaration: 'var ProbeExported = 1',
+  },
+  {
+    name: 'mutation-go-black-box-main-caught',
+    description: 'A white-box test in the composition root must turn the golangci-lint hook red.',
+    glob: 'cmd/**/*.go',
+    filename: 'probe_white_box_test.go',
+    declaration: 'import "testing"\n\nfunc TestProbeWhiteBox(t *testing.T) { t.Helper() }',
   },
 ];
 
@@ -36,7 +45,7 @@ export default {
       description: plant.description,
       kind: 'mutation',
       async run(repo: any) {
-        const planted = await plantGoFile(repo, 'lib/**/*.go', plant.filename, plant.declaration);
+        const planted = await plantGoFile(repo, plant.glob, plant.filename, plant.declaration);
         try {
           await expectRedWithDiagnostic(repo, gate, 'hook-go-black-box', whiteBox);
         } finally {

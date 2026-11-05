@@ -47,8 +47,8 @@ an Air hot-reload loop would add machinery without a real use case.
 
 ## Test and coverage law
 
-Every `*_test.go` file must declare a package ending in `_test`, and
-`export_test.go` is forbidden; golangci-lint's `testpackage` linter enforces both.
+Every `*_test.go` file, `export_test.go` included, must declare a package ending
+in `_test`; golangci-lint's `testpackage` linter enforces it.
 Unit coverage includes only `lib/**` and must be
 100%. Integration coverage includes only `adapters/**` and must be 100% in this
 minimal base. The checked-in ledger is `.config/go-base.coverage.yaml`. Each tier
@@ -61,15 +61,13 @@ Four independently invoked strict components cover unused code: staticcheck and
 deadcode each run once with test analysis/reachability enabled and once against
 production packages only. The production deadcode component therefore rejects
 a symbol reachable only from tests. None of the components has an exclusion
-list. Govulncheck is a blocking CI-only job; its probe routes its own
-vulnerable fixture through a deterministic scanner double, while the healthy
-path uses the real vulnerability database.
+list. Govulncheck is a blocking CI-only job.
 
 ## Docker and Helm
 
 The Dockerfile builds a static binary and runs it from
-`gcr.io/distroless/static-debian12:nonroot` as UID/GID 65532. Separate policy
-probes enforce the runtime base and user. The root chart remains a minimal
+`gcr.io/distroless/static-debian12:nonroot` as UID/GID 65532. The root chart
+remains a minimal
 all-yes Helm surface and is intentionally independent of downstream service
 chart design.
 

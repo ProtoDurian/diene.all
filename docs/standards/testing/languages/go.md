@@ -43,8 +43,8 @@ list: if code cannot be covered from its tier, it is in the wrong layer.
 
 Every `*_test.go` file declares `package <name>_test` and imports the package
 under test like any other client. `export_test.go` is banned: it would expose
-internals to tests only. The pre-commit hook enforces both (golangci-lint's
-`testpackage` linter and `scripts/validate/go-black-box-tests.sh`).
+internals to tests only. The pre-commit hook enforces both with golangci-lint's
+`testpackage` linter.
 
 ```go
 // tests/unit/note/note_test.go

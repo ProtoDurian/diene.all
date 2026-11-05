@@ -71,7 +71,8 @@ linters:
         - name: package-comments
           disabled: true
     testpackage:
-      # lint export_test.go too: no white-box backdoor
+      # export_test.go and package main get no white-box exemption
+      allow-packages: [none]
       skip-regexp: ^$
   exclusions:
     generated: lax
