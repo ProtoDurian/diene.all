@@ -28,7 +28,7 @@ tasks:
     desc: Remove .NET build and test artifacts
     cmds:
       - find . -mindepth 2 -maxdepth 2 -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +
-      - rm -rf TestResults
+      - rm -rf TestResults reports
 
   build:
     desc: Build the .NET solution in Release
