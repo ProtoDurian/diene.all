@@ -46,10 +46,7 @@ for p in "${D_PATHS[@]}"; do
 done
 
 # --- references -------------------------------------------------------------------
-# The observability payload (shared .3 .. observability .3, held byte-equal by
-# payload-equality) describes a consumer's infra/primordial_chart/, which is
-# not a D path. Its files are scanned for every D token except the bare
-# infra/ prefix; every other file is scanned for all of them.
+# payload docs name a consumer's infra/primordial_chart/: scan them for every D token but bare infra/
 here=".github/named-checks/bun-base-wo-helm-docker-w-observability"
 payload_sha="$(cat "${here}/payload.sha")"
 git rev-parse --verify --quiet "${payload_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${payload_sha}" || true

@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# bun-base-wo-helm-docker-w-observability is cut from bun-base-wo-helm-docker: HEAD contains bun-base-wo-helm-docker's
-# recorded .3 commit.
-
-# The graph ancestor: bun-base-wo-helm-docker at its recorded .3 commit (parent.sha).
 parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ bun-base-wo-helm-docker .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }

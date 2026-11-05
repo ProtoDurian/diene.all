@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The diff from bun-base-wo-helm-docker's .3 commit is the accepted observability payload
-# (shared .3 .. observability .3) byte-for-byte: the same paths with the same
-# status, every added file's mode and blob identical to observability's, and
-# every edited parent file gaining exactly the lines the payload adds and
-# losing exactly the lines it removes. This node's own named checks are the
-# only paths outside the payload.
-
 here="$(dirname "$0")"
 own_dir='.github/named-checks/bun-base-wo-helm-docker-w-observability/'
 
@@ -16,9 +9,6 @@ ensure_commit() {
   git rev-parse --verify --quiet "${1}^{commit}" >/dev/null || { echo "❌ ${2} commit ${1} not found; fetch it first" >&2 && exit 1; }
 }
 
-# The graph ancestors: bun-base-wo-helm-docker (parent.sha) and observability (payload.sha) at
-# their recorded .3 commits. The payload is measured from the shared .3 commit
-# observability itself was cut from.
 parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "${here}/parent.sha")}"
 payload_sha="${NAMED_CHECKS_PAYLOAD_SHA:-$(cat "${here}/payload.sha")}"
 ensure_commit "${parent_sha}" "bun-base-wo-helm-docker .3"
