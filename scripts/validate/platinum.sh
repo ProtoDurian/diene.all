@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016 # jq and yq programs are single-quoted on purpose
 set -euo pipefail
 
 mode="${1:-}"
@@ -9,188 +10,285 @@ trap 'rm -rf "${tmp}"' EXIT
 
 [ -z "${mode}" ] && echo "❌ validation mode not set" >&2 && exit 1
 
-# Standard stacked-values render into a file. No config vendoring (platinum is config-free).
-render() {
-  helm template "${release}" chart --namespace "${namespace}" "$@" 2>/dev/null
+c=chart
+# name|values flags: base, local loopback landscapes, serving landscape x cluster, ENTEI host role.
+stacks=("base|" "ditto|--values ${c}/values.ditto.yaml" "rotom|--values ${c}/values.rotom.yaml" "absol|--values ${c}/values.absol.yaml")
+for l in pichu pikachu raichu ampharos; do
+  for k in opal ruby emerald; do
+    stacks+=("${l}-${k}|--values ${c}/values.${l}.yaml --values ${c}/values.${k}.yaml")
+  done
+done
+stacks+=("entei|--values ${c}/values.opal.yaml --values ${c}/values.entei.yaml")
+entei=(--values "${c}/values.opal.yaml" --values "${c}/values.entei.yaml")
+
+render() { helm template "${release}" chart --namespace "${namespace}" "$@"; }
+render_stack() { # render_stack <stack entry> <out>
+  # shellcheck disable=SC2086
+  render ${1#*|} >"$2"
+}
+json() { yq eval-all -o=json '.' "$1" | jq -s 'map(select(.kind != null))'; }
+
+need_jq() {
+  local reason="$1"
+  shift
+  jq -e "$@" >/dev/null || { echo "❌ ${reason}" >&2 && return 1; }
+}
+
+# expect_red <label> <pattern> <cmd...>: the check must fail, and fail for the expected reason.
+expect_red() {
+  local label="$1" pattern="$2"
+  shift 2
+  if "$@" >"${tmp}/red.txt" 2>&1; then
+    echo "❌ negative fixture '${label}' was not caught" >&2 && exit 1
+  fi
+  rg -q -- "${pattern}" "${tmp}/red.txt" || { echo "❌ negative fixture '${label}' failed for the wrong reason" >&2 && cat "${tmp}/red.txt" >&2 && exit 1; }
+  echo "🟥 negative fixture '${label}' caught"
+}
+
+expect_refusal() {
+  local pattern="$1"
+  shift
+  expect_red "refusal: ${pattern}" "${pattern}" render "$@"
+}
+
+# yq_edit <in> <out> <expr>: a sabotaged copy of a render.
+yq_edit() { yq eval-all "$3" "$1" >"$2"; }
+
+assert_lpsm() { # assert_lpsm <render> <prefix> <landscape> <cluster>
+  json "$1" | need_jq "rendered labels differ from the LPSM set" --arg p "$2" --arg l "$3" --arg k "$4" '
+    ({($p + "/platform"): "sulfoxide", ($p + "/service"): "platinum", ($p + "/module"): "gateway", ($p + "/layer"): "1"}
+      + (if $l == "" then {} else {($p + "/landscape"): $l} end) + (if $k == "" then {} else {($p + "/cluster"): $k} end)) as $want |
+    map(select(.kind != "ClusterRole" and .kind != "ClusterRoleBinding")) as $objs |
+    ($objs | length) > 0 and all($objs[]; (.metadata.labels // {}) as $have | ($have | with_entries(select(.key | startswith($p + "/")))) == $want)'
+}
+
+assert_gateway() { # GatewayClass + ONE shared Gateway bound to kgateway, generated proxy kept internal
+  json "$1" | need_jq "expected one GatewayClass platinum (kgateway.dev/kgateway) and one shared Gateway platinum-shared" '
+    (map(select(.kind == "GatewayClass")) | length == 1 and .[0].metadata.name == "platinum" and .[0].spec.controllerName == "kgateway.dev/kgateway") and
+    (map(select(.kind == "Gateway")) | length == 1 and .[0].metadata.name == "platinum-shared" and .[0].spec.gatewayClassName == "platinum"
+      and .[0].spec.infrastructure.parametersRef == {group: "gateway.kgateway.dev", kind: "GatewayParameters", name: "platinum-proxy"}) and
+    (map(select(.kind == "GatewayParameters")) | length == 1 and .[0].metadata.name == "platinum-proxy" and .[0].spec.kube.service.type == "ClusterIP")'
+}
+
+assert_health() { # fixed /healthz route on the shared Gateway, answered 2xx by kgateway
+  json "$1" | need_jq "health route contract broken (Exact /healthz on platinum-shared:http -> DirectResponse platinum-healthz 2xx)" '
+    (map(select(.kind == "HTTPRoute" and .metadata.name == "platinum-healthz")) | length == 1) and
+    (map(select(.kind == "HTTPRoute" and .metadata.name == "platinum-healthz"))[0].spec as $s |
+      $s.parentRefs == [{name: "platinum-shared", sectionName: "http"}] and ($s.hostnames // []) == [] and ($s.rules | length) == 1 and
+      $s.rules[0].matches == [{path: {type: "Exact", value: "/healthz"}}] and ($s.rules[0].backendRefs // []) == [] and
+      $s.rules[0].filters == [{type: "ExtensionRef", extensionRef: {group: "gateway.kgateway.dev", kind: "DirectResponse", name: "platinum-healthz"}}]) and
+    (map(select(.kind == "DirectResponse" and .metadata.name == "platinum-healthz")) | length == 1 and .[0].spec.status >= 200 and .[0].spec.status < 300)'
+}
+
+edge() { json "$1" | jq 'map(select(.kind == "Service" and .metadata.name == "platinum-edge")) | .[0]'; }
+
+assert_lb() { # assert_lb <render> <provider>
+  edge "$1" | need_jq "platinum-edge is not a LoadBalancer exposing 80/443 on the generated proxy" '
+    .spec.type == "LoadBalancer" and .spec.selector == {"gateway.networking.k8s.io/gateway-name": "platinum-shared"} and
+    ([.spec.ports[] | [.port, .targetPort]] | sort) == [[80, 8080], [443, 8443]] and ([.spec.ports[] | has("nodePort")] | any | not)' || return 1
+  case "$2" in
+  aws) edge "$1" | need_jq "AWS overlay lost its NLB Elastic IP annotations" '.metadata.annotations as $a |
+      ($a["service.beta.kubernetes.io/aws-load-balancer-eip-allocations"] // "" | split(",") | map(select(. != "")) | length) as $e |
+      $a["service.beta.kubernetes.io/aws-load-balancer-type"] == "external" and $a["service.beta.kubernetes.io/aws-load-balancer-scheme"] == "internet-facing" and
+      $e > 0 and ($a["service.beta.kubernetes.io/aws-load-balancer-subnets"] // "" | split(",") | length) == $e' || return 1 ;;
+  oci) edge "$1" | need_jq "OCI overlay lost its reserved public IP annotation" '.metadata.annotations as $a |
+      ($a["oci.oraclecloud.com/reserved-ips"] // "" | test("^[0-9.]+$")) and $a["oci.oraclecloud.com/load-balancer-type"] == "nlb"' || return 1 ;;
+  digitalocean) edge "$1" | need_jq "DigitalOcean overlay lost its LB-lifetime name annotation" '.metadata.annotations as $a |
+      ($a["service.beta.kubernetes.io/do-loadbalancer-name"] // "" | length) > 0' || return 1 ;;
+  local) edge "$1" | need_jq "local loopback overlay carries a cloud LB annotation" '.metadata.annotations | keys | all(startswith("atomi.cloud/"))' || return 1 ;;
+  esac
+  local others
+  others="$(edge "$1" | jq -r '.metadata.annotations | keys[] | select(startswith("atomi.cloud/") | not)' | rg -v "^($(provider_keys "$2"))$" || true)"
+  [ -z "${others}" ] || { echo "❌ ${2} overlay carries another provider's annotation: ${others}" >&2 && return 1; }
+}
+
+provider_keys() {
+  case "$1" in
+  aws) echo 'service\.beta\.kubernetes\.io/aws-load-balancer-.*' ;;
+  oci) echo 'oci\.oraclecloud\.com/.*' ;;
+  digitalocean) echo 'service\.beta\.kubernetes\.io/do-loadbalancer-.*' ;;
+  *) echo '__none__' ;;
+  esac
+}
+
+assert_entei() { # the dev-host role renders the shared edge only
+  json "$1" | need_jq "ENTEI overlay renders more than the shared edge (or lost ListenerSet admission)" '
+    (map(select(.kind != "ServiceAccount" and .kind != "ClusterRole" and .kind != "ClusterRoleBinding" and .kind != "Deployment" and .metadata.name != "platinum-gateway") | .kind + "/" + .metadata.name) | sort) ==
+      ["DirectResponse/platinum-healthz", "Gateway/platinum-shared", "GatewayClass/platinum", "GatewayParameters/platinum-proxy", "HTTPRoute/platinum-healthz", "Service/platinum-edge"] and
+    (map(select(.kind == "Gateway"))[0].spec as $g |
+      $g.allowedListeners == {namespaces: {from: "Selector", selector: {matchLabels: {"atomi.cloud/managed-vcluster": "true"}}}} and
+      $g.listeners == [{name: "http", protocol: "HTTP", port: 80, allowedRoutes: {namespaces: {from: "Same"}}}])'
+}
+
+assert_vap() { # assert_vap <render> <label>: the inherited Q-G20 stage
+  kubeconform -strict -summary -schema-location default -schema-location 'schemas/{{ .ResourceKind }}.json' "$1" || { echo "❌ kubeconform rejected ${2}" >&2 && return 1; }
+  yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "$1" >"$1.vap.yaml"
+  kyverno apply policies/vap --resource "$1.vap.yaml" --detailed-results --remove-color >"$1.kyverno.txt" 2>&1 ||
+    { cat "$1.kyverno.txt" && echo "❌ VAP stage denied ${2}" >&2 && return 1; }
 }
 
 case "${mode}" in
-schema)
-  helm lint chart --namespace "${namespace}" >/dev/null
-  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml >/dev/null
-  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml --values chart/values.lapras.yaml >/dev/null
-  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml --values chart/values.aws.yaml >/dev/null
-  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml --values chart/values.oci.yaml >/dev/null
-  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml --values chart/values.digitalocean.yaml >/dev/null
-  helm lint chart --namespace "${namespace}" --values chart/values.entei.yaml >/dev/null
+schema | lint)
+  for s in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    helm lint chart --namespace "${namespace}" ${s#*|} >"${tmp}/lint.txt" 2>&1 || { cat "${tmp}/lint.txt" >&2 && echo "❌ ${s%%|*} rejected" >&2 && exit 1; }
+  done
+  [ "${mode}" = lint ] && { echo "✅ Platinum lint validation passed" && exit 0; }
+  expect_red 'unknown provider' "value must be one of" helm lint chart --namespace "${namespace}" --set gateway.provider=gcp
+  expect_red 'foreign controller' "value must be 'kgateway.dev/kgateway'" helm lint chart --namespace "${namespace}" --set gateway.controllerName=example.com/other
+  expect_red 'non-2xx health status' "maximum" helm lint chart --namespace "${namespace}" --set gateway.health.status=503
   ;;
 schema-drift)
   bash ./scripts/local/generate-chart-schema.sh "${tmp}/values.schema.json" >/dev/null
-  cmp chart/values.schema.json "${tmp}/values.schema.json"
-  ;;
-lint)
-  helm lint chart --namespace "${namespace}"
-  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml
-  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml --values chart/values.lapras.yaml
-  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml --values chart/values.aws.yaml
-  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml --values chart/values.oci.yaml
-  helm lint chart --namespace "${namespace}" --values chart/values.example.yaml --values chart/values.digitalocean.yaml
-  helm lint chart --namespace "${namespace}" --values chart/values.entei.yaml
+  cmp chart/values.schema.json "${tmp}/values.schema.json" || { echo "❌ chart/values.schema.json is stale" >&2 && exit 1; }
   ;;
 render)
-  render --values chart/values.example.yaml >/dev/null
-  render --values chart/values.example.yaml --values chart/values.lapras.yaml >/dev/null
-  render --values chart/values.example.yaml --values chart/values.aws.yaml >/dev/null
-  render --values chart/values.example.yaml --values chart/values.oci.yaml >/dev/null
-  render --values chart/values.example.yaml --values chart/values.digitalocean.yaml >/dev/null
-  render --values chart/values.entei.yaml >/dev/null
+  for s in "${stacks[@]}"; do render_stack "${s}" "${tmp}/r.yaml"; done
+  test -z "$(find chart -maxdepth 1 -name 'values.lapras.yaml')" || { echo "❌ lapras is Boron-direct and has no kgateway overlay" >&2 && exit 1; }
+  expect_refusal 'must equal release namespace' --namespace other
+  expect_refusal 'fullnameOverride must be' --set fullnameOverride=platinum-api
+  expect_refusal 'upstream.fullnameOverride must be' --set upstream.fullnameOverride=platinum-api
+  expect_refusal 'AWS gateway mode requires' --set gateway.provider=aws
+  expect_refusal 'identical lengths' --values chart/values.ruby.yaml --set 'gateway.aws.eipAllocationIds={eipalloc-1}'
+  expect_refusal 'OCI gateway mode requires' --set gateway.provider=oci
+  expect_refusal 'no registered-fleet Certificates' --set gateway.provider=local
   ;;
-labels)
-  render --values chart/values.example.yaml --values chart/values.lapras.yaml >"${tmp}/rendered.yaml"
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" | jq -s -e 'map(select(.kind != null)) | all(.[]; .metadata.labels["atomi.cloud/platform"] == "sulfoxide" and .metadata.labels["atomi.cloud/service"] == "platinum" and .metadata.labels["atomi.cloud/module"] == "gateway" and .metadata.labels["atomi.cloud/layer"] == "1" and .metadata.labels["atomi.cloud/landscape"] == "example" and .metadata.labels["atomi.cloud/cluster"] == "lapras" and .metadata.annotations["atomi.cloud/platform"] == "sulfoxide")' >/dev/null
-  render --values chart/values.example.yaml --values chart/values.lapras.yaml --set labelPrefix=example.dev >"${tmp}/override.yaml"
-  yq eval-all -o=json '.' "${tmp}/override.yaml" | jq -s -e 'map(select(.kind != null)) | all(.[]; .metadata.labels["example.dev/platform"] == "sulfoxide" and .metadata.annotations["example.dev/service"] == "platinum" and .metadata.labels["atomi.cloud/platform"] == null and .metadata.annotations["atomi.cloud/service"] == null)' >/dev/null
+lpsm-labels)
+  render >"${tmp}/base.yaml"
+  assert_lpsm "${tmp}/base.yaml" atomi.cloud "" ""
+  render --values chart/values.ditto.yaml >"${tmp}/ditto.yaml"
+  assert_lpsm "${tmp}/ditto.yaml" atomi.cloud ditto ""
+  render --values chart/values.raichu.yaml --values chart/values.ruby.yaml >"${tmp}/raichu.yaml"
+  assert_lpsm "${tmp}/raichu.yaml" atomi.cloud raichu ruby
+  render "${entei[@]}" >"${tmp}/entei.yaml"
+  assert_lpsm "${tmp}/entei.yaml" atomi.cloud "" entei
+  json "${tmp}/raichu.yaml" | need_jq "platinum-owned objects lack LPSM annotations" 'map(select(.metadata.name | test("^platinum-(edge|shared|proxy|healthz|cert)|^platinum$"))) | all(.[]; .metadata.annotations["atomi.cloud/platform"] == "sulfoxide")'
+  expect_refusal 'upstream.commonLabels must equal' --values chart/values.raichu.yaml --set serviceTree.cluster=other
+  expect_refusal 'upstream.commonLabels must equal' --set labelPrefix=example.dev
+  yq_edit "${tmp}/raichu.yaml" "${tmp}/drift.yaml" '(select(.kind == "Gateway") | .metadata.labels."atomi.cloud/service") = "drift"'
+  expect_red 'a drifted LPSM label' 'labels differ from the LPSM set' assert_lpsm "${tmp}/drift.yaml" atomi.cloud raichu ruby
   ;;
-reloader)
-  render --values chart/values.example.yaml >"${tmp}/default.yaml"
-  yq eval-all -o=json '.' "${tmp}/default.yaml" | jq -s -e 'map(select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job")) | length > 0 and all(.[]; .metadata.annotations["reloader.stakater.com/auto"] == "true")' >/dev/null
-  render --values chart/values.example.yaml --set healthBackend.reloader.enabled=false >"${tmp}/optout.yaml"
-  yq eval-all -o=json '.' "${tmp}/optout.yaml" | jq -s -e 'map(select(.kind == "Deployment"))[0].metadata.annotations["reloader.stakater.com/auto"] == null' >/dev/null
+gateway)
+  for s in "${stacks[@]}"; do
+    render_stack "${s}" "${tmp}/g.yaml"
+    assert_gateway "${tmp}/g.yaml" || { echo "❌ in stack ${s%%|*}" >&2 && exit 1; }
+  done
+  render --values chart/values.pichu.yaml --values chart/values.opal.yaml >"${tmp}/g.yaml"
+  json "${tmp}/g.yaml" | need_jq "registered-fleet Gateway lacks its HTTP + two terminating HTTPS listeners" '
+    map(select(.kind == "Gateway"))[0].spec.listeners | map([.name, .protocol, .port, (.tls.mode // ""), (.tls.certificateRefs[0].name // "")]) ==
+      [["http", "HTTP", 80, "", ""], ["https-primary", "HTTPS", 443, "Terminate", "platinum-certprimary"], ["https-backup", "HTTPS", 443, "Terminate", "platinum-certbackup"]]'
+  yq_edit "${tmp}/g.yaml" "${tmp}/two.yaml" '., (select(.kind == "Gateway") | .metadata.name = "platinum-second")'
+  expect_red 'a second Gateway' 'one shared Gateway' assert_gateway "${tmp}/two.yaml"
+  yq_edit "${tmp}/g.yaml" "${tmp}/lb.yaml" '(select(.kind == "GatewayParameters") | .spec.kube.service.type) = "LoadBalancer"'
+  expect_red 'a second public LoadBalancer from the generated proxy' 'one shared Gateway' assert_gateway "${tmp}/lb.yaml"
   ;;
-fullname)
-  render --values chart/values.example.yaml >"${tmp}/names.yaml"
-  # Every namespaced platinum-owned resource is `<service>-<token>` (exactly one dash); the cluster-scoped GatewayClass is the bare classname.
-  yq eval-all -o=json '.' "${tmp}/names.yaml" | jq -s -e 'map(select(.kind != null and .kind != "GatewayClass") | .metadata.name) | all(.[]; test("^[a-z0-9]+-[a-z0-9]+$"))' >/dev/null
-  yq eval-all -o=json '.' "${tmp}/names.yaml" | jq -s -e 'map(select(.kind == "GatewayClass"))[0].metadata.name == "platinum"' >/dev/null
-  yq -e '.upstream.fullnameOverride | test("^[a-z0-9]+-[a-z0-9]+$")' chart/values.yaml >/dev/null
-  ;;
-gateway-class)
-  render --values chart/values.example.yaml >"${tmp}/gc.yaml"
-  yq eval-all -o=json '.' "${tmp}/gc.yaml" | jq -s -e 'map(select(.kind == "GatewayClass"))[0] | .metadata.name == "platinum" and .spec.controllerName == "kgateway.dev/kgateway"' >/dev/null
-  yq eval-all -o=json '.' "${tmp}/gc.yaml" | jq -s -e 'map(select(.kind == "Gateway"))[0] | .metadata.name == "platinum-gateway" and .spec.gatewayClassName == "platinum" and ([.spec.listeners[].protocol] | sort) == ["HTTP", "HTTPS", "HTTPS"]' >/dev/null
-  if render --values chart/values.example.yaml --set-string gateway.controllerName=example.invalid/controller >"${tmp}/wrong-controller.yaml"; then
-    echo "❌ non-kgateway controller binding passed schema/render validation" >&2
-    exit 1
-  fi
-  ;;
-gateway-proxy)
-  render --values chart/values.example.yaml --values chart/values.lapras.yaml --set upstream.enabled=true >"${tmp}/enabled.yaml"
-  yq -e '.dependencies[] | select(.name == "kgateway") | .version == "v2.2.9"' chart/Chart.lock >/dev/null
-  yq eval-all -o=json '.' "${tmp}/enabled.yaml" | jq -s -e 'map(select(.kind == "Deployment" and .metadata.name == "platinum-upstream")) | length == 1' >/dev/null
-  yq eval-all -o=json '.' "${tmp}/enabled.yaml" | jq -s -e 'map(select(.kind == "Service" and .metadata.name == "platinum-edge"))[0]' >"${tmp}/edge.json"
-  yq eval-all -o=json '.' tests/fixtures/kgateway-v2.2.9-proxy-render.yaml | jq -s -e 'map(select(.kind == "Service"))[0]' >"${tmp}/proxy-service.json"
-  yq eval-all -o=json '.' tests/fixtures/kgateway-v2.2.9-proxy-render.yaml | jq -s -e 'map(select(.kind == "Deployment"))[0]' >"${tmp}/proxy-deployment.json"
-  jq -e --slurpfile proxyService "${tmp}/proxy-service.json" --slurpfile proxyDeployment "${tmp}/proxy-deployment.json" '
-    .spec.selector == $proxyService[0].spec.selector and
-    ([.spec.ports[] | {name, targetPort}] | sort_by(.targetPort)) == ([$proxyService[0].spec.ports[] | {name, targetPort}] | sort_by(.targetPort)) and
-    ([$proxyService[0].spec.ports[] | {name, targetPort}] | sort_by(.targetPort)) == ([$proxyDeployment[0].spec.template.spec.containers[0].ports[] | {name, targetPort: .containerPort}] | sort_by(.targetPort))
-  ' "${tmp}/edge.json" >/dev/null
-  if render --values chart/values.example.yaml --set gateway.proxy.selector=null >"${tmp}/missing-selector.yaml"; then
-    echo "❌ missing generated-proxy selector rendered successfully" >&2
-    exit 1
-  fi
-  if render --values chart/values.example.yaml --set gateway.proxy.httpTargetPort=8080 >"${tmp}/wrong-port.yaml"; then
-    echo "❌ mismatched generated-proxy targetPort rendered successfully" >&2
-    exit 1
-  fi
-  ;;
-gateway-health)
-  render --values chart/values.example.yaml >"${tmp}/health.yaml"
-  yq eval-all -o=json '.' "${tmp}/health.yaml" | jq -s -e 'map(select(.kind == "HTTPRoute"))[0] as $r | $r.metadata.name == "platinum-health" and $r.spec.parentRefs[0].name == "platinum-gateway" and $r.spec.rules[0].matches[0].path.type == "Exact" and $r.spec.rules[0].matches[0].path.value == "/healthz" and $r.spec.rules[0].backendRefs[0].name == "platinum-api" and $r.spec.rules[0].backendRefs[0].port == 9898' >/dev/null
-  yq eval-all 'select(.kind != "HTTPRoute")' "${tmp}/health.yaml" >"${tmp}/missing-health-route.yaml"
-  if yq eval-all -o=json '.' "${tmp}/missing-health-route.yaml" | jq -s -e 'map(select(.kind == "HTTPRoute")) | length == 1' >/dev/null; then
-    echo "❌ missing health HTTPRoute passed the route contract" >&2
-    exit 1
-  fi
-  yq eval-all 'select(.kind == "HTTPRoute") | .spec.rules[0].backendRefs[0].port = 8080' "${tmp}/health.yaml" >"${tmp}/broken-health.yaml"
-  if yq eval-all -o=json '.' "${tmp}/broken-health.yaml" | jq -s -e 'map(select(.kind == "HTTPRoute"))[0] | .spec.rules[0].matches[0].path.type == "Exact" and .spec.rules[0].matches[0].path.value == "/healthz" and .spec.rules[0].backendRefs[0].name == "platinum-api" and .spec.rules[0].backendRefs[0].port == 9898' >/dev/null; then
-    echo "❌ corrupted health backend route passed the fixed contract" >&2
-    exit 1
-  fi
-  ;;
-registered-cert)
-  render --values chart/values.example.yaml >"${tmp}/certs.yaml"
-  yq eval-all -o=json '.' "${tmp}/certs.yaml" | jq -s -e '
-    (map(select(.kind == "Certificate"))) as $certs |
-    (map(select(.kind == "Gateway"))[0]) as $gateway |
-    ($certs | map({key: .spec.commonName, value: .spec.secretName}) | from_entries) as $secrets |
-    ($certs | length) == 2 and
-    all($certs[]; . as $cert | $cert.spec.issuerRef.kind == "ClusterIssuer" and $cert.spec.issuerRef.name == "zinc-wildcard-letsencrypt" and ($cert.spec.commonName | startswith("*.")) and ($cert.spec.dnsNames | index($cert.spec.commonName) != null)) and
-    ([$gateway.spec.listeners[] | select(.protocol == "HTTPS")] | length) == 2 and
-    all($gateway.spec.listeners[] | select(.protocol == "HTTPS"); .tls.mode == "Terminate" and (.tls.certificateRefs | length) == 1 and .tls.certificateRefs[0].kind == "Secret" and .tls.certificateRefs[0].name == $secrets[.hostname])
-  ' >/dev/null
-  if render --values chart/values.example.yaml --set-json 'registeredCertificates.primary.dnsNames=["atomi.cloud"]' >"${tmp}/missing-san.yaml"; then
-    echo "❌ wildcard Certificate without its wildcard SAN rendered successfully" >&2
-    exit 1
-  fi
-  yq eval-all 'select(.kind == "Gateway") | (.spec.listeners[] | select(.name == "https-primary").tls.certificateRefs[0].name) = "wrong-secret"' "${tmp}/certs.yaml" >"${tmp}/broken-ref.yaml"
-  if yq eval-all -o=json '.' "${tmp}/broken-ref.yaml" | jq -s -e '
-    (map(select(.kind == "Certificate")) | map(.spec.secretName)) as $secrets |
-    all(map(select(.kind == "Gateway"))[0].spec.listeners[] | select(.protocol == "HTTPS"); . as $listener | $listener.tls.mode == "Terminate" and ($secrets | index($listener.tls.certificateRefs[0].name) != null))
-  ' >/dev/null; then
-    echo "❌ broken HTTPS Certificate Secret reference passed the TLS contract" >&2
-    exit 1
-  fi
-  ;;
-entei-overlay)
-  render --values chart/values.entei.yaml >"${tmp}/entei.yaml"
-  yq eval-all -o=json '.' "${tmp}/entei.yaml" | jq -s -e '
-    map(select(.kind != null) | {apiVersion, kind, name: .metadata.name}) | sort_by(.kind, .name) ==
-    ([
-      {apiVersion: "gateway.networking.k8s.io/v1", kind: "Gateway", name: "platinum-gateway"},
-      {apiVersion: "gateway.networking.k8s.io/v1", kind: "GatewayClass", name: "platinum"},
-      {apiVersion: "v1", kind: "Service", name: "platinum-edge"}
-    ] | sort_by(.kind, .name))
-  ' >/dev/null
+health)
+  for s in "${stacks[@]}"; do
+    render_stack "${s}" "${tmp}/h.yaml"
+    assert_health "${tmp}/h.yaml" || { echo "❌ in stack ${s%%|*}" >&2 && exit 1; }
+  done
+  render --set gateway.health.path=/health >"${tmp}/path.yaml"
+  expect_red 'health route on a different path' 'health route contract broken' assert_health "${tmp}/path.yaml"
+  render >"${tmp}/h.yaml"
+  yq_edit "${tmp}/h.yaml" "${tmp}/backend.yaml" '(select(.kind == "HTTPRoute") | .spec.rules[0].filters[0].extensionRef.name) = "platinum-other"'
+  expect_red 'health route to another backend' 'health route contract broken' assert_health "${tmp}/backend.yaml"
+  yq_edit "${tmp}/h.yaml" "${tmp}/none.yaml" 'select(.kind != "HTTPRoute")'
+  expect_red 'health route missing' 'health route contract broken' assert_health "${tmp}/none.yaml"
   ;;
 lb)
-  render --values chart/values.example.yaml --values chart/values.digitalocean.yaml >"${tmp}/do.yaml"
-  render --values chart/values.example.yaml --values chart/values.oci.yaml >"${tmp}/oci.yaml"
-  render --values chart/values.example.yaml --values chart/values.aws.yaml >"${tmp}/aws.yaml"
-  yq eval-all -o=json '.' "${tmp}/do.yaml" | jq -s -e 'map(select(.kind == "Service" and .metadata.name == "platinum-edge"))[0] | .spec.type == "LoadBalancer" and (.spec.selector | length) == 3 and ([.spec.ports[].targetPort] | sort) == [80, 443] and .metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-eip-allocations"] == null and .metadata.annotations["oci.oraclecloud.com/reserved-ips"] == null' >/dev/null
-  yq eval-all -o=json '.' "${tmp}/oci.yaml" | jq -s -e 'map(select(.kind == "Service" and .metadata.name == "platinum-edge"))[0] | .metadata.annotations["oci.oraclecloud.com/reserved-ips"] != null and (.metadata.annotations["oci.oraclecloud.com/reserved-ips"] | length) > 0' >/dev/null
-  yq eval-all -o=json '.' "${tmp}/aws.yaml" | jq -s -e 'map(select(.kind == "Service" and .metadata.name == "platinum-edge"))[0] | (.metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-subnets"] | split(",") | length) > 0 and (.metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-eip-allocations"] | split(",") | length) == (.metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-subnets"] | split(",") | length)' >/dev/null
-  ! rg -n 'nodePort:|hostPort:' "${tmp}/do.yaml" "${tmp}/oci.yaml" "${tmp}/aws.yaml"
-  yq eval-all 'select(.kind == "Service" and .metadata.name == "platinum-edge") | del(.metadata.annotations."service.beta.kubernetes.io/aws-load-balancer-eip-allocations")' "${tmp}/aws.yaml" >"${tmp}/aws-missing.yaml"
-  if yq eval-all -o=json '.' "${tmp}/aws-missing.yaml" | jq -s -e 'map(select(.kind == "Service" and .metadata.name == "platinum-edge"))[0].metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-eip-allocations"] != null' >/dev/null; then
-    echo "❌ AWS overlay without its EIP annotation passed provider conformance" >&2
-    exit 1
-  fi
-  yq eval-all 'select(.kind == "Service" and .metadata.name == "platinum-edge") | del(.metadata.annotations."oci.oraclecloud.com/reserved-ips")' "${tmp}/oci.yaml" >"${tmp}/oci-missing.yaml"
-  if yq eval-all -o=json '.' "${tmp}/oci-missing.yaml" | jq -s -e 'map(select(.kind == "Service" and .metadata.name == "platinum-edge"))[0].metadata.annotations["oci.oraclecloud.com/reserved-ips"] != null' >/dev/null; then
-    echo "❌ OCI overlay without its reserved-IP annotation passed provider conformance" >&2
-    exit 1
-  fi
+  for s in "${stacks[@]}"; do
+    render_stack "${s}" "${tmp}/lb.yaml"
+    provider="$(yq -r '.gateway.provider' chart/values.yaml)"
+    for f in ${s#*|}; do if [ -f "${f}" ] && [ -n "$(yq -r '.gateway.provider // ""' "${f}")" ]; then provider="$(yq -r '.gateway.provider' "${f}")"; fi; done
+    assert_lb "${tmp}/lb.yaml" "${provider}" || { echo "❌ in stack ${s%%|*}" >&2 && exit 1; }
+  done
+  render --values chart/values.pichu.yaml --values chart/values.ruby.yaml >"${tmp}/aws.yaml"
+  render --values chart/values.pichu.yaml --values chart/values.emerald.yaml >"${tmp}/oci.yaml"
+  render --values chart/values.pichu.yaml --values chart/values.opal.yaml >"${tmp}/digitalocean.yaml"
+  [ "$(for f in aws oci digitalocean; do edge "${tmp}/${f}.yaml" | jq -c '.metadata.annotations | with_entries(select(.key | startswith("atomi.cloud/") | not))'; done | sort -u | wc -l)" -eq 3 ] ||
+    { echo "❌ per-cloud LB annotation sets are not distinct" >&2 && exit 1; }
+  yq_edit "${tmp}/aws.yaml" "${tmp}/aws-drop.yaml" '(select(.kind == "Service" and .metadata.name == "platinum-edge") | .metadata.annotations) |= with_entries(select(.key | test("aws-load-balancer") | not))'
+  expect_red 'AWS annotation block dropped' 'lost its NLB Elastic IP annotations' assert_lb "${tmp}/aws-drop.yaml" aws
+  yq_edit "${tmp}/oci.yaml" "${tmp}/oci-drop.yaml" '(select(.kind == "Service" and .metadata.name == "platinum-edge") | .metadata.annotations) |= with_entries(select(.key | test("oraclecloud") | not))'
+  expect_red 'OCI annotation block dropped' 'lost its reserved public IP annotation' assert_lb "${tmp}/oci-drop.yaml" oci
+  yq_edit "${tmp}/digitalocean.yaml" "${tmp}/do-drop.yaml" '(select(.kind == "Service" and .metadata.name == "platinum-edge") | .metadata.annotations) |= with_entries(select(.key | test("do-loadbalancer") | not))'
+  expect_red 'DO annotation block dropped' 'lost its LB-lifetime name annotation' assert_lb "${tmp}/do-drop.yaml" digitalocean
+  yq_edit "${tmp}/digitalocean.yaml" "${tmp}/clusterip.yaml" '(select(.kind == "Service" and .metadata.name == "platinum-edge") | .spec.type) = "ClusterIP"'
+  expect_red 'edge Service not a LoadBalancer' 'is not a LoadBalancer' assert_lb "${tmp}/clusterip.yaml" digitalocean
   ;;
-task-surface)
-  task --list-all | rg -q 'example:lapras:debug'
-  task --list-all | rg -q 'example:lapras:template'
-  task --list-all | rg -q 'example:lapras:install'
-  task --list-all | rg -q 'example:lapras:remove'
+entei)
+  render "${entei[@]}" >"${tmp}/entei.yaml"
+  assert_entei "${tmp}/entei.yaml"
+  yq_edit "${tmp}/entei.yaml" "${tmp}/cert.yaml" '., (select(.kind == "GatewayClass") | .apiVersion = "cert-manager.io/v1" | .kind = "Certificate" | .metadata.name = "instance")'
+  expect_red 'ENTEI renders an instance Certificate' 'more than the shared edge' assert_entei "${tmp}/cert.yaml"
+  yq_edit "${tmp}/entei.yaml" "${tmp}/ls.yaml" '., (select(.kind == "GatewayClass") | .kind = "ListenerSet" | .metadata.name = "host")'
+  expect_red 'ENTEI renders a per-host ListenerSet' 'more than the shared edge' assert_entei "${tmp}/ls.yaml"
+  yq_edit "${tmp}/entei.yaml" "${tmp}/route.yaml" '., (select(.kind == "HTTPRoute") | .metadata.name = "platinum-host")'
+  expect_red 'ENTEI renders a per-host HTTPRoute' 'more than the shared edge' assert_entei "${tmp}/route.yaml"
+  render "${entei[@]}" --set devHost.emergencyListeners.enabled=true \
+    --set-json 'devHost.emergencyListeners.listeners=[{"name":"escape","protocol":"HTTP","port":80,"hostname":"escape.example.test"}]' >"${tmp}/escape.yaml"
+  json "${tmp}/escape.yaml" | need_jq "emergency listener not appended" 'map(select(.kind == "Gateway"))[0].spec.listeners | map(.name) == ["http", "escape"]'
+  expect_red 'direct mutation on by default' 'more than the shared edge' assert_entei "${tmp}/escape.yaml"
+  listeners="$(jq -nc '[range(64)] | map({name: "l\(.)", protocol: "HTTP", port: 80, hostname: "h\(.).example.test"})')"
+  expect_refusal '64-listener ceiling' "${entei[@]}" --set devHost.emergencyListeners.enabled=true --set-json "devHost.emergencyListeners.listeners=${listeners}"
+  expect_refusal 'emergency fallback is disabled' "${entei[@]}" --set-json 'devHost.emergencyListeners.listeners=[{"name":"x","protocol":"HTTP","port":80}]'
+  expect_refusal 'requires devHost.enabled' --set devHost.emergencyListeners.enabled=true
+  expect_refusal 'renders no Certificate' "${entei[@]}" --set registeredCertificates.enabled=true
+  ;;
+issuer-free)
+  for s in "${stacks[@]}"; do
+    render_stack "${s}" "${tmp}/i.yaml"
+    json "${tmp}/i.yaml" | need_jq "${s%%|*}: platinum renders an issuer, Secret, ExternalSecret or ListenerSet" 'map(select(.kind | IN("Issuer", "ClusterIssuer", "Secret", "ExternalSecret", "ListenerSet"))) == []'
+    json "${tmp}/i.yaml" | need_jq "${s%%|*}: registered Certificates must be the two zinc-letsencrypt wildcards" '
+      map(select(.kind == "Certificate")) as $c | ($c | length) == 0 or (($c | length) == 2 and
+        all($c[]; .spec.issuerRef == {group: "cert-manager.io", kind: "ClusterIssuer", name: "zinc-letsencrypt"} and (.spec.dnsNames | length) == 1 and (.spec.dnsNames[0] | test("^\\*\\.[a-z0-9.-]+$"))))'
+  done
+  render --values chart/values.ditto.yaml >"${tmp}/local.yaml"
+  json "${tmp}/local.yaml" | need_jq "local loopback stack renders Certificates" 'map(select(.kind == "Certificate")) == []'
+  ;;
+pins)
+  for dep in kgateway kgateway-crds; do
+    v="$(yq -r ".dependencies[] | select(.name == \"${dep}\") | .version" chart/Chart.yaml)"
+    [[ ${v} =~ ^v2\.[0-9]+\.[0-9]+$ ]] || { echo "❌ ${dep} chart pin '${v}' is not an explicit v2.x.y" >&2 && exit 1; }
+    [ "$(yq -r ".dependencies[] | select(.name == \"${dep}\") | .version" chart/Chart.lock)" = "${v}" ] || { echo "❌ Chart.lock ${dep} differs from Chart.yaml" >&2 && exit 1; }
+    test -s "chart/charts/${dep}-${v}.tgz" || { echo "❌ chart/charts/${dep}-${v}.tgz is not vendored" >&2 && exit 1; }
+  done
+  v="$(yq -r '.dependencies[] | select(.name == "kgateway") | .version' chart/Chart.yaml)"
+  [ "$(yq -r '.appVersion' chart/Chart.yaml)" = "${v}" ] || { echo "❌ appVersion differs from the kgateway pin" >&2 && exit 1; }
+  for key in .upstream.image.tag .upstream.controller.image.tag; do
+    [ "$(yq -r "${key}" chart/values.yaml)" = "${v}" ] || { echo "❌ ${key} is not pinned to ${v}" >&2 && exit 1; }
+  done
+  render >"${tmp}/p.yaml"
+  json "${tmp}/p.yaml" | need_jq "controller image or proxy image default is not the pinned ${v}" --arg v "${v}" '
+    map(select(.kind == "Deployment" and .metadata.name == "platinum-gateway"))[0].spec.template.spec.containers[0] as $c |
+    $c.image == "cr.kgateway.dev/kgateway-dev/kgateway:\($v)" and ($c.env[] | select(.name == "KGW_DEFAULT_IMAGE_TAG") | .value) == $v'
+  gzip -dc tests/fixtures/gateway-api-standard-v1.7.0.yaml.gz | yq -o=json 'select(.metadata.name == "listenersets.gateway.networking.k8s.io")' |
+    need_jq "ListenerSet is not pinned to gateway.networking.k8s.io/v1 in the Gateway API v1.7.0 standard bundle" '.metadata.annotations["gateway.networking.k8s.io/bundle-version"] == "v1.7.0" and .metadata.annotations["gateway.networking.k8s.io/channel"] == "standard" and [.spec.versions[] | select(.served and .storage) | .name] == ["v1"]'
+  [ "$(yq -r '.spec.parentRef.kind + "@" + .apiVersion' tests/fixtures/entei/listenerset.yaml)" = "Gateway@gateway.networking.k8s.io/v1" ] || { echo "❌ fixture ListenerSet is not gateway.networking.k8s.io/v1" >&2 && exit 1; }
+  [[ "$(yq -r '.image.tag' tests/fixtures/entei/cert-manager-values.yaml)" =~ ^v1\.[0-9]+\.[0-9]+$ ]] || { echo "❌ cert-manager fixture version is not pinned" >&2 && exit 1; }
+  rg -q 'gateway-api-standard-v1\.7\.0\.yaml\.gz' scripts/validate/platinum-k3d.sh || { echo "❌ k3d tier does not apply the pinned Gateway API fixture" >&2 && exit 1; }
+  ;;
+reloader)
+  render >"${tmp}/r.yaml"
+  json "${tmp}/r.yaml" | need_jq "controller pods are not reloader opt-in" 'map(select(.kind == "Deployment"))[0].spec.template.metadata.annotations["reloader.stakater.com/auto"] == "true"'
+  render --set-string 'upstream.controller.podAnnotations.reloader\.stakater\.com/auto=false' >"${tmp}/o.yaml"
+  json "${tmp}/o.yaml" | need_jq "reloader opt-out did not turn the annotation off" 'map(select(.kind == "Deployment"))[0].spec.template.metadata.annotations["reloader.stakater.com/auto"] == "false"'
   ;;
 rendered-manifests)
-  render --values chart/values.example.yaml --values chart/values.lapras.yaml >"${tmp}/rendered.yaml"
-  kubeconform -strict -summary -schema-location default -schema-location 'schemas/{{ .ResourceKind }}.json' "${tmp}/rendered.yaml"
-  yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "${tmp}/rendered.yaml" >"${tmp}/vap-resources.yaml"
-  kyverno apply policies/vap --resource "${tmp}/vap-resources.yaml" --detailed-results --remove-color
-  ;;
-vap-sabotage)
-  # ONE Q-G20 wiring sabotage: a reappearing NodePort surface must trip the service-baseline VAP.
-  render --values chart/values.example.yaml --values chart/values.lapras.yaml >"${tmp}/rendered.yaml"
-  yq eval-all 'select(.kind == "Service" and .metadata.name == "platinum-edge")' "${tmp}/rendered.yaml" |
-    sed 's/type: LoadBalancer/type: NodePort/' >"${tmp}/sabotaged-service.yaml"
-  kyverno apply policies/vap/service-baseline.yaml --resource "${tmp}/sabotaged-service.yaml" --detailed-results --remove-color >"${tmp}/vap-out.txt" 2>&1 ||
-    { grep -q 'fail: 1' "${tmp}/vap-out.txt" && echo "sabotage correctly caught (NodePort rejected)"; }
-  grep -q 'fail: 1' "${tmp}/vap-out.txt" || {
-    echo "❌ NodePort sabotage was NOT caught" >&2
-    cat "${tmp}/vap-out.txt"
-    exit 1
-  }
+  for s in "${stacks[@]}"; do
+    render_stack "${s}" "${tmp}/m-${s%%|*}.yaml"
+    assert_vap "${tmp}/m-${s%%|*}.yaml" "${s%%|*}"
+  done
+  # Platinum's ONE Q-G20 wiring sabotage: the edge Service type moved off LoadBalancer.
+  yq_edit "${tmp}/m-pichu-opal.yaml" "${tmp}/nodeport.yaml" '(select(.kind == "Service" and .metadata.name == "platinum-edge") | .spec.type) = "NodePort"'
+  expect_red 'edge Service type moved to NodePort' 'NodePort services are forbidden' assert_vap "${tmp}/nodeport.yaml" nodeport
   ;;
 publish-git)
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/git" bash ./scripts/ci/publish.sh >/dev/null
   [ ! -s "${tmp}/git/platinum-0.1.0.tgz" ] && echo "❌ git chart package missing" >&2 && exit 1
   [ ! -s "${tmp}/git/index.yaml" ] && echo "❌ git chart index missing" >&2 && exit 1
+  tar -tzf "${tmp}/git/platinum-0.1.0.tgz" >"${tmp}/files.txt"
+  rg -q '^platinum/charts/kgateway/Chart.yaml$' "${tmp}/files.txt" || { echo "❌ package lacks the vendored kgateway chart" >&2 && exit 1; }
   ;;
 publish-oci)
   PUBLISH_MODE=oci PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/oci" bash ./scripts/ci/publish.sh >/dev/null
@@ -199,388 +297,18 @@ publish-oci)
   ;;
 version)
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh >/dev/null
+  expect_red 'tag differs from Chart.yaml' 'does not match tag' env PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v9.9.9 PUBLISH_OUTPUT_DIR="${tmp}/bad" bash ./scripts/ci/publish.sh
+  ;;
+task-surface)
+  task --list-all --json | jq -e '[.tasks[].name] as $n | ["debug", "template", "install", "remove"] | all(("pichu:opal:" + .) | IN($n[]))' >/dev/null ||
+    { echo "❌ pichu:opal is missing a debug/template/install/remove task" >&2 && exit 1; }
+  task --silent pichu:opal:template >"${tmp}/task.yaml"
+  rg -q 'atomi.cloud/cluster: "opal"' "${tmp}/task.yaml" || { echo "❌ pichu:opal:template did not stack values.opal.yaml" >&2 && exit 1; }
   ;;
 presence)
   test -s docs/developer/platinum-baseline.md
   test -s .claude/skills/platinum/SKILL.md
-  test -s chart/templates/gatewayclass.yaml
-  test -s chart/templates/gateway.yaml
-  test -s chart/templates/gateway-service.yaml
-  test -s chart/templates/gateway-health-route.yaml
-  test -s chart/templates/health-backend.yaml
-  test -s chart/templates/registered-certificates.yaml
-  test -s chart/values.aws.yaml
-  test -s chart/values.oci.yaml
-  test -s chart/values.digitalocean.yaml
-  test -s tests/fixtures/kgateway-v2.2.9-proxy-render.yaml
-  test -s tests/fixtures/gateway-api-standard-channel-v1.4.0.yaml
-  test -s policies/vap/workload-baseline.yaml
-  test -s policies/vap/service-baseline.yaml
-  ;;
-tokenization-presence)
-  rg -q '^## Tokenization surface$' docs/developer/platinum-baseline.md
-  rg -q 'repository-qualified physical instance id' docs/developer/platinum-baseline.md
-  rg -q 'upstream chart name/version/repository' docs/developer/platinum-baseline.md
-  ;;
-gateway-api-crd-fixture)
-  # RB-244 regression guard: the standard-channel Gateway API CRDs must be
-  # vendored, non-empty, checksum-pinned, and parse as the expected CRDs. This
-  # mode would have caught the 404 — before the repair no local fixture existed
-  # and the proof fetched a live, renameable upstream release URL.
-  fixture_path="$(bash ./scripts/local/gateway-api-crd-fixture.sh verify)"
-  pinned_version="$(bash ./scripts/local/gateway-api-crd-fixture.sh version)"
-  case "${fixture_path}" in
-  */"gateway-api-standard-channel-${pinned_version}.yaml") ;;
-  *)
-    echo "❌ fixture path does not embed pinned version ${pinned_version}" >&2
-    exit 1
-    ;;
-  esac
-  yq eval-all -o=json '.' "${fixture_path}" | jq -s -e '
-    [.[].metadata.name] as $names |
-    ($names | index("gatewayclasses.gateway.networking.k8s.io")) != null and
-    ($names | index("gateways.gateway.networking.k8s.io")) != null and
-    ($names | index("httproutes.gateway.networking.k8s.io")) != null and
-    ([.[].kind] | any(. == "CustomResourceDefinition"))
-  ' >/dev/null
-  # The proof must apply the checksum-pinned fixture, never a live external URL.
-  rg -q 'gateway-api-crd-fixture\.sh verify' scripts/validate/platinum-k3d.sh
-  if rg -q 'https?://[^[:space:]]*gateway-api[^[:space:]]*channel\.yaml' scripts/validate/platinum-k3d.sh; then
-    echo "❌ platinum-k3d proof still references a live Gateway API channel URL" >&2
-    exit 1
-  fi
-  ;;
-kgateway-crd-apply)
-  # RB-295 regression guard: the rendered kgateway-crds-v2.2.9 fallback (after
-  # `||`) must apply server-side with the stable field manager. Client-side
-  # apply persists the whole manifest into the last-applied-configuration
-  # annotation, and the archive's GatewayParameters CRD exceeds Kubernetes'
-  # 262144-byte annotation limit, so the fallback failed before any Platinum
-  # install. Static assertion only — no k3d or live provider work.
-  fallback="$(rg -o -- '\|\|.*helm template kgateway-crds.*' scripts/validate/platinum-k3d.sh || true)"
-  if [ -z "${fallback}" ]; then
-    echo "❌ kgateway-crds rendered fallback pipeline not found in platinum-k3d.sh" >&2
-    exit 1
-  fi
-  if ! printf '%s\n' "${fallback}" | rg -q -- 'kgateway-crds-v2\.2\.9\.tgz'; then
-    echo "❌ kgateway-crds rendered fallback does not render the pinned v2.2.9 archive" >&2
-    exit 1
-  fi
-  if ! printf '%s\n' "${fallback}" | rg -q -- '--server-side'; then
-    echo "❌ kgateway-crds rendered fallback does not use server-side apply" >&2
-    exit 1
-  fi
-  if ! printf '%s\n' "${fallback}" | rg -q -- '--field-manager=platinum-k3d-proof'; then
-    echo "❌ kgateway-crds rendered fallback missing stable field manager platinum-k3d-proof" >&2
-    exit 1
-  fi
-  ;;
-k3d-readiness-budget)
-  # RB-333 regression guard: the cold-node proof exhausted the old five-minute
-  # Helm wait and tore the cluster down without preserving any resource state.
-  # Keep the widened waits bounded by the 7200-second shard, then execute the
-  # proof against controlled stubs to verify safe captures, ordering, the
-  # shared failure deadline, and original-status preservation.
-  k3d_script="${PLATINUM_K3D_SCRIPT:-scripts/validate/platinum-k3d.sh}"
-
-  read_budget() {
-    local script_path="$1"
-    local budget_name="$2"
-    local value
-
-    value="$(sed -n "s/^readonly ${budget_name}=//p" "${script_path}")"
-    if [[ ! ${value} =~ ^[0-9]+$ ]]; then
-      echo "❌ ${budget_name} is missing or is not one integer in ${script_path}" >&2
-      return 1
-    fi
-    printf '%s\n' "${value}"
-  }
-
-  validate_readiness_contract() {
-    local script_path="$1"
-    local helm_seconds gateway_seconds health_seconds failure_seconds total_seconds shard_seconds
-
-    if rg -q -- '--timeout([=[:space:]])5m' "${script_path}"; then
-      echo "❌ old five-minute readiness timeout remains in ${script_path}" >&2
-      return 1
-    fi
-
-    helm_seconds="$(read_budget "${script_path}" helm_readiness_timeout_seconds)" || return 1
-    gateway_seconds="$(read_budget "${script_path}" gateway_readiness_timeout_seconds)" || return 1
-    health_seconds="$(read_budget "${script_path}" health_readiness_timeout_seconds)" || return 1
-    failure_seconds="$(read_budget "${script_path}" production_failure_handling_budget_seconds)" || return 1
-    total_seconds="$(read_budget "${script_path}" total_worst_case_budget_seconds)" || return 1
-    shard_seconds="$(read_budget "${script_path}" shard_hard_timeout_seconds)" || return 1
-
-    if [ "${helm_seconds}" -ne 900 ] || [ "${gateway_seconds}" -ne 600 ] || [ "${health_seconds}" -ne 300 ]; then
-      echo "❌ Platinum readiness waits are below the accepted 900/600/300-second budgets" >&2
-      return 1
-    fi
-    if [ "${failure_seconds}" -ne 300 ] || [ "${total_seconds}" -ne $((helm_seconds + gateway_seconds + health_seconds + failure_seconds)) ]; then
-      echo "❌ documented Platinum total does not equal its budget components" >&2
-      return 1
-    fi
-    if [ "${total_seconds}" -ne 2100 ] || [ "${shard_seconds}" -ne 7200 ] || [ "${total_seconds}" -ge "${shard_seconds}" ]; then
-      echo "❌ Platinum total worst-case budget is not 2100 seconds within the 7200-second shard" >&2
-      return 1
-    fi
-    if ! rg -Fq -- '--wait --timeout "${helm_readiness_timeout_seconds}s"' "${script_path}"; then
-      echo "❌ Helm install is not bound to the accepted readiness budget" >&2
-      return 1
-    fi
-    if ! rg -Fq -- '--timeout="${gateway_readiness_timeout_seconds}s"' "${script_path}"; then
-      echo "❌ Gateway wait is not bound to the accepted readiness budget" >&2
-      return 1
-    fi
-    if ! rg -Fq 'health_deadline=$((SECONDS + health_readiness_timeout_seconds))' "${script_path}"; then
-      echo "❌ endpoint/health polling is not wall-clock bounded" >&2
-      return 1
-    fi
-  }
-
-  write_behavior_stubs() {
-    local mock_bin="$1"
-
-    mkdir -p "${mock_bin}"
-    tee "${mock_bin}/bash" >/dev/null <<'BASH_STUB'
-#!/usr/bin/env sh
-set -eu
-trace="${PLATINUM_BEHAVIOR_TRACE:?}"
-case "${1:-}" in
-./scripts/local/create-k3d-cluster.sh)
-  printf 'create\n' >>"${trace}"
-  exit "${PLATINUM_BEHAVIOR_CREATE_EXIT:-17}"
-  ;;
-./scripts/local/delete-k3d-cluster.sh)
-  printf 'teardown:start\n' >>"${trace}"
-  if [ "${PLATINUM_BEHAVIOR_TEARDOWN_IGNORE_TERM:-false}" = "true" ]; then
-    trap '' TERM
-  fi
-  sleep "${PLATINUM_BEHAVIOR_TEARDOWN_SLEEP_SECONDS:-0}"
-  printf 'teardown:end\n' >>"${trace}"
-  exit "${PLATINUM_BEHAVIOR_TEARDOWN_EXIT:-31}"
-  ;;
-*)
-  printf 'unsafe:bash:%s\n' "$*" >>"${trace}"
-  exit 97
-  ;;
-esac
-BASH_STUB
-
-    tee "${mock_bin}/helm" >/dev/null <<'HELM_STUB'
-#!/usr/bin/env sh
-set -eu
-trace="${PLATINUM_BEHAVIOR_TRACE:?}"
-args=" $* "
-printf 'SECRET_SENTINEL_FROM_HELM_STDERR\n' >&2
-case "${args}" in
-*" status "*|*" history "*)
-  printf 'unsafe:helm:%s\n' "$*" >>"${trace}"
-  exit 41
-  ;;
-esac
-case "${args}" in
-" list --kube-context k3d-platinum --namespace sulfoxide --all --filter ^platinum$ --output json ") ;;
-*)
-  printf 'unsafe:helm:%s\n' "$*" >>"${trace}"
-  exit 42
-  ;;
-esac
-printf 'capture:helm-release\n' >>"${trace}"
-if [ "${PLATINUM_BEHAVIOR_DIAGNOSTIC_IGNORE_TERM:-false}" = "true" ]; then
-  trap '' TERM
-fi
-sleep "${PLATINUM_BEHAVIOR_DIAGNOSTIC_SLEEP_SECONDS:-0}"
-printf '['
-i=0
-while [ "${i}" -lt 20 ]; do
-  [ "${i}" -eq 0 ] || printf ','
-  printf '{"name":"platinum","namespace":"sulfoxide","revision":1,"updated":"2026-07-21T00:00:00Z","status":"pending-install","chart":"platinum-0.1.0","app_version":"0.1.0"}'
-  i=$((i + 1))
-done
-printf ']\n'
-HELM_STUB
-
-    tee "${mock_bin}/kubectl" >/dev/null <<'KUBECTL_STUB'
-#!/usr/bin/env sh
-set -eu
-trace="${PLATINUM_BEHAVIOR_TRACE:?}"
-args=" $* "
-printf 'SECRET_SENTINEL_FROM_KUBECTL_STDERR\n' >&2
-case "${args}" in
-*" describe "*|*" logs "*|*" -A "*|*" --all-namespaces "*)
-  printf 'unsafe:kubectl:%s\n' "$*" >>"${trace}"
-  exit 51
-  ;;
-esac
-case "${args}" in
-" --context k3d-platinum --namespace sulfoxide --request-timeout=15s get deployments,statefulsets,daemonsets,jobs --selector app.kubernetes.io/instance in (platinum,platinum-gateway) -o jsonpath="*)
-  marker=workloads
-  ;;
-" --context k3d-platinum --namespace sulfoxide --request-timeout=15s get pods --selector app.kubernetes.io/instance in (platinum,platinum-gateway) -o jsonpath="*)
-  marker=pods
-  ;;
-" --context k3d-platinum --namespace sulfoxide --request-timeout=15s get gateway platinum-gateway -o jsonpath="*)
-  marker=gateway
-  ;;
-" --context k3d-platinum --namespace sulfoxide --request-timeout=15s get events --field-selector involvedObject.kind=Gateway,involvedObject.name=platinum-gateway -o jsonpath="*)
-  marker=gateway-events
-  ;;
-*)
-  printf 'unsafe:kubectl:%s\n' "$*" >>"${trace}"
-  exit 52
-  ;;
-esac
-printf 'capture:%s\n' "${marker}" >>"${trace}"
-if [ "${PLATINUM_BEHAVIOR_DIAGNOSTIC_IGNORE_TERM:-false}" = "true" ]; then
-  trap '' TERM
-fi
-sleep "${PLATINUM_BEHAVIOR_DIAGNOSTIC_SLEEP_SECONDS:-0}"
-i=0
-while [ "${i}" -lt 20 ]; do
-  printf '%s\tsulfoxide\tplatinum-%02d\tReady=True:BehaviorStub\n' "${marker}" "${i}"
-  i=$((i + 1))
-done
-KUBECTL_STUB
-
-    chmod +x "${mock_bin}/bash" "${mock_bin}/helm" "${mock_bin}/kubectl"
-  }
-
-  run_behavior_case() {
-    local case_name="$1"
-    local failure_budget="$2"
-    local cleanup_reserve="$3"
-    local diagnostic_sleep="$4"
-    local teardown_sleep="$5"
-    local diagnostic_ignore_term="$6"
-    local teardown_ignore_term="$7"
-    local expect_full_capture="$8"
-    local case_dir="${tmp}/behavior-${case_name}"
-    local mock_bin="${case_dir}/mock-bin"
-    local evidence="${case_dir}/evidence"
-    local trace="${case_dir}/trace.log"
-    local run_log="${case_dir}/run.log"
-    local start_seconds run_status elapsed_seconds teardown_line last_capture_line file_bytes
-    local byte_limit=128
-    local required_marker required_file
-
-    mkdir -p "${evidence}"
-    : >"${trace}"
-    write_behavior_stubs "${mock_bin}"
-
-    start_seconds="${SECONDS}"
-    set +e
-    timeout --signal=TERM --kill-after=1 10s env \
-      PATH="${mock_bin}:${PATH}" \
-      PLATINUM_EVIDENCE_DIR="${evidence}" \
-      PLATINUM_BEHAVIOR_TEST=true \
-      PLATINUM_BEHAVIOR_TRACE="${trace}" \
-      PLATINUM_BEHAVIOR_CREATE_EXIT=17 \
-      PLATINUM_BEHAVIOR_TEARDOWN_EXIT=31 \
-      PLATINUM_BEHAVIOR_TEARDOWN_SLEEP_SECONDS="${teardown_sleep}" \
-      PLATINUM_BEHAVIOR_TEARDOWN_IGNORE_TERM="${teardown_ignore_term}" \
-      PLATINUM_BEHAVIOR_DIAGNOSTIC_SLEEP_SECONDS="${diagnostic_sleep}" \
-      PLATINUM_BEHAVIOR_DIAGNOSTIC_IGNORE_TERM="${diagnostic_ignore_term}" \
-      PLATINUM_TEST_FAILURE_BUDGET_SECONDS="${failure_budget}" \
-      PLATINUM_TEST_KILL_GRACE_SECONDS=1 \
-      PLATINUM_TEST_CLEANUP_RESERVE_SECONDS="${cleanup_reserve}" \
-      PLATINUM_TEST_DIAGNOSTIC_COMMAND_MAX_SECONDS=30 \
-      PLATINUM_TEST_DIAGNOSTIC_BYTE_LIMIT="${byte_limit}" \
-      /bin/bash "${k3d_script}" >"${run_log}" 2>&1
-    run_status=$?
-    set -e
-    elapsed_seconds=$((SECONDS - start_seconds))
-
-    if [ "${run_status}" -ne 17 ]; then
-      echo "❌ ${case_name}: diagnostics/cleanup replaced proof exit 17 with ${run_status}" >&2
-      return 1
-    fi
-    if [ "${elapsed_seconds}" -gt $((failure_budget + 2)) ]; then
-      echo "❌ ${case_name}: failure path exceeded shared deadline (${elapsed_seconds}s)" >&2
-      return 1
-    fi
-    if rg -q '^unsafe:' "${trace}"; then
-      echo "❌ ${case_name}: proof attempted a broad or unrecognized diagnostic command" >&2
-      sed -n '1,120p' "${trace}" >&2
-      return 1
-    fi
-    if ! rg -q '^teardown:start$' "${trace}"; then
-      echo "❌ ${case_name}: bounded teardown was not attempted" >&2
-      return 1
-    fi
-    if ! rg -q '^capture:' "${trace}"; then
-      echo "❌ ${case_name}: no diagnostics ran before teardown" >&2
-      return 1
-    fi
-    teardown_line="$(rg -n '^teardown:start$' "${trace}" | cut -d: -f1)"
-    last_capture_line="$(rg -n '^capture:' "${trace}" | tail -n 1 | cut -d: -f1)"
-    if [ "${last_capture_line}" -ge "${teardown_line}" ]; then
-      echo "❌ ${case_name}: teardown began before diagnostics completed" >&2
-      return 1
-    fi
-
-    if [ "${expect_full_capture}" = "true" ]; then
-      for required_marker in helm-release workloads pods gateway gateway-events; do
-        if ! rg -q "^capture:${required_marker}$" "${trace}"; then
-          echo "❌ ${case_name}: missing required safe capture ${required_marker}" >&2
-          return 1
-        fi
-      done
-      for required_file in metadata.tsv helm-release.tsv workloads.tsv pods.tsv gateway.tsv gateway-events.tsv; do
-        if [ ! -s "${evidence}/failure-diagnostics/${required_file}" ]; then
-          echo "❌ ${case_name}: missing diagnostic artifact ${required_file}" >&2
-          return 1
-        fi
-        file_bytes="$(wc -c <"${evidence}/failure-diagnostics/${required_file}")"
-        if [ "${file_bytes}" -gt "${byte_limit}" ]; then
-          echo "❌ ${case_name}: ${required_file} exceeded ${byte_limit} bytes" >&2
-          return 1
-        fi
-      done
-      if ! rg -q '^proof_exit_status=17$' "${evidence}/failure-diagnostics/metadata.tsv"; then
-        echo "❌ ${case_name}: metadata did not retain proof exit 17" >&2
-        return 1
-      fi
-      if rg -q 'SECRET_SENTINEL' "${evidence}/failure-diagnostics"; then
-        echo "❌ ${case_name}: diagnostic stderr leaked into durable evidence" >&2
-        return 1
-      fi
-      if find "${evidence}/failure-diagnostics" -type f \( -name '*log*' -o -name '*describe*' -o -name 'helm-status*' -o -name 'helm-history*' \) | rg -q .; then
-        echo "❌ ${case_name}: broad diagnostic artifacts were persisted" >&2
-        return 1
-      fi
-    fi
-  }
-
-  validate_readiness_contract "${k3d_script}"
-  run_behavior_case complete-captures 8 3 0 0 false false true
-  run_behavior_case diagnostic-deadline 5 2 30 0 true false false
-  run_behavior_case teardown-deadline 5 2 0 30 false true true
-
-  # A nonfunctional look-alike can carry every required literal and pass the
-  # static budget checks. It must still fail the executable behavior contract.
-  static_spoof="${tmp}/rb333-static-spoof.sh"
-  tee "${static_spoof}" >/dev/null <<'STATIC_SPOOF'
-#!/usr/bin/env bash
-readonly helm_readiness_timeout_seconds=900
-readonly gateway_readiness_timeout_seconds=600
-readonly health_readiness_timeout_seconds=300
-readonly production_failure_handling_budget_seconds=300
-readonly total_worst_case_budget_seconds=2100
-readonly shard_hard_timeout_seconds=7200
-# --wait --timeout "${helm_readiness_timeout_seconds}s"
-# --timeout="${gateway_readiness_timeout_seconds}s"
-health_deadline=$((SECONDS + health_readiness_timeout_seconds))
-exit 0
-STATIC_SPOOF
-  validate_readiness_contract "${static_spoof}"
-  real_k3d_script="${k3d_script}"
-  k3d_script="${static_spoof}"
-  if run_behavior_case static-spoof 8 3 0 0 false false false >/dev/null 2>&1; then
-    echo "❌ nonfunctional static look-alike passed the behavioral RB-333 guard" >&2
-    exit 1
-  fi
-  k3d_script="${real_k3d_script}"
+  rg -q 'listener ceiling' docs/developer/platinum-baseline.md || { echo "❌ baseline doc does not document the emergency listener ceiling" >&2 && exit 1; }
   ;;
 *)
   echo "❌ unknown validation mode '${mode}'" >&2

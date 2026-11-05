@@ -2,13 +2,13 @@ version: '3'
 
 includes:
   helm: tasks/Taskfile.helm.yaml
-  example:lapras:
+  pichu:opal:
     taskfile: tasks/Taskfile.cluster.yaml
     vars:
       RELEASE_NAME: platinum
       NAMESPACE: sulfoxide
-      LANDSCAPE: example
-      CLUSTER: lapras
+      LANDSCAPE: pichu
+      CLUSTER: opal
 
 tasks:
   setup:
@@ -22,41 +22,41 @@ tasks:
       - pre-commit run --all-files
 
   build:
-    desc: Build chart dependencies (platinum is config-free; no config vendoring)
+    desc: Build the pinned chart dependencies
     cmds:
       - helm dependency build chart
 
   update:
-    desc: Refresh the pinned upstream chart dependencies (kgateway + kgateway-crds)
+    desc: Refresh the pinned upstream chart dependencies
     cmds:
       - helm dependency update chart
 
   latest:
-    desc: Resolve the latest real upstream kgateway chart, CRD, and image tags
+    desc: Resolve the latest real upstream kgateway chart and image tags
     cmds:
       - ./scripts/local/latest-chart-upstreams.sh
 
-  test:
-    desc: Run the platinum unit/static tier
-    cmds:
-      - ./scripts/ci/platinum.sh
-
   test:unit:
-    desc: Run schema, lint, render, VAP, gateway, LB, and publish dry-run validation
+    desc: Run schema, lint, render, policy, and contract validation
     cmds:
       - ./scripts/ci/platinum.sh
 
   test:int:
-    desc: Run the local k3d installation + Gateway Programmed proof
+    desc: Run the k3d integration tier
     cmds:
-      - ./scripts/validate/platinum-k3d.sh
+      - ./scripts/ci/platinum-k3d.sh
+
+  test:entei:
+    desc: Run the k3d ENTEI dev-host fixture tier
+    cmds:
+      - ./scripts/ci/platinum-entei.sh
 
   start:cluster:
-    desc: Start the local k3d lapras proof cluster
+    desc: Start the local k3d proof cluster
     cmds:
       - ./scripts/local/create-k3d-cluster.sh
 
   stop:cluster:
-    desc: Delete the local k3d lapras proof cluster
+    desc: Delete the local k3d proof cluster
     cmds:
       - ./scripts/local/delete-k3d-cluster.sh

@@ -1,139 +1,96 @@
 # Platinum baseline
 
-Platinum (element name for kgateway) is the platform Gateway API ingress chart. It is a
-materialized chart product: it inherits the helm-wrapper _shape_ — two-dimension stacked values,
-generated schema, the rendered-manifest validation stage, fullname and LPSM label conventions, and
-the dual publish modes — but carries no CyanPrint probe matrix. Evidence is an ordinary testing
-pyramid: unit tier is lint/render/schema/static conformance (including the inherited VAP stage with
-one wiring sabotage); the integration tier installs on ephemeral k3d with the live kgateway control
-plane.
+Platinum (graph node `charts/kgateway`) is the fleet's Gateway API ingress chart. It is a materialized
+chart product: it inherits the helm-wrapper shape (stacked values, generated schema, the
+rendered-manifest validation stage, `<service>-<token>` names, LPSM labels, dual publish modes) but
+carries no probe matrix. Evidence is a testing pyramid with negative fixtures as ordinary tests.
 
-## What platinum wraps
+## What it wraps
 
-The chart vendors two pinned upstreams from `oci://cr.kgateway.dev/kgateway-dev/charts`:
+`chart/charts/` vendors two pinned upstreams from `oci://cr.kgateway.dev/kgateway-dev/charts`:
 
-- `kgateway` (alias `upstream`) — the Envoy-based Gateway API control plane.
-- `kgateway-crds` — the `gateway.kgateway.dev/*` custom resources.
+- `kgateway` v2.5.0 (alias `upstream`, on by default) — the control plane, named `platinum-gateway`
+  (the primary workload). Images: `cr.kgateway.dev/kgateway-dev/kgateway:v2.5.0` and the generated
+  proxy `cr.kgateway.dev/kgateway-dev/envoy-wrapper:v2.5.0`.
+- `kgateway-crds` v2.5.0 (alias `crds`, off by default) — the `gateway.kgateway.dev` CRDs.
 
-Both dependencies are `enabled: false` by default. Unit-tier static checks render platinum-owned
-objects only; the k3d integration tier flips `upstream.enabled=true` (and applies the standard
-Gateway API CRDs, which deploy separately from kgateway-crds) so the shared Gateway reaches
-`Programmed=True`.
+Install order per cluster: Gateway API v1.7.0 standard CRDs, then `kgateway-crds` as its own release,
+then platinum. The release cannot carry its own CRDs because it renders `GatewayParameters` and
+`DirectResponse` objects. kgateway v2.5.0 needs Kubernetes 1.33 or newer.
 
 ## Rendering model
 
-Two independent stacked dimensions, inherited from helm-wrapper:
+Two independent stacked dimensions: `values.yaml` → landscape overlay → cluster overlay.
 
-1. `chart/values.yaml` — platform/service/module/layer defaults (`sulfoxide` / `platinum` / `gateway` / `1`).
-2. `chart/values.<landscape>.yaml` — landscape identity and provider behavior.
-3. `chart/values.<cluster>.yaml` — normally-thin cluster identity.
+- Serving landscapes: `values.pichu.yaml`, `values.pikachu.yaml`, `values.raichu.yaml`, `values.ampharos.yaml`.
+- Cluster overlays carry the provider settings. Live marks are fleet deployment input; the
+  representative overlays are `values.opal.yaml` (DigitalOcean), `values.ruby.yaml` (AWS) and
+  `values.emerald.yaml` (OCI).
+- Loopback-only local landscapes: `values.ditto.yaml`, `values.rotom.yaml`, `values.absol.yaml`
+  (`provider: local`, no cloud annotation, no registered-fleet Certificate).
+- Lapras is Boron-direct and has no platinum overlay.
+- ENTEI: provider cluster overlay, then `values.entei.yaml`.
 
-The sample stacks are `values.yaml → values.example.yaml → values.lapras.yaml` (ordinary local),
-`values.yaml → values.example.yaml → values.aws.yaml|values.oci.yaml|values.digitalocean.yaml`
-(representative provider overlays), and `values.yaml → values.entei.yaml` (the ENTEI dev-host
-overlay). Landscape, cluster, and provider overlays remain independently stackable. Platinum is
-config-free and ExternalSecret-free, so there is no build-phase config vendoring and no pre-sync
-migration hook.
+Every overlay that changes `serviceTree` also sets the same key in `upstream.commonLabels`; render
+refuses when the kgateway labels differ from the LPSM set.
 
-## Identity and naming
+## Objects
 
-- `labelPrefix` is the only prefix input (`atomi.cloud`); every service-tree label and annotation helper reads it.
-- LPSM is `{landscape, platform, service, module}`; the platform slot always comes from the release namespace (`sulfoxide`).
-- Resource names use `<service>-<token>` with exactly one dash, always via the fullname helper: `platinum-edge` (LoadBalancer), `platinum-gateway` (Gateway), `platinum-health` (HTTPRoute), `platinum-api` (the health backend, the chart's primary workload), `platinum-certprimary` / `platinum-certbackup` (registered-fleet wildcard Certificates). The cluster-scoped `GatewayClass` is the bare classname `platinum`.
+| Object                     | Name                                          | Notes                                                |
+| -------------------------- | --------------------------------------------- | ---------------------------------------------------- |
+| GatewayClass               | `platinum`                                    | controller `kgateway.dev/kgateway`                   |
+| Gateway                    | `platinum-shared`                             | the one shared Gateway per cluster                   |
+| GatewayParameters          | `platinum-proxy`                              | keeps kgateway's generated proxy Service `ClusterIP` |
+| Service                    | `platinum-edge`                               | `type: LoadBalancer`, the only public origin         |
+| HTTPRoute + DirectResponse | `platinum-healthz`                            | `Exact /healthz` answered `200` by the proxy         |
+| Certificate ×2             | `platinum-certprimary`, `platinum-certbackup` | registered fleet only                                |
 
-## Gateway API edge
+`platinum-edge` selects the proxy by `gateway.networking.k8s.io/gateway-name: platinum-shared`.
+kgateway binds listener ports below 1024 at port + 8000, so 80/443 target 8080/8443; the k3d tier
+checks that against the generated proxy Service.
 
-Platinum owns one shared edge per target cluster:
+## Fixed-IP LoadBalancer annotations
 
-- A `GatewayClass` named `platinum` bound to v2.2.9's real controller,
-  `kgateway.dev/kgateway`. The schema pins this value and the live adoption is verified in k3d.
-- One shared `Gateway` (`platinum-gateway`) with HTTP plus terminating HTTPS listeners for the
-  selected primary and backup registered-fleet wildcard domains.
-- The LoadBalancer `Service` (`platinum-edge`), `type: LoadBalancer`, selecting the proxy generated
-  for `platinum-gateway` through kgateway v2.2.9's exact three stable labels. Its numeric
-  `targetPort`s 80 and 443 match the generated proxy listener container ports. A checked-in
-  v2.2.9 proxy golden and the enabled upstream render guard this binding; missing/mismatched
-  selector or port values fail rendering.
+The cloud LB is the sole public origin; NodePort and hostPort never appear. A NodePort Service is
+denied by the inherited VAP stage (platinum's one Q-G20 wiring sabotage).
 
-### Per-provider fixed-IP LoadBalancer annotations
-
-The cloud load balancer is the sole public origin mode. NodePort and hostPort are absent and a
-reappearing NodePort surface trips the inherited VAP stage (this is platinum's one Q-G20 wiring
-sabotage; per-rule proof lives in charts/vap-policies).
-
-- AWS NLB: deterministic subnet list paired positionally with Elastic IP allocation ids (`service.beta.kubernetes.io/aws-load-balancer-subnets` + `...-eip-allocations`). This path carries the standing EKS Auto Mode compatibility assumption until the live test completes.
-- OCI: reserved public IP annotation (`oci.oraclecloud.com/reserved-ips`).
-- DigitalOcean: provider-lifetime-stable load balancer IP, with no fixed-IP annotation.
+- AWS NLB: subnet list paired with fleet-allocated Elastic IP allocations.
+- OCI: NLB on a reserved public IP.
+- DigitalOcean: no reserved IP for LBs; the named LB keeps its IP for its lifetime only. On
+  recreation the traffic controller re-derives A-sets from `ClusterRegistration.status`.
 
 ## Health endpoint
 
-Every gateway exposes `/healthz` and must return 2xx. This is the target the traffic controller's
-unified 5s poll hits once per cluster per tick; its liveness stamps
-`ClusterRegistration.status.acceptingTraffic`. Platinum renders an `HTTPRoute` (`platinum-health`)
-that pins the `/healthz` path and routes to the platinum-owned health backend (`platinum-api`).
-Chart scope stops at "route rendered + 2xx in k3d"; the runtime poll cadence and stale-tick paging
-are traffic-controller behavior.
+`/healthz` on the `http` listener is the target of the traffic controller's 5s poll (once per cluster
+per tick). Chart scope is "route rendered + 2xx in k3d"; the poll itself belongs to T3.
 
-## Registered-fleet certificates
+## Certificates and issuers
 
-Platinum issues the registered-fleet wildcard `Certificate`s against zinc's DNS-01 `ClusterIssuer`
-definition (owned by charts/zinc and instantiated once per cluster — one definition, not per
-landscape):
-
-- `platinum-certprimary` — the primary base-domain wildcard.
-- `platinum-certbackup` — the second R53 base-domain wildcard for cluster-endpoint failover TLS (S8 backup domain).
-
-Each wildcard is present in the Certificate's `dnsNames` SAN list (the apex may be an additional
-SAN). The shared Gateway consumes the matching generated Secrets through two explicit HTTPS
-listeners with `tls.mode: Terminate`; a missing wildcard SAN or broken Secret reference is a unit
-test failure.
-
-Zinc remains the issuer-definition owner. Platinum neither hand-authors nor infers per-host
-Certificates from Gateway listeners. Exact-host TLS ownership (one exact-name `Certificate` per
-approved Garden hostname, one-label wildcards rejected as coverage for a dotted hostname) belongs to
-the exposure-materializer, not this chart.
+Platinum renders no issuer. Registered-fleet stacks render the primary `*.cluster.atomi.cloud`
+wildcard and the S8 Route53 backup-domain wildcard against zinc's `zinc-letsencrypt` ClusterIssuer,
+each served by a terminating HTTPS listener. The backup domain value is a placeholder until the S8
+domain is named.
 
 ## ENTEI dev-host overlay
 
-`values.entei.yaml` selects `devHost.enabled: true`. In this mode platinum renders the shared
-`GatewayClass`, the shared `Gateway`, and the provider `LoadBalancer` only. The exact rendered
-object-set assertion rejects any additional object, including the ordinary health Deployment and
-its ClusterIP Service. Per-host `Certificate`,
-`ListenerSet`, and `HTTPRoute` are owned by the exposure materializer; this chart renders none of
-them, and the registered-fleet Certificates are disabled because ENTEI's exact-name certs come from
-the materializer. Garden submits the narrow owner-scoped exposure claim and needs no general ENTEI
-kubeconfig. ENTEI itself remains a registered, infrastructure-only, `traffic=false` host; this chart
-does not add it to any workload roster.
+ENTEI is a registered, infrastructure-only, `traffic=false` host. With `devHost.enabled` platinum
+renders only the shared GatewayClass, Gateway, LoadBalancer and the health route: no Certificate, no
+ListenerSet, no per-host HTTPRoute. The exposure materializer owns the issue-once instance
+Certificate (one single-label wildcard per service/platform pair) and the per-host `ListenerSet`
+(`gateway.networking.k8s.io/v1`, Gateway API v1.7.0 standard) and `HTTPRoute`.
 
-## Publishing
+The Gateway admits ListenerSets only from namespaces labelled `atomi.cloud/managed-vcluster: "true"`.
 
-OCI is the default publish/consume mode. Git chart repositories remain secondary.
-`scripts/release/bump.sh` stamps `chart/Chart.yaml` at the release commit; `scripts/ci/publish.sh`
-refuses a manifest/tag mismatch, regenerates Helm docs, and supports git packaging plus OCI dry-run
-or push. No external publish is needed for local proof.
+Direct mutation of the shared Gateway is disabled by default. `devHost.emergencyListeners` is an
+emergency-only fallback: its listeners are appended to the shared Gateway and inherit the Gateway
+listener ceiling (64 listeners, render refuses beyond it) that ListenerSet avoids.
 
-## Tokenization surface
+## Tests
 
-Tokenize these isolated scalars when materializing an instance:
-
-- chart and release name;
-- `serviceTree` platform/service/module/layer values;
-- `labelPrefix`;
-- upstream chart name/version/repository (kgateway + kgateway-crds) and vendored archive filenames;
-- upstream kgateway image references used by `latest`;
-- the GatewayClass name and controllerName binding;
-- OCI organization/repository path and secondary git repository URL;
-- landscape and cluster overlay filenames;
-- k3d cluster and local registry names;
-- repository-qualified physical instance id, normalized DNS label, and original-id annotation;
-- selected hostname zone;
-- the registered-fleet base-domain wildcards and the zinc ClusterIssuer name;
-- per-provider LoadBalancer annotation keys and fixed-IP allocation values.
-
-## Held boundaries
-
-The full k3d integration tier (Gateway `Programmed=True`, real proxy Endpoints, live `/healthz` 2xx
-through a LoadBalancer ingress or isolated k3d host endpoint, and a durable local OCI round-trip
-archive + SHA-256), the ENTEI exact-host TLS integration
-scenarios, the `ListenerSet` API-version pin, and the final landscape/profile roster remain reserved
-for the serialized proof window or their owning nodes.
+- Unit (`scripts/ci/platinum.sh`): schema, lint and render over every stack, LPSM labels, gateway,
+  health, LB, ENTEI, issuer-free, pins, reloader opt-out, rendered-manifest VAP stage, publish modes.
+- Integration (`scripts/ci/platinum-k3d.sh`, ditto stack): Gateway Programmed, sample HTTPRoute,
+  `/healthz` 2xx through `platinum-edge`, local OCI round-trip.
+- ENTEI fixtures (`scripts/ci/platinum-entei.sh`): cert-manager from `tests/fixtures/entei/`, a fixture
+  CA Issuer and instance Certificate, a ClusterIP Service, ListenerSet and HTTPRoute; exact-host TLS,
+  Service replacement, named-port change, then deletion leaves the Gateway and Certificate unchanged.

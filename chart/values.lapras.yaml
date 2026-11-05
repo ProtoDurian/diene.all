@@ -1,9 +1,0 @@
-# Independent local-cluster overlay. It contains no landscape decision.
-serviceTree:
-  cluster: lapras
-
-# zinc's wildcard ClusterIssuer is absent on local k3d; the registered-fleet certs ride this chart only on real clusters.
-registeredCertificates:
-  enabled: false
-
-# The base selector and 80/443 target ports bind to the generated v2.2.9 proxy.

@@ -1,14 +1,14 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Platinum Values",
-    "description": "Generated schema for the platinum Gateway API chart.",
+    "title": "Diene Platinum Values",
+    "description": "Generated schema for the diene platinum kgateway wrapper.",
     "type": "object",
     "required": [
         "fullnameOverride"
     ],
     "properties": {
-        "devHost": {
-            "description": "ENTEI dev-host shared-Gateway mode. When enabled, platinum renders the shared GatewayClass, Gateway, and LoadBalancer only; per-host Certificate, ListenerSet, and HTTPRoute are owned by the exposure materializer, not this chart.",
+        "crds": {
+            "description": "kgateway CRDs (pinned). Installed once per cluster as its own release before platinum.",
             "type": "object",
             "properties": {
                 "enabled": {
@@ -16,13 +16,42 @@
                 }
             }
         },
+        "devHost": {
+            "description": "ENTEI dev-host shared-Gateway role. Platinum renders the shared edge only; per-host Certificate, ListenerSet, and HTTPRoute belong to the exposure materializer.",
+            "type": "object",
+            "properties": {
+                "emergencyListeners": {
+                    "description": "Emergency-only direct listeners on the shared Gateway. They count against the Gateway listener ceiling that ListenerSet avoids.",
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "listeners": {
+                            "type": "array",
+                            "items": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "listenerSetNamespaceLabel": {
+                    "description": "Namespace label (under labelPrefix, value \"true\") that admits a namespace's ListenerSets.",
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]+$"
+                }
+            }
+        },
         "fullnameOverride": {
-            "description": "Primary workload fullname (`\u003cservice\u003e-\u003ctoken\u003e`). The wrapper convention names the chart's primary served endpoint.",
+            "description": "Primary workload fullname (`\u003cservice\u003e-\u003cmodule\u003e`): the kgateway control plane.",
             "type": "string",
             "pattern": "^[a-z0-9]+-[a-z0-9]+$"
         },
         "gateway": {
-            "description": "Gateway API edge: shared GatewayClass, shared Gateway, the LoadBalancer exposure, and the health route.",
+            "description": "Shared Gateway API edge: GatewayClass, one shared Gateway, the provider LoadBalancer, and the health route.",
             "type": "object",
             "properties": {
                 "aws": {
@@ -44,13 +73,13 @@
                         }
                     }
                 },
-                "classname": {
-                    "description": "GatewayClass name platinum owns. Registered-fleet and local LAPRAS-class gateways reference it.",
+                "className": {
+                    "description": "GatewayClass name platinum owns.",
                     "type": "string",
                     "pattern": "^[a-z0-9-]+$"
                 },
                 "controllerName": {
-                    "description": "Controller binding pinned to kgateway v2.2.9's real controller name.",
+                    "description": "kgateway's controller name.",
                     "type": "string",
                     "enum": [
                         "kgateway.dev/kgateway"
@@ -62,13 +91,15 @@
                 "health": {
                     "type": "object",
                     "properties": {
-                        "expectedStatus": {
-                            "type": "string"
-                        },
                         "path": {
-                            "description": "Fixed health path the traffic controller polls once per cluster per tick.",
+                            "description": "Fixed path the traffic controller polls once per cluster per tick.",
                             "type": "string",
                             "pattern": "^/.*"
+                        },
+                        "status": {
+                            "type": "integer",
+                            "maximum": 299,
+                            "minimum": 200
                         }
                     }
                 },
@@ -90,184 +121,14 @@
                     "enum": [
                         "aws",
                         "oci",
-                        "digitalocean"
+                        "digitalocean",
+                        "local"
                     ]
-                },
-                "proxy": {
-                    "type": "object",
-                    "properties": {
-                        "httpTargetPort": {
-                            "description": "Generated v2.2.9 proxy container port for the HTTP listener.",
-                            "type": "integer",
-                            "maximum": 65535,
-                            "minimum": 1
-                        },
-                        "httpsTargetPort": {
-                            "description": "Generated v2.2.9 proxy container port for the HTTPS listeners.",
-                            "type": "integer",
-                            "maximum": 65535,
-                            "minimum": 1
-                        },
-                        "selector": {
-                            "description": "Exact stable labels on the v2.2.9 proxy generated for Gateway platinum-gateway.",
-                            "type": "object",
-                            "properties": {
-                                "app.kubernetes.io/instance": {
-                                    "type": "string"
-                                },
-                                "app.kubernetes.io/name": {
-                                    "type": "string"
-                                },
-                                "gateway.networking.k8s.io/gateway-name": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
                 },
                 "tlsPort": {
                     "type": "integer",
                     "maximum": 65535,
                     "minimum": 1
-                }
-            }
-        },
-        "healthBackend": {
-            "description": "Platinum-owned /healthz responder. It is the gateway health-route backend and the chart's primary workload.",
-            "type": "object",
-            "properties": {
-                "enabled": {
-                    "type": "boolean"
-                },
-                "image": {
-                    "type": "object",
-                    "properties": {
-                        "pullPolicy": {
-                            "type": "string",
-                            "enum": [
-                                "Always",
-                                "IfNotPresent",
-                                "Never"
-                            ]
-                        },
-                        "repository": {
-                            "type": "string"
-                        },
-                        "tag": {
-                            "type": "string",
-                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
-                        }
-                    }
-                },
-                "podSecurityContext": {
-                    "type": "object",
-                    "properties": {
-                        "fsGroup": {
-                            "type": "integer"
-                        },
-                        "runAsGroup": {
-                            "type": "integer"
-                        },
-                        "runAsNonRoot": {
-                            "type": "boolean"
-                        },
-                        "runAsUser": {
-                            "type": "integer"
-                        }
-                    }
-                },
-                "port": {
-                    "type": "integer",
-                    "maximum": 65535,
-                    "minimum": 1
-                },
-                "reloader": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        }
-                    }
-                },
-                "replicas": {
-                    "type": "integer",
-                    "minimum": 1
-                },
-                "resources": {
-                    "type": "object",
-                    "properties": {
-                        "limits": {
-                            "type": "object",
-                            "properties": {
-                                "cpu": {
-                                    "type": "string"
-                                },
-                                "memory": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "requests": {
-                            "type": "object",
-                            "properties": {
-                                "cpu": {
-                                    "type": "string"
-                                },
-                                "memory": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
-                },
-                "securityContext": {
-                    "type": "object",
-                    "properties": {
-                        "allowPrivilegeEscalation": {
-                            "type": "boolean"
-                        },
-                        "capabilities": {
-                            "type": "object",
-                            "properties": {
-                                "drop": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                        },
-                        "readOnlyRootFilesystem": {
-                            "type": "boolean"
-                        },
-                        "runAsGroup": {
-                            "type": "integer"
-                        },
-                        "runAsNonRoot": {
-                            "type": "boolean"
-                        },
-                        "runAsUser": {
-                            "type": "integer"
-                        }
-                    }
-                }
-            }
-        },
-        "instance": {
-            "description": "Optional physical-instance metadata. The instance remains outside LPSM.",
-            "type": "object",
-            "properties": {
-                "physicalId": {
-                    "type": "string"
-                }
-            }
-        },
-        "kgatewayCrds": {
-            "description": "Standard-channel and kgateway CRD subchart. Enabled in the k3d integration tier; off for unit-tier static checks.",
-            "type": "object",
-            "properties": {
-                "enabled": {
-                    "type": "boolean"
                 }
             }
         },
@@ -278,21 +139,14 @@
             "minLength": 1
         },
         "registeredCertificates": {
-            "description": "Registered-fleet wildcard Certificates. Zinc owns the DNS-01 ClusterIssuer definition (charts/zinc); this chart only issues against it.",
+            "description": "Registered-fleet wildcard Certificates against zinc's DNS-01 ClusterIssuer. Platinum renders no issuer.",
             "type": "object",
             "properties": {
                 "backup": {
                     "type": "object",
                     "properties": {
-                        "dnsNames": {
-                            "type": "array",
-                            "uniqueItems": true,
-                            "items": {
-                                "type": "string"
-                            }
-                        },
                         "domain": {
-                            "description": "Second R53 base-domain wildcard for cluster-endpoint failover TLS (S8 backup domain).",
+                            "description": "S8 Route53 backup base domain wildcard (tokenize before live use).",
                             "type": "string",
                             "pattern": "^\\*\\.[a-z0-9.-]+$"
                         }
@@ -307,12 +161,11 @@
                         "kind": {
                             "type": "string",
                             "enum": [
-                                "ClusterIssuer",
-                                "Issuer"
+                                "ClusterIssuer"
                             ]
                         },
                         "name": {
-                            "description": "ClusterIssuer name owned by charts/zinc and instantiated once per cluster.",
+                            "description": "ClusterIssuer instantiated per cluster by charts/zinc.",
                             "type": "string"
                         }
                     }
@@ -320,15 +173,7 @@
                 "primary": {
                     "type": "object",
                     "properties": {
-                        "dnsNames": {
-                            "type": "array",
-                            "uniqueItems": true,
-                            "items": {
-                                "type": "string"
-                            }
-                        },
                         "domain": {
-                            "description": "Primary registered-fleet base-domain wildcard (atomi.cloud).",
                             "type": "string",
                             "pattern": "^\\*\\.[a-z0-9.-]+$"
                         }
@@ -365,9 +210,27 @@
             }
         },
         "upstream": {
-            "description": "Pinned kgateway control-plane subchart. Enabled in the k3d integration tier; off for unit-tier static checks.",
+            "description": "kgateway control plane (pinned). Its labels must equal the LPSM set.",
             "type": "object",
             "properties": {
+                "commonLabels": {
+                    "type": "object",
+                    "properties": {
+                        "atomi.cloud/layer": {
+                            "type": "string"
+                        },
+                        "atomi.cloud/module": {
+                            "type": "string"
+                        },
+                        "atomi.cloud/platform": {
+                            "type": "string"
+                        },
+                        "atomi.cloud/service": {
+                            "type": "string"
+                        }
+                    },
+                    "additionalProperties": true
+                },
                 "controller": {
                     "type": "object",
                     "properties": {
@@ -382,11 +245,77 @@
                                 }
                             }
                         },
-                        "service": {
+                        "podAnnotations": {
                             "type": "object",
                             "properties": {
-                                "type": {
+                                "reloader.stakater.com/auto": {
                                     "type": "string"
+                                }
+                            }
+                        },
+                        "podSecurityContext": {
+                            "type": "object",
+                            "properties": {
+                                "runAsGroup": {
+                                    "type": "integer"
+                                },
+                                "runAsNonRoot": {
+                                    "type": "boolean"
+                                },
+                                "runAsUser": {
+                                    "type": "integer"
+                                }
+                            }
+                        },
+                        "resources": {
+                            "type": "object",
+                            "properties": {
+                                "limits": {
+                                    "type": "object",
+                                    "properties": {
+                                        "cpu": {
+                                            "type": "string"
+                                        },
+                                        "memory": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "requests": {
+                                    "type": "object",
+                                    "properties": {
+                                        "cpu": {
+                                            "type": "string"
+                                        },
+                                        "memory": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "securityContext": {
+                            "type": "object",
+                            "properties": {
+                                "allowPrivilegeEscalation": {
+                                    "type": "boolean"
+                                },
+                                "capabilities": {
+                                    "type": "object",
+                                    "properties": {
+                                        "drop": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                },
+                                "readOnlyRootFilesystem": {
+                                    "type": "boolean"
+                                },
+                                "runAsNonRoot": {
+                                    "type": "boolean"
                                 }
                             }
                         }
@@ -398,6 +327,17 @@
                 "fullnameOverride": {
                     "type": "string",
                     "pattern": "^[a-z0-9]+-[a-z0-9]+$"
+                },
+                "image": {
+                    "type": "object",
+                    "properties": {
+                        "registry": {
+                            "type": "string"
+                        },
+                        "tag": {
+                            "type": "string"
+                        }
+                    }
                 }
             }
         }

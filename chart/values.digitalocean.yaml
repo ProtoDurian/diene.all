@@ -1,3 +1,0 @@
-# Representative DigitalOcean provider overlay. Stack after one landscape overlay.
-gateway:
-  provider: digitalocean

@@ -6,38 +6,14 @@
   env,
 }:
 let
-  # The wrapper hooks below run their validators through a pinned runtime rather
-  # than the ambient shell, so this stays even though the parent no longer needs it.
-  validator-runtime = pkgs.buildEnv {
-    name = "workspace-validator-runtime";
-    paths = [
-      packages.bash
-      packages.git
-      packages.gitlint
-      packages.helm-schema
-      packages.jq
-      packages.kubeconform
-      packages.kubernetes-helm
-      packages.kyverno
-      packages.ripgrep
-      packages.yq-go
-      pkgs.coreutils
-      pkgs.findutils
-      pkgs.gnugrep
-      pkgs.gnused
-    ];
-  };
-  validator =
-    command:
-    "${packages.bash}/bin/bash -c 'export PATH=${validator-runtime}/bin; exec ${packages.bash}/bin/bash ${command}'";
-
-  # toolchain-smoke asserts the DECLARED env lists actually provide their binaries.
   envPath = pkgs.lib.makeBinPath (env.system ++ env.main ++ env.lint ++ env.dev);
 in
 pre-commit-lib.run {
   src = ../.;
 
+  # hooks
   hooks = {
+    # formatter
     treefmt = {
       enable = true;
       package = formatter;
@@ -83,15 +59,11 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    # The selector is directory-shaped on purpose: every standard under
-    # docs/standards/ and every first-level skill trigger is linted, so adding a
-    # topic needs no edit here. Vendored skills sit deeper than one level and are
-    # ignored again by .markdownlint-cli2.jsonc.
     a-markdownlint = {
       enable = true;
       name = "Markdown lint";
       entry = "${pkgs.markdownlint-cli2}/bin/markdownlint-cli2";
-      files = "^(CLAUDE\\.md|README\\.md|docs/standards/.*\\.md|\\.claude/skills/[^/]+/SKILL\\.md)$";
+      files = "^(docs/standards/.*\\.md|\\.claude/skills/[^/]+/SKILL\\.md)$";
       pass_filenames = true;
       language = "system";
     };
@@ -113,8 +85,6 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    # -x + SCRIPTDIR: staged-file batching splits scripts from their sources,
-    # so ShellCheck must follow source= directives itself.
     a-shellcheck = {
       enable = true;
       name = "Shellcheck";
@@ -124,22 +94,20 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    # ### platinum-hooks
-    # #### source: platinum
-    a-platinum-helm-docs = {
+    a-wrapper-helm-docs = {
       enable = true;
-      name = "Platinum chart docs";
+      name = "Helm wrapper docs";
       entry = "${packages.infralint}/bin/helm-docs --chart-search-root chart";
       files = "^chart/.*";
       pass_filenames = false;
       language = "system";
     };
 
-    a-platinum-helm-lint = {
+    a-wrapper-helm-lint = {
       enable = true;
-      name = "Platinum chart lint";
-      entry = validator "scripts/validate/platinum.sh lint";
-      files = "^(chart/.*|scripts/(local|validate|ci)/.*)$";
+      name = "Helm wrapper lint";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH bash scripts/validate/helm-wrapper.sh lint'";
+      files = "^(chart/.*|config/.*|scripts/(local|validate)/.*)$";
       pass_filenames = false;
       language = "system";
     };

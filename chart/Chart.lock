@@ -1,9 +1,9 @@
 dependencies:
 - name: kgateway
   repository: oci://cr.kgateway.dev/kgateway-dev/charts
-  version: v2.2.9
+  version: v2.5.0
 - name: kgateway-crds
   repository: oci://cr.kgateway.dev/kgateway-dev/charts
-  version: v2.2.9
-digest: sha256:aaa733cef8a2abee3999903ab288d57f97e28d78c3a17b9a53f9007d8094b599
-generated: "2026-07-19T10:01:53.74303324Z"
+  version: v2.5.0
+digest: sha256:5725f0e89c45ec17b9ae8513516022bae3c724b67d5d11b5bedfa7bf3d66f8b8
+generated: "2026-11-05T17:52:04.404899681Z"

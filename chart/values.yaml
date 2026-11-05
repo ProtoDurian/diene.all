@@ -3,8 +3,8 @@
 labelPrefix: atomi.cloud
 
 # @schema pattern:^[a-z0-9]+-[a-z0-9]+$;required:true
-# -- Primary workload fullname (`<service>-<token>`). The wrapper convention names the chart's primary served endpoint.
-fullnameOverride: platinum-api
+# -- Primary workload fullname (`<service>-<module>`): the kgateway control plane.
+fullnameOverride: platinum-gateway
 
 # -- Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays.
 serviceTree:
@@ -17,20 +17,16 @@ serviceTree:
   # @schema pattern:^[0-9]+$;required:true
   layer: '1'
 
-# -- Optional physical-instance metadata. The instance remains outside LPSM.
-instance:
-  physicalId: example-repository:run-001
-
-# -- Gateway API edge: shared GatewayClass, shared Gateway, the LoadBalancer exposure, and the health route.
+# -- Shared Gateway API edge: GatewayClass, one shared Gateway, the provider LoadBalancer, and the health route.
 gateway:
   enabled: true
   # @schema pattern:^[a-z0-9-]+$
-  # -- GatewayClass name platinum owns. Registered-fleet and local LAPRAS-class gateways reference it.
-  classname: platinum
+  # -- GatewayClass name platinum owns.
+  className: platinum
   # @schema enum:[kgateway.dev/kgateway]
-  # -- Controller binding pinned to kgateway v2.2.9's real controller name.
+  # -- kgateway's controller name.
   controllerName: kgateway.dev/kgateway
-  provider: digitalocean # @schema enum:[aws, oci, digitalocean]
+  provider: digitalocean # @schema enum:[aws, oci, digitalocean, local]
   port: 80 # @schema minimum:1;maximum:65535
   tlsPort: 443 # @schema minimum:1;maximum:65535
   aws:
@@ -38,87 +34,74 @@ gateway:
     eipAllocationIds: [] # @schema item:string;uniqueItems:true
   oci:
     reservedPublicIp: ''
-  proxy:
-    # -- Exact stable labels on the v2.2.9 proxy generated for Gateway platinum-gateway.
-    selector:
-      app.kubernetes.io/name: platinum-gateway
-      app.kubernetes.io/instance: platinum-gateway
-      gateway.networking.k8s.io/gateway-name: platinum-gateway
-    # -- Generated v2.2.9 proxy container port for the HTTP listener.
-    httpTargetPort: 80 # @schema minimum:1;maximum:65535
-    # -- Generated v2.2.9 proxy container port for the HTTPS listeners.
-    httpsTargetPort: 443 # @schema minimum:1;maximum:65535
   health:
     # @schema pattern:^/.*
-    # -- Fixed health path the traffic controller polls once per cluster per tick.
+    # -- Fixed path the traffic controller polls once per cluster per tick.
     path: /healthz
-    expectedStatus: 2xx
+    status: 200 # @schema minimum:200;maximum:299
 
-# -- Platinum-owned /healthz responder. It is the gateway health-route backend and the chart's primary workload.
-healthBackend:
-  enabled: true
-  replicas: 1 # @schema minimum:1
-  image:
-    repository: ghcr.io/stefanprodan/podinfo
-    tag: 6.9.2 # @schema pattern:^[A-Za-z0-9][A-Za-z0-9._-]*$
-    pullPolicy: IfNotPresent # @schema enum:[Always, IfNotPresent, Never]
-  port: 9898 # @schema minimum:1;maximum:65535
-  reloader:
-    enabled: true
-  podSecurityContext:
-    runAsNonRoot: true
-    runAsUser: 10000
-    runAsGroup: 10000
-    fsGroup: 10000
-  securityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    runAsUser: 10000
-    runAsGroup: 10000
-    capabilities:
-      drop: [ALL]
-  resources:
-    requests:
-      cpu: 10m
-      memory: 32Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
+# -- ENTEI dev-host shared-Gateway role. Platinum renders the shared edge only; per-host Certificate, ListenerSet, and HTTPRoute belong to the exposure materializer.
+devHost:
+  enabled: false
+  # @schema pattern:^[a-z0-9-]+$
+  # -- Namespace label (under labelPrefix, value "true") that admits a namespace's ListenerSets.
+  listenerSetNamespaceLabel: managed-vcluster
+  # -- Emergency-only direct listeners on the shared Gateway. They count against the Gateway listener ceiling that ListenerSet avoids.
+  emergencyListeners:
+    enabled: false
+    listeners: [] # @schema item:object
 
-# -- Registered-fleet wildcard Certificates. Zinc owns the DNS-01 ClusterIssuer definition (charts/zinc); this chart only issues against it.
+# -- Registered-fleet wildcard Certificates against zinc's DNS-01 ClusterIssuer. Platinum renders no issuer.
 registeredCertificates:
   enabled: true
   issuerRef:
-    kind: ClusterIssuer # @schema enum:[ClusterIssuer, Issuer]
-    # -- ClusterIssuer name owned by charts/zinc and instantiated once per cluster.
-    name: zinc-wildcard-letsencrypt
+    kind: ClusterIssuer # @schema enum:[ClusterIssuer]
+    # -- ClusterIssuer instantiated per cluster by charts/zinc.
+    name: zinc-letsencrypt
   primary:
     # @schema pattern:^\*\.[a-z0-9.-]+$
-    # -- Primary registered-fleet base-domain wildcard (atomi.cloud).
-    domain: '*.atomi.cloud'
-    dnsNames: ['*.atomi.cloud', 'atomi.cloud'] # @schema item:string;uniqueItems:true
+    domain: '*.cluster.atomi.cloud'
   backup:
     # @schema pattern:^\*\.[a-z0-9.-]+$
-    # -- Second R53 base-domain wildcard for cluster-endpoint failover TLS (S8 backup domain).
-    domain: '*.atomi.cloud.failover'
-    dnsNames: ['*.atomi.cloud.failover', 'atomi.cloud.failover'] # @schema item:string;uniqueItems:true
+    # -- S8 Route53 backup base domain wildcard (tokenize before live use).
+    domain: '*.cluster.atomi-backup.invalid'
 
-# -- ENTEI dev-host shared-Gateway mode. When enabled, platinum renders the shared GatewayClass, Gateway, and LoadBalancer only; per-host Certificate, ListenerSet, and HTTPRoute are owned by the exposure materializer, not this chart.
-devHost:
-  enabled: false
-
-# -- Pinned kgateway control-plane subchart. Enabled in the k3d integration tier; off for unit-tier static checks.
+# -- kgateway control plane (pinned). Its labels must equal the LPSM set.
 upstream:
-  enabled: false
-  fullnameOverride: platinum-upstream # @schema pattern:^[a-z0-9]+-[a-z0-9]+$
+  enabled: true
+  fullnameOverride: platinum-gateway # @schema pattern:^[a-z0-9]+-[a-z0-9]+$
+  commonLabels: # @schema additionalProperties:true
+    atomi.cloud/platform: sulfoxide
+    atomi.cloud/service: platinum
+    atomi.cloud/module: gateway
+    atomi.cloud/layer: '1'
+  image:
+    registry: cr.kgateway.dev/kgateway-dev
+    tag: v2.5.0
   controller:
     image:
       repository: kgateway
-      tag: v2.2.9
-    service:
-      type: ClusterIP
+      tag: v2.5.0
+    podAnnotations:
+      reloader.stakater.com/auto: 'true'
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 10101
+      runAsGroup: 10101
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      capabilities:
+        drop: [ALL]
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: '1'
+        memory: 512Mi
 
-# -- Standard-channel and kgateway CRD subchart. Enabled in the k3d integration tier; off for unit-tier static checks.
-kgatewayCrds:
+# -- kgateway CRDs (pinned). Installed once per cluster as its own release before platinum.
+crds:
   enabled: false

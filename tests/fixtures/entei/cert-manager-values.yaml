@@ -1,0 +1,5 @@
+# Node-owned cert-manager fixture. image.tag is also the pinned jetstack/cert-manager chart version.
+crds:
+  enabled: true
+image:
+  tag: v1.21.3

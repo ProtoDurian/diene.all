@@ -1,0 +1,34 @@
+{{- include "platinum.validateServiceTree" . -}}
+{{- if .Values.upstream.enabled -}}
+{{- if ne .Values.upstream.fullnameOverride (include "platinum.primaryName" .) -}}
+{{- fail (printf "upstream.fullnameOverride must be %q" (include "platinum.primaryName" .)) -}}
+{{- end -}}
+{{- if ne (toJson .Values.upstream.commonLabels) (include "platinum.lpsm" .) -}}
+{{- fail (printf "upstream.commonLabels must equal the LPSM label set %s" (include "platinum.lpsm" .)) -}}
+{{- end -}}
+{{- end -}}
+{{- $p := .Values.gateway.provider -}}
+{{- if and (eq $p "aws") (ne (len .Values.gateway.aws.subnetIds) (len .Values.gateway.aws.eipAllocationIds)) -}}
+{{- fail "gateway.aws.subnetIds and gateway.aws.eipAllocationIds must have identical lengths" -}}
+{{- end -}}
+{{- if and (eq $p "aws") (eq (len .Values.gateway.aws.subnetIds) 0) -}}
+{{- fail "AWS gateway mode requires at least one subnet/EIP pair" -}}
+{{- end -}}
+{{- if and (eq $p "oci") (empty .Values.gateway.oci.reservedPublicIp) -}}
+{{- fail "OCI gateway mode requires gateway.oci.reservedPublicIp" -}}
+{{- end -}}
+{{- if and (eq $p "local") .Values.registeredCertificates.enabled -}}
+{{- fail "local loopback gateways carry no registered-fleet Certificates" -}}
+{{- end -}}
+{{- if and .Values.devHost.enabled .Values.registeredCertificates.enabled -}}
+{{- fail "the ENTEI dev-host overlay renders no Certificate; disable registeredCertificates" -}}
+{{- end -}}
+{{- if and .Values.devHost.emergencyListeners.enabled (not .Values.devHost.enabled) -}}
+{{- fail "devHost.emergencyListeners requires devHost.enabled" -}}
+{{- end -}}
+{{- if and (not .Values.devHost.emergencyListeners.enabled) .Values.devHost.emergencyListeners.listeners -}}
+{{- fail "devHost.emergencyListeners.listeners is set but the emergency fallback is disabled" -}}
+{{- end -}}
+{{- if gt (len (include "platinum.listeners" . | fromYamlArray)) 64 -}}
+{{- fail "shared Gateway exceeds the 64-listener ceiling; attach a ListenerSet instead" -}}
+{{- end -}}
