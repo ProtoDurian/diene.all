@@ -38,6 +38,7 @@ linters:
     - rowserrcheck
     - sloglint
     - staticcheck
+    - testpackage
     - unconvert
     - unparam
     - unused
@@ -69,6 +70,9 @@ linters:
           disabled: true
         - name: package-comments
           disabled: true
+    testpackage:
+      # lint export_test.go too: no white-box backdoor
+      skip-regexp: ^$
   exclusions:
     generated: lax
 

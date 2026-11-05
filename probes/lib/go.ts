@@ -60,24 +60,6 @@ export async function flipGoAssertion(repo: ProbeRepo): Promise<string> {
   throw new Error('no structural Go assertion target found');
 }
 
-export async function plantWhiteBoxTest(repo: ProbeRepo): Promise<string> {
-  const paths = (await repo.glob('tests/**/*_test.go')).sort();
-  if (paths.length === 0) {
-    throw new Error('no Go test package found');
-  }
-  const source = await repo.read(paths[0]);
-  const external = packageName(source);
-  if (!external.endsWith('_test')) {
-    throw new Error('healthy test package is not external');
-  }
-  const target = `${directory(paths[0])}/probe_white_box_test.go`;
-  await repo.write(
-    target,
-    `package ${external.slice(0, -5)}\n\nimport "testing"\n\nfunc TestProbeWhiteBox(t *testing.T) { t.Helper() }\n`,
-  );
-  return target;
-}
-
 export async function breakAdapter(repo: ProbeRepo): Promise<string> {
   const paths = (await repo.glob('adapters/**/*.go')).sort();
   for (const path of paths) {
@@ -147,4 +129,55 @@ export async function unformatGo(repo: ProbeRepo): Promise<string> {
   const unformatted = `func ${signature[1]}( ${signature[2]} )${signature[3]}{`;
   await repo.write(path, source.replace(signature[0], unformatted));
   return path;
+}
+
+const imagePolicies = {
+  distroless: {
+    rule: 'final runtime image must use the distroless nonroot base',
+    subject: 'final stage base image',
+    expected: 'FROM gcr.io/distroless/static-debian12:nonroot AS runtime',
+  },
+  nonroot: {
+    rule: 'final runtime image must run as 65532:65532',
+    subject: 'final stage effective user',
+    expected: 'USER 65532:65532',
+  },
+};
+
+type ImagePolicy = keyof typeof imagePolicies;
+
+function imagePolicyViolation(dockerfile: string, policy: ImagePolicy): string | undefined {
+  let from = '';
+  let user = '';
+  for (const line of dockerfile.split('\n')) {
+    const words = line
+      .trim()
+      .split(/\s+/)
+      .filter(word => !word.startsWith('--'));
+    const keyword = words[0]?.toUpperCase();
+    if (keyword === 'FROM') {
+      from =
+        words.length === 4 && words[2].toUpperCase() === 'AS' ? `${words[1]} AS ${words[3]}` : words.slice(1).join(' ');
+      user = '';
+    } else if (keyword === 'USER') {
+      user = words.slice(1).join(' ');
+    }
+  }
+  const { rule, subject, expected } = imagePolicies[policy];
+  const observed = policy === 'distroless' ? `FROM ${from}` : user ? `USER ${user}` : '<none declared>';
+  return observed === expected ? undefined : `${rule}: ${subject} is '${observed}', expected '${expected}'`;
+}
+
+export async function expectImagePolicyGreen(repo: ProbeRepo, policy: ImagePolicy): Promise<void> {
+  const violation = imagePolicyViolation(await repo.read('infra/Dockerfile'), policy);
+  if (violation) {
+    throw new Error(`${policy} image policy failed on the healthy repo: ${violation}`);
+  }
+}
+
+export async function expectImagePolicyRed(repo: ProbeRepo, policy: ImagePolicy): Promise<void> {
+  const violation = imagePolicyViolation(await repo.read('infra/Dockerfile'), policy);
+  if (!violation?.startsWith(imagePolicies[policy].rule)) {
+    throw new Error(`${policy} image policy stayed green after sabotage`);
+  }
 }
