@@ -1,7 +1,5 @@
-# Independent landscape overlay. It sets the cluster landscape on both the
-# service-tree projection and the admission params that drive value-checking CEL.
+# Audit landscape: violations warn and audit, nothing is blocked.
 serviceTree:
   landscape: example
 
-params:
-  landscape: example
+enforcement: audit

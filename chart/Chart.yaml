@@ -1,6 +1,6 @@
 apiVersion: v2
 name: vanadium
-description: Controller-free ValidatingAdmissionPolicy admission layer for AtomiCloud fleets
+description: Controller-free ValidatingAdmissionPolicy set for AtomiCloud clusters
 type: application
 version: 0.1.0
 appVersion: '1.30.0'

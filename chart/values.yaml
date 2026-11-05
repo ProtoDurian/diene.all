@@ -1,78 +1,127 @@
 # @schema pattern:^[a-z0-9.-]+$;minLength:1
-# -- Prefix used by every service-tree label and annotation helper.
+# -- Prefix used by every service-tree label, annotation and policy key.
 labelPrefix: atomi.cloud
 
 # @schema pattern:^[a-z0-9]+-[a-z0-9]+$;required:true
-# -- Chart release fullname. Admission objects are cluster-scoped; the value still
-# follows the one-dash `<service>-<token>` convention used family-wide.
-fullnameOverride: vanadium-admission
+# -- Release fullname. It must be `<service>-<module>`.
+fullnameOverride: vanadium-policies
 
-# -- Stable four-slot service-tree projection. Landscape and cluster are added by
-# independent overlays. Vanadium is fleet admission infrastructure, not a workload.
+# -- Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays.
 serviceTree:
   # @schema pattern:^[a-z0-9]+$;required:true
-  platform: fleet
+  platform: admission
   # @schema pattern:^[a-z0-9]+$;required:true
   service: vanadium
   # @schema pattern:^[a-z0-9]+$;required:true
-  module: admission
+  module: policies
   # @schema pattern:^[0-9]+$;required:true
-  layer: '0'
+  layer: '1'
 
-# -- Cluster admission context rendered into the value-checking CEL expressions.
-# The installed policy set carries no runtime params (paramKind), so the generic
-# rendered-manifest validation stage can evaluate it offline.
-params:
-  # @schema pattern:^[a-z0-9-]+$;required:true
-  # -- This cluster's landscape; the landscape-match rule renders it into CEL.
-  landscape: example
-  # @schema item:string;pattern:^[a-z0-9]+$;minItems:1;uniqueItems:true
-  # -- Platforms permitted to deploy into the fleet.
-  acceptedPlatforms: [nitroso, sample]
-  # @schema item:string;pattern:^[0-9]+$;minItems:1;uniqueItems:true
-  # -- Architecture layers allowed by the layer-range rule (0 infrastructure, 1 service, 2 app).
-  acceptedLayers: ['0', '1', '2']
+# @schema enum:[audit, deny];required:true
+# -- Landscape posture. `audit` binds every policy `[Warn, Audit]` (nothing blocked); `deny` binds `[Deny]`.
+enforcement: audit
 
-# -- Namespace-label exemption convention. A namespace labeled
-# `<prefix>/<labelKey>: "true"` is skipped by every binding.
-exemption:
-  # @schema pattern:^[a-z0-9-]+$
-  labelKey: policy-exempt
+# @schema pattern:^[a-z0-9-]+$;minLength:1;required:true
+# -- Namespaces labeled `<labelPrefix>/<exemptionLabel>: "true"` are skipped by every binding.
+exemptionLabel: policy-exempt
 
-# -- Per-rule enable + validationActions. The default fleet posture is the
-# pre-enforcement audit pair `[Warn, Audit]`; an enforcement landscape overlay
-# flips one or more rules to `[Deny]`.
+# -- One ValidatingAdmissionPolicy + binding per enabled policy. A non-empty `actions` overrides the landscape posture for that policy.
 policies:
   requireLabels:
     enabled: true
-    actions: [Warn, Audit]
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
   requireAnnotations:
     enabled: true
-    actions: [Warn, Audit]
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
   landscapeMatch:
     enabled: true
-    actions: [Warn, Audit]
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
   layerRange:
     enabled: true
-    actions: [Warn, Audit]
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+    # @schema item:string;minItems:1;uniqueItems:true
+    # -- Accepted `<labelPrefix>/layer` values.
+    layers: ['0', '1', '2']
   platformAccepted:
     enabled: true
-    actions: [Warn, Audit]
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+    # @schema item:string;minItems:1;uniqueItems:true
+    # -- Accepted `<labelPrefix>/platform` values.
+    platforms: [admission, telemetry, sample]
   disallowLatest:
     enabled: true
-    actions: [Warn, Audit]
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
   requireResources:
     enabled: true
-    actions: [Warn, Audit]
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
   disallowNodePort:
     enabled: true
-    actions: [Warn, Audit]
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
   requireNonRoot:
     enabled: true
-    actions: [Warn, Audit]
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
   disallowPrivEscalation:
     enabled: true
-    actions: [Warn, Audit]
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+  disallowHostProcess:
+    enabled: true
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+  disallowHostNamespaces:
+    enabled: true
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+  disallowPrivileged:
+    enabled: true
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+  disallowCapabilities:
+    enabled: true
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+  disallowHostPorts:
+    enabled: true
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+  restrictAppArmor:
+    enabled: true
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+  restrictSELinux:
+    enabled: true
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+  disallowProcMount:
+    enabled: true
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+  restrictSeccomp:
+    enabled: true
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+  restrictSysctls:
+    enabled: true
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
   restrictVolumeTypes:
     enabled: true
-    actions: [Warn, Audit]
+    # @schema item:string;itemEnum:[Warn, Audit, Deny];uniqueItems:true;maxItems:2
+    actions: []
+    # -- The one hostPath allowance: these exact paths, for this ServiceAccount in this namespace (alloy-logs). Empty `serviceAccount` disables it.
+    hostPathCarveOut:
+      # @schema pattern:^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$
+      serviceAccount: aluminium-alloy-logs
+      # @schema pattern:^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+      namespace: telemetry
+      # @schema item:string;uniqueItems:true
+      paths: [/var/log]

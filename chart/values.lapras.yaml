@@ -1,4 +1,2 @@
-# Independent local-cluster overlay. It carries only cluster identity; the
-# landscape decision lives in the landscape overlay and is not duplicated here.
 serviceTree:
   cluster: lapras

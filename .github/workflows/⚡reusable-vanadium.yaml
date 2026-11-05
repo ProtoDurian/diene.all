@@ -1,18 +1,29 @@
-# ### vanadium-reusable-ci
-# #### source: vanadium
 name: ⚡ Reusable Vanadium
 
 on:
   workflow_call:
 
 jobs:
-  validate:
-    name: Validate Vanadium Policies
+  unit:
+    name: Vanadium Unit
     runs-on:
-      - nscloud-ubuntu-22.04-amd64-4x8-with-cache
-      - nscloud-cache-size-50gb
-      - nscloud-cache-tag-atomi-nix-store-cache-linux-amd64
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
-      - name: Run vanadium validation
+      - name: Run the unit tier
         run: nix develop .#ci -c ./scripts/ci/vanadium.sh
+
+  integration:
+    name: Vanadium Integration
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Install on k3d and prove warn, deny and exemption
+        run: nix develop .#ci -c ./scripts/ci/vanadium-k3d.sh

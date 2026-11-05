@@ -2,7 +2,7 @@
 
 ![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.30.0](https://img.shields.io/badge/AppVersion-1.30.0-informational?style=flat-square)
 
-Controller-free ValidatingAdmissionPolicy admission layer for AtomiCloud fleets
+Controller-free ValidatingAdmissionPolicy set for AtomiCloud clusters
 
 ## Requirements
 
@@ -12,15 +12,15 @@ Kubernetes: `>=1.30.0-0`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| exemption | object | `{"labelKey":"policy-exempt"}` | Namespace-label exemption convention. A namespace labeled `<prefix>/<labelKey>: "true"` is skipped by every binding. |
-| fullnameOverride | string | `"vanadium-admission"` | Chart release fullname. Admission objects are cluster-scoped; the value still follows the one-dash `<service>-<token>` convention used family-wide. |
-| labelPrefix | string | `"atomi.cloud"` | Prefix used by every service-tree label and annotation helper. |
-| params | object | `{"acceptedLayers":["0","1","2"],"acceptedPlatforms":["nitroso","sample"],"landscape":"example"}` | Cluster admission context rendered into the value-checking CEL expressions. The installed policy set carries no runtime params (paramKind), so the generic rendered-manifest validation stage can evaluate it offline. |
-| params.acceptedLayers | list | `["0","1","2"]` | Architecture layers allowed by the layer-range rule (0 infrastructure, 1 service, 2 app). |
-| params.acceptedPlatforms | list | `["nitroso","sample"]` | Platforms permitted to deploy into the fleet. |
-| params.landscape | string | `"example"` | This cluster's landscape; the landscape-match rule renders it into CEL. |
-| policies | object | `{"disallowLatest":{"actions":["Warn","Audit"],"enabled":true},"disallowNodePort":{"actions":["Warn","Audit"],"enabled":true},"disallowPrivEscalation":{"actions":["Warn","Audit"],"enabled":true},"landscapeMatch":{"actions":["Warn","Audit"],"enabled":true},"layerRange":{"actions":["Warn","Audit"],"enabled":true},"platformAccepted":{"actions":["Warn","Audit"],"enabled":true},"requireAnnotations":{"actions":["Warn","Audit"],"enabled":true},"requireLabels":{"actions":["Warn","Audit"],"enabled":true},"requireNonRoot":{"actions":["Warn","Audit"],"enabled":true},"requireResources":{"actions":["Warn","Audit"],"enabled":true},"restrictVolumeTypes":{"actions":["Warn","Audit"],"enabled":true}}` | Per-rule enable + validationActions. The default fleet posture is the pre-enforcement audit pair `[Warn, Audit]`; an enforcement landscape overlay flips one or more rules to `[Deny]`. |
-| serviceTree | object | `{"layer":"0","module":"admission","platform":"fleet","service":"vanadium"}` | Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays. Vanadium is fleet admission infrastructure, not a workload. |
+| enforcement | string | `"audit"` | Landscape posture. `audit` binds every policy `[Warn, Audit]` (nothing blocked); `deny` binds `[Deny]`. |
+| exemptionLabel | string | `"policy-exempt"` | Namespaces labeled `<labelPrefix>/<exemptionLabel>: "true"` are skipped by every binding. |
+| fullnameOverride | string | `"vanadium-policies"` | Release fullname. It must be `<service>-<module>`. |
+| labelPrefix | string | `"atomi.cloud"` | Prefix used by every service-tree label, annotation and policy key. |
+| policies | object | `{"disallowCapabilities":{"actions":[],"enabled":true},"disallowHostNamespaces":{"actions":[],"enabled":true},"disallowHostPorts":{"actions":[],"enabled":true},"disallowHostProcess":{"actions":[],"enabled":true},"disallowLatest":{"actions":[],"enabled":true},"disallowNodePort":{"actions":[],"enabled":true},"disallowPrivEscalation":{"actions":[],"enabled":true},"disallowPrivileged":{"actions":[],"enabled":true},"disallowProcMount":{"actions":[],"enabled":true},"landscapeMatch":{"actions":[],"enabled":true},"layerRange":{"actions":[],"enabled":true,"layers":["0","1","2"]},"platformAccepted":{"actions":[],"enabled":true,"platforms":["admission","telemetry","sample"]},"requireAnnotations":{"actions":[],"enabled":true},"requireLabels":{"actions":[],"enabled":true},"requireNonRoot":{"actions":[],"enabled":true},"requireResources":{"actions":[],"enabled":true},"restrictAppArmor":{"actions":[],"enabled":true},"restrictSELinux":{"actions":[],"enabled":true},"restrictSeccomp":{"actions":[],"enabled":true},"restrictSysctls":{"actions":[],"enabled":true},"restrictVolumeTypes":{"actions":[],"enabled":true,"hostPathCarveOut":{"namespace":"telemetry","paths":["/var/log"],"serviceAccount":"aluminium-alloy-logs"}}}` | One ValidatingAdmissionPolicy + binding per enabled policy. A non-empty `actions` overrides the landscape posture for that policy. |
+| policies.layerRange.layers | list | `["0","1","2"]` | Accepted `<labelPrefix>/layer` values. |
+| policies.platformAccepted.platforms | list | `["admission","telemetry","sample"]` | Accepted `<labelPrefix>/platform` values. |
+| policies.restrictVolumeTypes.hostPathCarveOut | object | `{"namespace":"telemetry","paths":["/var/log"],"serviceAccount":"aluminium-alloy-logs"}` | The one hostPath allowance: these exact paths, for this ServiceAccount in this namespace (alloy-logs). Empty `serviceAccount` disables it. |
+| serviceTree | object | `{"layer":"1","module":"policies","platform":"admission","service":"vanadium"}` | Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays. |
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)

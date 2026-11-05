@@ -1,22 +1,6 @@
 schemaVersion: 2
 
 types:
-  # `amend` is this node's own commit vocabulary. The parent's release.yaml does
-  # not carry it, so the merge would have dropped it silently while the type
-  # count stayed at 13 — the parent adds `merge` in the same edit. Restored here
-  # deliberately: removing a type retires commit messages that already exist in
-  # this node's history and in its contributor docs.
-  #
-  # The parent's `merge` type is deliberately NOT carried for the same reason,
-  # applied symmetrically: a node keeps its own pre-merge vocabulary in both
-  # directions, because gaining pairs moves it out of its tier just as losing
-  # them does, only upward. This node's set is the 13 types / 17 pairs below.
-  - type: amend
-    desc: Small amendments and typo fixes
-    scopes:
-      default:
-        desc: Amend existing work
-        release: false
   - type: build
     desc: Build-system changes
     scopes:
@@ -81,6 +65,12 @@ types:
       default:
         desc: Fix a bug
         release: patch
+  - type: merge
+    desc: Branch merges
+    scopes:
+      default:
+        desc: Merge a branch
+        release: false
   - type: perf
     desc: Performance improvements
     section: 🚀 Performance Improvement 🚀
@@ -175,9 +165,6 @@ release:
     assets:
       - Changelog.md
       - docs/developer/CommitConventions.md
-      # This node versions a Helm chart, so the release commit carries the chart
-      # manifest and its generated docs. Both are written by the `prepare` hook
-      # below, in the same edit that lists them here.
       - chart/Chart.yaml
       - chart/README.md
   github:
@@ -186,13 +173,7 @@ release:
     releasedLabels:
       - released
   hooks:
-    # Hook point a downstream node fills; a version file enters commit.assets in
-    # the same edit as the command that writes it.
-    #
-    # This node is Vanadium: it versions the policy chart manifest and generated
-    # chart documentation, so the stamp regenerates both and keeps Vanadium's
-    # own Helm-docs hook green. Both files are listed in
-    # `release.commit.assets` above.
+    # A file a hook writes joins commit.assets in the same edit.
     prepare:
       - phase: afterWrite
         command: './scripts/release/bump.sh ${version}'

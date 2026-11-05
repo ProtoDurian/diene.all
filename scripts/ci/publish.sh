@@ -7,6 +7,7 @@ release_version="${RELEASE_VERSION:-}"
 output_dir="${PUBLISH_OUTPUT_DIR:-dist/${mode}}"
 oci_registry="${OCI_REGISTRY:-}"
 oci_repository="${OCI_REPOSITORY:-charts}"
+oci_repository="${oci_repository,,}"
 plain_http="${OCI_PLAIN_HTTP:-false}"
 oci_username="${OCI_USERNAME:-}"
 oci_password="${OCI_PASSWORD:-}"
@@ -22,8 +23,7 @@ helm-docs --chart-search-root chart
 mkdir -p "${output_dir}"
 helm dependency build chart
 helm package chart --destination "${output_dir}" --version "${version}"
-chart_name="$(yq -r '.name' chart/Chart.yaml)"
-package="${output_dir}/${chart_name}-${version}.tgz"
+package="${output_dir}/vanadium-${version}.tgz"
 [ ! -s "${package}" ] && echo "❌ chart package was not created" >&2 && exit 1
 
 if [ "${mode}" = "git" ]; then

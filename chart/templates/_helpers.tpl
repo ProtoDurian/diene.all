@@ -1,24 +1,49 @@
-{{/* Stable chart identity. */}}
 {{- define "vanadium.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{/* The one and only service-tree label/annotation prefix. */}}
 {{- define "vanadium.labelPrefix" -}}
 {{- required "labelPrefix is required" .Values.labelPrefix | trimSuffix "/" -}}
 {{- end -}}
 
-{{/* Common selector labels. */}}
-{{- define "vanadium.selectorLabels" -}}
-app.kubernetes.io/name: vanadium
-app.kubernetes.io/instance: {{ .Release.Name }}
+{{- define "vanadium.validateServiceTree" -}}
+{{- $platform := required "serviceTree.platform is required" .Values.serviceTree.platform -}}
+{{- $_ := required "serviceTree.service is required" .Values.serviceTree.service -}}
+{{- $_ = required "serviceTree.module is required" .Values.serviceTree.module -}}
+{{- $_ = required "serviceTree.layer is required" .Values.serviceTree.layer -}}
+{{- $_ = required "serviceTree.landscape is required; set it in the landscape overlay" .Values.serviceTree.landscape -}}
+{{- if ne $platform .Release.Namespace -}}
+{{- fail (printf "serviceTree.platform %q must equal release namespace %q" $platform .Release.Namespace) -}}
+{{- end -}}
 {{- end -}}
 
-{{/* Chart + service-tree labels. Every key uses the single configurable prefix. */}}
+{{- define "vanadium.resourceName" -}}
+{{- $root := .root -}}
+{{- $service := required "serviceTree.service is required" $root.Values.serviceTree.service | lower -}}
+{{- $token := required "resource token is required" .token | lower -}}
+{{- $token = regexReplaceAll "[^a-z0-9]+" $token "" -}}
+{{- if not (regexMatch "^[a-z0-9]+$" $service) -}}
+{{- fail (printf "service %q must be dash-less lowercase alphanumeric" $service) -}}
+{{- end -}}
+{{- if not (regexMatch "^[a-z0-9]+$" $token) -}}
+{{- fail (printf "token %q must normalize to a dash-less lowercase token" .token) -}}
+{{- end -}}
+{{- printf "%s-%s" $service $token -}}
+{{- end -}}
+
+{{- define "vanadium.primaryName" -}}
+{{- $expected := include "vanadium.resourceName" (dict "root" . "token" (required "serviceTree.module is required" .Values.serviceTree.module)) -}}
+{{- if ne .Values.fullnameOverride $expected -}}
+{{- fail (printf "fullnameOverride must be %q, got %q" $expected .Values.fullnameOverride) -}}
+{{- end -}}
+{{- $expected -}}
+{{- end -}}
+
 {{- define "vanadium.labels" -}}
 {{- $prefix := include "vanadium.labelPrefix" . -}}
 helm.sh/chart: {{ include "vanadium.chart" . }}
-{{ include "vanadium.selectorLabels" . }}
+app.kubernetes.io/name: {{ include "vanadium.primaryName" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
 {{- range $key, $value := .Values.serviceTree }}
 {{ printf "%s/%s" $prefix $key }}: {{ $value | quote }}
 {{- end }}
@@ -26,7 +51,6 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
-{{/* Service-tree annotations (identity is never a secret). */}}
 {{- define "vanadium.annotations" -}}
 {{- $prefix := include "vanadium.labelPrefix" . -}}
 {{- range $key, $value := .Values.serviceTree }}
@@ -34,184 +58,279 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 {{- end -}}
 
-{{/* Build an exactly-one-dash policy name: vanadium-<dashless-token>. */}}
-{{- define "vanadium.policyName" -}}
+{{- define "vanadium.actions" -}}
 {{- $root := .root -}}
-{{- $service := required "serviceTree.service is required" $root.Values.serviceTree.service | lower -}}
-{{- $token := required "policy name (token) is required" .name | lower -}}
-{{- $token = regexReplaceAll "[^a-z0-9]+" $token "" -}}
-{{- if not (regexMatch "^[a-z0-9]+$" $service) -}}
-{{- fail (printf "service %q must be dash-less lowercase alphanumeric" $service) -}}
+{{- $actions := .cfg.actions | default list -}}
+{{- if not $actions -}}
+{{- $actions = ternary (list "Deny") (list "Warn" "Audit") (eq $root.Values.enforcement "deny") -}}
 {{- end -}}
-{{- if not (regexMatch "^[a-z0-9]+$" $token) -}}
-{{- fail (printf "policy token %q must normalize to a dash-less lowercase token" .name) -}}
+{{- if and (has "Deny" $actions) (has "Warn" $actions) -}}
+{{- fail (printf "policies.%s.actions cannot combine Deny and Warn" .name) -}}
 {{- end -}}
-{{- printf "%s-%s" $service $token -}}
+{{- if and (has "Deny" $actions) (ne $root.Values.enforcement "deny") -}}
+{{- fail (printf "policies.%s binds Deny in an audit landscape (enforcement %q)" .name $root.Values.enforcement) -}}
 {{- end -}}
-
-{{/* Namespace-label exemption selector. A namespace labeled
-     `<prefix>/<exemption.labelKey>: "true"` is exempt from every binding. */}}
-{{- define "vanadium.exemptionSelector" -}}
-{{- $prefix := include "vanadium.labelPrefix" . -}}
-{{- $key := printf "%s/%s" $prefix (required "exemption.labelKey is required" .Values.exemption.labelKey) -}}
-matchExpressions:
-  - key: {{ $key | quote }}
-    operator: NotIn
-    values:
-      - 'true'
+{{- toJson $actions -}}
 {{- end -}}
 
-{{/* resourceRules fragments shared across policies. */}}
-{{- define "vanadium.rules.workload" -}}
-- apiGroups: [apps, batch]
-  apiVersions: [v1]
-  operations: [CREATE, UPDATE]
-  resources: [deployments, statefulsets, daemonsets, jobs]
-{{- end -}}
-
-{{- define "vanadium.rules.service" -}}
+{{- define "vanadium.rules" -}}
+{{- if or (eq . "lpsm") (eq . "services") }}
 - apiGroups: ['']
   apiVersions: [v1]
   operations: [CREATE, UPDATE]
   resources: [services]
+{{- end }}
+{{- if eq . "pods" }}
+- apiGroups: ['']
+  apiVersions: [v1]
+  operations: [CREATE, UPDATE]
+  resources: [pods, pods/ephemeralcontainers]
+- apiGroups: [apps]
+  apiVersions: [v1]
+  operations: [CREATE, UPDATE]
+  resources: [replicasets]
+{{- end }}
+{{- if ne . "services" }}
+- apiGroups: [apps]
+  apiVersions: [v1]
+  operations: [CREATE, UPDATE]
+  resources: [deployments, statefulsets, daemonsets]
+- apiGroups: [batch]
+  apiVersions: [v1]
+  operations: [CREATE, UPDATE]
+  resources: [jobs, cronjobs]
+{{- end }}
 {{- end -}}
 
-{{- define "vanadium.rules.workloadAndService" -}}
-{{ include "vanadium.rules.workload" . }}
-{{ include "vanadium.rules.service" . }}
+{{- define "vanadium.podVariables" -}}
+- name: spec
+  expression: >-
+    object.kind == 'Pod' ? object.spec :
+    object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec :
+    object.spec.template.spec
+- name: containers
+  expression: >-
+    variables.spec.containers +
+    (has(variables.spec.initContainers) ? variables.spec.initContainers : [])
+- name: allContainers
+  expression: >-
+    variables.containers +
+    (has(variables.spec.ephemeralContainers) ? variables.spec.ephemeralContainers : [])
 {{- end -}}
 
-{{/* ---- per-policy resourceRules selectors ---- */}}
-{{- define "vanadium.match.requireLabels" -}}{{ include "vanadium.rules.workloadAndService" . }}{{- end -}}
-{{- define "vanadium.match.requireAnnotations" -}}{{ include "vanadium.rules.workloadAndService" . }}{{- end -}}
-{{- define "vanadium.match.landscapeMatch" -}}{{ include "vanadium.rules.workloadAndService" . }}{{- end -}}
-{{- define "vanadium.match.layerRange" -}}{{ include "vanadium.rules.workloadAndService" . }}{{- end -}}
-{{- define "vanadium.match.platformAccepted" -}}{{ include "vanadium.rules.workloadAndService" . }}{{- end -}}
-{{- define "vanadium.match.disallowLatest" -}}{{ include "vanadium.rules.workload" . }}{{- end -}}
-{{- define "vanadium.match.requireResources" -}}{{ include "vanadium.rules.workload" . }}{{- end -}}
-{{- define "vanadium.match.disallowNodePort" -}}{{ include "vanadium.rules.service" . }}{{- end -}}
-{{- define "vanadium.match.requireNonRoot" -}}{{ include "vanadium.rules.workload" . }}{{- end -}}
-{{- define "vanadium.match.disallowPrivEscalation" -}}{{ include "vanadium.rules.workload" . }}{{- end -}}
-{{- define "vanadium.match.restrictVolumeTypes" -}}{{ include "vanadium.rules.workload" . }}{{- end -}}
-
-{{/* ---- per-policy human messages ---- */}}
-{{- define "vanadium.message.requireLabels" -}}Workloads and services must carry the full LPSM label set (landscape, platform, service, module, layer).{{- end -}}
-{{- define "vanadium.message.requireAnnotations" -}}Workloads and services must carry the full LPSM annotation set (landscape, platform, service, module, layer).{{- end -}}
-{{- define "vanadium.message.landscapeMatch" -}}LPSM landscape label and annotation must equal this cluster's landscape.{{- end -}}
-{{- define "vanadium.message.layerRange" -}}LPSM layer must be one of the accepted layers.{{- end -}}
-{{- define "vanadium.message.platformAccepted" -}}LPSM platform must be in the accepted platform list.{{- end -}}
-{{- define "vanadium.message.disallowLatest" -}}Workload images must use an explicit non-latest tag.{{- end -}}
-{{- define "vanadium.message.requireResources" -}}Every container must declare CPU and memory requests and limits.{{- end -}}
-{{- define "vanadium.message.disallowNodePort" -}}NodePort services are forbidden; use ClusterIP or LoadBalancer.{{- end -}}
-{{- define "vanadium.message.requireNonRoot" -}}Workloads must run non-root at the pod and container level.{{- end -}}
-{{- define "vanadium.message.disallowPrivEscalation" -}}Containers must not allow privilege escalation.{{- end -}}
-{{- define "vanadium.message.restrictVolumeTypes" -}}hostPath volumes are forbidden outside the alloy /var/log container-logs carve-out.{{- end -}}
-
-{{/* ---- per-policy CEL expressions (object-only; rendered literals come from values) ---- */}}
-{{/* requireLabels: the five LPSM keys must be present as labels. */}}
-{{- define "vanadium.cel.requireLabels" -}}
+{{- define "vanadium.lpsmKeys" -}}
 {{- $p := include "vanadium.labelPrefix" . -}}
-has(object.metadata) && has(object.metadata.labels) &&
-"{{ $p }}/landscape" in object.metadata.labels &&
-"{{ $p }}/platform" in object.metadata.labels &&
-"{{ $p }}/service" in object.metadata.labels &&
-"{{ $p }}/module" in object.metadata.labels &&
-"{{ $p }}/layer" in object.metadata.labels
+['{{ $p }}/landscape', '{{ $p }}/platform', '{{ $p }}/service', '{{ $p }}/module', '{{ $p }}/layer']
 {{- end -}}
 
-{{/* requireAnnotations: the five LPSM keys must be present as annotations. */}}
-{{- define "vanadium.cel.requireAnnotations" -}}
-{{- $p := include "vanadium.labelPrefix" . -}}
-has(object.metadata) && has(object.metadata.annotations) &&
-"{{ $p }}/landscape" in object.metadata.annotations &&
-"{{ $p }}/platform" in object.metadata.annotations &&
-"{{ $p }}/service" in object.metadata.annotations &&
-"{{ $p }}/module" in object.metadata.annotations &&
-"{{ $p }}/layer" in object.metadata.annotations
+{{- /* metaValue <root> <key> <accepted CEL list>: label and annotation, where present, are in the list. */ -}}
+{{- define "vanadium.metaValue" -}}
+{{- $k := printf "%s/%s" (include "vanadium.labelPrefix" .root) .key -}}
+(!has(object.metadata.labels) || !('{{ $k }}' in object.metadata.labels) || object.metadata.labels['{{ $k }}'] in {{ .list }}) &&
+(!has(object.metadata.annotations) || !('{{ $k }}' in object.metadata.annotations) || object.metadata.annotations['{{ $k }}'] in {{ .list }})
 {{- end -}}
 
-{{/* landscapeMatch: label and annotation landscape equal the cluster landscape. */}}
-{{- define "vanadium.cel.landscapeMatch" -}}
-{{- $p := include "vanadium.labelPrefix" . -}}
-{{- $landscape := required "params.landscape is required" .Values.params.landscape -}}
-has(object.metadata) && has(object.metadata.labels) && has(object.metadata.annotations) &&
-"{{ $p }}/landscape" in object.metadata.labels &&
-"{{ $p }}/landscape" in object.metadata.annotations &&
-object.metadata.labels["{{ $p }}/landscape"] == "{{ $landscape }}" &&
-object.metadata.annotations["{{ $p }}/landscape"] == "{{ $landscape }}"
+{{- define "vanadium.policy.requireLabels" -}}
+rules: lpsm
+message: Workloads and services must carry every LPSM label (landscape, platform, service, module, layer).
+expression: >-
+  has(object.metadata.labels) &&
+  {{ include "vanadium.lpsmKeys" . }}.all(k, k in object.metadata.labels)
 {{- end -}}
 
-{{/* layerRange: layer label is one of the accepted layers. */}}
-{{- define "vanadium.cel.layerRange" -}}
-{{- $p := include "vanadium.labelPrefix" . -}}
-{{- $layers := .Values.params.acceptedLayers | toJson -}}
-has(object.metadata) && has(object.metadata.labels) &&
-"{{ $p }}/layer" in object.metadata.labels &&
-{{ $layers }}.exists(x, x == object.metadata.labels["{{ $p }}/layer"])
+{{- define "vanadium.policy.requireAnnotations" -}}
+rules: lpsm
+message: Workloads and services must carry every LPSM annotation (landscape, platform, service, module, layer).
+expression: >-
+  has(object.metadata.annotations) &&
+  {{ include "vanadium.lpsmKeys" . }}.all(k, k in object.metadata.annotations)
 {{- end -}}
 
-{{/* platformAccepted: platform label is in the accepted list. */}}
-{{- define "vanadium.cel.platformAccepted" -}}
-{{- $p := include "vanadium.labelPrefix" . -}}
-{{- $platforms := .Values.params.acceptedPlatforms | toJson -}}
-has(object.metadata) && has(object.metadata.labels) &&
-"{{ $p }}/platform" in object.metadata.labels &&
-{{ $platforms }}.exists(x, x == object.metadata.labels["{{ $p }}/platform"])
+{{- define "vanadium.policy.landscapeMatch" -}}
+rules: lpsm
+message: The LPSM landscape label and annotation must equal this cluster's landscape.
+expression: >-
+  {{- include "vanadium.metaValue" (dict "root" . "key" "landscape" "list" (list .Values.serviceTree.landscape | toJson | replace "\"" "'")) | nindent 2 }}
 {{- end -}}
 
-{{/* disallowLatest: every container image ends with a non-latest tag or immutable digest. */}}
-{{- define "vanadium.cel.disallowLatest" -}}
-object.spec.template.spec.containers.all(c,
+{{- define "vanadium.policy.layerRange" -}}
+rules: lpsm
+message: The LPSM layer must be one of the accepted layers.
+expression: >-
+  {{- include "vanadium.metaValue" (dict "root" . "key" "layer" "list" (.Values.policies.layerRange.layers | toJson | replace "\"" "'")) | nindent 2 }}
+{{- end -}}
+
+{{- define "vanadium.policy.platformAccepted" -}}
+rules: lpsm
+message: The LPSM platform must be in the accepted platform list.
+expression: >-
+  {{- include "vanadium.metaValue" (dict "root" . "key" "platform" "list" (.Values.policies.platformAccepted.platforms | toJson | replace "\"" "'")) | nindent 2 }}
+{{- end -}}
+
+{{- define "vanadium.policy.disallowLatest" -}}
+rules: pods
+message: Every container image must carry an explicit non-latest tag or a digest.
+expression: >-
+  variables.allContainers.all(c,
   (c.image.matches('^(.*/)?[^/@:]+:[^/@:]+$') ||
-   c.image.matches('^.+@[^/@:]+:[A-Fa-f0-9]+$')) && !c.image.endsWith(':latest')) &&
-(!has(object.spec.template.spec.initContainers) || object.spec.template.spec.initContainers.all(c,
-  (c.image.matches('^(.*/)?[^/@:]+:[^/@:]+$') ||
-   c.image.matches('^.+@[^/@:]+:[A-Fa-f0-9]+$')) && !c.image.endsWith(':latest')))
+  c.image.matches('^[^@]+@[a-z0-9]+([+._-][a-z0-9]+)*:[a-fA-F0-9]{32,}$')) &&
+  !c.image.endsWith(':latest'))
 {{- end -}}
 
-{{/* requireResources: every container declares cpu+memory requests and limits. */}}
-{{- define "vanadium.cel.requireResources" -}}
-object.spec.template.spec.containers.all(c,
+{{- define "vanadium.policy.requireResources" -}}
+rules: pods
+message: Every container and init container must declare CPU and memory requests and limits.
+expression: >-
+  variables.containers.all(c,
   has(c.resources) && has(c.resources.requests) && has(c.resources.limits) &&
   has(c.resources.requests.cpu) && has(c.resources.requests.memory) &&
-  has(c.resources.limits.cpu) && has(c.resources.limits.memory)) &&
-(!has(object.spec.template.spec.initContainers) || object.spec.template.spec.initContainers.all(c,
-  has(c.resources) && has(c.resources.requests) && has(c.resources.limits) &&
-  has(c.resources.requests.cpu) && has(c.resources.requests.memory) &&
-  has(c.resources.limits.cpu) && has(c.resources.limits.memory)))
+  has(c.resources.limits.cpu) && has(c.resources.limits.memory))
 {{- end -}}
 
-{{/* disallowNodePort: services must not be NodePort. */}}
-{{- define "vanadium.cel.disallowNodePort" -}}
-!has(object.spec.type) || object.spec.type != 'NodePort'
+{{- define "vanadium.policy.disallowNodePort" -}}
+rules: services
+message: NodePort services are forbidden; use ClusterIP or LoadBalancer.
+expression: >-
+  !has(object.spec.type) || object.spec.type != 'NodePort'
 {{- end -}}
 
-{{/* requireNonRoot: pod and every container run non-root. */}}
-{{- define "vanadium.cel.requireNonRoot" -}}
-has(object.spec.template.spec.securityContext) &&
-object.spec.template.spec.securityContext.runAsNonRoot == true &&
-object.spec.template.spec.containers.all(c,
-  has(c.securityContext) && c.securityContext.runAsNonRoot == true) &&
-(!has(object.spec.template.spec.initContainers) || object.spec.template.spec.initContainers.all(c,
-  has(c.securityContext) && c.securityContext.runAsNonRoot == true))
+{{- define "vanadium.policy.requireNonRoot" -}}
+rules: pods
+message: Pods must run as non-root (runAsNonRoot true, no runAsUser 0) at the pod or every container level.
+expression: >-
+  variables.allContainers.all(c, !has(c.securityContext) ||
+  ((!has(c.securityContext.runAsNonRoot) || c.securityContext.runAsNonRoot == true) &&
+  (!has(c.securityContext.runAsUser) || c.securityContext.runAsUser != 0))) &&
+  (!has(variables.spec.securityContext) || !has(variables.spec.securityContext.runAsUser) ||
+  variables.spec.securityContext.runAsUser != 0) &&
+  ((has(variables.spec.securityContext) && has(variables.spec.securityContext.runAsNonRoot) &&
+  variables.spec.securityContext.runAsNonRoot == true) ||
+  variables.allContainers.all(c, has(c.securityContext) &&
+  has(c.securityContext.runAsNonRoot) && c.securityContext.runAsNonRoot == true))
 {{- end -}}
 
-{{/* disallowPrivEscalation: no container may allow privilege escalation. */}}
-{{- define "vanadium.cel.disallowPrivEscalation" -}}
-object.spec.template.spec.containers.all(c,
-  has(c.securityContext) && c.securityContext.allowPrivilegeEscalation == false) &&
-(!has(object.spec.template.spec.initContainers) || object.spec.template.spec.initContainers.all(c,
-  has(c.securityContext) && c.securityContext.allowPrivilegeEscalation == false))
+{{- define "vanadium.policy.disallowPrivEscalation" -}}
+rules: pods
+message: Every container must set allowPrivilegeEscalation to false.
+expression: >-
+  variables.allContainers.all(c, has(c.securityContext) &&
+  has(c.securityContext.allowPrivilegeEscalation) &&
+  c.securityContext.allowPrivilegeEscalation == false)
 {{- end -}}
 
-{{/* restrictVolumeTypes: PSS restricted source whitelist with a narrow alloy hostPath carve-out. */}}
-{{- define "vanadium.cel.restrictVolumeTypes" -}}
-!has(object.spec.template.spec.volumes) ||
-object.spec.template.spec.volumes.all(v,
+{{- define "vanadium.policy.restrictVolumeTypes" -}}
+{{- $carve := .Values.policies.restrictVolumeTypes.hostPathCarveOut -}}
+{{- range $carve.paths }}
+{{- if or (not (hasPrefix "/" .)) (contains ".." .) (contains "'" .) }}
+{{- fail (printf "hostPathCarveOut path %q must be absolute with no .. or quote" .) -}}
+{{- end }}
+{{- end }}
+rules: pods
+message: Only PSS restricted volume types are allowed; hostPath only for the scoped alloy-logs carve-out.
+expression: >-
+  !has(variables.spec.volumes) || variables.spec.volumes.all(v,
   has(v.configMap) || has(v.csi) || has(v.downwardAPI) || has(v.emptyDir) ||
-  has(v.ephemeral) || has(v.persistentVolumeClaim) || has(v.projected) ||
-  has(v.secret) ||
-  (has(v.hostPath) && has(object.spec.template.spec.serviceAccountName) &&
-   object.spec.template.spec.serviceAccountName == 'alloy-logs' && has(v.hostPath.path) &&
-   (v.hostPath.path == '/var/log' || v.hostPath.path.startsWith('/var/log/'))))
+  has(v.ephemeral) || has(v.persistentVolumeClaim) || has(v.projected) || has(v.secret) ||
+  {{- if and $carve.serviceAccount $carve.paths }}
+  (has(v.hostPath) && has(object.metadata.namespace) &&
+  object.metadata.namespace == '{{ required "hostPathCarveOut.namespace is required" $carve.namespace }}' &&
+  has(variables.spec.serviceAccountName) &&
+  variables.spec.serviceAccountName == '{{ $carve.serviceAccount }}' &&
+  v.hostPath.path in {{ $carve.paths | toJson | replace "\"" "'" }}))
+  {{- else }}
+  false)
+  {{- end }}
+{{- end -}}
+
+{{- define "vanadium.policy.disallowHostProcess" -}}
+rules: pods
+message: Windows HostProcess pods and containers are forbidden.
+expression: >-
+  ([variables.spec] + variables.allContainers).all(x, !has(x.securityContext) ||
+  !has(x.securityContext.windowsOptions) || !has(x.securityContext.windowsOptions.hostProcess) ||
+  x.securityContext.windowsOptions.hostProcess == false)
+{{- end -}}
+
+{{- define "vanadium.policy.disallowHostNamespaces" -}}
+rules: pods
+message: hostNetwork, hostPID and hostIPC are forbidden.
+expression: >-
+  (!has(variables.spec.hostNetwork) || variables.spec.hostNetwork == false) &&
+  (!has(variables.spec.hostPID) || variables.spec.hostPID == false) &&
+  (!has(variables.spec.hostIPC) || variables.spec.hostIPC == false)
+{{- end -}}
+
+{{- define "vanadium.policy.disallowPrivileged" -}}
+rules: pods
+message: Privileged containers are forbidden.
+expression: >-
+  variables.allContainers.all(c, !has(c.securityContext) ||
+  !has(c.securityContext.privileged) || c.securityContext.privileged == false)
+{{- end -}}
+
+{{- define "vanadium.policy.disallowCapabilities" -}}
+rules: pods
+message: Containers may only add the PSS baseline capabilities.
+expression: >-
+  variables.allContainers.all(c, !has(c.securityContext) ||
+  !has(c.securityContext.capabilities) || !has(c.securityContext.capabilities.add) ||
+  c.securityContext.capabilities.add.all(cap, cap in ['AUDIT_WRITE', 'CHOWN', 'DAC_OVERRIDE',
+  'FOWNER', 'FSETID', 'KILL', 'MKNOD', 'NET_BIND_SERVICE', 'SETFCAP', 'SETGID', 'SETPCAP',
+  'SETUID', 'SYS_CHROOT']))
+{{- end -}}
+
+{{- define "vanadium.policy.disallowHostPorts" -}}
+rules: pods
+message: Container hostPorts are forbidden.
+expression: >-
+  variables.allContainers.all(c, !has(c.ports) ||
+  c.ports.all(p, !has(p.hostPort) || p.hostPort == 0))
+{{- end -}}
+
+{{- define "vanadium.policy.restrictAppArmor" -}}
+rules: pods
+message: AppArmor profiles must be RuntimeDefault or Localhost.
+expression: >-
+  ([variables.spec] + variables.allContainers).all(x, !has(x.securityContext) ||
+  !has(x.securityContext.appArmorProfile) ||
+  x.securityContext.appArmorProfile.type in ['RuntimeDefault', 'Localhost'])
+{{- end -}}
+
+{{- define "vanadium.policy.restrictSELinux" -}}
+rules: pods
+message: SELinux type must be a container type, and user and role must be unset.
+expression: >-
+  ([variables.spec] + variables.allContainers).all(x, !has(x.securityContext) ||
+  !has(x.securityContext.seLinuxOptions) ||
+  ((!has(x.securityContext.seLinuxOptions.type) || x.securityContext.seLinuxOptions.type in
+  ['', 'container_t', 'container_init_t', 'container_kvm_t', 'container_engine_t']) &&
+  (!has(x.securityContext.seLinuxOptions.user) || x.securityContext.seLinuxOptions.user == '') &&
+  (!has(x.securityContext.seLinuxOptions.role) || x.securityContext.seLinuxOptions.role == '')))
+{{- end -}}
+
+{{- define "vanadium.policy.disallowProcMount" -}}
+rules: pods
+message: procMount must be Default.
+expression: >-
+  variables.allContainers.all(c, !has(c.securityContext) ||
+  !has(c.securityContext.procMount) || c.securityContext.procMount == 'Default')
+{{- end -}}
+
+{{- define "vanadium.policy.restrictSeccomp" -}}
+rules: pods
+message: seccomp profiles must not be Unconfined.
+expression: >-
+  ([variables.spec] + variables.allContainers).all(x, !has(x.securityContext) ||
+  !has(x.securityContext.seccompProfile) || x.securityContext.seccompProfile.type != 'Unconfined')
+{{- end -}}
+
+{{- define "vanadium.policy.restrictSysctls" -}}
+rules: pods
+message: Only the PSS baseline safe sysctls are allowed.
+expression: >-
+  !has(variables.spec.securityContext) || !has(variables.spec.securityContext.sysctls) ||
+  variables.spec.securityContext.sysctls.all(s, s.name in ['kernel.shm_rmid_forced',
+  'net.ipv4.ip_local_port_range', 'net.ipv4.ip_unprivileged_port_start', 'net.ipv4.tcp_syncookies',
+  'net.ipv4.ping_group_range', 'net.ipv4.ip_local_reserved_ports', 'net.ipv4.tcp_keepalive_time',
+  'net.ipv4.tcp_fin_timeout', 'net.ipv4.tcp_keepalive_intvl', 'net.ipv4.tcp_keepalive_probes'])
 {{- end -}}

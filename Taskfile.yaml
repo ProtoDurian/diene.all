@@ -1,8 +1,18 @@
 version: '3'
 
+includes:
+  helm: tasks/Taskfile.helm.yaml
+  example:lapras:
+    taskfile: tasks/Taskfile.cluster.yaml
+    vars:
+      RELEASE_NAME: vanadium
+      NAMESPACE: admission
+      LANDSCAPE: example
+      CLUSTER: lapras
+
 tasks:
   setup:
-    desc: Set up generated workspace assets
+    desc: Set up the workspace
     cmds:
       - ./scripts/local/setup.sh
 
@@ -11,17 +21,27 @@ tasks:
     cmds:
       - pre-commit run --all-files
 
-  test:
-    desc: Run the vanadium unit/static tier
+  build:
+    desc: Build chart dependencies
     cmds:
-      - ./scripts/ci/vanadium.sh
+      - helm dependency build chart
 
   test:unit:
-    desc: Run schema, lint, render, label, exemption, audit/enforce, and per-rule CEL conformance
+    desc: Run schema, lint, render, policy, and contract validation
     cmds:
       - ./scripts/ci/vanadium.sh
 
   test:int:
-    desc: Run the local k3d admission-policy proof (reserved for the live window)
+    desc: Run the local k3d installation proof
     cmds:
-      - K3D_ISOLATE_BY_PATH=true VANADIUM_EVIDENCE_DIR="{{.ROOT_DIR}}/.vanadium-evidence" ./scripts/validate/vanadium-k3d.sh
+      - ./scripts/ci/vanadium-k3d.sh
+
+  start:cluster:
+    desc: Start the local k3d lapras proof cluster
+    cmds:
+      - ./scripts/local/create-k3d-cluster.sh
+
+  stop:cluster:
+    desc: Delete the local k3d lapras proof cluster
+    cmds:
+      - ./scripts/local/delete-k3d-cluster.sh

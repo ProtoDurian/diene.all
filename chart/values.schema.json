@@ -1,474 +1,552 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vanadium Values",
-  "description": "Generated schema for the vanadium ValidatingAdmissionPolicy chart.",
-  "type": "object",
-  "required": [
-    "fullnameOverride"
-  ],
-  "properties": {
-    "exemption": {
-      "description": "Namespace-label exemption convention. A namespace labeled `<prefix>/<labelKey>: \"true\"` is skipped by every binding.",
-      "type": "object",
-      "properties": {
-        "labelKey": {
-          "type": "string",
-          "pattern": "^[a-z0-9-]+$"
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Diene Vanadium Values",
+    "description": "Generated schema for the diene vanadium ValidatingAdmissionPolicy chart.",
+    "type": "object",
+    "required": [
+        "fullnameOverride",
+        "enforcement",
+        "exemptionLabel"
+    ],
+    "properties": {
+        "enforcement": {
+            "description": "Landscape posture. `audit` binds every policy `[Warn, Audit]` (nothing blocked); `deny` binds `[Deny]`.",
+            "type": "string",
+            "enum": [
+                "audit",
+                "deny"
+            ]
+        },
+        "exemptionLabel": {
+            "description": "Namespaces labeled `\u003clabelPrefix\u003e/\u003cexemptionLabel\u003e: \"true\"` are skipped by every binding.",
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "minLength": 1
+        },
+        "fullnameOverride": {
+            "description": "Release fullname. It must be `\u003cservice\u003e-\u003cmodule\u003e`.",
+            "type": "string",
+            "pattern": "^[a-z0-9]+-[a-z0-9]+$"
+        },
+        "labelPrefix": {
+            "description": "Prefix used by every service-tree label, annotation and policy key.",
+            "type": "string",
+            "pattern": "^[a-z0-9.-]+$",
+            "minLength": 1
+        },
+        "policies": {
+            "description": "One ValidatingAdmissionPolicy + binding per enabled policy. A non-empty `actions` overrides the landscape posture for that policy.",
+            "type": "object",
+            "properties": {
+                "disallowCapabilities": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "disallowHostNamespaces": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "disallowHostPorts": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "disallowHostProcess": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "disallowLatest": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "disallowNodePort": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "disallowPrivEscalation": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "disallowPrivileged": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "disallowProcMount": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "landscapeMatch": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "layerRange": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "layers": {
+                            "description": "Accepted `\u003clabelPrefix\u003e/layer` values.",
+                            "type": "array",
+                            "minItems": 1,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "platformAccepted": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "platforms": {
+                            "description": "Accepted `\u003clabelPrefix\u003e/platform` values.",
+                            "type": "array",
+                            "minItems": 1,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "requireAnnotations": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "requireLabels": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "requireNonRoot": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "requireResources": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "restrictAppArmor": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "restrictSELinux": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "restrictSeccomp": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "restrictSysctls": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "restrictVolumeTypes": {
+                    "type": "object",
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Warn",
+                                    "Audit",
+                                    "Deny"
+                                ]
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "hostPathCarveOut": {
+                            "description": "The one hostPath allowance: these exact paths, for this ServiceAccount in this namespace (alloy-logs). Empty `serviceAccount` disables it.",
+                            "type": "object",
+                            "properties": {
+                                "namespace": {
+                                    "type": "string",
+                                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                                },
+                                "paths": {
+                                    "type": "array",
+                                    "uniqueItems": true,
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "serviceAccount": {
+                                    "type": "string",
+                                    "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "serviceTree": {
+            "description": "Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays.",
+            "type": "object",
+            "required": [
+                "platform",
+                "service",
+                "module",
+                "layer"
+            ],
+            "properties": {
+                "layer": {
+                    "type": "string",
+                    "pattern": "^[0-9]+$"
+                },
+                "module": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+$"
+                },
+                "platform": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+$"
+                },
+                "service": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+$"
+                }
+            }
         }
-      }
-    },
-    "fullnameOverride": {
-      "description": "Chart release fullname. Admission objects are cluster-scoped; the value still follows the one-dash `<service>-<token>` convention used family-wide.",
-      "type": "string",
-      "pattern": "^[a-z0-9]+-[a-z0-9]+$"
-    },
-    "labelPrefix": {
-      "description": "Prefix used by every service-tree label and annotation helper.",
-      "type": "string",
-      "pattern": "^[a-z0-9.-]+$",
-      "minLength": 1
-    },
-    "params": {
-      "description": "Cluster admission context rendered into the value-checking CEL expressions. The installed policy set carries no runtime params (paramKind), so the generic rendered-manifest validation stage can evaluate it offline.",
-      "type": "object",
-      "required": [
-        "landscape"
-      ],
-      "properties": {
-        "acceptedLayers": {
-          "description": "Architecture layers allowed by the layer-range rule (0 infrastructure, 1 service, 2 app).",
-          "type": "array",
-          "pattern": "^[0-9]+$",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "type": "string"
-          }
-        },
-        "acceptedPlatforms": {
-          "description": "Platforms permitted to deploy into the fleet.",
-          "type": "array",
-          "pattern": "^[a-z0-9]+$",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "type": "string"
-          }
-        },
-        "landscape": {
-          "description": "This cluster's landscape; the landscape-match rule renders it into CEL.",
-          "type": "string",
-          "pattern": "^[a-z0-9-]+$"
-        }
-      }
-    },
-    "policies": {
-      "description": "Per-rule enable + validationActions. The default fleet posture is the pre-enforcement audit pair `[Warn, Audit]`; an enforcement landscape overlay flips one or more rules to `[Deny]`.",
-      "type": "object",
-      "properties": {
-        "disallowLatest": {
-          "type": "object",
-          "properties": {
-            "actions": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "enum": [
-                  "Warn",
-                  "Audit",
-                  "Deny"
-                ]
-              },
-              "oneOf": [
-                {
-                  "const": [
-                    "Warn",
-                    "Audit"
-                  ]
-                },
-                {
-                  "const": [
-                    "Deny"
-                  ]
-                }
-              ]
-            },
-            "enabled": {
-              "type": "boolean"
-            }
-          }
-        },
-        "disallowNodePort": {
-          "type": "object",
-          "properties": {
-            "actions": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "enum": [
-                  "Warn",
-                  "Audit",
-                  "Deny"
-                ]
-              },
-              "oneOf": [
-                {
-                  "const": [
-                    "Warn",
-                    "Audit"
-                  ]
-                },
-                {
-                  "const": [
-                    "Deny"
-                  ]
-                }
-              ]
-            },
-            "enabled": {
-              "type": "boolean"
-            }
-          }
-        },
-        "disallowPrivEscalation": {
-          "type": "object",
-          "properties": {
-            "actions": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "enum": [
-                  "Warn",
-                  "Audit",
-                  "Deny"
-                ]
-              },
-              "oneOf": [
-                {
-                  "const": [
-                    "Warn",
-                    "Audit"
-                  ]
-                },
-                {
-                  "const": [
-                    "Deny"
-                  ]
-                }
-              ]
-            },
-            "enabled": {
-              "type": "boolean"
-            }
-          }
-        },
-        "landscapeMatch": {
-          "type": "object",
-          "properties": {
-            "actions": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "enum": [
-                  "Warn",
-                  "Audit",
-                  "Deny"
-                ]
-              },
-              "oneOf": [
-                {
-                  "const": [
-                    "Warn",
-                    "Audit"
-                  ]
-                },
-                {
-                  "const": [
-                    "Deny"
-                  ]
-                }
-              ]
-            },
-            "enabled": {
-              "type": "boolean"
-            }
-          }
-        },
-        "layerRange": {
-          "type": "object",
-          "properties": {
-            "actions": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "enum": [
-                  "Warn",
-                  "Audit",
-                  "Deny"
-                ]
-              },
-              "oneOf": [
-                {
-                  "const": [
-                    "Warn",
-                    "Audit"
-                  ]
-                },
-                {
-                  "const": [
-                    "Deny"
-                  ]
-                }
-              ]
-            },
-            "enabled": {
-              "type": "boolean"
-            }
-          }
-        },
-        "platformAccepted": {
-          "type": "object",
-          "properties": {
-            "actions": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "enum": [
-                  "Warn",
-                  "Audit",
-                  "Deny"
-                ]
-              },
-              "oneOf": [
-                {
-                  "const": [
-                    "Warn",
-                    "Audit"
-                  ]
-                },
-                {
-                  "const": [
-                    "Deny"
-                  ]
-                }
-              ]
-            },
-            "enabled": {
-              "type": "boolean"
-            }
-          }
-        },
-        "requireAnnotations": {
-          "type": "object",
-          "properties": {
-            "actions": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "enum": [
-                  "Warn",
-                  "Audit",
-                  "Deny"
-                ]
-              },
-              "oneOf": [
-                {
-                  "const": [
-                    "Warn",
-                    "Audit"
-                  ]
-                },
-                {
-                  "const": [
-                    "Deny"
-                  ]
-                }
-              ]
-            },
-            "enabled": {
-              "type": "boolean"
-            }
-          }
-        },
-        "requireLabels": {
-          "type": "object",
-          "properties": {
-            "actions": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "enum": [
-                  "Warn",
-                  "Audit",
-                  "Deny"
-                ]
-              },
-              "oneOf": [
-                {
-                  "const": [
-                    "Warn",
-                    "Audit"
-                  ]
-                },
-                {
-                  "const": [
-                    "Deny"
-                  ]
-                }
-              ]
-            },
-            "enabled": {
-              "type": "boolean"
-            }
-          }
-        },
-        "requireNonRoot": {
-          "type": "object",
-          "properties": {
-            "actions": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "enum": [
-                  "Warn",
-                  "Audit",
-                  "Deny"
-                ]
-              },
-              "oneOf": [
-                {
-                  "const": [
-                    "Warn",
-                    "Audit"
-                  ]
-                },
-                {
-                  "const": [
-                    "Deny"
-                  ]
-                }
-              ]
-            },
-            "enabled": {
-              "type": "boolean"
-            }
-          }
-        },
-        "requireResources": {
-          "type": "object",
-          "properties": {
-            "actions": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "enum": [
-                  "Warn",
-                  "Audit",
-                  "Deny"
-                ]
-              },
-              "oneOf": [
-                {
-                  "const": [
-                    "Warn",
-                    "Audit"
-                  ]
-                },
-                {
-                  "const": [
-                    "Deny"
-                  ]
-                }
-              ]
-            },
-            "enabled": {
-              "type": "boolean"
-            }
-          }
-        },
-        "restrictVolumeTypes": {
-          "type": "object",
-          "properties": {
-            "actions": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "enum": [
-                  "Warn",
-                  "Audit",
-                  "Deny"
-                ]
-              },
-              "oneOf": [
-                {
-                  "const": [
-                    "Warn",
-                    "Audit"
-                  ]
-                },
-                {
-                  "const": [
-                    "Deny"
-                  ]
-                }
-              ]
-            },
-            "enabled": {
-              "type": "boolean"
-            }
-          }
-        }
-      }
-    },
-    "serviceTree": {
-      "description": "Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays. Vanadium is fleet admission infrastructure, not a workload.",
-      "type": "object",
-      "required": [
-        "platform",
-        "service",
-        "module",
-        "layer"
-      ],
-      "properties": {
-        "layer": {
-          "type": "string",
-          "pattern": "^[0-9]+$"
-        },
-        "module": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+$"
-        },
-        "platform": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+$"
-        },
-        "service": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+$"
-        }
-      }
     }
-  }
 }
