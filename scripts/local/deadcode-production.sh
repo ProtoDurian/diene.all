@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "🔍 Running production deadcode without test reachability"
-report="$(deadcode -json ./...)"
+report="$(./scripts/local/with-deadcode-consumer.sh deadcode -json ./...)"
 # deadcode prints `null` when it finds nothing, so an empty report means it never looked.
 [ -z "${report}" ] && echo "❌ production deadcode produced no report" >&2 && exit 1
 count="$(jq '(. // []) | length' <<<"${report}")"

@@ -1,7 +1,6 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
-import { plantProductionOnlySymbol } from './lib/go.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic, plantProductionOnlySymbol } from './lib/go.ts';
 
-// The production deadcode component, invoked directly rather than through the composite dispatcher.
 const gate = 'nix develop .#ci -c ./scripts/local/deadcode-production.sh';
 
 // The component reports findings as deadcode's own JSON, so the fixture is proven by its entry, not by a bare name match.
@@ -23,7 +22,6 @@ export default {
       name: 'mutation-deadcode-production-caught',
       description: 'A symbol reachable only from a test must turn the production deadcode component red.',
       kind: 'mutation',
-      expectedImpact: ['go-lib-export-docs'],
       async run(repo: any) {
         const planted = await plantProductionOnlySymbol(repo);
         try {

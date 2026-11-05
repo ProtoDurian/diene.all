@@ -3,30 +3,41 @@ package note
 // DOMAIN WIRING: replaceable Note sample service over the KV port.
 import "context"
 
-// Store persists and loads string values by key.
-type Store interface {
-	Save(context.Context, string, string) error
-	Load(context.Context, string) (string, error)
+// Note is a stored note addressed by its slug.
+type Note struct {
+	Slug string
+	Body string
 }
 
-// Service persists and loads notes through a Store.
+// Store is the key-value port the Service persists notes through.
+type Store interface {
+	Save(ctx context.Context, key string, value string) error
+	Load(ctx context.Context, key string) (string, error)
+}
+
+// Service creates and loads notes through a Store.
 type Service struct {
 	store Store
+	keys  KeyComposer
 }
 
-// NewService creates a note service backed by store.
-func NewService(store Store) Service {
-	return Service{store: store}
+// NewService returns a Service over store that derives keys with keys.
+func NewService(store Store, keys KeyComposer) Service {
+	return Service{store: store, keys: keys}
 }
 
-// Save persists a note under its namespaced slug.
-func (service Service) Save(ctx context.Context, value Note) error {
-	return service.store.Save(ctx, NamespacedKey("notes", value.Slug), value.Body)
+// Create slugs title, saves body under the slug's key and returns the stored note.
+func (service Service) Create(ctx context.Context, title string, body string) (Note, error) {
+	value := Note{Slug: service.keys.Slug(title), Body: body}
+	if err := service.store.Save(ctx, service.keys.Compose(value.Slug), value.Body); err != nil {
+		return Note{}, err
+	}
+	return value, nil
 }
 
-// Load retrieves a note by slug.
+// Load returns the note stored under slug.
 func (service Service) Load(ctx context.Context, slug string) (Note, error) {
-	body, err := service.store.Load(ctx, NamespacedKey("notes", slug))
+	body, err := service.store.Load(ctx, service.keys.Compose(slug))
 	if err != nil {
 		return Note{}, err
 	}

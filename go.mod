@@ -1,4 +1,4 @@
-module github.com/AtomiCloud/diene.go-lib
+module github.com/ProtoDurian/diene.go-lib
 
 go 1.26.0
 

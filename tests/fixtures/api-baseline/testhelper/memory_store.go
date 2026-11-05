@@ -1,20 +1,42 @@
-// Package testhelper provides the stable consumer-facing fake API.
+// Package testhelper provides consumer-facing fakes for tests that use the sample library.
 package testhelper
 
-import "context"
+// DOMAIN WIRING: replaceable Note sample TestHelper.
+import (
+	"context"
 
-// MemoryStore is an in-memory note store with injectable failures.
+	"github.com/ProtoDurian/diene.go-lib/lib/note"
+)
+
+// MemoryStore is an in-memory note.Store with injectable failures.
 type MemoryStore struct {
 	Values    map[string]string
 	SaveError error
 	LoadError error
 }
 
-// NewMemoryStore creates an empty in-memory store.
-func NewMemoryStore() *MemoryStore { return &MemoryStore{} }
+// NewMemoryStore returns an empty MemoryStore.
+func NewMemoryStore() *MemoryStore {
+	return &MemoryStore{Values: map[string]string{}}
+}
 
 // Save stores value at key unless SaveError is set.
-func (*MemoryStore) Save(context.Context, string, string) error { return nil }
+func (store *MemoryStore) Save(_ context.Context, key string, value string) error {
+	if store.SaveError != nil {
+		return store.SaveError
+	}
+	store.Values[key] = value
+	return nil
+}
 
-// Load retrieves key unless LoadError is set.
-func (*MemoryStore) Load(context.Context, string) (string, error) { return "", nil }
+// Load returns the value at key unless LoadError is set.
+func (store *MemoryStore) Load(_ context.Context, key string) (string, error) {
+	if store.LoadError != nil {
+		return "", store.LoadError
+	}
+	return store.Values[key], nil
+}
+
+var _ note.Store = (*MemoryStore)(nil)
+
+// END DOMAIN WIRING

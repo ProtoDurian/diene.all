@@ -1,3 +1,3 @@
-module example.invalid/go-lib-api-baseline
+module github.com/ProtoDurian/diene.go-lib
 
 go 1.26.0

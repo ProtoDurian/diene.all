@@ -1,6 +1,5 @@
-import { expectGreen, expectRedWithDiagnostic } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic } from './lib/go.ts';
 
-// Drive the exact self-contained CI vulnerability entrypoint in both arms.
 const ciVulnGate = './scripts/ci/vuln.sh';
 
 export default {

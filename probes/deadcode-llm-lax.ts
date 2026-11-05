@@ -1,4 +1,4 @@
-import { expectGreen } from './lib/helpers.ts';
+import { expectGreen } from './lib/go.ts';
 
 // Every scanner pass records its own completion line, so a header-only or truncated report cannot read as a clean one.
 const passes = [

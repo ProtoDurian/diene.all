@@ -11,33 +11,28 @@ with packages;
   lint = [
     actionlint
     dlint
-    infralint
+    go-tools
+    gofumpt
+    golangci-lint
+    gotools
+    infralint-core
     pre-commit
     shellcheck
     skills-sync
     treefmt
-
-    deadcode
-    gofumpt
-    golangci-lint
-    staticcheck
   ];
 
   main = [
     cyanprint
     git
-    go-task
-    infisical
-    shellcheck
-
-    # ### go-lib-main
-    # #### source: go-lib
-    gorelease
-    zip
-
     go
+    go-task
     gotestsum
     govulncheck
+    infisical
+    releaser
+    shellcheck
+    zip
   ];
 
   releaser = [
@@ -46,7 +41,7 @@ with packages;
 
   system = [
     atomiutils
-    infrautils
+    infrautils-core
     nix
   ];
 }

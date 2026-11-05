@@ -1,0 +1,36 @@
+name: ⚡ Reusable Test
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: Test mode to run (unit, int or meta)
+        required: true
+        type: string
+
+jobs:
+  test:
+    name: ${{ inputs.mode == 'int' && 'Integration Tests' || inputs.mode == 'meta' && 'Meta Tests' || 'Unit Tests' }}
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+        with:
+          namespacelabs: 'true'
+      - uses: AtomiCloud/actions.cache-go@v2
+      - if: inputs.mode == 'int'
+        uses: AtomiCloud/actions.setup-docker@v2
+      - name: Run ${{ inputs.mode }} coverage
+        env:
+          MODE: ${{ inputs.mode }}
+        run: nix develop .#ci -c ./scripts/ci/test.sh "${MODE}"
+      - name: Upload ${{ inputs.mode }} coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ inputs.mode }}
+          path: coverage/${{ inputs.mode }}/coverage.out
+          if-no-files-found: warn

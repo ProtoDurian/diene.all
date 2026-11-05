@@ -1,16 +1,14 @@
-# ### go-lib-cd
-# #### source: go-lib
 name: CD
 
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - v*.*.*
 
 jobs:
   publish:
-    name: Verify Go module publication
+    name: Verify Go proxy publication
     permissions:
       contents: read
-    uses: ./.github/workflows/reusable-go-publish.yaml
+    uses: ./.github/workflows/⚡reusable-publish.yaml
     secrets: inherit

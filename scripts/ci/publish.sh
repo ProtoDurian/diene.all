@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-tag="${1:-${GITHUB_REF_NAME:-}}"
+tag="${1:-}"
 
 ./scripts/validate/go-publish-guard.sh "${tag}"
-./scripts/local/setup.sh
 ./scripts/local/build.sh
 ./scripts/validate/go-proxy-roundtrip.sh "${tag}"
 

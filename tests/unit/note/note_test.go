@@ -6,54 +6,95 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/AtomiCloud/diene.go-lib/lib/note"
-	"github.com/AtomiCloud/diene.go-lib/testhelper"
+	"github.com/ProtoDurian/diene.go-lib/lib/note"
 )
 
-func TestSlugAndNamespacedKey(t *testing.T) {
+type FakeStore struct {
+	Values  map[string]string
+	SaveErr error
+	LoadErr error
+}
+
+func (store *FakeStore) Save(_ context.Context, key string, value string) error {
+	store.Values[key] = value
+	return store.SaveErr
+}
+
+func (store *FakeStore) Load(_ context.Context, key string) (string, error) {
+	return store.Values[key], store.LoadErr
+}
+
+func TestKeyComposerSlug(t *testing.T) {
 	t.Parallel()
 
-	if got := note.Slug("Hello   World"); got != "hello-world" {
-		t.Fatalf("Slug() = %q, want %q", got, "hello-world")
-	}
-	if got := note.NamespacedKey("notes", "hello-world"); got != "notes:hello-world" {
-		t.Fatalf("NamespacedKey() = %q, want %q", got, "notes:hello-world")
+	// Arrange
+	keys := note.NewKeyComposer("notes")
+
+	// Act
+	got := keys.Slug("Hello   World")
+
+	// Assert
+	if want := "hello-world"; got != want {
+		t.Fatalf("Slug() = %q, want %q", got, want)
 	}
 }
 
-func TestServiceJourney(t *testing.T) {
+func TestKeyComposerCompose(t *testing.T) {
 	t.Parallel()
 
-	store := testhelper.NewMemoryStore()
-	service := note.NewService(store)
-	value := note.New("Hello World", "from the domain")
+	// Arrange
+	keys := note.NewKeyComposer("notes")
 
-	if err := service.Save(context.Background(), value); err != nil {
-		t.Fatalf("Save() error = %v", err)
+	// Act
+	got := keys.Compose("hello-world")
+
+	// Assert
+	if want := "notes:hello-world"; got != want {
+		t.Fatalf("Compose() = %q, want %q", got, want)
 	}
-	loaded, err := service.Load(context.Background(), value.Slug)
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
+}
+
+func TestServiceRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	store := &FakeStore{Values: map[string]string{}}
+	service := note.NewService(store, note.NewKeyComposer("notes"))
+
+	// Act
+	created, createErr := service.Create(context.Background(), "Hello World", "from the domain")
+	loaded, loadErr := service.Load(context.Background(), created.Slug)
+
+	// Assert
+	if createErr != nil || loadErr != nil {
+		t.Fatalf("Create() error = %v, Load() error = %v", createErr, loadErr)
 	}
-	if loaded != value {
-		t.Fatalf("Load() = %#v, want %#v", loaded, value)
+	if want := (note.Note{Slug: "hello-world", Body: "from the domain"}); loaded != want {
+		t.Fatalf("Load() = %#v, want %#v", loaded, want)
+	}
+	if got := store.Values["notes:hello-world"]; got != "from the domain" {
+		t.Fatalf("stored value = %q, want %q", got, "from the domain")
 	}
 }
 
 func TestServiceErrors(t *testing.T) {
 	t.Parallel()
 
+	// Arrange
 	want := errors.New("store unavailable")
-	store := testhelper.NewMemoryStore()
-	store.SaveError = want
-	store.LoadError = want
-	service := note.NewService(store)
+	store := &FakeStore{Values: map[string]string{}, SaveErr: want, LoadErr: want}
+	service := note.NewService(store, note.NewKeyComposer("notes"))
 
-	if err := service.Save(context.Background(), note.New("Failure", "body")); !errors.Is(err, want) {
-		t.Fatalf("Save() error = %v, want %v", err, want)
+	// Act
+	_, createErr := service.Create(context.Background(), "Failure", "body")
+	_, loadErr := service.Load(context.Background(), "failure")
+
+	// Assert
+	if !errors.Is(createErr, want) {
+		t.Fatalf("Create() error = %v, want %v", createErr, want)
 	}
-	if _, err := service.Load(context.Background(), "failure"); !errors.Is(err, want) {
-		t.Fatalf("Load() error = %v, want %v", err, want)
+	if !errors.Is(loadErr, want) {
+		t.Fatalf("Load() error = %v, want %v", loadErr, want)
 	}
 }
 

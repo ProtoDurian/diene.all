@@ -7,38 +7,44 @@ downstream nodes.
 
 ## Toolchain
 
-The Nix shells provide Go 1.26.5, golangci-lint, govulncheck, deadcode,
-staticcheck, gofumpt, and gotestsum. Go 1.26.5 is an explicit patch-level
-override of the shared 26.05 package because govulncheck rejects Go 1.26.4 for
-GO-2026-5856. The override remains source-pinned and carries no vulnerability
-exclusion.
+The Nix shells provide Go (from the AtomiCloud registry, which pins the patch
+level), golangci-lint, govulncheck, deadcode, staticcheck, gofumpt and
+gotestsum.
 
 ## Repository shape
 
 - `lib/` contains pure domain packages.
 - `adapters/` contains dependency implementations.
-- Executable descendants use `cmd/<name>/` as their single composition root.
-  Library templates deliberately omit `cmd/` and expose packages only.
+- `testhelper/` ships consumer-facing fakes; there is no `cmd/`: a library has no
+  composition root ([Go library baseline](go-lib-baseline.md)).
 - `tests/unit/` imports domain packages only through their public API.
 - `tests/int/` proves adapters against real dependencies with
   testcontainers-go.
+- `tests/meta/` proves the `testhelper` package through its public API.
 
-The Note/Redis code is a replaceable sample fenced by these structural
-directories. Downstream templates may replace the sample while retaining the
-same gates and tier boundaries.
+The Note/Redis code is a replaceable sample fenced by `DOMAIN WIRING` and
+`END DOMAIN WIRING` comments in every `lib/note/*.go` file,
+`adapters/kv/redis.go`, and `testhelper/memory_store.go`, with matching boundaries in
+`tests/unit/note/note_test.go`, `tests/int/kv/redis_test.go`, and
+`tests/meta/testhelper/memory_store_test.go`. Downstream templates may replace only the bytes
+inside those fences while retaining the same gates and tier boundaries.
 
 ## Commands
 
 - `task setup` installs modules and synchronizes vendored skills.
-- `task build` compiles the repository's Go packages or, in executable
-  descendants, creates their declared artifact.
+- `task build` compiles every package of the module.
 - `task typecheck` compiles source packages without running tests.
-- `task test`, `task test:unit`, and `task test:int` run the tiered suites.
-- `task test:coverage`, `task test:unit:coverage`, and
-  `task test:int:coverage` enforce the scoped ledgers.
-- `task test:watch` watches the unit tier.
-- `task deadcode` runs whole-repository and production-only strict passes, then
-  writes the nonblocking review feed to `reports/deadcode-llm.txt`.
+- `task test`, `task test:unit`, `task test:int`, and `task test:meta` run the
+  tiered suites.
+- `task test:coverage`, `task test:unit:coverage`, `task test:int:coverage`,
+  and `task test:meta:coverage` enforce the scoped ledgers.
+- `task test:unit:watch` watches the unit tier.
+- `task vuln` scans dependencies with govulncheck.
+- `task deadcode:strict` runs the four blocking staticcheck/deadcode passes:
+  whole repository and production only, for each tool.
+- `task deadcode` writes the nonblocking LLM review feed to
+  `reports/deadcode-llm.txt`.
+- `task validate` runs the library gates.
 - `task up` and `task down` manage the local Redis dependency.
 
 There is deliberately no `task dev`: this base is not a long-running server, so
@@ -49,22 +55,24 @@ an Air hot-reload loop would add machinery without a real use case.
 Every `*_test.go` file must declare a package ending in `_test`, and
 `export_test.go` is forbidden. Unit coverage includes only `lib/**` and must be
 100%. Integration coverage includes only `adapters/**` and must be 100% in this
-minimal base. The checked-in ledger is `.config/go-base.coverage.yaml`; Codecov
-flags are informational and carry forward independently.
+minimal base. The checked-in ledger is `.config/go-base.coverage.yaml`. Each tier
+writes its own profile: `coverage/unit/coverage.out`,
+`coverage/int/coverage.out` and `coverage/meta/coverage.out`.
 
 ## Deadcode and vulnerability law
 
-The whole-repository pass runs deadcode with tests enabled and staticcheck with
-test analysis. The production pass disables test reachability so a symbol used
-only by tests fails. Neither pass has an exclusion list. Govulncheck is a
-blocking CI-only job; its negative proof routes a pinned vulnerable fixture
-through a deterministic scanner double, while the healthy path uses the real
-vulnerability database.
+Four independently invoked strict components cover unused code: staticcheck and
+deadcode each run once with test analysis/reachability enabled and once against
+production packages only. The production deadcode component therefore rejects
+a symbol reachable only from tests. None of the components has an exclusion
+list. Govulncheck is a blocking CI-only job; its negative proof routes a pinned
+vulnerable fixture through a deterministic scanner double, while the healthy
+path uses the real vulnerability database.
 
 ## Template-maintenance boundary
 
 Downstream authors may adapt package/module identity, sample domain code,
-coverage thresholds after adding real surface, and README badges. They must
-preserve black-box tests, tier scoping, both deadcode passes, the CI-only
-vulnerability gate, at most one composition root, and generated hook/probe
-coverage.
+coverage thresholds after adding real surface.
+They must preserve black-box tests, tier scoping,
+all four staticcheck/deadcode components, the CI-only vulnerability gate, and
+generated hook/probe coverage.

@@ -1,5 +1,5 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
-import { plantWhiteBoxTest } from './lib/go.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic, plantWhiteBoxTest } from './lib/go.ts';
 
 const gate = 'nix develop .#ci -c pre-commit run a-go-black-box --all-files';
 

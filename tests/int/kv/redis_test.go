@@ -5,12 +5,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/AtomiCloud/diene.go-lib/adapters/kv"
+	"github.com/ProtoDurian/diene.go-lib/adapters/kv"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 func TestRedisStore(t *testing.T) {
+	// Arrange
 	ctx := context.Background()
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
@@ -34,10 +35,13 @@ func TestRedisStore(t *testing.T) {
 		t.Fatalf("resolve Redis endpoint: %v", err)
 	}
 	store := kv.NewRedisStore(endpoint)
+
+	// Act
 	if saveErr := store.Save(ctx, "notes:integration", "connected"); saveErr != nil {
 		t.Fatalf("Save() error = %v", saveErr)
 	}
 	got, err := store.Load(ctx, "notes:integration")
+	// Assert
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}

@@ -1,44 +1,56 @@
 package testhelper_test
 
+// DOMAIN WIRING: replaceable Note sample TestHelper meta tests.
 import (
 	"context"
 	"errors"
 	"testing"
 
-	"github.com/AtomiCloud/diene.go-lib/lib/note"
-	"github.com/AtomiCloud/diene.go-lib/testhelper"
+	"github.com/ProtoDurian/diene.go-lib/lib/note"
+	"github.com/ProtoDurian/diene.go-lib/testhelper"
 )
 
-func TestMemoryStoreContract(t *testing.T) {
+func TestMemoryStoreServesTheService(t *testing.T) {
 	t.Parallel()
 
-	store := testhelper.NewMemoryStore()
-	service := note.NewService(store)
-	want := note.New("Meta Contract", "consumer fake")
+	// Arrange
+	service := note.NewService(testhelper.NewMemoryStore(), note.NewKeyComposer("notes"))
 
-	if err := service.Save(context.Background(), want); err != nil {
-		t.Fatalf("Save() error = %v", err)
+	// Act
+	created, err := service.Create(context.Background(), "Meta Contract", "consumer fake")
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
 	}
-	got, err := service.Load(context.Background(), want.Slug)
+	got, err := service.Load(context.Background(), created.Slug)
+	// Assert
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if got != want {
-		t.Fatalf("Load() = %#v, want %#v", got, want)
+	if got != created {
+		t.Fatalf("Load() = %#v, want %#v", got, created)
 	}
 }
 
-func TestMemoryStoreFailures(t *testing.T) {
+func TestMemoryStoreInjectedFailures(t *testing.T) {
 	t.Parallel()
 
+	// Arrange
 	want := errors.New("injected failure")
 	store := testhelper.NewMemoryStore()
 	store.SaveError = want
-	if err := store.Save(context.Background(), "key", "value"); !errors.Is(err, want) {
-		t.Fatalf("Save() error = %v, want %v", err, want)
-	}
 	store.LoadError = want
-	if _, err := store.Load(context.Background(), "key"); !errors.Is(err, want) {
-		t.Fatalf("Load() error = %v, want %v", err, want)
+
+	// Act
+	saveErr := store.Save(context.Background(), "key", "value")
+	_, loadErr := store.Load(context.Background(), "key")
+
+	// Assert
+	if !errors.Is(saveErr, want) {
+		t.Fatalf("Save() error = %v, want %v", saveErr, want)
+	}
+	if !errors.Is(loadErr, want) {
+		t.Fatalf("Load() error = %v, want %v", loadErr, want)
 	}
 }
+
+// END DOMAIN WIRING
