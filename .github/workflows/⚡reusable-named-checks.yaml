@@ -13,7 +13,5 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
-        with:
-          namespacelabs: 'true'
       - name: Run named checks
         run: nix develop .#ci -c ./scripts/ci/named-checks.sh

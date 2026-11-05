@@ -21,8 +21,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
-        with:
-          namespacelabs: 'true'
       - name: Build and push Helm
         env:
           CHART_PATH: ${{ inputs.chart_path }}
