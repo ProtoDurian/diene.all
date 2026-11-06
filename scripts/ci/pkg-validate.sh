@@ -19,16 +19,33 @@ trap 'rm -rf "${scratch}"' EXIT
 
 echo "🧪 Restoring both packages into a scratch consumer..."
 dotnet new console --framework net10.0 --no-restore --output "${scratch}" >/dev/null
-dotnet add "${scratch}" package AtomiCloud.Diene.Note --version "${version}" --source "$(pwd)/${artifacts}" --no-restore >/dev/null
-dotnet add "${scratch}" package AtomiCloud.Diene.Note.TestHelper --version "${version}" --source "$(pwd)/${artifacts}" --no-restore >/dev/null
+dotnet add "${scratch}" package AtomiCloud.Diene.Result --version "${version}" --source "$(pwd)/${artifacts}" --no-restore >/dev/null
+dotnet add "${scratch}" package AtomiCloud.Diene.Result.TestHelper --version "${version}" --source "$(pwd)/${artifacts}" --no-restore >/dev/null
 printf '%s\n' \
-  'using AtomiCloud.Diene.Note;' \
-  'using AtomiCloud.Diene.Note.TestHelper.Note;' \
+  'using AtomiCloud.Diene.Results;' \
+  'using AtomiCloud.Diene.Results.TestHelper;' \
   '' \
-  'var subject = new NoteSummariser();' \
-  'var note = new NoteRecord { Title = "Hello", Body = "world" };' \
-  'subject.AssertSummary(note, 80, "Hello — world");' >"${scratch}/Program.cs"
-dotnet restore "${scratch}" --source "$(pwd)/${artifacts}" --packages "${scratch}/packages" >/dev/null
+  'var result = Result.Ok<int, string>(42);' \
+  'result.Should().BeOk(42);' >"${scratch}/Program.cs"
+cat >"${scratch}/nuget.config" <<EOF
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="local" value="$(pwd)/${artifacts}" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="local">
+      <package pattern="AtomiCloud.Diene.Result" />
+      <package pattern="AtomiCloud.Diene.Result.TestHelper" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+EOF
+dotnet restore "${scratch}" --packages "${scratch}/packages" >/dev/null
 dotnet build "${scratch}" -c Release --no-restore >/dev/null
 
 echo "✅ Package validation and scratch consumption passed"
