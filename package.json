@@ -50,8 +50,8 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@atomicloud/diene.interfaces": "1.0.0",
-    "@atomicloud/diene.result": "1.0.2",
+    "@atomicloud/diene.interfaces": "^1.0.0",
+    "@atomicloud/diene.result": "^1.0.2",
     "@js-temporal/polyfill": "^0.5.1"
   },
   "devDependencies": {
