@@ -5,7 +5,7 @@ parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ shared .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 
-topics='datetime|domain-driven-design|functional-practices|solid-principles|stateless-oop-di|testing|utilities|validation'
+topics='datetime|domain-driven-design|functional-practices|solid-principles|stateless-oop-di|testing|utilities|validation|wire-format'
 projects='(App|Lib|UnitTest|IntTest)[A-Za-z0-9]*/[^/]+\.(cs|csproj)|(App|Lib|UnitTest|IntTest)[A-Za-z0-9]*/.+/[^/]+\.cs'
 config='dotnet-base\.slnx|global\.json|Directory\.(Build|Packages)\.props|\.config/dotnet-(base\.test\.yaml|tools\.json)'
 scripts='scripts/ci/(build|test|dead-code)\.sh|scripts/local/(build|dotnet-dead-code|dotnet-test)\.sh|scripts/release/bump\.sh'
