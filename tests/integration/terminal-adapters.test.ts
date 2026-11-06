@@ -15,15 +15,18 @@ describe('terminal and system adapters', () => {
   });
 
   it('should route presentation output and exit state through ConsoleIo', () => {
+    // Arrange
     const log = spyOn(console, 'log').mockImplementation(() => undefined);
     const error = spyOn(console, 'error').mockImplementation(() => undefined);
     const subject = new ConsoleIo();
 
+    // Act
     subject.success('saved');
     subject.warn('careful');
     subject.error('failed');
     subject.setExitCode(7);
 
+    // Assert
     expect(log).toHaveBeenCalledTimes(2);
     expect(error).toHaveBeenCalledTimes(1);
     expect(process.exitCode).toBe(7);
@@ -31,6 +34,7 @@ describe('terminal and system adapters', () => {
   });
 
   it('should delegate progress state to cli-progress', () => {
+    // Arrange
     const events: string[] = [];
     const bar = {
       start: (total: number, current: number) => events.push(`start:${total}:${current}`),
@@ -39,14 +43,17 @@ describe('terminal and system adapters', () => {
     } as unknown as SingleBar;
     const subject = new CliProgressBar(bar);
 
+    // Act
     subject.start(3);
     subject.tick();
     subject.stop();
 
+    // Assert
     expect(events).toEqual(['start:3:0', 'tick', 'stop']);
   });
 
   it('should delegate live status to ora', () => {
+    // Arrange
     const events: string[] = [];
     const spinner = {
       start: (text: string) => events.push(`start:${text}`),
@@ -55,14 +62,17 @@ describe('terminal and system adapters', () => {
     } as unknown as Ora;
     const subject = new OraSpinner(spinner);
 
+    // Act
     subject.start('working');
     subject.succeed('done');
     subject.fail('failed');
 
+    // Assert
     expect(events).toEqual(['start:working', 'succeed:done', 'fail:failed']);
   });
 
   it('should delegate questions to inquirer and return the answer', async () => {
+    // Arrange
     const client = {
       prompt: async (questions: ReadonlyArray<Record<string, unknown>>) => {
         expect(questions).toEqual([{ type: 'input', name: 'answer', message: 'value?' }]);
@@ -70,10 +80,18 @@ describe('terminal and system adapters', () => {
       },
     } as unknown as Pick<typeof inquirer, 'prompt'>;
 
-    expect(await new InquirerPrompt(client).ask('value?')).toBe('chosen');
+    // Act
+    const answer = await new InquirerPrompt(client).ask('value?');
+
+    // Assert
+    expect(answer).toBe('chosen');
   });
 
   it('should report the host platform through BunShell', async () => {
-    expect(await new BunShell().platform()).toMatch(/\S+/);
+    // Act
+    const platform = await new BunShell().platform();
+
+    // Assert
+    expect(platform).toMatch(/\S+/);
   });
 });

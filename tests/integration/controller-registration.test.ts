@@ -14,33 +14,34 @@ function program(): Command {
 
 describe('controller registration', () => {
   it('should bind each controller action to its handler', async () => {
+    // Arrange
     const store = new FakeKeyValueStore({ 'demo:key': 'found' });
     const kv = new KvService(store);
-
     const setIo = captureIo();
     const setProgram = program();
     new SetController(kv, setIo).register(setProgram);
-    await setProgram.parseAsync(['bun', 'bun-cli', 'set', 'demo', 'key', 'value']);
-    expect(setIo.exitCodes).toEqual([0]);
-
     const getIo = captureIo();
     const getProgram = program();
     new GetController(kv, getIo, new FakePrompt('key'), false).register(getProgram);
-    await getProgram.parseAsync(['bun', 'bun-cli', 'get', 'demo', 'key']);
-    expect(getIo.exitCodes).toEqual([0]);
-
     const seedIo = captureIo();
     const seedProgram = program();
     new SeedController(kv, seedIo, captureProgress()).register(seedProgram);
-    await seedProgram.parseAsync(['bun', 'bun-cli', 'seed', 'demo', '1']);
-    expect(seedIo.exitCodes).toEqual([0]);
-
     const doctorIo = captureIo();
     const doctorProgram = program();
     new DoctorController(new DoctorService(store, new FakeShell('linux')), doctorIo, captureSpinner()).register(
       doctorProgram,
     );
+
+    // Act
+    await setProgram.parseAsync(['bun', 'bun-cli', 'set', 'demo', 'key', 'value']);
+    await getProgram.parseAsync(['bun', 'bun-cli', 'get', 'demo', 'key']);
+    await seedProgram.parseAsync(['bun', 'bun-cli', 'seed', 'demo', '1']);
     await doctorProgram.parseAsync(['bun', 'bun-cli', 'doctor']);
+
+    // Assert
+    expect(setIo.exitCodes).toEqual([0]);
+    expect(getIo.exitCodes).toEqual([0]);
+    expect(seedIo.exitCodes).toEqual([0]);
     expect(doctorIo.exitCodes).toEqual([0]);
   });
 });
