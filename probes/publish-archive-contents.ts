@@ -1,15 +1,15 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-const PUBIGNORE = 'packages/diene_dart_lib/.pubignore';
+const PUBIGNORE = 'packages/diene_result/.pubignore';
 const SHIPPED = [
-  'diene_dart_lib.dart',
+  'diene_result.dart',
   'test_helper.dart',
-  'diene_dart_lib.md',
+  'diene_result.md',
   'LICENSE',
   'CHANGELOG.md',
   'README.md',
-  'diene_dart_lib_example.dart',
-  'diene-dart-lib-usage',
+  'diene_result_example.dart',
+  'diene-result-usage',
   'SKILL.md',
   'patterns.md',
 ];
@@ -17,7 +17,7 @@ const EXCLUDED = ['test', 'tool', 'deadcode_entrypoints.dart', 'c0_conformance_t
 
 // The dry-run listing is a tree; match whole leaf names, with or without a size suffix.
 const ARCHIVE_CHECK =
-  "nix develop .#ci -c bash -c 'set -euo pipefail; cd packages/diene_dart_lib; " +
+  "nix develop .#ci -c bash -c 'set -euo pipefail; cd packages/diene_result; " +
   'listing=$(dart pub publish --dry-run --skip-validation 2>&1); ' +
   `for f in ${SHIPPED.join(' ')}; do printf "%s\\n" "$listing" | grep -Eq "─ $f( \\(|\\$)" || { echo "archive is missing $f" >&2; exit 1; }; done; ` +
   `for f in ${EXCLUDED.join(' ')}; do if printf "%s\\n" "$listing" | grep -Eq "─ $f( \\(|\\$)"; then echo "archive ships $f" >&2; exit 1; fi; done'`;
@@ -45,7 +45,7 @@ export default {
         await withCleanProbeState(repo, [PUBIGNORE], async () => {
           await repo.write(PUBIGNORE, `${await repo.read(PUBIGNORE)}/skills/\n`);
           await expectRedBecause(repo, ARCHIVE_CHECK, 'publish-archive-contents', [
-            'archive is missing diene-dart-lib-usage',
+            'archive is missing diene-result-usage',
           ]);
         });
       },

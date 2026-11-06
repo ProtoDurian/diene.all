@@ -87,7 +87,7 @@ pre-commit-lib.run {
       enable = true;
       name = "Dart format";
       entry = "${packages.dart}/bin/dart format --output=none --set-exit-if-changed";
-      files = "^packages/diene_dart_lib/(lib|test|example|tool)/.*\\.dart$";
+      files = "^packages/diene_result/(lib|test|example|tool)/.*\\.dart$";
       pass_filenames = true;
       language = "system";
     };

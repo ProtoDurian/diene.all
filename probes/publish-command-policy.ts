@@ -1,7 +1,7 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
 const PUBLISH_SH = 'scripts/ci/publish.sh';
-const MEMBER_PUBSPEC = 'packages/diene_dart_lib/pubspec.yaml';
+const MEMBER_PUBSPEC = 'packages/diene_result/pubspec.yaml';
 const STUB_DIR = '.probe-publish-stub';
 // A recording `dart` stands in for the real one, so nothing is ever uploaded.
 const STUB = '#!/usr/bin/env bash\nprintf \'%s|%s\\n\' "$(pwd -P)" "$*" >>"$PROBE_DART_CALLS"\n';
@@ -14,7 +14,7 @@ function publishCheck(version: string): string {
     'if grep -q "pub publish" "$PROBE_DART_CALLS" 2>/dev/null; then echo "publish ran before the version guard" >&2; exit 1; fi; ' +
     `./scripts/ci/publish.sh v${version} >/dev/null; ` +
     'last=$(tail -n 1 "$PROBE_DART_CALLS"); ' +
-    '[ "$last" = "$root/packages/diene_dart_lib|pub publish --force" ] || { echo "publish ran as: $last" >&2; exit 1; }\''
+    '[ "$last" = "$root/packages/diene_result|pub publish --force" ] || { echo "publish ran as: $last" >&2; exit 1; }\''
   );
 }
 
@@ -52,7 +52,7 @@ export default {
       async run(repo: any) {
         await withStub(repo, [PUBLISH_SH], async version => {
           await repo.patch(PUBLISH_SH, {
-            find: 'cd "${root_dir}/packages/diene_dart_lib"',
+            find: 'cd "${root_dir}/packages/diene_result"',
             replace: 'cd "${root_dir}"',
           });
           await expectRedBecause(repo, publishCheck(version), 'publish-command-policy', ['publish ran as:']);
