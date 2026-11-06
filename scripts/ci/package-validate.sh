@@ -4,19 +4,19 @@ set -euo pipefail
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
-./scripts/ci/setup.sh
+dart pub get
 ./scripts/validate/dart-package.sh
 ./scripts/validate/release-policy.sh
 
-# pub.dev dry-run and pana score run against the publishable member.
-cd "${root_dir}/packages/diene_result"
+cd "${root_dir}/packages/diene_dart_lib"
 
-echo "📦 Running pub.dev publish dry-run..."
+echo "📦 Building pub.dev dry-run archive..."
 dart pub publish --dry-run --skip-validation
 
+echo "📚 Generating Dart API documentation..."
+dart doc --dry-run
+
 echo "📊 Running pana package analysis..."
-pana_args=(--exit-code-threshold 0)
-[[ -n ${PUB_HOSTED_URL:-} ]] && pana_args+=(--hosted-url "${PUB_HOSTED_URL}")
-dart run pana "${pana_args[@]}" .
+"${root_dir}/scripts/validate/pana-score.sh"
 
 echo "✅ Dart package validation passed"

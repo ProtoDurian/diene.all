@@ -2,7 +2,6 @@
 with packages;
 {
   dev = [
-    dart
     git
     go-task
     infisical
@@ -25,6 +24,7 @@ with packages;
     git
     go-task
     infisical
+    releaser
     shellcheck
   ];
 

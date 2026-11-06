@@ -1,42 +1,42 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-// Gate: the C0 conformance harness (`dart test test/conformance`) recomputes
-// the frozen Result projection digest and compares it with SHA256SUMS.
-// Sabotage corrupts that digest and proves the harness detects the drift.
-const MEMBER = 'packages/diene_result';
-const CONFORMANCE =
-  "nix develop .#ci --no-write-lock-file -c bash -lc 'cd packages/diene_result && dart test test/conformance'";
-const CHECKSUM = `${MEMBER}/test/fixtures/c0/SHA256SUMS`;
+const HARNESS = "nix develop .#ci -c bash -c 'cd packages/diene_dart_lib && dart test test/conformance'";
 
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: {
-    post: ['nix develop .#ci --no-write-lock-file -c dart pub get --offline'],
-  },
+  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
   probes: [
     {
       name: 'baseline-c0-fixture-harness-green',
-      description: 'dart test test/conformance passes with the frozen projection checksum',
+      description: 'the C0 harness verifies the pinned fixture checksums and round-trips each fixture',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, CONFORMANCE, 'c0-fixture-harness');
+        await expectGreen(repo, HARNESS, 'c0-fixture-harness');
       },
     },
     {
       name: 'mutation-c0-fixture-harness-caught',
-      description: 'the conformance harness fails once a fixture digest is corrupted',
+      description: 'the C0 harness fails once one pinned fixture digest is corrupted',
       kind: 'mutation',
-      expectedImpact: ['unit-coverage-ledger'],
+      expectedImpact: [],
       async run(repo: any) {
-        const ledger = await repo.read(CHECKSUM);
-        const digest = ledger.match(/^[0-9a-f]{64}/)?.[0];
-        if (!digest) {
-          throw new Error('c0-fixture-harness: SHA256SUMS has no fixture digest');
+        const target = (await repo.glob('packages/*/test/fixtures/c0/manifest.json')).sort()[0];
+        if (!target) {
+          throw new Error('c0-fixture-harness: no fixture manifest to sabotage');
         }
-        const corrupted = (digest[0] === '0' ? '1' : '0') + digest.slice(1);
-        await repo.write(CHECKSUM, ledger.replace(digest, corrupted));
-        await expectRed(repo, CONFORMANCE, 'c0-fixture-harness');
+        await withCleanProbeState(repo, [target], async () => {
+          const manifest = JSON.parse(await repo.read(target));
+          const entries = manifest.fixtures ?? {};
+          const first = Object.keys(entries).sort()[0];
+          if (!first) {
+            throw new Error('c0-fixture-harness: fixture manifest has no entries');
+          }
+          const digest = String(entries[first]);
+          entries[first] = (digest[0] === '0' ? '1' : '0') + digest.slice(1);
+          await repo.write(target, `${JSON.stringify(manifest, null, 2)}\n`);
+          await expectRedBecause(repo, HARNESS, 'c0-fixture-harness', ['digest drifted from the manifest']);
+        });
       },
     },
   ],

@@ -19,7 +19,7 @@ let
           ;
       }
     );
-    nix-unstable = (with pkgs-unstable; { });
+
     nix-2605 = (
       with pkgs-2605;
       {
@@ -35,7 +35,8 @@ let
           ;
       }
     );
-    dart-lib-packages = (
+
+    nix-unstable = (
       with pkgs-unstable;
       {
         dart = flutter.dart;
@@ -44,4 +45,4 @@ let
   };
 in
 with all;
-nix-2605 // nix-unstable // atomipkgs // dart-lib-packages
+atomipkgs // nix-2605 // nix-unstable
