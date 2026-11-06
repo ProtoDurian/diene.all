@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Nothing of H survives in the files; the many-owner files still parse and lint.
-# Binaries are not checked (owner !A103): the bundles keep helm on PATH.
+# Binaries are not checked (owner ruling): the bundles keep helm on PATH.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible

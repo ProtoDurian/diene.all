@@ -110,7 +110,7 @@ apply_H() {
   # shellcheck disable=SC2016
   edit docs/developer/bun-baseline.md sed_e '/^- `task helm:lint` and `task helm:template` retain the inherited Helm axis\.$/d;s/^- Unit, integration, build, Docker, and Helm are separate CI jobs\.$/- Unit, integration, build, and Docker are separate CI jobs./'
 
-  # owner !A103: nix keeps the whole infralint + infrautils bundles; only prose loses its Helm words.
+  # Owner ruling: nix keeps the whole infralint + infrautils bundles; only prose loses its Helm words.
   edit docs/standards/ci-cd/index.md sed_z 's#The Docker and Helm scripts build#The Docker scripts build#;s#Docker and Helm callers pass per-repository image or chart values#Docker callers pass per-repository image values#;s#Add another image or chart as another caller job#Add another image as another caller job#'
   edit README.md sed_e 's/split CI\/CD, Docker, Helm, secrets,/split CI\/CD, Docker, secrets,/'
   edit docs/standards/taskfile/index.md sed_e 's/^5\. Put repository-specific image and chart values in Taskfile/5. Put repository-specific image values in Taskfile/'
