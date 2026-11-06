@@ -13,7 +13,9 @@ builds:
       - linux-arm64
       - darwin-arm64
       - windows-x64-baseline
+    # Setting flags replaces the builder default, so --compile must stay listed.
     flags:
+      - --compile
       - --minify
 
 archives:
