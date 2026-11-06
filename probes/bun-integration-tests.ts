@@ -6,7 +6,7 @@ export default {
   probes: [
     {
       name: 'baseline-bun-integration-tests-green',
-      description: 'The Bun integration tier proves the Redis adapter with Testcontainers.',
+      description: 'The Bun integration tier proves the Postgres adapters with Testcontainers.',
       kind: 'baseline',
       async run(repo: any) {
         await expectBunGreen(
@@ -25,10 +25,10 @@ export default {
         const paths = await repo.glob('src/adapters/**/*.ts');
         for (const path of paths) {
           const source = await repo.read(path);
-          if (source.includes('return this.client.get(key);')) {
+          if (source.includes('return rows[0]?.value;')) {
             await repo.write(
               path,
-              source.replace('return this.client.get(key);', 'return key.length === 0 ? this.client.get(key) : null;'),
+              source.replace('return rows[0]?.value;', 'return key.length === 0 ? rows[0]?.value : undefined;'),
             );
             await expectBunRed(
               repo,
@@ -38,7 +38,7 @@ export default {
             return;
           }
         }
-        throw new Error('no structural Redis adapter target found');
+        throw new Error('no structural cache adapter target found');
       },
     },
   ],
