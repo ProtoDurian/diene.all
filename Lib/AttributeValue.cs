@@ -31,7 +31,7 @@ public enum AttributeValueKind
 /// One structured attribute attached to a log or metric record. The value is
 /// stored in its C0 wire form, so a record that round-trips through a transport
 /// is byte-identical to the record that was emitted, and every date, time,
-/// duration, and timezone obeys the R14 serialization contract.
+/// duration, and timezone obeys the C0 serialization contract.
 /// </summary>
 public readonly struct AttributeValue : IEquatable<AttributeValue>
 {

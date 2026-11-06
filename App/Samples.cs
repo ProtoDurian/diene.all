@@ -2,16 +2,10 @@ using AtomiCloud.DotnetBase.App.Adapters;
 
 namespace AtomiCloud.DotnetBase.App;
 
-/// <summary>
-/// Exercises the full published surface of <c>AtomiCloud.Diene.Interfaces</c> as an
-/// in-repo consumer. Each method is a compilable usage example; most results are
-/// discarded because the demonstration is the call itself, not its output.
-/// </summary>
 public static class Samples
 {
     private static readonly DateTimeOffset Anchor = new(2026, 7, 25, 22, 30, 0, TimeSpan.Zero);
 
-    /// <summary>Runs every demonstration.</summary>
     public static void RunAll()
     {
         Errors();

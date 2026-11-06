@@ -4,10 +4,10 @@ using System.Xml;
 namespace AtomiCloud.Diene.Interfaces;
 
 /// <summary>
-/// The C0 wire contract for seam values (R14): instants are RFC 3339 / ISO 8601
+/// The C0 wire contract for seam values: instants are RFC 3339 / ISO 8601
 /// in UTC, durations are ISO 8601 durations, timezones are IANA ids, and every
 /// enumeration has one stable lowercase wire name shared with the bun, dart, and
-/// go members of the same S33 interfaces family.
+/// go members of the same interfaces family.
 /// </summary>
 public static class SeamWire
 {

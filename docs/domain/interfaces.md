@@ -1,6 +1,6 @@
 # Shared seams
 
-`AtomiCloud.Diene.Interfaces` is the .NET member of the S33 cross-family
+`AtomiCloud.Diene.Interfaces` is the .NET member of the cross-family
 common-interfaces library. It DECLARES seams and ships mocks; it contains no
 concrete host implementation.
 
@@ -41,7 +41,7 @@ shipped contract suites against a real host.
 
 ## Wire contract
 
-`SeamWire` and `AttributeValue` carry the C0 serialization contract (R14):
+`SeamWire` and `AttributeValue` carry the C0 serialization contract:
 
 - instants are RFC 3339 in UTC (`yyyy-MM-ddTHH:mm:ss.fffffffZ`);
 - durations are ISO 8601 (`PT1M30S`);

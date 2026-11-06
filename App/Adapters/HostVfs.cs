@@ -2,18 +2,11 @@ using System.Text;
 
 namespace AtomiCloud.DotnetBase.App.Adapters;
 
-/// <summary>
-/// The host-backed reference <see cref="IVfs"/> over <c>System.IO</c>. It converts
-/// every filesystem condition into a <see cref="SeamError"/> value and never lets
-/// an exception escape, which is the S33 rule the shipped contract suite checks.
-/// </summary>
 public sealed class HostVfs : IVfs
 {
-    /// <inheritdoc />
     public Task<Result<bool, SeamError>> Exists(string path, CancellationToken cancellationToken = default) =>
         Task.FromResult(Guarded<bool>(path, "exists", cancellationToken, full => File.Exists(full) || Directory.Exists(full)));
 
-    /// <inheritdoc />
     public async Task<Result<ReadOnlyMemory<byte>, SeamError>> ReadBytes(
         string path,
         CancellationToken cancellationToken = default)
@@ -37,14 +30,12 @@ public sealed class HostVfs : IVfs
         }
     }
 
-    /// <inheritdoc />
     public async Task<Result<string, SeamError>> ReadText(string path, CancellationToken cancellationToken = default)
     {
         var bytes = await ReadBytes(path, cancellationToken).ConfigureAwait(false);
         return bytes.Map(value => Encoding.UTF8.GetString(value.Span));
     }
 
-    /// <inheritdoc />
     public async Task<Result<Unit, SeamError>> WriteBytes(
         string path,
         ReadOnlyMemory<byte> bytes,
@@ -76,7 +67,6 @@ public sealed class HostVfs : IVfs
         }
     }
 
-    /// <inheritdoc />
     public Task<Result<Unit, SeamError>> WriteText(
         string path,
         string content,
@@ -87,7 +77,6 @@ public sealed class HostVfs : IVfs
         return WriteBytes(path, Encoding.UTF8.GetBytes(content), options, cancellationToken);
     }
 
-    /// <inheritdoc />
     public Task<Result<IReadOnlyList<VfsEntry>, SeamError>> List(
         string path,
         VfsListOptions options = default,
@@ -128,7 +117,6 @@ public sealed class HostVfs : IVfs
         }
     }
 
-    /// <inheritdoc />
     public Task<Result<Unit, SeamError>> CreateDirectory(
         string path,
         VfsDirectoryOptions options = default,
@@ -162,7 +150,6 @@ public sealed class HostVfs : IVfs
         }
     }
 
-    /// <inheritdoc />
     public Task<Result<Unit, SeamError>> Delete(
         string path,
         VfsDirectoryOptions options = default,

@@ -2,16 +2,8 @@ using System.Security;
 
 namespace AtomiCloud.DotnetBase.App.Adapters;
 
-/// <summary>
-/// The host-backed reference <see cref="ISystem"/>. It lives in the non-packable
-/// demo consumer, not in the shipped library: under the S33 boundary the
-/// interfaces package declares seams and ships mocks, while every concrete host
-/// adapter belongs to the consumer that owns its runtime. It exists here so the
-/// integration tier can run the shipped contract suite against a REAL host.
-/// </summary>
 public sealed class HostSystem : ISystem
 {
-    /// <inheritdoc />
     public Result<Option<string>, SeamError> Environment(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -30,7 +22,6 @@ public sealed class HostSystem : ISystem
         }
     }
 
-    /// <inheritdoc />
     public Result<string, SeamError> CurrentDirectory()
     {
         try
@@ -43,10 +34,8 @@ public sealed class HostSystem : ISystem
         }
     }
 
-    /// <inheritdoc />
     public Result<DateTimeOffset, SeamError> NowUtc() => Result.Ok<DateTimeOffset, SeamError>(DateTimeOffset.UtcNow);
 
-    /// <inheritdoc />
     public async Task<Result<Unit, SeamError>> Delay(TimeSpan duration, CancellationToken cancellationToken = default)
     {
         try

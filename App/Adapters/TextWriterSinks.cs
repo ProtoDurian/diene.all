@@ -1,15 +1,7 @@
 namespace AtomiCloud.DotnetBase.App.Adapters;
 
-/// <summary>
-/// A host-backed reference <see cref="ILoggerSink"/> writing rendered records to a
-/// <see cref="TextWriter"/>. <c>AtomiCloud.Diene.Otel</c> ships the real telemetry
-/// implementation; this demo adapter exists so the integration tier can run the
-/// shipped logger contract against something that performs real IO.
-/// </summary>
-/// <param name="writer">The destination writer.</param>
 public sealed class TextWriterLoggerSink(TextWriter writer) : ILoggerSink
 {
-    /// <inheritdoc />
     public Result<Unit, SeamError> Emit(LogRecord record)
     {
         if (record is null)
@@ -41,15 +33,8 @@ public sealed class TextWriterLoggerSink(TextWriter writer) : ILoggerSink
     }
 }
 
-/// <summary>
-/// A host-backed reference <see cref="IMetricsCollector"/> writing rendered samples
-/// to a <see cref="TextWriter"/>, for the same reason as
-/// <see cref="TextWriterLoggerSink"/>.
-/// </summary>
-/// <param name="writer">The destination writer.</param>
 public sealed class TextWriterMetricsCollector(TextWriter writer) : IMetricsCollector
 {
-    /// <inheritdoc />
     public Result<Unit, SeamError> Emit(MetricRecord record)
     {
         if (record is null)

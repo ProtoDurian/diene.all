@@ -3,14 +3,8 @@ using System.Diagnostics;
 
 namespace AtomiCloud.DotnetBase.App.Adapters;
 
-/// <summary>
-/// The host-backed reference <see cref="ITerminal"/> over <c>System.Diagnostics</c>.
-/// A non-zero exit code is a successful <see cref="TerminalOutput"/>; only a launch
-/// failure becomes <see cref="SeamErrors.LaunchFailed"/>.
-/// </summary>
 public sealed class HostTerminal : ITerminal
 {
-    /// <inheritdoc />
     public async Task<Result<TerminalOutput, SeamError>> Run(
         TerminalCommand command,
         CancellationToken cancellationToken = default)
