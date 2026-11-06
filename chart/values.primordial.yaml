@@ -1,0 +1,8 @@
+serviceTree:
+  landscape: primordial
+
+upstream:
+  commonLabels:
+    atomi.cloud/landscape: primordial
+  podLabels:
+    atomi.cloud/landscape: primordial

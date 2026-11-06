@@ -1,358 +1,280 @@
 #!/usr/bin/env bash
-# Xenon unit-tier validation (materialized chart product — no probe matrix).
-# One mode per independently invoked mechanism; the CI orchestrator calls them in order.
+# shellcheck disable=SC2016 # jq programs are single-quoted on purpose
 set -euo pipefail
 
 mode="${1:-}"
 release="${RELEASE:-xenon}"
-namespace="${NAMESPACE:-sample}"
-matrix_json="$(yq -o=json '.' chart/toggle-map.yaml)"
+namespace="${NAMESPACE:-metrics}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 
 [ -z "${mode}" ] && echo "❌ validation mode not set" >&2 && exit 1
 
+landscapes='["primordial","lapras","ditto","rotom","absol","eevee","castform","serving"]'
+expected='{"primordial":"ON","lapras":"OFF","ditto":"OFF","rotom":"OFF","absol":"OFF","eevee":"ON","castform":"ON","serving":"per-cluster"}'
+stacks=("")
+for l in $(jq -r '.[]' <<<"${landscapes}"); do stacks+=("--values chart/values.${l}.yaml"); done
+full=(--values chart/values.serving.yaml --values chart/values.canary.yaml)
+stacks+=("${full[*]}")
+objects='["APIService/v1beta1.metrics.k8s.io","ClusterRole/system:upstream-aggregated-reader","ClusterRole/system:xenon-metrics","ClusterRoleBinding/system:xenon-metrics","ClusterRoleBinding/xenon-metrics:system:auth-delegator","Deployment/xenon-metrics","RoleBinding/xenon-metrics-auth-reader","Service/xenon-metrics","ServiceAccount/xenon-metrics"]'
+
+render() {
+  local chart="$1"
+  shift
+  helm template "${release}" "${chart}" --namespace "${namespace}" "$@"
+}
+
+json() { yq eval-all -o=json '.' "$1" | jq -s 'map(select(.kind != null))'; }
+
+need_jq() {
+  local reason="$1"
+  shift
+  jq -e "$@" >/dev/null || { echo "❌ ${reason}" >&2 && return 1; }
+}
+
+expect_red() {
+  local label="$1" pattern="$2"
+  shift 2
+  if "$@" >"${tmp}/red.txt" 2>&1; then
+    echo "❌ negative fixture '${label}' was not caught" >&2 && exit 1
+  fi
+  rg -q -- "${pattern}" "${tmp}/red.txt" || { echo "❌ negative fixture '${label}' failed for the wrong reason" >&2 && cat "${tmp}/red.txt" >&2 && exit 1; }
+}
+
+expect_refusal() {
+  local pattern="$1"
+  shift
+  expect_red "refusal: $*" "${pattern}" render chart "$@"
+}
+
+copy_tree() {
+  mkdir -p "$1"
+  cp -a chart "$1/"
+}
+
+state_of() {
+  local file="$1" deployments
+  deployments="$(json "${file}" | jq '[.[] | select(.kind == "Deployment")] | length')"
+  if [ "${deployments}" = 1 ]; then
+    json "${file}" | need_jq 'an ON render is not exactly the metrics-server object set' --argjson want "${objects}" '(map(.kind + "/" + .metadata.name) | sort) == $want' || return 1
+    echo ON
+  elif [ "$(json "${file}" | jq length)" = 0 ]; then
+    echo OFF
+  else
+    echo "❌ ${file} renders objects but no single metrics-server Deployment" >&2 && return 1
+  fi
+}
+
+# Toggle map (chart/toggle-map.yaml) == goal baseline == overlays' real render == README matrix.
+toggle_check() {
+  local dir="$1" map overlays l state fact enabled
+  map="$(yq -o=json '.' "${dir}/toggle-map.yaml")"
+  need_jq 'toggle map landscapes are not exactly the eight defined landscapes' --argjson want "${landscapes}" '[.landscapes[].landscape] == $want' <<<"${map}" || return 1
+  need_jq 'toggle map differs from the expected baseline (OFF lapras/ditto/rotom/absol, ON primordial/eevee/castform, serving per cluster)' --argjson want "${expected}" '(.landscapes | map({(.landscape): .xenon}) | add) == $want' <<<"${map}" || return 1
+  need_jq 'a toggle map row is not ON exactly when no built-in provider is declared' '
+    all(.landscapes[] | select(.landscape != "serving"); (.builtInMetricsProvider | type) == "boolean" and .xenon == (if .builtInMetricsProvider then "OFF" else "ON" end))' <<<"${map}" || return 1
+  need_jq 'an enabled serving substrate declares a built-in provider (duplicate provider)' '
+    (.servingSubstrates | length) > 0 and
+    all(.servingSubstrates[]; (.builtInMetricsProvider | type) == "boolean" and .xenon == (if .builtInMetricsProvider then "OFF" else "ON" end))' <<<"${map}" || return 1
+  overlays="$(for f in "${dir}"/values.*.yaml; do yq -r '.serviceTree.landscape // ""' "${f}"; done | rg -v '^$' | jq -Rsc 'split("\n") | map(select(. != "")) | sort')"
+  [ "${overlays}" = "$(jq -c sort <<<"${landscapes}")" ] || { echo "❌ landscape overlays ${overlays} are not exactly the eight defined landscapes" >&2 && return 1; }
+  for l in $(jq -r '.[]' <<<"${landscapes}"); do
+    [ "$(yq -r '.serviceTree.landscape' "${dir}/values.${l}.yaml")" = "${l}" ] || { echo "❌ values.${l}.yaml is not the ${l} overlay" >&2 && return 1; }
+    [ "$(jq -r --arg l "${l}" '.landscapes[] | select(.landscape == $l) | .overlay' <<<"${map}")" = "values.${l}.yaml" ] || { echo "❌ toggle map row ${l} does not name values.${l}.yaml" >&2 && return 1; }
+    if [ "${l}" = serving ]; then
+      while IFS=$'\t' read -r sub fact want; do
+        enabled=true
+        [ "${fact}" = true ] && enabled=false
+        render "${dir}" --values "${dir}/values.serving.yaml" --set "builtInMetricsProvider=${fact}" --set "upstream.enabled=${enabled}" >"${tmp}/toggle.yaml" || return 1
+        state="$(state_of "${tmp}/toggle.yaml")" || return 1
+        [ "${state}" = "${want}" ] || { echo "❌ serving substrate ${sub} renders ${state}, expected ${want}" >&2 && return 1; }
+      done < <(jq -r '.servingSubstrates[] | [.substrate, .builtInMetricsProvider, .xenon] | @tsv' <<<"${map}")
+      [ "$(yq -r '.builtInMetricsProvider' "${dir}/values.serving.yaml")" = false ] || { echo "❌ values.serving.yaml does not declare the serving default builtInMetricsProvider=false" >&2 && return 1; }
+      continue
+    fi
+    render "${dir}" --values "${dir}/values.${l}.yaml" >"${tmp}/toggle.yaml" || return 1
+    state="$(state_of "${tmp}/toggle.yaml")" || return 1
+    want="$(jq -r --arg l "${l}" '.[$l]' <<<"${expected}")"
+    [ "${state}" = "${want}" ] || { echo "❌ ${l} renders xenon ${state}, expected ${want}" >&2 && return 1; }
+    fact="$(yq -r '.builtInMetricsProvider' "${dir}/values.${l}.yaml")"
+    [ "${fact}" = null ] && fact="$(yq -r '.builtInMetricsProvider' "${dir}/values.yaml")"
+    [ "${fact}" = "$(jq -r --arg l "${l}" '.landscapes[] | select(.landscape == $l) | .builtInMetricsProvider' <<<"${map}")" ] ||
+      { echo "❌ ${l} overlay declares builtInMetricsProvider=${fact}, the toggle map disagrees" >&2 && return 1; }
+  done
+  rows="$(rg -o '^\| ([a-z]+) \| [^|]+ \| [^|]+ \| (ON|OFF|per cluster) \|' -r '$1 $2' "${dir}/README.md" | jq -Rsc 'split("\n") | map(select(. != "") | split(" ") | {(.[0]): (if .[1] == "per" then "per-cluster" else .[1] end)}) | add')"
+  [ "${rows}" = "$(jq -c . <<<"${expected}")" ] || { echo "❌ README needed/provided matrix rows ${rows} differ from the toggle map" >&2 && return 1; }
+  subs="$(rg -o '^\| ([A-Za-z -]+) \| [^|]+ \| (ON|OFF) \|$' -r '$1|$2' "${dir}/README.md" | jq -Rsc 'split("\n") | map(select(. != "") | split("|") | {substrate: .[0], xenon: .[1]})')"
+  [ "${subs}" = "$(jq -c '.servingSubstrates | map({substrate, xenon})' <<<"${map}")" ] || { echo "❌ README serving substrate rows ${subs} differ from the toggle map" >&2 && return 1; }
+}
+
+assert_lpsm() {
+  local prefix="$1" file="$2"
+  json "${file}" | need_jq 'metrics-server labels differ from the LPSM set' --arg p "${prefix}" '
+    ({($p + "/platform"): "metrics", ($p + "/service"): "xenon", ($p + "/module"): "metrics", ($p + "/layer"): "1",
+      ($p + "/landscape"): "serving", ($p + "/cluster"): "canary"}) as $want |
+    def has_lpsm: . as $l | all($want | to_entries[]; $l[.key] == .value);
+    length == 9 and all(.[]; .metadata.labels | has_lpsm) and
+    all(.[] | select(.kind == "Deployment"); .spec.template.metadata.labels | has_lpsm)'
+}
+
+assert_reloader() {
+  json "$1" | need_jq "the metrics-server Deployment does not carry reloader.stakater.com/auto=$2" --arg want "$2" '
+    map(select(.kind == "Deployment")) as $d | ($d | length) == 1 and $d[0].metadata.annotations["reloader.stakater.com/auto"] == $want'
+}
+
+vap_stage() {
+  kubeconform -strict -summary -schema-location default "$1"
+  yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "$1" >"$1.vap.yaml"
+  json "$1.vap.yaml" | need_jq "the metrics-server workload is not in the VAP input ($2)" '(map(.kind + "/" + .metadata.name) | sort) == ["Deployment/xenon-metrics","Service/xenon-metrics"]' || return 1
+  kyverno apply policies/vap --resource "$1.vap.yaml" --detailed-results --remove-color >"$1.vap.txt" 2>&1 ||
+    { cat "$1.vap.txt" >&2 && echo "❌ the metrics-server workload or Service fails the VAP ($2)" >&2 && return 1; }
+  rg -q '^pass: [1-9][0-9]*, fail: 0, warn: 0, error: 0' "$1.vap.txt" || { cat "$1.vap.txt" >&2 && echo "❌ the VAP stage evaluated nothing ($2)" >&2 && return 1; }
+}
+
+# publish.sh runs `helm dependency build`, which needs a repo entry for the https upstream.
+helm_repos() {
+  export HELM_REPOSITORY_CONFIG="${tmp}/repositories.yaml" HELM_REPOSITORY_CACHE="${tmp}/repository-cache"
+  helm repo add metrics-server "$(yq -r '.dependencies[] | select(.name == "metrics-server") | .repository' chart/Chart.yaml)" >/dev/null
+}
+
 case "${mode}" in
 schema)
-  helm lint chart --namespace "${namespace}" >/dev/null
-  while IFS= read -r landscape_entry; do
-    helm_args=()
-    while IFS= read -r overlay; do
-      helm_args+=(--values "${overlay}")
-    done < <(printf '%s' "${landscape_entry}" | jq -r '.overlays[]')
-    helm lint chart --namespace "${namespace}" "${helm_args[@]}" >/dev/null
-  done < <(printf '%s' "${matrix_json}" | jq -c '.landscapes[]')
-  ;;
-schema-negative)
-  yq '.metricsServer.replicas = 0' chart/values.yaml >"${tmp}/invalid-values.yaml"
-  if helm lint chart --namespace "${namespace}" --values chart/values.pichu.yaml --values "${tmp}/invalid-values.yaml" >"${tmp}/schema.stdout" 2>"${tmp}/schema.stderr"; then
-    echo "❌ replicas=0 passed Helm schema validation" >&2
-    exit 1
-  fi
-  rg -qi 'replicas.*(greater than or equal to 1|minimum)' "${tmp}/schema.stdout" "${tmp}/schema.stderr"
+  expect_red 'layer is not numeric' "serviceTree/layer.*does not match pattern|at '/serviceTree/layer'" helm lint chart --namespace "${namespace}" --set-string serviceTree.layer=one
+  expect_red 'dashed platform' "serviceTree/platform.*does not match pattern|at '/serviceTree/platform'" helm lint chart --namespace metrics-server --set serviceTree.platform=metrics-server
+  expect_red 'non-boolean provider fact' "builtInMetricsProvider" helm lint chart --namespace "${namespace}" --set-string builtInMetricsProvider=maybe
   ;;
 schema-drift)
   bash ./scripts/local/generate-chart-schema.sh "${tmp}/values.schema.json" >/dev/null
   cmp chart/values.schema.json "${tmp}/values.schema.json"
   ;;
-dependency)
-  bash ./scripts/local/vendor-metrics-server.sh build >/dev/null
-  chart_version="$(yq -r '.dependencies[] | select(.name == "metrics-server") | .version' chart/Chart.yaml)"
-  lock_version="$(yq -r '.dependencies[] | select(.name == "metrics-server") | .version' chart/Chart.lock)"
-  app_version="$(yq -r '.appVersion' chart/Chart.yaml)"
-  evidence_version="$(yq -r '.chart.version' chart/upstream-evidence.yaml)"
-  evidence_app="$(yq -r '.chart.appVersion' chart/upstream-evidence.yaml)"
-  archive="chart/charts/metrics-server-${chart_version}.tgz"
-  [ "${chart_version}" != "${lock_version}" ] && echo "❌ Chart.yaml and Chart.lock dependency versions differ" >&2 && exit 1
-  [ "${chart_version}" != "${evidence_version}" ] && echo "❌ selected chart and upstream evidence versions differ" >&2 && exit 1
-  [ "${app_version}" != "${evidence_app}" ] && echo "❌ selected app and upstream evidence versions differ" >&2 && exit 1
-  [ "$(find chart/charts -maxdepth 1 -type f -name 'metrics-server-*.tgz' | wc -l)" -ne 1 ] && echo "❌ vendored metrics-server archive inventory is not singular" >&2 && exit 1
-  [ ! -s "${archive}" ] && echo "❌ vendored metrics-server archive is missing" >&2 && exit 1
-  [ "$(sha256sum "${archive}" | awk '{print $1}')" != "$(yq -r '.chart.patchedArchiveSha256' chart/upstream-evidence.yaml)" ] && echo "❌ vendored metrics-server archive hash drifted" >&2 && exit 1
-  ;;
-upstream)
-  bash ./scripts/local/latest-chart-upstreams.sh
-  ;;
 lint)
-  helm lint chart --namespace "${namespace}"
-  while IFS= read -r landscape_entry; do
-    landscape="$(printf '%s' "${landscape_entry}" | jq -r '.landscape')"
-    helm_args=()
-    while IFS= read -r overlay; do
-      helm_args+=(--values "${overlay}")
-    done < <(printf '%s' "${landscape_entry}" | jq -r '.overlays[]')
-    echo "🔎 linting ${landscape} stack"
-    helm lint chart --namespace "${namespace}" "${helm_args[@]}"
-  done < <(printf '%s' "${matrix_json}" | jq -c '.landscapes[]')
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    helm lint chart --namespace "${namespace}" ${stack} >"${tmp}/schema.txt" 2>&1 ||
+      { echo "❌ schema rejected the stack '${stack:-values.yaml}'" >&2 && cat "${tmp}/schema.txt" >&2 && exit 1; }
+  done
   ;;
 render)
-  helm template "${release}" chart --namespace "${namespace}" >/dev/null
-  while IFS= read -r landscape_entry; do
-    helm_args=()
-    while IFS= read -r overlay; do
-      helm_args+=(--values "${overlay}")
-    done < <(printf '%s' "${landscape_entry}" | jq -r '.overlays[]')
-    helm template "${release}" chart --namespace "${namespace}" "${helm_args[@]}" >/dev/null
-  done < <(printf '%s' "${matrix_json}" | jq -c '.landscapes[]')
-  ;;
-labels)
-  yq -e '.global.serviceTree | has("platform") | not' chart/values.yaml >/dev/null
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.pichu.yaml >"${tmp}/rendered.yaml"
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" | jq --arg ns "${namespace}" -se '
-    def lpsm($prefix; $namespace):
-      (.[$prefix + "/platform"] == $namespace)
-      and (.[$prefix + "/service"] == "xenon")
-      and (.[$prefix + "/module"] == "metrics")
-      and (.[$prefix + "/layer"] == "1")
-      and (.[$prefix + "/landscape"] == "pichu");
-    . as $resources
-    | ($resources | map(select(.kind == "Deployment" and .metadata.name == "xenon-metrics"))) as $deployments
-    | ($resources | map(select(.kind == "ConfigMap" and .metadata.name == "xenon-lpsm"))) as $configmaps
-    | ($deployments | length) == 1
-      and ($configmaps | length) == 1
-      and ($configmaps[0].metadata.labels | lpsm("atomi.cloud"; $ns))
-      and ($configmaps[0].metadata.annotations | lpsm("atomi.cloud"; $ns))
-      and ($deployments[0].metadata.labels | lpsm("atomi.cloud"; $ns))
-      and ($deployments[0].metadata.annotations | lpsm("atomi.cloud"; $ns))
-      and ($deployments[0].spec.template.metadata.labels | lpsm("atomi.cloud"; $ns))
-      and ($deployments[0].spec.template.metadata.annotations | lpsm("atomi.cloud"; $ns))
-  ' >/dev/null
-  helm template "${release}" chart --namespace tenant --values chart/values.pichu.yaml --set global.labelPrefix=example.dev >"${tmp}/override.yaml"
-  yq eval-all -o=json '.' "${tmp}/override.yaml" | jq -se '
-    def lpsm:
-      (. ["example.dev/platform"] == "tenant")
-      and (. ["example.dev/service"] == "xenon")
-      and (. ["example.dev/module"] == "metrics")
-      and (. ["example.dev/layer"] == "1")
-      and (. ["example.dev/landscape"] == "pichu");
-    . as $resources
-    | ($resources | map(select(.kind == "Deployment" and .metadata.name == "xenon-metrics"))[0]) as $deployment
-    | ($resources | map(select(.kind == "ConfigMap" and .metadata.name == "xenon-lpsm"))[0]) as $configmap
-    | ($configmap.metadata.labels | lpsm)
-      and ($configmap.metadata.annotations | lpsm)
-      and ($deployment.metadata.labels | lpsm)
-      and ($deployment.metadata.annotations | lpsm)
-      and ($deployment.spec.template.metadata.labels | lpsm)
-      and ($deployment.spec.template.metadata.annotations | lpsm)
-      and ([
-        $configmap.metadata.labels,
-        $configmap.metadata.annotations,
-        $deployment.metadata.labels,
-        $deployment.metadata.annotations,
-        $deployment.spec.template.metadata.labels,
-        $deployment.spec.template.metadata.annotations
-      ] | map(to_entries[]) | map(select(.key | startswith("atomi.cloud/"))) | length) == 0
-  ' >/dev/null
-  if helm template "${release}" chart --namespace tenant --values chart/values.pichu.yaml --set global.serviceTree.platform=wrong >/dev/null 2>&1; then
-    echo "❌ a duplicate free platform value was accepted" >&2
-    exit 1
-  fi
-  ;;
-reloader)
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.pichu.yaml >"${tmp}/default.yaml"
-  yq eval-all -o=json '.' "${tmp}/default.yaml" | jq -s -e 'map(select(.kind == "Deployment" and .metadata.name == "xenon-metrics"))[0].spec.template.metadata.annotations["reloader.stakater.com/auto"] == "true"' >/dev/null
-  yq -n '.metricsServer.podAnnotations."reloader.stakater.com/auto" = "false"' >"${tmp}/optout.yaml"
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.pichu.yaml --values "${tmp}/optout.yaml" >"${tmp}/optout-render.yaml"
-  yq eval-all -o=json '.' "${tmp}/optout-render.yaml" | jq -s -e 'map(select(.kind == "Deployment" and .metadata.name == "xenon-metrics"))[0].spec.template.metadata.annotations["reloader.stakater.com/auto"] == "false"' >/dev/null
-  ;;
-fullname)
-  yq -e '.metricsServer.fullnameOverride | test("^[a-z0-9]+-[a-z0-9]+$")' chart/values.yaml >/dev/null
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.pichu.yaml \
-    --set metricsServer.addonResizer.enabled=true \
-    --set metricsServer.podDisruptionBudget.enabled=true \
-    --set metricsServer.metrics.enabled=true \
-    --set metricsServer.serviceMonitor.enabled=true \
-    --set metricsServer.tls.type=cert-manager \
-    --api-versions cert-manager.io/v1 \
-    --api-versions monitoring.coreos.com/v1 >"${tmp}/names.yaml"
-  yq eval-all -o=json '.' "${tmp}/names.yaml" | jq -se '
-    map(select(type == "object" and has("kind"))) as $resources
-    | ([ $resources[] | select(.kind == "APIService" and .metadata.name == "v1beta1.metrics.k8s.io") ] | length) == 1
-      and all($resources[];
-        if .kind == "APIService" then .metadata.name == "v1beta1.metrics.k8s.io"
-        else (.metadata.name | test("^xenon-[a-z0-9]+$")) end)
-      and all($resources[] | select(.kind == "ClusterRoleBinding" and (.roleRef.name | startswith("xenon-")));
-        .roleRef.name as $role | any($resources[]; .kind == "ClusterRole" and .metadata.name == $role))
-  ' >/dev/null
-  ;;
-task-surface)
-  # Capture the task list once, then match against the buffer. Piping
-  # `task --list-all | rg -q` races a SIGPIPE (exit 141) under `pipefail`:
-  # `rg -q` closes the pipe on the first match while `task` is still writing.
-  task_surface="$(task --list-all)"
-  rg -q 'lapras:k3d:debug' <<<"${task_surface}"
-  rg -q 'lapras:k3d:template' <<<"${task_surface}"
-  rg -q 'lapras:k3d:install' <<<"${task_surface}"
-  rg -q 'lapras:k3d:remove' <<<"${task_surface}"
-  ;;
-sit-handoff)
-  bash -n ./scripts/validate/xenon-sit.sh
-  bash -n ./scripts/validate/xenon-sit-cleanup.sh
-  rg -q 'helm install' scripts/validate/xenon-sit.sh
-  if rg -q 'helm upgrade' scripts/validate/xenon-sit.sh; then
-    echo "❌ SIT handoff retains upgrading Helm semantics" >&2
-    exit 1
-  fi
-  rg -q -- '--atomic --wait' scripts/validate/xenon-sit.sh
-  rg -q -- '--labels' scripts/validate/xenon-sit.sh
-  rg -q -- '--selector' scripts/validate/xenon-sit-cleanup.sh
-  rg -q 'ownership\.claim' scripts/validate/xenon-sit.sh scripts/validate/xenon-sit-cleanup.sh
-  rg -q 'helm uninstall' scripts/validate/xenon-sit-cleanup.sh
-  rg -q 'failed-uninstall' scripts/validate/xenon-sit-cleanup.sh
-  rg -q 'failed-owner-mismatch' scripts/validate/xenon-sit-cleanup.sh
-  for artifact in sit.stdout sit.stderr preflight-values preflight-render helm-install rollout helm-status top-nodes top-pods cleanup-owner cleanup-uninstall cleanup.status; do
-    rg -q "${artifact}" scripts/validate/xenon-sit.sh scripts/validate/xenon-sit-cleanup.sh
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    render chart ${stack} >/dev/null
   done
-
-  real_helm="$(command -v helm)"
-  export REAL_HELM="${real_helm}"
-  export FAKE_HELM_LOG="${tmp}/disabled-helm.log"
-  export FAKE_KUBECTL_LOG="${tmp}/disabled-kubectl.log"
-  # shellcheck disable=SC2329 # Exported into the child SIT harness.
-  helm() {
-    printf '%s\n' "$*" >>"${FAKE_HELM_LOG}"
-    return 97
-  }
-  # shellcheck disable=SC2329 # Exported into the child SIT harness.
-  kubectl() {
-    printf '%s\n' "$*" >>"${FAKE_KUBECTL_LOG}"
-    return 98
-  }
-  export -f helm kubectl
-  if SIT_CONTEXT=fake-context \
-    SIT_NAMESPACE=sample \
-    RELEASE=xenon \
-    SIT_VALUES_FILE="$(realpath chart/values.lapras.yaml)" \
-    SIT_EVIDENCE_DIR="${tmp}/disabled-evidence" \
-    bash ./scripts/validate/xenon-sit.sh >"${tmp}/disabled.stdout" 2>"${tmp}/disabled.stderr"; then
-    echo "❌ disabled SIT values reached a successful handoff" >&2
-    exit 1
-  fi
-  if [ -s "${FAKE_HELM_LOG}" ] || [ -s "${FAKE_KUBECTL_LOG}" ]; then
-    echo "❌ disabled SIT values reached a cluster-facing command" >&2
-    exit 1
-  fi
-  rg -q 'authoritative toggle-map ON stack' "${tmp}/disabled-evidence/sit.stderr"
-
-  export FAKE_HELM_LOG="${tmp}/race-helm.log"
-  export FAKE_HELM_INSTALL_ATTEMPT="${tmp}/race-install-attempt"
-  export FAKE_HELM_UNINSTALL_ATTEMPT="${tmp}/race-uninstall-attempt"
-  export FAKE_KUBECTL_LOG="${tmp}/race-kubectl.log"
-  helm() {
-    printf '%s\n' "$*" >>"${FAKE_HELM_LOG}"
-    case "${1:-}" in
-    template)
-      "${REAL_HELM}" "$@"
-      ;;
-    list)
-      local has_selector=false
-      local arg
-      for arg in "$@"; do
-        [ "${arg}" = "--selector" ] && has_selector=true
-      done
-      if [ "${has_selector}" = "true" ]; then
-        printf '%s\n' '[]'
-      elif [ -e "${FAKE_HELM_INSTALL_ATTEMPT}" ]; then
-        printf '%s\n' '[{"name":"xenon"}]'
-      else
-        printf '%s\n' '[]'
-      fi
-      ;;
-    install)
-      : >"${FAKE_HELM_INSTALL_ATTEMPT}"
-      echo "simulated same-name install collision" >&2
-      return 1
-      ;;
-    uninstall)
-      : >"${FAKE_HELM_UNINSTALL_ATTEMPT}"
-      return 99
-      ;;
-    *)
-      echo "unexpected fake Helm command: ${1:-<empty>}" >&2
-      return 96
-      ;;
-    esac
-  }
-  kubectl() {
-    printf '%s\n' "$*" >>"${FAKE_KUBECTL_LOG}"
-    return 95
-  }
-  export -f helm kubectl
-  if SIT_CONTEXT=fake-context \
-    SIT_NAMESPACE=sample \
-    RELEASE=xenon \
-    SIT_VALUES_FILE="$(realpath chart/values.pichu.yaml)" \
-    SIT_EVIDENCE_DIR="${tmp}/race-evidence" \
-    bash ./scripts/validate/xenon-sit.sh >"${tmp}/race.stdout" 2>"${tmp}/race.stderr"; then
-    echo "❌ same-name ownership race did not fail the SIT handoff" >&2
-    exit 1
-  fi
-  rg -q '^install ' "${FAKE_HELM_LOG}"
-  if rg -q '^(upgrade|uninstall) ' "${FAKE_HELM_LOG}" || [ -e "${FAKE_HELM_UNINSTALL_ATTEMPT}" ]; then
-    echo "❌ same-name ownership race reached upgrade or uninstall" >&2
-    exit 1
-  fi
-  if [ -s "${FAKE_KUBECTL_LOG}" ]; then
-    echo "❌ failed collision unexpectedly reached kubectl" >&2
-    exit 1
-  fi
-  rg -qx 'failed-owner-mismatch' "${tmp}/race-evidence/cleanup.status"
-  run_id="$(jq -r '.runId' "${tmp}/race-evidence/inputs.json")"
-  ownership_label_key="$(jq -r '.ownershipLabel.key' "${tmp}/race-evidence/inputs.json")"
-  jq -e --slurpfile claim "${tmp}/race-evidence/ownership.claim" '
-    .runId == $claim[0].runId
-    and .ownershipLabel == $claim[0].ownershipLabel
-    and .landscape == "pichu"
-  ' "${tmp}/race-evidence/inputs.json" >/dev/null
-  jq -e '.metricsServer.enabled == true' "${tmp}/race-evidence/preflight-values.json" >/dev/null
-  yq eval-all -o=json '.' "${tmp}/race-evidence/preflight-render.yaml" | jq -se --arg key "${ownership_label_key}" --arg runId "${run_id}" '
-    map(select(type == "object" and .kind == "Deployment" and .metadata.name == "xenon-metrics"))
-    | length == 1
-      and .[0].metadata.labels[$key] == $runId
-      and .[0].spec.template.metadata.labels[$key] == $runId
-  ' >/dev/null
-  rg -F -q -- "--labels ${ownership_label_key}=${run_id}" "${FAKE_HELM_LOG}"
-  rg -F -q -- "--selector ${ownership_label_key}=${run_id}" "${FAKE_HELM_LOG}"
+  expect_refusal 'must equal release namespace' "${full[@]}" --namespace other
   ;;
 toggle-map)
-  bash ./scripts/validate/check-xenon-toggle-map.sh
-  yq '.metricsServer.enabled = true' chart/values.lapras.yaml >"${tmp}/lapras-on.yaml"
-  if TOGGLE_REPLACE_PATH=chart/values.lapras.yaml TOGGLE_REPLACE_WITH="${tmp}/lapras-on.yaml" bash ./scripts/validate/check-xenon-toggle-map.sh >/dev/null 2>&1; then
-    echo "❌ lapras OFF→ON mutation did not redden the authoritative matrix checker" >&2
-    exit 1
-  fi
+  toggle_check chart
+  copy_tree "${tmp}/lapras-on"
+  yq -i '.builtInMetricsProvider = false | .upstream.enabled = true | .upstream.commonLabels["atomi.cloud/landscape"] = "lapras" | .upstream.podLabels["atomi.cloud/landscape"] = "lapras"' "${tmp}/lapras-on/chart/values.lapras.yaml"
+  expect_red 'lapras overlay flipped OFF -> ON' 'lapras renders xenon ON, expected OFF' toggle_check "${tmp}/lapras-on/chart"
+  copy_tree "${tmp}/lapras-map"
+  yq -i '(.landscapes[] | select(.landscape == "lapras")) |= (.xenon = "ON" | .builtInMetricsProvider = false)' "${tmp}/lapras-map/chart/toggle-map.yaml"
+  expect_red 'toggle map lapras flipped OFF -> ON' 'differs from the expected baseline' toggle_check "${tmp}/lapras-map/chart"
+  copy_tree "${tmp}/serving-dup"
+  yq -i '.servingSubstrates += [{"substrate": "k3s", "builtInMetricsProvider": true, "xenon": "ON"}]' "${tmp}/serving-dup/chart/toggle-map.yaml"
+  expect_red 'an enabled serving substrate with a built-in provider' 'enabled serving substrate declares a built-in provider' toggle_check "${tmp}/serving-dup/chart"
+  expect_refusal 'duplicate provider' --values chart/values.serving.yaml --set builtInMetricsProvider=true
+  expect_refusal 'duplicate provider' --values chart/values.lapras.yaml --set upstream.enabled=true
+  expect_refusal 'missing provider' --values chart/values.eevee.yaml --set upstream.enabled=false
+  copy_tree "${tmp}/onprem"
+  printf 'serviceTree:\n  landscape: onprem\n' >"${tmp}/onprem/chart/values.onprem.yaml"
+  expect_red 'an extra onprem landscape overlay' 'landscape overlays .* are not exactly the eight' toggle_check "${tmp}/onprem/chart"
+  copy_tree "${tmp}/onprem-map"
+  yq -i '.landscapes += [{"landscape": "onprem", "overlay": "values.onprem.yaml", "builtInMetricsProvider": false, "xenon": "ON"}]' "${tmp}/onprem-map/chart/toggle-map.yaml"
+  expect_red 'an extra onprem toggle map key' 'not exactly the eight defined landscapes' toggle_check "${tmp}/onprem-map/chart"
+  copy_tree "${tmp}/missing"
+  yq -i 'del(.landscapes[] | select(.landscape == "castform"))' "${tmp}/missing/chart/toggle-map.yaml"
+  expect_red 'a missing castform toggle map key' 'not exactly the eight defined landscapes' toggle_check "${tmp}/missing/chart"
+  copy_tree "${tmp}/readme"
+  sed -i 's/^| rotom \(.*\) | OFF |/| rotom \1 | ON |/' "${tmp}/readme/chart/README.md"
+  expect_red 'README matrix row drift' 'README needed/provided matrix rows' toggle_check "${tmp}/readme/chart"
+  copy_tree "${tmp}/readme-sub"
+  sed -i '/^| DOKS |/d' "${tmp}/readme-sub/chart/README.md"
+  expect_red 'README serving substrate row missing' 'README serving substrate rows' toggle_check "${tmp}/readme-sub/chart"
+  ;;
+kube-floor)
+  render chart "${full[@]}" --kube-version 1.31.0 >/dev/null
+  expect_refusal 'needs Kubernetes 1.31\+' "${full[@]}" --kube-version 1.30.0
+  for l in lapras ditto rotom absol; do
+    [ "$(render chart --values "chart/values.${l}.yaml" --kube-version 1.30.0 | yq eval-all -o=json '.' | jq -s 'map(select(.kind != null)) | length')" = 0 ] ||
+      { echo "❌ OFF landscape ${l} does not install cleanly on Kubernetes 1.30" >&2 && exit 1; }
+  done
+  ;;
+lpsm-labels)
+  render chart "${full[@]}" >"${tmp}/lpsm.yaml"
+  assert_lpsm atomi.cloud "${tmp}/lpsm.yaml"
+  expect_refusal 'upstream.commonLabels must equal' "${full[@]}" --set labelPrefix=example.dev
+  expect_refusal 'upstream.commonLabels must equal' "${full[@]}" --set serviceTree.cluster=other
+  expect_refusal 'upstream.podLabels must equal' "${full[@]}" --set-string 'upstream.podLabels.atomi\.cloud/cluster=other'
+  copy_tree "${tmp}/nolabels"
+  yq -i 'del(.upstream.commonLabels) | del(.upstream.podLabels)' "${tmp}/nolabels/chart/values.yaml" "${tmp}/nolabels/chart/values.serving.yaml" "${tmp}/nolabels/chart/values.canary.yaml"
+  sed -i '/include "xenon.validateUpstreamLabels"/d' "${tmp}/nolabels/chart/templates/validate.yaml"
+  render "${tmp}/nolabels/chart" "${full[@]}" >"${tmp}/nolabels.yaml"
+  expect_red 'LPSM labels dropped' 'labels differ from the LPSM set' assert_lpsm atomi.cloud "${tmp}/nolabels.yaml"
+  ;;
+reloader)
+  for stack in "--values chart/values.primordial.yaml" "${full[*]}"; do
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/reloader.yaml"
+    assert_reloader "${tmp}/reloader.yaml" true
+  done
+  render chart "${full[@]}" --set-string 'upstream.deploymentAnnotations.reloader\.stakater\.com/auto=false' >"${tmp}/optout.yaml"
+  assert_reloader "${tmp}/optout.yaml" false
+  copy_tree "${tmp}/noreloader"
+  yq -i 'del(.upstream.deploymentAnnotations)' "${tmp}/noreloader/chart/values.yaml"
+  render "${tmp}/noreloader/chart" "${full[@]}" >"${tmp}/noreloader.yaml"
+  expect_red 'Reloader annotation dropped' 'reloader.stakater.com/auto=true' assert_reloader "${tmp}/noreloader.yaml" true
   ;;
 rendered-manifests)
-  while IFS= read -r landscape_entry; do
-    enabled="$(printf '%s' "${landscape_entry}" | jq -r '.enabled')"
-    [ "${enabled}" != "true" ] && continue
-    landscape="$(printf '%s' "${landscape_entry}" | jq -r '.landscape')"
-    helm_args=()
-    while IFS= read -r overlay; do
-      helm_args+=(--values "${overlay}")
-    done < <(printf '%s' "${landscape_entry}" | jq -r '.overlays[]')
-    helm template "${release}" chart --namespace "${namespace}" "${helm_args[@]}" >"${tmp}/${landscape}.yaml"
-    kubeconform -strict -summary "${tmp}/${landscape}.yaml"
-    yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "${tmp}/${landscape}.yaml" >"${tmp}/${landscape}-vap.yaml"
-    kyverno apply policies/vap --resource "${tmp}/${landscape}-vap.yaml" --detailed-results --remove-color
-  done < <(printf '%s' "${matrix_json}" | jq -c '.landscapes[]')
+  index=0
+  for stack in "" "--values chart/values.primordial.yaml" "--values chart/values.eevee.yaml" "--values chart/values.castform.yaml" "${full[*]}"; do
+    index=$((index + 1))
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/rendered-${index}.yaml"
+    vap_stage "${tmp}/rendered-${index}.yaml" "stack ${stack:-values.yaml}"
+  done
+  render chart "${full[@]}" --set upstream.image.tag=latest >"${tmp}/latest.yaml"
+  expect_red 'a :latest metrics-server image' 'explicit non-latest tag' vap_stage "${tmp}/latest.yaml" latest
   ;;
-vap-sabotage)
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.pichu.yaml --set metricsServer.image.tag=latest >"${tmp}/rendered.yaml" 2>/dev/null
-  yq eval-all 'select(.kind == "Deployment" or .kind == "Service")' "${tmp}/rendered.yaml" >"${tmp}/vap-resources.yaml"
-  if kyverno apply policies/vap --resource "${tmp}/vap-resources.yaml" --remove-color >/dev/null 2>&1; then
-    echo "❌ :latest wiring sabotage was not caught by the VAP stage" >&2
-    exit 1
-  fi
+pin)
+  dep="$(yq -o=json '.dependencies[] | select(.name == "metrics-server")' chart/Chart.yaml)"
+  version="$(jq -r .version <<<"${dep}")"
+  [[ ${version} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "❌ metrics-server chart ${version} is not an exact pin" >&2 && exit 1; }
+  [ "$(jq -r .alias <<<"${dep}")" = upstream ] || { echo "❌ metrics-server is not aliased upstream" >&2 && exit 1; }
+  [ "$(jq -r .condition <<<"${dep}")" = upstream.enabled ] || { echo "❌ metrics-server is not gated by upstream.enabled" >&2 && exit 1; }
+  [ "$(yq -r '.dependencies[] | select(.name == "metrics-server") | .version' chart/Chart.lock)" = "${version}" ] || { echo "❌ Chart.lock differs from Chart.yaml" >&2 && exit 1; }
+  [ "$(git ls-files 'chart/charts/*.tgz')" = "chart/charts/metrics-server-${version}.tgz" ] || { echo "❌ the vendored archive is not metrics-server-${version}.tgz" >&2 && exit 1; }
+  app="$(tar -xzOf "chart/charts/metrics-server-${version}.tgz" metrics-server/Chart.yaml | yq -r .appVersion)"
+  [ "$(yq -r .appVersion chart/Chart.yaml)" = "${app}" ] || { echo "❌ appVersion differs from the vendored chart's app ${app}" >&2 && exit 1; }
+  image="$(render chart "${full[@]}" | yq -N eval-all 'select(.kind == "Deployment") | .spec.template.spec.containers[].image')"
+  [ "${image}" = "registry.k8s.io/metrics-server/metrics-server:v${app}" ] || { echo "❌ image ${image} is not registry.k8s.io/metrics-server/metrics-server:v${app}" >&2 && exit 1; }
+  ;;
+task-surface)
+  task --list-all --json | jq -e '[.tasks[].name] as $names | ["debug", "template", "install", "remove"] | all(("serving:canary:" + .) | IN($names[]))' >/dev/null ||
+    { echo "❌ serving:canary is missing a debug/template/install/remove task" >&2 && exit 1; }
+  task --silent serving:canary:template >"${tmp}/task-template.yaml"
+  rg -q '^kind: Deployment$' "${tmp}/task-template.yaml" || { echo "❌ serving:canary:template rendered no Deployment" >&2 && exit 1; }
+  rg -q 'atomi.cloud/cluster: canary' "${tmp}/task-template.yaml" || { echo "❌ serving:canary:template did not stack values.canary.yaml" >&2 && exit 1; }
   ;;
 publish-git)
+  helm_repos
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/git" bash ./scripts/ci/publish.sh >/dev/null
-  [ ! -s "${tmp}/git/diene-xenon-0.1.0.tgz" ] && echo "❌ git chart package missing" >&2 && exit 1
+  [ ! -s "${tmp}/git/xenon-0.1.0.tgz" ] && echo "❌ git chart package missing" >&2 && exit 1
   [ ! -s "${tmp}/git/index.yaml" ] && echo "❌ git chart index missing" >&2 && exit 1
   ;;
 publish-oci)
+  helm_repos
   PUBLISH_MODE=oci PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/oci" bash ./scripts/ci/publish.sh >/dev/null
-  [ ! -s "${tmp}/oci/diene-xenon-0.1.0.tgz" ] && echo "❌ OCI chart package missing" >&2 && exit 1
+  [ ! -s "${tmp}/oci/xenon-0.1.0.tgz" ] && echo "❌ OCI chart package missing" >&2 && exit 1
   rg -q '^oci://registry.example.invalid/charts$' "${tmp}/oci/oci-ref.txt"
   ;;
 version)
+  helm_repos
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh >/dev/null
-  if PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.2.0 PUBLISH_OUTPUT_DIR="${tmp}/version-bad" bash ./scripts/ci/publish.sh >/dev/null 2>&1; then
-    echo "❌ version==tag guard did not red on a mismatched tag" >&2
-    exit 1
-  fi
+  expect_red 'a tag that differs from Chart.yaml' 'does not match tag 9.9.9' env PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v9.9.9 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh
   ;;
 presence)
   test -s docs/developer/xenon-baseline.md
-  test -s chart/toggle-map.yaml
-  test -s chart/upstream-evidence.yaml
-  test -s chart/patches/metrics-server-3.13.1-xenon.patch
-  test -s chart/templates/lpsm-configmap.yaml
-  test -s policies/vap/workload-baseline.yaml
-  test -s policies/vap/service-baseline.yaml
-  test -x scripts/local/vendor-metrics-server.sh
-  test -x scripts/validate/check-xenon-toggle-map.sh
-  test -x scripts/validate/xenon-sit-cleanup.sh
+  test -s .claude/skills/xenon/SKILL.md
   ;;
 *)
   echo "❌ unknown validation mode '${mode}'" >&2
@@ -360,4 +282,4 @@ presence)
   ;;
 esac
 
-echo "✅ Xenon ${mode} validation passed"
+echo "✅ xenon ${mode} validation passed"

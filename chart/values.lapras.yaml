@@ -1,8 +1,8 @@
-# Independent landscape overlay. Lapras uses k3s/k3d, which bundles
-# metrics-server, so xenon is OFF and the whole wrapper renders nothing.
-global:
-  serviceTree:
-    landscape: lapras
+serviceTree:
+  landscape: lapras
 
-metricsServer:
+# k3d/k3s bundles metrics-server, so xenon is OFF.
+builtInMetricsProvider: true
+
+upstream:
   enabled: false

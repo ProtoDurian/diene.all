@@ -1,0 +1,11 @@
+serviceTree:
+  landscape: serving
+
+# Each registered serving cluster declares its own fact; one whose substrate bundles a provider sets it true and OFF.
+builtInMetricsProvider: false
+
+upstream:
+  commonLabels:
+    atomi.cloud/landscape: serving
+  podLabels:
+    atomi.cloud/landscape: serving

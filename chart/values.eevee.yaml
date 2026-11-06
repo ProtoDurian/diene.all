@@ -1,0 +1,11 @@
+serviceTree:
+  landscape: eevee
+
+upstream:
+  commonLabels:
+    atomi.cloud/landscape: eevee
+  podLabels:
+    atomi.cloud/landscape: eevee
+  # The in-vcluster kubelet endpoint serves a self-signed certificate (vCluster metrics-server docs).
+  args:
+    - --kubelet-insecure-tls

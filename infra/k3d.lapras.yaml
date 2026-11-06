@@ -12,7 +12,7 @@ ports:
 registries:
   create:
     name: diene-xenon-registry
-    host: 0.0.0.0
+    host: 127.0.0.1
     hostPort: '5001'
 options:
   k3s:

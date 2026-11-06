@@ -1,67 +1,59 @@
-# Diene workspace baseline
+# Commands
 
-<!-- ### nix-root -->
-<!-- #### source: main -->
+Run `task --list` for every available task and its description. The task set is
+declared in [`Taskfile.yaml`](Taskfile.yaml), whose `includes:` block maps each
+namespace to a file under [`tasks/`](tasks); a task shown as `<namespace>:<task>`
+is that key in the included file. Build artifacts — Dockerfiles and Helm charts —
+live under [`infra/`](infra) and may be plural, so their tasks are keyed per
+artifact. See [the Taskfile standard](docs/standards/taskfile/index.md) for the
+conventions.
 
-Diene's reproducible development environment is managed by Nix. Run `direnv allow` once, then use `pls` tasks from the loaded shell.
+# Development Environment
 
-<!-- ### workspace -->
-<!-- #### source: workspace -->
+All binaries, tools, and PATH are managed by **Nix**. Do not install tools manually or modify PATH outside of the nix configuration.
 
-This branch is the workspace baseline inherited by every downstream sample: split CI/CD, Helm, secrets, release configuration, validators, standards, and vendored agent-skill synchronization.
+## Prerequisites
 
-## Commands
+1. **[Nix](https://nixos.org/download)** — package manager
+2. **[Docker](https://docs.docker.com/get-docker)** — container runtime
+3. **[direnv](https://direnv.net/docs/installation.html)** — auto-loads the nix shell on `cd`
 
-- `pls setup` — synchronize installed diene package skills.
-- `pls lint` — run every pre-commit gate.
-- `pls helm:lint` / `pls helm:template` — validate or render the root chart.
-- `pls secret:scan` — scan tracked content for secrets.
-- `pls skills:sync` — rebuild `.claude/skills/vendor/` from installed packages.
+## Getting Started
 
-## Standards
+```bash
+direnv allow    # first time only — loads the nix dev shell
+```
 
-- [CI/CD workflows](docs/standards/ci-cd/index.md)
-- [conventional commits](docs/standards/conventional-commits/index.md)
-- [Helm charts and publishing](docs/standards/helm/index.md)
-- [Infisical and secrets](docs/standards/infisical/index.md)
-- [linting and pre-commit](docs/standards/linting/index.md)
-- [Nix flakes and development shells](docs/standards/nix/index.md)
-- [release automation](docs/standards/semantic-release/index.md)
-- [service-tree identity](docs/standards/service-tree/index.md)
-- [shell scripts](docs/standards/shell-scripts/index.md)
-- [Taskfile conventions](docs/standards/taskfile/index.md)
+Once allowed, direnv automatically loads the development environment whenever you enter the project directory.
 
-<!-- ### shared -->
-<!-- #### source: shared -->
+## Nix Configuration
 
-## Shared standards
+See [docs/standards/nix/index.md](docs/standards/nix/index.md) for the full guide on:
 
-- [Authorization](docs/standards/authorization/index.md)
-- [Contributor documentation](docs/standards/contributor-docs/index.md)
-- [Date and time](docs/standards/datetime/index.md)
-- [Domain-driven design](docs/standards/domain-driven-design/index.md)
-- [Functional practices](docs/standards/functional-practices/index.md)
-- [Software design philosophy](docs/standards/software-design-philosophy/index.md)
-- [SOLID principles](docs/standards/solid-principles/index.md)
-- [Stateless OOP and dependency injection](docs/standards/stateless-oop-di/index.md)
-- [Testing](docs/standards/testing/index.md)
-- [Three-layer architecture](docs/standards/three-layer-architecture/index.md)
-- [Utility libraries](docs/standards/utilities/index.md)
-- [Data validation](docs/standards/validation/index.md)
+- File structure (`flake.nix`, `nix/`, `.envrc`)
+- Adding/removing packages
+- Environment groups and shells
+- Formatters and pre-commit hooks
+- Adding registries
 
-Domain-specific documentation belongs under [docs/domain/](docs/domain/README.md).
-The `docs/standards/contracts/` location is reserved for the separately owned C0
-contracts standard.
+# Standards
 
-<!-- ### xenon -->
-<!-- #### source: xenon -->
+The conventions this repository follows live under
+[`docs/standards/`](docs/standards). Read the standard for the surface you are
+changing before you change it. [`CLAUDE.md`](CLAUDE.md) links the ones an agent
+reaches for most often; it is a convenience, not a required index, and nothing
+checks that it names every surface.
 
-## Xenon chart sample
+# Workspace baseline
 
-This branch materializes the conditional metrics-server wrapper chart, its stacked values, generated schema, per-landscape enablement toggle, and rendered-manifest validation.
+This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, Docker, Helm, secrets, release configuration, validators, and standards.
 
-- `pls build` — reproduce the pinned and patched metrics-server dependency.
-- `pls test:unit` — run schema, lint, render, toggle-map, VAP, and publish dry-runs.
-- `pls test:int` — run the transactional SIT handoff on an enabled landscape (required context/namespace/release/evidence inputs; orchestration-authorized).
-- `pls lapras:k3d:template` — render the committed OFF landscape + cluster stack.
+# Xenon
+
+This branch materializes the Helm wrapper as `xenon`: the Resource Metrics API (`kubectl top`, HPA) as a passthrough of kubernetes-sigs/metrics-server 3.13.1. It is ON only where the cluster has no built-in provider; the per-landscape toggle map is in the [chart README](chart/README.md).
+
+- `task build` — build the pinned chart dependency.
+- `task test:unit` — run schema, lint, render, toggle map, LPSM, Reloader, VAP, and publish dry-runs.
+- `task test:int` — install on the `canary-xenon` k3d cluster (bundled metrics-server disabled), check `kubectl top nodes`, and round-trip the chart through a local OCI registry.
+- `task serving:canary:template` — render the independent landscape + cluster stack.
 - [Xenon baseline](docs/developer/xenon-baseline.md)

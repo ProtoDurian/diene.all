@@ -1,0 +1,5 @@
+{{- include "xenon.validateServiceTree" . -}}
+{{- include "xenon.validateToggle" . -}}
+{{- if .Values.upstream.enabled -}}
+{{- include "xenon.validateUpstreamLabels" . -}}
+{{- end -}}

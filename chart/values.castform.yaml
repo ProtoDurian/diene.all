@@ -1,0 +1,11 @@
+serviceTree:
+  landscape: castform
+
+upstream:
+  commonLabels:
+    atomi.cloud/landscape: castform
+  podLabels:
+    atomi.cloud/landscape: castform
+  # The in-vcluster kubelet endpoint serves a self-signed certificate (vCluster metrics-server docs).
+  args:
+    - --kubelet-insecure-tls

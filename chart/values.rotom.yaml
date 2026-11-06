@@ -1,0 +1,8 @@
+serviceTree:
+  landscape: rotom
+
+# k3d/k3s bundles metrics-server, so xenon is OFF.
+builtInMetricsProvider: true
+
+upstream:
+  enabled: false

@@ -1,0 +1,8 @@
+serviceTree:
+  cluster: canary
+
+upstream:
+  commonLabels:
+    atomi.cloud/cluster: canary
+  podLabels:
+    atomi.cloud/cluster: canary

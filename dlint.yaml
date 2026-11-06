@@ -1,7 +1,7 @@
 schemaVersion: 1
 checks:
   action-pins:
-    trustedPattern: ^AtomiCloud/
+    trustedPattern: ^(AtomiCloud|ProtoDurian|actions)/
     workflowsDir: .github/workflows
   exec-bits:
     globs:
@@ -24,6 +24,7 @@ checks:
       - gomplate
       - helm version
       - helm-docs
+      - helm-schema --help
       - infisical
       - jq
       - k3d
@@ -44,3 +45,4 @@ checks:
       - nix/packages.nix
       - nix/env.nix
       - nix/shells.nix
+  release-gating: {}
