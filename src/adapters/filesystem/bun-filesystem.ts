@@ -41,8 +41,8 @@ export class BunFileSystem implements IFileSystem {
       await handle.close();
       await rename(temporary, target);
     } catch (error) {
-      await handle.close().catch(() => undefined);
-      await rm(temporary).catch(() => undefined);
+      await Promise.allSettled([handle.close()]);
+      await Promise.allSettled([rm(temporary)]);
       throw error;
     }
   }

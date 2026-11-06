@@ -49,7 +49,7 @@ async function readBoundedResponse(response: Response, method: string, path: str
       const chunk = result.value;
       total += chunk.byteLength;
       if (total > MAX_RESPONSE_BYTES) {
-        await reader.cancel('response exceeded the one-MiB limit').catch(() => undefined);
+        await Promise.allSettled([reader.cancel('response exceeded the one-MiB limit')]);
         throw new GitHubError(`GitHub API ${method} ${path} response is too large`);
       }
       chunks.push(chunk);

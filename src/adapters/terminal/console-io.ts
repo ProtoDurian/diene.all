@@ -5,6 +5,9 @@ export interface ICliIo {
 }
 
 export class ConsoleIo implements ICliIo {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor() {}
+
   write(text: string): void {
     process.stdout.write(text);
   }

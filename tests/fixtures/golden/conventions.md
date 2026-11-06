@@ -1,5 +1,22 @@
 # Commit conventions
 
+This repository follows [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+
+- `release.yaml` is the machine-readable source of truth: it owns the
+  commit types, the scopes valid for each one, and the version bump each scope
+  causes.
+- [The conventional-commits standard](../standards/conventional-commits/index.md)
+  explains how to read that vocabulary and how to mark a breaking change.
+
+## Status of this file
+
+This file is generated. `release.yaml` names this path in its
+`conventions.path` value, `releaser conventions` writes it, and a release run
+rewrites it as well. Change `release.yaml` and regenerate rather than
+editing this file: everything up to here comes from that file's
+`conventions.template`, and everything from the `type(scope)` line below is
+generated from the commit vocabulary.
+
 Use `type(scope)!: subject`. Omit `(scope)` only when the type's `default` scope applies.
 
 
@@ -8,7 +25,6 @@ Use `type(scope)!: subject`. Omit `(scope)` only when the type's `default` scope
 
 | Type | Description | Release |
 | --- | --- | --- |
-| `amend` | Small amendments and typo fixes | no release |
 | `build` | Build-system changes | no release |
 | `chore` | Repository chores | no release |
 | `ci` | CI/CD changes | no release |
@@ -17,6 +33,7 @@ Use `type(scope)!: subject`. Omit `(scope)` only when the type's `default` scope
 | `docs` | Documentation changes | no release |
 | `feat` | New features | scope-dependent |
 | `fix` | Bug fixes | patch |
+| `merge` | Branch merges | no release |
 | `perf` | Performance improvements | patch |
 | `refactor` | Refactors | minor |
 | `style` | Non-functional style changes | patch |
@@ -25,12 +42,6 @@ Use `type(scope)!: subject`. Omit `(scope)` only when the type's `default` scope
 ## Scopes
 
 
-
-### `amend` scopes
-
-| Scope | Description | Release |
-| --- | --- | --- |
-| `default` | Amend existing work | no release |
 
 ### `build` scopes
 
@@ -84,6 +95,12 @@ Use `type(scope)!: subject`. Omit `(scope)` only when the type's `default` scope
 | --- | --- | --- |
 | `default` | Fix a bug | patch |
 
+### `merge` scopes
+
+| Scope | Description | Release |
+| --- | --- | --- |
+| `default` | Merge a branch | no release |
+
 ### `perf` scopes
 
 | Scope | Description | Release |
@@ -116,7 +133,4 @@ Use `type(scope)!: subject`. Omit `(scope)` only when the type's `default` scope
 
 ## V.A.E. guidance
 
-| Type | Verb | Application | Example |
-| --- | --- | --- | --- |
-| feat | add | <scope>, <title> | `feat: add a release capability` |
-| fix | fix | <title> | `fix: preserve changelog preamble` |
+No V.A.E. guidance is configured.
