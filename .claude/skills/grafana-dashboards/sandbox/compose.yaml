@@ -21,3 +21,16 @@ services:
     ports: ['127.0.0.1:9090:9090']
     volumes:
       - ./prom-data:/prometheus
+  loki:
+    image: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+    profiles: [logs]
+    # 7h keeps the whole 6-hour history in memory; at the default 2h, queries miss lines older than about 2.5h
+    command: [-config.file=/etc/loki/local-config.yaml, -ingester.max-chunk-age=7h, -reporting.enabled=false]
+    ports: ['127.0.0.1:3100:3100']
+  tempo:
+    image: grafana/tempo:3.1.1@sha256:64e2fbd56d9c2b3412a4b430a58ea59e91a670b1e75f920a0c702213ad145044
+    profiles: [logs]
+    command: [-config.file=/etc/tempo.yaml]
+    ports: ['127.0.0.1:3200:3200', '127.0.0.1:4318:4318']
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml:ro
