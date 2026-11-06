@@ -59,10 +59,7 @@ fi
 
 if [[ ${mode} == "attw" || ${mode} == "all" ]]; then
   echo "🔎 Checking type resolvability (attw)..."
-  # node10 predates the "exports" field and cannot resolve subpath exports
-  # (/build-time, /test-helper); profile to node16 so its EOL resolver does not
-  # false-fail the multi-entry package. node16 (CJS+ESM) and bundler are checked.
-  ./node_modules/.bin/attw pkg.tgz --profile node16
+  ./node_modules/.bin/attw pkg.tgz
 fi
 
 if [[ ${mode} == "consumer" || ${mode} == "all" ]]; then
