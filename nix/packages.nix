@@ -89,7 +89,7 @@ let
           version = manifest.version;
           inherit src;
           entrypoint = entry;
-          depsHash = pkgs-2605.lib.fakeHash;
+          depsHash = "sha256-rUm8WlPGQxXUV+H8VeiZDn7hnZjrx18+nn3M+/hkZnU=";
           bun = pkgs-2605.bun;
         };
       };
