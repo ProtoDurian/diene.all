@@ -76,7 +76,7 @@ Start empty. Add a dashboard or alert only when a gate in `SIGNALS.md` says yes.
 
 ## Three rules
 
-1. **Labels are stamped, never written.** Alert and dashboard files hold plain Grafana content: no Kubernetes wrapper and no LPSM label blocks. Selecting LPSM labels in a query, such as `{service="zinc"}`, is expected. The primordial chart stamps alerts. For metrics, logs and traces, the OTel library sets the values from the service's config, and the collector (Grafana Alloy, an agent on each Kubernetes node) turns them into labels. This repo's app chart, `infra/root_chart/`, sets none.
+1. **Labels are stamped, never written.** Alert and dashboard files hold plain Grafana content: no Kubernetes wrapper and no LPSM label blocks. Selecting LPSM labels in a query, such as `{service="zinc"}`, is expected. The primordial chart stamps alerts. For metrics, logs and traces, the OTel library sets the values from the service's config, and the collector (Grafana Alloy, an agent on each Kubernetes node) turns them into labels. The app chart, if the repo has one, sets none.
 2. **Strict on metrics and alerts, liberal on logs and traces**: [why and how](/docs/standards/observability/signals.md#cost-strict-on-metrics-liberal-on-logs-and-traces).
 3. **Rules never decide who gets paged**, e.g. no `team:` or `receiver:` label and no contact point in a tier file. The platform team's routing reads the `severity` and LPSM labels and decides who is notified in each landscape. The same rule file works in every landscape.
 

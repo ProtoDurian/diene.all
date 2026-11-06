@@ -6,12 +6,12 @@ The files in `observability/` are plain Grafana content. The service's **primord
 
 - **One Grafana per landscape.** The chart is installed once per landscape, onto Primordial, into that landscape's namespace `{grafana-namespace}`. Each install targets that landscape's Grafana through the operator's `instanceSelector` (`{instance-selector}`; both values from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you)). Installs never share a Grafana, so uids and names carry no landscape and never collide.
 - Each install stamps its landscape on the alert rules and points them at that landscape's datasources, so one rule file works everywhere and `expr` never selects `landscape`. Dashboards use the `$landscape` variable.
-- The app chart, `infra/root_chart/`, only runs the service. It never renders observability files.
+- The app chart, if the repo has one, only runs the service. It never renders observability files.
 - Build the rendering with `helm-wrapper`, not with CI scripts.
 
 ## The chart copy
 
-Helm can only read files inside its chart folder and rejects symlinks that point outside it. This repo has no copy step yet. The chart build must copy `observability/` to `infra/primordial_chart/files/observability/` before every lint, template, package or publish, and `.gitignore` must hold `infra/primordial_chart/files/`. Add the copy as a `primordial_chart:copy` task in `tasks/Taskfile.helm.yaml` that the chart's other tasks depend on (a chart's tasks are named `<chart folder>:<verb>`: [Helm standard](/docs/standards/helm/index.md), [Taskfile conventions](/docs/standards/taskfile/index.md)). Never edit or commit the copy; `observability/` stays the source.
+Helm can only read files inside its chart folder and rejects symlinks that point outside it. This repo has no copy step yet. The chart build must copy `observability/` to `infra/primordial_chart/files/observability/` before every lint, template, package or publish, and `.gitignore` must hold `infra/primordial_chart/files/`. Add the copy as a `primordial_chart:copy` task that the chart's other tasks depend on (a chart's tasks are named `<chart folder>:<verb>`; [Taskfile conventions](/docs/standards/taskfile/index.md)). Never edit or commit the copy; `observability/` stays the source.
 
 ## One file → one resource
 
