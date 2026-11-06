@@ -146,7 +146,7 @@
                     "type": "object",
                     "properties": {
                         "domain": {
-                            "description": "S8 Route53 backup base domain wildcard (tokenize before live use).",
+                            "description": "Route53 backup base domain wildcard (tokenize before live use).",
                             "type": "string",
                             "pattern": "^\\*\\.[a-z0-9.-]+$"
                         }

@@ -67,8 +67,8 @@ per tick). Chart scope is "route rendered + 2xx in k3d"; the poll itself belongs
 ## Certificates and issuers
 
 Platinum renders no issuer. Registered-fleet stacks render the primary `*.cluster.atomi.cloud`
-wildcard and the S8 Route53 backup-domain wildcard against zinc's `zinc-letsencrypt` ClusterIssuer,
-each served by a terminating HTTPS listener. The backup domain value is a placeholder until the S8
+wildcard and the Route53 backup-domain wildcard against zinc's `zinc-letsencrypt` ClusterIssuer,
+each served by a terminating HTTPS listener. The backup domain value is a placeholder until the backup
 domain is named.
 
 ## ENTEI dev-host overlay

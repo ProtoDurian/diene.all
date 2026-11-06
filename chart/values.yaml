@@ -63,7 +63,7 @@ registeredCertificates:
     domain: '*.cluster.atomi.cloud'
   backup:
     # @schema pattern:^\*\.[a-z0-9.-]+$
-    # -- S8 Route53 backup base domain wildcard (tokenize before live use).
+    # -- Route53 backup base domain wildcard (tokenize before live use).
     domain: '*.cluster.atomi-backup.invalid'
 
 # -- kgateway control plane (pinned). Its labels must equal the LPSM set.
