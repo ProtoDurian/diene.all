@@ -25,15 +25,21 @@ let
       {
         inherit
           actionlint
+          age
           bun
+          docker-client
+          docker-compose
           git
           go-task
           infisical
           nix
           nodejs
+          opentofu
           pre-commit
           shellcheck
+          sops
           treefmt
+          wrangler
           ;
       }
     );

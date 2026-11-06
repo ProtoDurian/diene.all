@@ -2,6 +2,8 @@
 with packages;
 {
   dev = [
+    docker-client
+    docker-compose
     git
     go-task
     infisical
@@ -19,14 +21,18 @@ with packages;
   ];
 
   main = [
+    age
     bun
     cyanprint
     git
     go-task
     infisical
     nodejs
+    opentofu
     releaser
     shellcheck
+    sops
+    wrangler
   ];
 
   releaser = [

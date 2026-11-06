@@ -33,3 +33,8 @@ desktop.ini
 *~
 .kagent/
 .kloop/
+
+### aseity
+.wrangler/
+.dev.vars
+*.agekey
