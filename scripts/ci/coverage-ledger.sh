@@ -1,16 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Filter an lcov ledger to the paths a tier owns, then assert 100% line coverage.
-#
-# Extracted verbatim from scripts/ci/test.sh. This half carries NO Dart: it is
-# awk over lcov records, so it is identical on every descendant that renames its
-# package. test.sh is the file the eight dart children rewrite (each substitutes
-# its own packages/diene_* member); keeping the generic half out of that file
-# means a fix here does not have to be re-applied eight times.
-#
-# usage: coverage-ledger.sh <all.info> <out.lcov> <sf-pattern> <mode-label>
-
 all_ledger="${1:?usage: coverage-ledger.sh <all.info> <out.lcov> <sf-pattern> <mode-label>}"
 ledger="${2:?usage: coverage-ledger.sh <all.info> <out.lcov> <sf-pattern> <mode-label>}"
 pattern="${3:?usage: coverage-ledger.sh <all.info> <out.lcov> <sf-pattern> <mode-label>}"

@@ -4,9 +4,6 @@ set -euo pipefail
 mode="${1:-}"
 coverage_mode="${2:-no-coverage}"
 
-# The publishable member lives under packages/diene_dart_lib (pub workspace).
-# `dart pub get` resolves at the repo root; `dart test`, coverage collection and
-# the coverage:format_coverage run all execute with CWD = the member directory.
 member_dir="${MEMBER_DIR:-packages/diene_dart_lib}"
 test_helper_path="${TEST_HELPER_PATH:-lib/test_helper.dart}"
 meta_test_path="${META_TEST_PATH:-test/meta}"
@@ -17,16 +14,12 @@ meta_test_path="${META_TEST_PATH:-test/meta}"
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
-# Conditional meta activation: the meta tier is a successful no-op unless BOTH
-# the TestHelper source and the meta test directory exist. Presence of exactly
-# one is caught by the package-validate identity checks; here we simply skip when
-# neither is present so a no-helper fixture stays green.
 if [[ ${mode} == "meta" && (! -f "${member_dir}/${test_helper_path}" || ! -d "${member_dir}/${meta_test_path}") ]]; then
   echo "✅ Meta tier inactive: this package has no TestHelper"
   exit 0
 fi
 
-./scripts/ci/setup.sh
+dart pub get
 
 package_config="${root_dir}/.dart_tool/package_config.json"
 cd "${root_dir}/${member_dir}"
@@ -40,12 +33,13 @@ if [[ ${coverage_mode} == "no-coverage" ]]; then
   exit 0
 fi
 
-coverage_dir="coverage/${mode}"
-raw_dir="${coverage_dir}/raw"
-all_ledger="${coverage_dir}/all.info"
-ledger="${coverage_dir}/lcov.info"
-rm -rf "${coverage_dir}"
-mkdir -p "${raw_dir}"
+report_dir="${root_dir}/reports/${mode}"
+raw_dir="$(mktemp -d)"
+trap 'rm -rf "${raw_dir}"' EXIT
+all_ledger="${raw_dir}/all.info"
+ledger="${report_dir}/lcov.info"
+rm -rf "${report_dir}"
+mkdir -p "${report_dir}"
 
 set +e
 dart test --reporter=expanded --coverage="${raw_dir}" "${tests[@]}"
@@ -62,10 +56,7 @@ dart run coverage:format_coverage \
 pattern='(^|/)lib/test_helper[.]dart$'
 [[ ${mode} == "unit" ]] && pattern='(^|/)lib/src/.*[.]dart$'
 
-# The filter-and-assert half is Dart-free and lives in its own script, so the eight
-# descendants that rewrite this file's member path do not each carry a copy of it.
 "${root_dir}/scripts/ci/coverage-ledger.sh" "${all_ledger}" "${ledger}" "${pattern}" "${mode}"
-rm -rf "${raw_dir}"
 
 [[ ${test_status} -ne 0 ]] && echo "❌ ${mode} tests failed (exit ${test_status})" >&2 && exit "${test_status}"
-echo "✅ ${mode} coverage artifact: ${member_dir}/${ledger}"
+echo "✅ ${mode} coverage artifact: reports/${mode}/lcov.info"

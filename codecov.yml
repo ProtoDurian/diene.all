@@ -1,4 +1,3 @@
-# Coverage statuses are informational; local unit and meta ledgers block at 100%.
 coverage:
   status:
     project:

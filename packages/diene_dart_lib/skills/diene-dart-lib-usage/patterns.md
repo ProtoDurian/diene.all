@@ -38,6 +38,6 @@ materialize a real library:
    `README.md`, and this skill's identity (`diene-dart-<name>-usage`).
 
 Retokenize the package identity to `diene_<name>` and the mirror to
-`AtomiCloud/diene.dart_<name>`. The surrounding template — strict analysis,
+`ProtoDurian/diene.dart_<name>`. The surrounding template — strict analysis,
 coverage ledgers, dead-code views, pana, and the OIDC publish flow — needs no
 change.

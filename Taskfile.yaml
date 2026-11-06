@@ -24,7 +24,7 @@ tasks:
   clean:
     desc: Remove Dart dependency, build, coverage, and generated-doc artifacts
     cmds:
-      - rm -rf .dart_tool packages/diene_dart_lib/.dart_tool packages/diene_dart_lib/coverage packages/diene_dart_lib/doc/api
+      - rm -rf .dart_tool packages/diene_dart_lib/.dart_tool reports packages/diene_dart_lib/doc/api
 
   build:
     desc: Validate the publishable Dart library and example

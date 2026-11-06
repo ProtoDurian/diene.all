@@ -1,9 +1,9 @@
 # diene_dart_lib
 
 [![pub package](https://img.shields.io/pub/v/diene_dart_lib.svg)](https://pub.dev/packages/diene_dart_lib)
-[![CI](https://github.com/AtomiCloud/diene.dart_lib/actions/workflows/ci.yaml/badge.svg)](https://github.com/AtomiCloud/diene.dart_lib/actions/workflows/ci.yaml)
-[![unit coverage](https://codecov.io/gh/AtomiCloud/diene.dart_lib/graph/badge.svg?flag=unit)](https://codecov.io/gh/AtomiCloud/diene.dart_lib)
-[![meta coverage](https://codecov.io/gh/AtomiCloud/diene.dart_lib/graph/badge.svg?flag=meta)](https://codecov.io/gh/AtomiCloud/diene.dart_lib)
+[![CI](https://github.com/ProtoDurian/diene.dart_lib/actions/workflows/ci.yaml/badge.svg)](https://github.com/ProtoDurian/diene.dart_lib/actions/workflows/ci.yaml)
+[![unit coverage](https://codecov.io/gh/ProtoDurian/diene.dart_lib/graph/badge.svg?flag=unit)](https://codecov.io/gh/ProtoDurian/diene.dart_lib)
+[![meta coverage](https://codecov.io/gh/ProtoDurian/diene.dart_lib/graph/badge.svg?flag=meta)](https://codecov.io/gh/ProtoDurian/diene.dart_lib)
 
 The generic, pure-Dart **library template** for the Diene family. It ships a
 small, replaceable sample domain — a `Note` value type with a JSON wire codec
@@ -39,7 +39,7 @@ C0 harness, and guidance on replacing the sample.
 ## Using this template
 
 This is a template: a materialized child retokenizes the package identity to
-`diene_<name>` / `AtomiCloud/diene.dart_<name>`, replaces `lib/src/**` with its
+`diene_<name>` / `ProtoDurian/diene.dart_<name>`, replaces `lib/src/**` with its
 own domain, and re-points the barrel exports. See
 `skills/diene-dart-lib-usage/patterns.md`.
 

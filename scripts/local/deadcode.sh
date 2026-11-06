@@ -6,7 +6,6 @@ cd "${root_dir}"
 
 member_dir="packages/diene_dart_lib"
 
-# Resolve the whole workspace once at the root.
 dart pub get
 
 production_root="$(mktemp -d)"
@@ -21,8 +20,6 @@ echo "🔎 Repository dead-code pass (library + tests + example)"
 
 echo "🔎 Production dead-code pass (published entrypoints, tests excluded)"
 cp "${member_dir}/analysis_options.yaml" "${production_root}/analysis_options.yaml"
-# Standalone manifest: drop `resolution: workspace` so `dart pub get` resolves
-# outside the pub workspace. Runtime dependencies (if any) are preserved.
 yq 'del(.resolution)' "${member_dir}/pubspec.yaml" >"${production_root}/pubspec.yaml"
 cp -R "${member_dir}/lib" "${production_root}/lib"
 mkdir -p "${production_root}/bin"

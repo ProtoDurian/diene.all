@@ -1,10 +1,3 @@
-# Reusable pub.dev publish job. Called by cd.yaml on a `v[0-9]+.[0-9]+.[0-9]+`
-# tag push, or by workflow_dispatch with an explicit release tag. Materializes
-# the AtomiCloud org pub.dev credential, pins the published member to the
-# release tag's bytes, then runs the manifest==tag guard and
-# `dart pub publish --force`.
-# pub.dev trusted publishing (OIDC) is deliberately NOT used (user ruling
-# 2026-07-25); the long-lived org credential is the only publish credential.
 name: ⚡ Reusable Dart Publish
 
 on:
@@ -15,10 +8,6 @@ on:
         required: true
         type: string
     secrets:
-      # Declared so a missing or misnamed org secret fails at workflow-call resolution,
-      # the same way bun-lib declares NPM_API_KEY and dotnet-lib declares NUGET_API_KEY.
-      # The runtime non-empty check below still stands; this only moves the earliest
-      # possible failure earlier.
       PUB_CREDENTIALS_JSON:
         required: true
 
@@ -30,9 +19,9 @@ jobs:
     environment: pub.dev
     timeout-minutes: 20
     runs-on:
-      - nscloud-ubuntu-22.04-amd64-4x8-with-cache
-      - nscloud-cache-size-50gb
-      - nscloud-cache-tag-atomi-nix-store-cache-linux-amd64
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
       - name: Pin the published member to the release tag
