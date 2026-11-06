@@ -1,6 +1,6 @@
 # OpenTelemetry Configuration
 
-Applies only if this repo has backend code (Bun, .NET or Go). That code comes from a CyanPrint template for its language (CyanPrint is the template generator this repo was made with; `.cyan_state.yaml` records its templates), which also adds its OTel library ("the library" below), its config library and the config files. This repo has none of them yet.
+Applies only if this repo has backend code (Bun, .NET or Go). That code comes from a CyanPrint template for its language (CyanPrint is the template generator this repo was made with; it records its templates in `.cyan_state.yaml` once a template has been applied), which also adds its OTel library ("the library" below), its config library and the config files. This repo has none of them yet.
 
 Backend services send logs, metrics and traces with OpenTelemetry (OTel). All three languages read the same `otel:` config block and set the same resource attributes. Frontends use Grafana Faro instead; see [Faro](/docs/standards/observability/faro.md).
 
@@ -52,7 +52,7 @@ Rules:
 - Each exporter is switched by its own `enabled` boolean, not by a string such as `exporter: otlp`.
 - OTLP (the OpenTelemetry Protocol) is always HTTP/protobuf (port 4318 by default); there is no protocol setting.
 - Durations are ISO 8601 strings: `PT10S` is 10 seconds.
-- The sampler `type` is `parentbased_traceidratio`, `always_on` or `always_off`; `ratio` (0 to 1) is the share of new traces kept.
+- The sampler `type` is `parentbased_traceidratio` (follow the caller's sampling decision if there is one, else keep the `ratio` share, 0 to 1, of new traces), `always_on` or `always_off`.
 - An enabled exporter with an empty `endpoint` fails config validation before startup.
 
 ## Resource attributes
@@ -98,5 +98,5 @@ Per language:
 ## Testing
 
 - **Unit tests**: every landscape's config passes validation.
-- **Integration tests**: use the library's in-memory telemetry; never start a fake collector.
+- **Integration tests**: test with the in-memory exporter the language template's OTel library ships; never start a fake collector.
 - **Real export**: checked after deploy, in Grafana Explore.

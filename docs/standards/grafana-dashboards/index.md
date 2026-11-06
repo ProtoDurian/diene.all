@@ -43,7 +43,7 @@ Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashbo
 
 - `$landscape` is required on every dashboard, with `refresh: 2` (reload on time change), so one dashboard works whether a Grafana's datasource holds one landscape or several; in a one-landscape Grafana it has one value. Add the datasource variable `prometheus_datasource` labeled `Prometheus data source` and, with log panels, `loki_datasource` labeled `Loki data source`; these names pass strict lint. Set `editable: false`.
 - Log panels also get a `$filter` text variable, applied as `|~ "$filter"`.
-- Link panels to the next view: a log line to its trace, a service tile to `/d/<platform>-<service>-overview`. Carry the scope in the URL: `?var-landscape=${landscape}`.
+- Link panels to the next view: a log line to its trace (set up by the platform team's logs datasource, not in dashboard JSON), a service tile to `/d/<platform>-<service>-overview`. Carry the scope in the URL: `?var-landscape=${landscape}`.
 
 ## Log and trace panels
 
@@ -55,7 +55,7 @@ The log line in the store is not what the app wrote: the logging library's JSON 
 4. **Note each stream's format and level encoding**, e.g. `level=error` (logfmt), `"level":"error"` (JSON), `"level":50` (pino numeric).
 5. **Filter the noise** with one targeted negative filter per noisy line type, e.g. `!= "grpc.health"`.
 6. **One panel per failure class**, taken from the failures named in `SIGNALS.md` (Gates 2 and 5), e.g. "Server errors (5xx)", "Auth denials (401/403)". An alert that sets `panel` links to the panel showing the data it fires on. The last panel is "all errors minus the classes above", so nothing hides. An empty class panel on a healthy service is correct; say so in its description.
-7. **Place log evidence in the row of the metric it explains**, not in a generic logs row at the bottom.
+7. **Place log evidence in the row of the metric it explains**, or in the detail row directly under it when that metric is in the overview row; never in a generic logs row at the bottom.
 8. **Rewrite lines to their key fields**: `| json | line_format "{{.level}} {{.msg}}"`. If `line_format` does not work on the engine, use `options.displayedFields`. Leave plain-text lines raw. Keep `prettifyLogMessage` off.
 9. **Record what you found** (formats, level encoding, noise filters, engine limits, date) in `observability/dashboards/log-notes.md`.
 

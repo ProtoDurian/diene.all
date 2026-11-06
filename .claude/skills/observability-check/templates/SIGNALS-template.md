@@ -5,9 +5,9 @@
 **Decision:** NO | YES
 **Why:** {who acts on the number, which SLO uses it, or which aggregate it answers}
 
-| Metric   | Type                    | Labels             | ATS                          | Why      |
-| -------- | ----------------------- | ------------------ | ---------------------------- | -------- |
-| `{name}` | counter/gauge/histogram | `{bounded labels}` | {estimate; histogram ×10–15} | {reason} |
+| Metric   | Type                    | Labels             | ATS                          | Why                                                       |
+| -------- | ----------------------- | ------------------ | ---------------------------- | --------------------------------------------------------- |
+| `{name}` | counter/gauge/histogram | `{bounded labels}` | {estimate; histogram ×10–15} | {reason; `planned` if the service has no code for it yet} |
 
 ### Gate 2 — Logs
 

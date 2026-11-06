@@ -10,11 +10,11 @@
 
 ## Dependencies
 
-| Direction | System       | Purpose | When it fails, this service… |
-| --------- | ------------ | ------- | ---------------------------- |
-| calls     | {downstream} | {why}   | {behavior}                   |
-| called by | {upstream}   | {why}   | {behavior}                   |
-| stores    | {db/queue}   | {what}  | {behavior}                   |
+| Direction | System and its owner        | Purpose | When it fails, this service… |
+| --------- | --------------------------- | ------- | ---------------------------- |
+| calls     | {downstream} ({owner team}) | {why}   | {behavior}                   |
+| called by | {upstream} ({owner team})   | {why}   | {behavior}                   |
+| stores    | {db/queue} ({owner team})   | {what}  | {behavior}                   |
 
 ## Failure modes
 

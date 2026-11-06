@@ -7,4 +7,4 @@ description: Write or change a Grafana dashboard in observability/dashboards/, t
 
 1. Write or change the dashboard following [Grafana Dashboards](/docs/standards/grafana-dashboards/index.md).
 2. Run its "Check it before merge" steps: JSON parse, strict lint, sandbox render, visual checklist.
-3. Sandbox files, metric generator and lint example: `.claude/skills/grafana-dashboards/sandbox/`. Last, run `pre-commit run --all-files`.
+3. Sandbox files, metric generator and lint example: `.claude/skills/grafana-dashboards/sandbox/`. Last, `git add` the new files, then `pre-commit run --all-files`; if a hook changes files, stage them and run it again.

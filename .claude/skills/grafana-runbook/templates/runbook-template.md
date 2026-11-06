@@ -35,4 +35,4 @@ Known causes: {YYYY-MM-DD — one-line incident summary}, or "none recorded yet"
 
 ## Escalation
 
-If not fixed in {30m}, or {condition}, escalate to the owner team in its channel (System overview, Links). Declare an incident if {user-impact condition}.
+If not fixed in {30m}, or {condition}, escalate to the owner team in its channel (System overview, Links); if a dependency is at fault, also to its owner (System overview, Dependencies). Declare an incident if {user-impact condition}.

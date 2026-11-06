@@ -1,13 +1,13 @@
 # Shipping Observability Files to Grafana
 
-The files in `observability/` are plain Grafana content. The service's **primordial chart** turns them into Grafana Operator resources (terms: [Observability Standards](/docs/standards/observability/index.md#terms)). This repo has no primordial chart yet; when you add one at `infra/primordial_chart/`, it must follow this page. **Until it exists, nothing renders these files, so the reviewer runs the [structural checks](#structural-checks) by hand.**
+The files in `observability/` are plain Grafana content. The service's **primordial chart** turns them into Grafana Operator resources (terms: [Observability Standards](/docs/standards/observability/index.md#terms)). This repo has no primordial chart yet; when you add one at `infra/primordial_chart/`, it must follow this page. **Until it exists, nothing renders these files, so the reviewer runs the [structural checks](#structural-checks) by hand.** You need `helm-wrapper`'s repository (the Helm library the chart builds on) from the platform team before you can write this chart; its README has the helpers.
 
 ## Where things run
 
 - **One Grafana per landscape.** The chart is installed once per landscape, onto Primordial, into that landscape's namespace `{grafana-namespace}`. Each install targets that landscape's Grafana through the operator's `instanceSelector` (`{instance-selector}`; both values from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you)). Installs never share a Grafana, so uids and names carry no landscape and never collide.
 - Each install stamps its landscape on the alert rules and points them at that landscape's datasources, so one rule file works everywhere and `expr` never selects `landscape`. Dashboards use the `$landscape` variable.
 - The app chart, `infra/root_chart/`, only runs the service. It never renders observability files.
-- Build the rendering with the `helm-wrapper` Helm library (reusable templates the chart depends on; repository and version from the platform team), not with CI scripts or kustomize.
+- Build the rendering with `helm-wrapper`, not with CI scripts or kustomize.
 
 ## The chart copy
 

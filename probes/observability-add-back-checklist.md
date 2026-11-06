@@ -24,7 +24,7 @@ This checklist is for the maintainers of the observability template. In a servic
 1. If its parent branch has moved, merge the parent first.
 2. Merge the `observability` branch with a merge commit. Never rebase, squash, cherry-pick or rewrite the payload files.
 3. Check that the merge adds exactly the payload: `git diff <parent> <merge>` shows the same changes as `git diff <base> observability`.
-4. Check that `probes/observability-*` (probes are tests under `probes/`, run with `bun test probes`, that check a feature's files exist) and the `observability-standards-present` row in `probes/features.json` arrived through the merge, not by hand.
+4. Check that `probes/observability-*` (a probe is a check file under `probes/` that the template's own test run executes) and the `observability-standards-present` row in `probes/features.json` arrived through the merge, not by hand.
 5. Run all the branch's probes and CI checks; all must pass.
 6. Write down the parent commit, the observability commit, the merge commit and the check results.
 

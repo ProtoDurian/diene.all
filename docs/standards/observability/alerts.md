@@ -16,8 +16,7 @@ observability/alerts/retry-queue/
 - **The file name is the severity**: `critical.yaml`, `warning.yaml` or `info.yaml`. There is no severity field, so the two can never disagree.
 - **Use only the tiers you need**: one file for a plain failure; two for capacity, slow decline or an SLO [burn rate](/docs/standards/observability/index.md#terms) (fast critical, slow warning); three only when the trend itself is worth recording.
 - **Tiers need real gaps**: for `>`, critical ≥ warning × 1.2 (4000 → 5000 is fine); for `<`, critical ≤ warning ÷ 1.2. For burn-rate tiers, compare the burn rates (14.4× vs 6×).
-- **The folder name is the slug** (rule in [Gate 6](/docs/standards/observability/signals.md#gate-6--alert-set-folders)).
-- **Every Gate 5 YES has a folder, and every folder has a Gate 5 YES.** No Gate 5 YES at all means no `alerts/<slug>/` folders, which is fine.
+- **The folder name is the slug, and the folders match [Gate 6](/docs/standards/observability/signals.md#gate-6--alert-set-folders) exactly.** No Gate 5 YES at all means no `alerts/<slug>/` folders, which is fine.
 - **One page per root cause**: if two sets fire for the same cause, keep the one users feel (the symptom) and demote or delete the other. One burn-rate set usually replaces several hand-made error and latency sets.
 
 ## The tier file
@@ -78,7 +77,7 @@ summary: '{{ humanizePercentage $values.A.Value }} of requests failing; SLO budg
 description: 'Check the error panels and recent deploys first.'
 ```
 
-Its `warning.yaml` has the same `expr` with `[30m]`, `[6h]` and `(6 * 0.001)`, and `for: 15m`:
+In `summary`, `$values.A.Value` is the left side of `and`, here the 5m error ratio. Its `warning.yaml` has the same `expr` with `[30m]`, `[6h]` and `(6 * 0.001)`, and `for: 15m`:
 
 ```text
 ( sum(rate(http_server_request_duration_seconds_count{service="zinc",http_response_status_code=~"5.."}[30m]))
@@ -120,8 +119,8 @@ histogram_quantile(0.99, sum by (le, pod) (rate(webhook_delivery_duration_second
 Before merge:
 
 1. **Structure**: the [structural checks](/docs/standards/observability/shipping.md#structural-checks).
-2. **Review**: tier gaps, `panel` points at the right panel, runbook complete, slug correct.
-3. **Fire it offline** (metric alerts). `promtool` (from `prometheus.cli` in the `dev` group of `nix/env.nix`, so in the default shell) runs the tier file's `expr` and `for` against made-up series: it must stay quiet while healthy and fire when bad. `yq` (in the shell; check with `command -v yq`) pulls both from the tier file, so nothing is copied by hand. The example tests the burn-rate `critical.yaml` above: no errors for an hour, then 10% errors.
+2. **Review**: tier gaps, `panel` points at the right panel, runbook complete, slug correct, and the Gate 5 Owner is not `pending`.
+3. **Fire it offline** (metric alerts). `promtool` (from `prometheus.cli` in the `dev` group of `nix/env.nix`, so in the default shell) runs the tier file's `expr` and `for` against made-up series: it must stay quiet while healthy and fire when bad. `yq` (from the atomiutils [bundle](/docs/standards/grafana-dashboards/sandbox.md#tools); check with `command -v yq`) pulls both from the tier file, so nothing is copied by hand. The example tests the burn-rate `critical.yaml` above: no errors for an hour, then 10% errors. Change the series labels to match every selector in your `expr`, or the bad case never fires.
 
    ```bash
    tier=observability/alerts/errors/critical.yaml

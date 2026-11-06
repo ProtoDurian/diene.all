@@ -10,7 +10,7 @@ A local Grafana, image renderer and Prometheus, so you can render a dashboard wi
 
 ## Tools
 
-Every tool comes from this repo's nix shell. Run `command -v jq curl file awk sed docker dashboard-linter promtool`; that is the check: each must print a `/nix/store/…` path. In `nix/env.nix`, `dashboard-linter` is in the `lint` group, `promtool` comes from `prometheus.cli` in the `dev` group (default shell), and the rest come from the atomiutils and infrautils bundles. The Docker CLI comes from infrautils; the Docker daemon comes from your Docker install (`CLAUDE.md`, Prerequisites) and must be running.
+Every tool comes from this repo's nix shell. Run `command -v jq curl file awk sed docker dashboard-linter promtool`; that is the check: each must print a `/nix/store/…` path. In `nix/env.nix`, `dashboard-linter` is in the `lint` group, `promtool` comes from `prometheus.cli` in the `dev` group (default shell), and the rest come from atomiutils and infrautils: tool bundles from the nix registry this repo's `flake.nix` uses (input `atomipkgs`); `command -v <tool>` shows which bundle a tool comes from. The Docker CLI comes from infrautils; the Docker daemon comes from your Docker install (`CLAUDE.md`, Prerequisites) and must be running.
 
 ## Files
 
@@ -24,7 +24,7 @@ Everything lives in `.claude/skills/grafana-dashboards/sandbox/`:
 | `dashboards/sample.json` | A small fixture dashboard that passes strict lint and renders with that data                       |
 | `dashboards/.lint`       | Example `dashboard-linter` exclusions, each with a reason                                          |
 
-After you copy the sandbox (below), edit `identity` (your platform, service and module, as your queries select them) and the metric list at the top of `$sb/generate-metrics.awk`, not the skill's copy. Add one line per metric and label set your dashboard queries (type, name, labels, normal value, incident value), including error series and values near your thresholds, so threshold colors show.
+For your own dashboard, write one line per metric and label set its queries use to `$sb/rows.txt`, in the format of the list at the top of `generate-metrics.awk` (type, name, labels, normal value, incident value), including error series and values near your thresholds, so threshold colors show. Pass it with `-v rows=`, and pass your platform, service and module, as your queries select them, with `-v identity=`; if your queries still say `{service}`, set `service=sandbox` (the `sed` line below puts `sandbox` there).
 
 ## Run it
 
@@ -36,10 +36,10 @@ sb="$(mktemp -d)"
 cp -r .claude/skills/grafana-dashboards/sandbox/. "$sb"
 board="$sb/dashboards/$(basename "$dashboard")"
 cp "$dashboard" "$board"
-sed -i 's/{platform}/sandbox/g; s/{service}/sandbox/g' "$board"
-# now edit "$sb/generate-metrics.awk"
+sed -i 's/\([^{]\){platform}/\1sandbox/g; s/\([^{]\){service}/\1sandbox/g; s/\([^{]\){module}/\1api/g' "$board"
+# your rows in "$sb/rows.txt" and your identity (see above); for sample.json, drop both -v options
 mkdir "$sb/prom-data"
-awk -f "$sb/generate-metrics.awk" > "$sb/metrics.om"
+awk -v rows="$sb/rows.txt" -v identity=platform=sandbox,service=sandbox,module=api -f "$sb/generate-metrics.awk" > "$sb/metrics.om"
 promtool tsdb create-blocks-from openmetrics "$sb/metrics.om" "$sb/prom-data"
 
 export SANDBOX_UID="$(id -u)" SANDBOX_GID="$(id -g)"
@@ -52,7 +52,8 @@ for _ in $(seq 60); do
 done
 ```
 
-- The `sed` line fills `{platform}` and `{service}`, if still unknown, with `sandbox` in the sandbox copy only, because Grafana uids allow only `A-Za-z0-9-_`.
+- The `sed` line fills `{platform}`, `{service}` and `{module}`, if still unknown, with `sandbox`, `sandbox` and `api` in the sandbox copy only, because Grafana uids allow only `A-Za-z0-9-_`. It leaves `{{…}}` legend names alone.
+- `promtool tsdb create-blocks-from openmetrics` writes the synthetic history straight into Prometheus's storage, so no scraping is needed.
 - `SANDBOX_UID`/`SANDBOX_GID` make Prometheus run as you, so it can write `prom-data`.
 - The unique project name keeps the containers and volumes apart from other stacks.
 - Grafana is anonymous admin, which is why every port is bound to `127.0.0.1`.
@@ -72,6 +73,7 @@ curl -fsS -o "$sb/panel-2.png" \
 
 - Render once per landscape (`var-landscape=pichu`, `raichu`) to prove the variable changes the data.
 - Raise `height` until the bottom row is in the picture.
+- `panelId=2` is an example: use the id of a panel an alert links to, or any panel that is not a row.
 - Open every PNG and go through the [visual checklist](/docs/standards/grafana-dashboards/index.md#visual-checklist).
 
 ## Clean up

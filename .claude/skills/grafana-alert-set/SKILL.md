@@ -7,4 +7,4 @@ description: Create or review an alert set, the folder observability/alerts/<slu
 
 1. Create the folder and choose its tiers following [Alerts](/docs/standards/observability/alerts.md).
 2. Write each tier file with `grafana-alert`.
-3. Write the folder's `runbook.md` with `grafana-runbook`, then run `pre-commit run --all-files`.
+3. Write the folder's `runbook.md` with `grafana-runbook`. Last, `git add` the new files, then `pre-commit run --all-files`; if a hook changes files, stage them and run it again.

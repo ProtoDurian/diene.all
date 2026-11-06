@@ -9,7 +9,7 @@ Frontends send telemetry with Grafana Faro, Grafana's frontend observability SDK
 Both frontends must:
 
 1. Read a validated config under `client.faro`: an enabled flag, the Faro collector URL, the sampling ratio, the app id (this frontend's app in Faro) and the stack id (the Grafana stack that holds it), plus the service-tree `app:` block (shape in [OpenTelemetry](/docs/standards/observability/otel.md#resource-attributes)). Key names other than `client.faro.build.*` come from the frontend template's config schema. The collector URL, app id and stack id come from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you).
-2. Start Faro exactly once, after the client config (the part of the app config that may reach the browser) is available.
+2. Start Faro exactly once. How the client config (the part of the app config that may reach the browser) reaches the browser is the frontend template's job; init runs once that config is readable.
 3. Do nothing, and make no network calls, when disabled.
 4. Fail visibly when enabled with invalid config. Never swallow a start-up failure and pretend telemetry works.
 5. Attach the full LPSM and version identity to every event, error, session and span (table below).
@@ -36,7 +36,7 @@ src/lib/observability/
 ├── config.ts                  # adapts the client config; loads no files
 ├── faro.ts                    # builds metadata and instrumentations; start-once init
 ├── faro-error-reporter.ts     # the app's error reporter
-├── FrontendObservability.tsx  # client-only component that calls init once config is injected
+├── FrontendObservability.tsx  # client-only component that calls init once the client config is readable
 └── index.ts                   # exports the public surface only
 ```
 
@@ -61,7 +61,7 @@ lib/src/observability/
 └── observability.dart
 ```
 
-Use Grafana's verified-publisher `faro` package. Map `service` to `appName`, `platform` to `namespace`, `version` to `appVersion` and landscape to `appEnv`; put the `atomi.*` values and `deployment.environment.name` in session or resource attributes. Wrap the app once with the SDK bootstrap, and add only the interaction and asset instrumentation widgets you need.
+Use the `faro` package on pub.dev, published by Grafana (verified publisher). Map `service` to `appName`, `platform` to `namespace`, `version` to `appVersion` and landscape to `appEnv`; put the `atomi.*` values and `deployment.environment.name` in session or resource attributes. Wrap the app once with the SDK bootstrap, and add only the interaction and asset instrumentation widgets you need.
 
 Flutter does not use the webpack source-map plugin; native symbol upload is not covered here.
 

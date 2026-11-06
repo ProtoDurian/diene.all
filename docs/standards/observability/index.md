@@ -6,7 +6,7 @@ How this service decides what to measure, and how it keeps its Grafana dashboard
 
 Examples in these docs use a made-up service: platform `tracker`, service `zinc`, module `webhook`.
 
-- **Service tree (LPSM)**: four labels that say where something runs: `landscape` (the environment, e.g. `pichu` = development, `raichu` = production), `platform` (the product), `service` (usually one repo, like this one) and `module` (one component, e.g. `api`). The linked page also has C (cluster); telemetry labels leave it out. Naming rules: [Service Tree](/docs/standards/service-tree/index.md).
+- **Service tree (LPSM)**: four labels that say where something runs: `landscape` (the environment, e.g. `pichu` = development, `raichu` = production), `platform` (the product), `service` (usually one repo, like this one) and `module` (one component, e.g. `api`). The linked page also defines a cluster level (LCPSM); telemetry labels leave it out. Naming rules: [Service Tree](/docs/standards/service-tree/index.md).
 - **Platform team**: the people who run Grafana, the collectors and alert routing. Not the same thing as the `platform` label.
 - **Stamping**: adding the LPSM labels automatically (rule 1 below).
 - **Signal**: one metric, log event or trace span. Their query languages are PromQL (metrics), LogQL (logs, in Loki) and TraceQL (traces, in Tempo).
@@ -14,7 +14,7 @@ Examples in these docs use a made-up service: platform `tracker`, service `zinc`
 - **SLO** (service level objective): the target share of good events over a 30-day window, e.g. 99.9% of requests succeed. The **error budget** is 1 − SLO, here 0.001. A service writes its SLOs in its `SIGNALS.md` answers (Gate 5).
 - **Burn rate**: how many times faster than allowed the error budget is being spent. 14.4× for 1 hour spends about 2% of the 30-day budget; 6× for 6 hours spends about 5%.
 - **The six gates**: six questions you answer for each feature to decide its signals. See [Signal decisions](/docs/standards/observability/signals.md).
-- **Severity tier**: `critical` (act now; usually pages on-call), `warning` (act in working hours; usually the team channel) or `info` (worth recording; nobody acts). An alert's tier is its file name.
+- **Severity tier**: `critical` (act now; usually pages on-call), `warning` (act in working hours; usually the team channel) or `info` (worth recording; nobody acts).
 - **Alert set**: one folder under `observability/alerts/` holding one to three tier files and their runbook. See [Alerts](/docs/standards/observability/alerts.md).
 - **Generic dashboard**: a dashboard the platform team runs for every service: request rate, errors, duration and resource use, filtered by LPSM. It is not in this repo.
 - **Curated dashboard**: a dashboard this repo owns, for this service's own custom metrics.
@@ -23,7 +23,7 @@ Examples in these docs use a made-up service: platform `tracker`, service `zinc`
 
 ## Values the platform team gives you
 
-This repo does not contain these values, so the docs use the placeholder shown. Ask the platform team for each value except `{repo-url}`, which is your repo's web URL plus `/blob/<default branch>`. Record each value in the places the last column names. Until a value is known, keep its placeholder. A dashboard cannot merge while `{platform}` or `{service}` is unknown (its uid needs them), and an alert set cannot merge while its owner is pending ([Gate 5](/docs/standards/observability/signals.md#gate-5--alerts-default-no)).
+This repo does not contain these values, so the docs use the placeholder shown. Ask the platform team for each value except `{repo-url}`, which is your repo's web URL plus `/blob/<default branch>`. Record each value in the places the last column names. Until a value is known, keep its placeholder. A dashboard cannot merge while `{platform}` or `{service}` is unknown (its uid needs them); for when an alert set can merge, see [Gate 5](/docs/standards/observability/signals.md#gate-5--alerts-default-no).
 
 | Value                                                                                         | Placeholder                                                                                                       | Recorded in                                                                                            |
 | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -62,7 +62,7 @@ observability/
 ├── index.md            # points here
 ├── SIGNALS.md          # the six-gate answers, one block per feature
 ├── overview.md         # system overview that every runbook links to
-├── dashboards/         # curated dashboards; empty until Gate 4 says yes
+├── dashboards/         # log-notes.md from the first log review; dashboards once Gate 4 says yes
 │   ├── README.md       # keeps the folder in git
 │   ├── overview.json
 │   ├── .lint           # exclusions for dashboard-linter (Grafana's dashboard linter), each with a reason

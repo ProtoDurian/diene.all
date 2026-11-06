@@ -12,7 +12,7 @@ Terms such as LPSM, ATS and SLO are defined in [Observability Standards](/docs/s
 | Logs    | Lines × bytes × retention                                                        | **Liberal**, as long as logs follow events, not loops                               |
 | Traces  | Spans × traffic × retention                                                      | **Liberal.** The platform team samples traces in the collector                      |
 
-An unbounded label (user ID, URL, request ID) turns one metric into millions of ATS. Put IDs in logs and span attributes instead. If the collector keeps a per-pod label (`pod` or `instance`; check one series in Grafana Explore), multiply the ATS by the replica count. For a new metric, assume it does and use the planned replica count. Count every landscape the service runs in, wherever its data is stored.
+An unbounded label (user ID, URL, request ID) turns one metric into millions of ATS. Put IDs in logs and span attributes instead. If the collector keeps a per-pod label (`pod` or `instance`; check one series in Grafana Explore), multiply the ATS by the replica count. For a new metric, assume it does and use the planned replica count. Count every landscape the service runs in, wherever its data is stored. Until you know the landscapes or replicas, assume 2 landscapes × 2 replicas and say so in the ATS cell.
 
 ## The six gates
 
@@ -46,7 +46,7 @@ An alert must pass all three checks:
 
 1. **Nothing heals it already.** If an autoscaler, restart policy or retry loop fixes the condition, do not alert on it. Alert when that mechanism is exhausted.
 2. **Someone can act.** The runbook must say what to do. "Watch it" means `info` at most, or no alert.
-3. **Someone owns it.** The owner team in `observability/overview.md` agrees to receive it. Until the platform team names it, write `pending` in the Gate 5 Owner column; an alert set cannot merge while its owner is pending. Delivery is the platform team's routing; if `{platform}` has no route yet, ask them.
+3. **Someone owns it.** The owner team in `observability/overview.md` agrees to receive it. Write `pending` in the Gate 5 Owner column until `overview.md` (written later, with `grafana-runbook`) names the owner team; an alert set cannot merge while its owner is pending. Delivery is the platform team's routing; if `{platform}` has no route yet, ask them.
 
 | Condition                             | Already healed by         | Alert?                          |
 | ------------------------------------- | ------------------------- | ------------------------------- |
@@ -56,17 +56,17 @@ An alert must pass all three checks:
 | One pod restart                       | restart policy            | No; a sustained crash loop: yes |
 | Retry queue growing despite retries   | retries are losing        | Yes                             |
 
-For each alert that survives, record in the Gate 5 table its tiers ([how many](/docs/standards/observability/alerts.md#one-alert-set--one-folder)), its type (see [Alerts](/docs/standards/observability/alerts.md)), any SLO it uses, what already heals it, its owner and a **noise budget**: how often you expect it to fire, e.g. "≤2 pages/month". An alert that fires more often than someone acts fails check 2.
+For each alert that survives, fill every Gate 5 column of the template ([tiers and types](/docs/standards/observability/alerts.md)); the **noise budget** is how often you expect it to fire, e.g. "≤2 pages/month". An alert that fires more often than someone acts fails check 2.
 
 ### Gate 6 — Alert-set folders
 
-Each Gate 5 alert becomes one folder, `observability/alerts/<slug>/`, with its tier files and `runbook.md`, in the same PR. Record a short slug next to each alert name, using only `a-z`, `0-9` and `-`: `Retry queue saturated` → `retry-queue`. Its length limit: [Shipping](/docs/standards/observability/shipping.md#structural-checks); if the platform is not known yet, keep the slug ≤ 12 characters and recheck once it is.
+Each Gate 5 alert becomes one folder, `observability/alerts/<slug>/`, with its tier files and `runbook.md`, in the same PR. Record a short slug next to each alert name, using only `a-z`, `0-9` and `-`: `Retry queue saturated` → `retry-queue`. Its length limit: [Shipping](/docs/standards/observability/shipping.md#structural-checks); if the platform is not known yet, keep the slug ≤ 12 and ≤ 23 − len(service) characters, which fits any platform name of up to 6 characters, and recheck once it is known.
 
 ## Review checklist
 
 - [ ] The feature has a block in `SIGNALS.md` with all six gates answered.
 - [ ] Every answer has a one-line reason; a bare YES or NO fails review.
 - [ ] Every YES names its metric, log event, span, panel or folder, and its cost (ATS, log volume or sampling).
-- [ ] Every Gate 5 YES has its tiers, an alert type, a noise budget and an owner (or `pending`).
-- [ ] Everything named exists in the PR: the metric in the service code (or `planned` in its Gate 1 row while the service has no code for it yet), each Gate 6 folder under `observability/alerts/`.
+- [ ] Every Gate 5 row is fully filled (Owner may be `pending`).
+- [ ] Everything named exists in the PR: each metric in the service code (unless its Gate 1 row says `planned`), each Gate 6 folder under `observability/alerts/`.
 - [ ] No unbounded metric labels, no logs in hot loops, a sampling ratio for every trace.
