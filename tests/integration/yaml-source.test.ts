@@ -26,6 +26,7 @@ beforeAll(async () => {
   await writeFile(join(dir, 'custom.yaml'), 'server:\n  port: 1\n  host: custom-host\n  tags: []\n');
   await writeFile(join(dir, 'empty.config.yaml'), '');
   await writeFile(join(dir, 'broken.config.yaml'), '- just\n- a\n- list\n');
+  await writeFile(join(dir, 'typo.config.yaml'), 'server: [unclosed\n');
 });
 
 afterAll(async () => {
@@ -136,6 +137,22 @@ describe('YamlConfigSource tiers', () => {
 
     // Assert
     await act.should.be.rejectedWith({ code: 'ENOENT' });
+  });
+
+  it('should name the file and keep the cause when the YAML does not parse', async () => {
+    // Arrange
+    const source = new YamlConfigSource({ dir, env: {} });
+
+    // Act
+    const error: object = await source.overlay('typo').then(
+      () => ({}),
+      (reason: Error) => reason,
+    );
+
+    // Assert
+    error.should.be.instanceof(YamlConfigSourceError);
+    (error as Error).message.should.startWith(`${join(dir, 'typo.config.yaml')}: `);
+    ((error as Error).cause as Error).name.should.equal('YAMLParseError');
   });
 
   it('should rethrow an overlay read error other than a missing file', async () => {

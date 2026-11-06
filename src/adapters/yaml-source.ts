@@ -6,8 +6,8 @@ import type { ConfigRecord } from '../lib/merge.js';
 import type { ConfigSource, EnvRecord } from '../lib/source.js';
 
 class YamlConfigSourceError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'YamlConfigSourceError';
   }
 }
@@ -39,7 +39,6 @@ class YamlConfigSource implements ConfigSource {
     return this.read(join(this.dir, this.baseFile), true);
   }
 
-  // A missing overlay file is an empty overlay; a missing base file is an error.
   overlay(landscape: string): Promise<ConfigRecord> {
     return this.read(join(this.dir, this.overlayFile(landscape)), false);
   }
@@ -60,10 +59,18 @@ class YamlConfigSource implements ConfigSource {
       if (!required && (error as { code?: string }).code === 'ENOENT') return {};
       throw error;
     }
-    const parsed: unknown = parseYaml(text);
+    const parsed = this.parse(text, path);
     if (parsed === null || parsed === undefined) return {};
     if (!isRecord(parsed)) throw new YamlConfigSourceError(`config file is not a mapping: ${path}`);
     return parsed;
+  }
+
+  private parse(text: string, path: string): unknown {
+    try {
+      return parseYaml(text);
+    } catch (error) {
+      throw new YamlConfigSourceError(`${path}: ${(error as Error).message}`, { cause: error });
+    }
   }
 }
 
