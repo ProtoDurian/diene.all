@@ -22,7 +22,7 @@ export default {
       async run(repo: any) {
         const workflow = '.github/workflows/cd.yaml';
         const source = await repo.read(workflow);
-        await repo.write(workflow, source.replace('⚡reusable-publish.yaml', '⚡reusable-does-not-exist.yaml'));
+        await repo.write(workflow, source.replace('⚡reusable-npm-publish.yaml', '⚡reusable-does-not-exist.yaml'));
         await expectRed(repo, WIRING, 'workflow-wiring-publish');
       },
     },
