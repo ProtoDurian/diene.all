@@ -186,20 +186,20 @@ describe('discovery metadata', () => {
     });
   });
 
-  it.each(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'])(
-    'should publish the MCP protected resource at %s',
-    async path => {
-      // Act
-      const actual = await h.request(path);
+  it.each([
+    '/.well-known/oauth-protected-resource',
+    '/.well-known/oauth-protected-resource/mcp',
+  ])('should publish the MCP protected resource at %s', async path => {
+    // Act
+    const actual = await h.request(path);
 
-      // Assert
-      ((await actual.json()) as object).should.deepEqual({
-        resource: 'https://aseity.test/mcp',
-        authorization_servers: ['https://aseity.test/api/auth'],
-        bearer_methods_supported: ['header'],
-      });
-    },
-  );
+    // Assert
+    ((await actual.json()) as object).should.deepEqual({
+      resource: 'https://aseity.test/mcp',
+      authorization_servers: ['https://aseity.test/api/auth'],
+      bearer_methods_supported: ['header'],
+    });
+  });
 });
 
 describe('social sign-in through the OAuth proxy', () => {

@@ -7,14 +7,14 @@
   "assets": {
     "directory": "dist/web",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/mcp*", "/.well-known/*"]
+    "run_worker_first": ["/api/*", "/mcp*", "/.well-known/*"],
   },
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
       "id": "00000000000000000000000000000000",
-      "localConnectionString": "postgres://aseity:aseity@127.0.0.1:5432/aseity"
-    }
+      "localConnectionString": "postgres://aseity:aseity@127.0.0.1:5432/aseity",
+    },
   ],
   "vars": {
     "APP_URL": "http://localhost:8787",
@@ -23,7 +23,7 @@
     "S3_ENDPOINT": "http://127.0.0.1:9000",
     "S3_BUCKET": "aseity",
     "S3_REGION": "auto",
-    "MAIL_FROM": "Aseity <no-reply@localhost>"
+    "MAIL_FROM": "Aseity <no-reply@localhost>",
   },
   "secrets": {
     "required": [
@@ -34,8 +34,8 @@
       "GITHUB_CLIENT_SECRET",
       "GOOGLE_CLIENT_ID",
       "GOOGLE_CLIENT_SECRET",
-      "MAIL_API_KEY"
-    ]
+      "MAIL_API_KEY",
+    ],
   },
   "triggers": { "crons": ["* * * * *"] },
   "env": {
@@ -46,8 +46,8 @@
         {
           "binding": "HYPERDRIVE",
           // Replace with `tofu output -raw hyperdrive_id` after the first apply.
-          "id": "00000000000000000000000000000000"
-        }
+          "id": "00000000000000000000000000000000",
+        },
       ],
       "vars": {
         "APP_URL": "https://aseity.example.com",
@@ -56,7 +56,7 @@
         "S3_ENDPOINT": "https://t3.storage.dev",
         "S3_BUCKET": "aseity-files",
         "S3_REGION": "auto",
-        "MAIL_FROM": "Aseity <no-reply@aseity.example.com>"
+        "MAIL_FROM": "Aseity <no-reply@aseity.example.com>",
       },
       "secrets": {
         "required": [
@@ -67,10 +67,10 @@
           "GITHUB_CLIENT_SECRET",
           "GOOGLE_CLIENT_ID",
           "GOOGLE_CLIENT_SECRET",
-          "MAIL_API_KEY"
-        ]
+          "MAIL_API_KEY",
+        ],
       },
-      "triggers": { "crons": ["* * * * *"] }
-    }
-  }
+      "triggers": { "crons": ["* * * * *"] },
+    },
+  },
 }
