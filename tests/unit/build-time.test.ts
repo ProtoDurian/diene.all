@@ -24,10 +24,20 @@ describe('BuildTimeValueMapper.map', () => {
         ATOMI_CLIENT__BUILD__TOKEN: 'secret',
         ATOMI_CLIENT__faro__build__key: 'secret',
         ATOMI_SERVER__DB__PASSWORD: 'pw',
-        ATOMI_SHARED__NAME: 'shared',
+        ATOMI_SERVER__NAME: 'server',
         ATOMI_CLIENT__FARO__URL: 'https://faro',
       },
       expected: { ATOMI_CLIENT__FARO__URL: 'https://faro' },
+    },
+    {
+      label: 'shared values, minus their BUILD subtree',
+      env: {
+        ATOMI_SHARED__APP_NAME: 'n',
+        ATOMI_Shared__Base_Url: 'https://app',
+        ATOMI_SHARED__SENTRY__BUILD__TOKEN: 'secret',
+        ATOMI_SHARED: 'bare',
+      },
+      expected: { ATOMI_SHARED__APP_NAME: 'n', ATOMI_Shared__Base_Url: 'https://app' },
     },
     { label: 'nothing when no variable matches', env: { PATH: '/usr/bin' }, expected: {} },
   ])('should keep $label', ({ env, expected }) => {

@@ -5,7 +5,7 @@ import type { EnvRecord } from './source.js';
 class BuildTimeValueMapper {
   constructor(private readonly matcher: EnvKeyMatcher = new EnvKeyMatcher()) {}
 
-  // Only client values may be inlined, and the client BUILD subtree holds build-step secrets.
+  // Client and shared values may be inlined; a BUILD subtree holds build-step secrets.
   map(env: EnvRecord, prefix: string): Record<string, string> {
     return Object.fromEntries(
       Object.entries(env).filter(
@@ -20,7 +20,7 @@ class BuildTimeValueMapper {
 
   private inlineable(name: string): boolean {
     const [scope, ...rest] = name.split(NESTING_SEPARATOR).map(segment => this.matcher.normalize(segment));
-    return scope === 'client' && rest.length > 0 && !rest.includes('build');
+    return (scope === 'client' || scope === 'shared') && rest.length > 0 && !rest.includes('build');
   }
 }
 
