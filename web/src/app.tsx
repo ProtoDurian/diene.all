@@ -8,6 +8,7 @@ import { useDelayed } from './lib/use-delayed.ts';
 import { ConsentScreen } from './screens/consent.tsx';
 import { CreateTenantForm } from './screens/create-tenant.tsx';
 import { NotesScreen } from './screens/notes.tsx';
+import { SelectTenantScreen } from './screens/select-tenant.tsx';
 import { SignInScreen } from './screens/sign-in.tsx';
 import { TenantSwitcher } from './screens/tenant-switcher.tsx';
 
@@ -85,5 +86,6 @@ export function App() {
   const path = usePath();
   if (path === '/sign-in') return <SignInScreen />;
   if (path === '/consent') return <ConsentScreen />;
+  if (path === '/select-tenant') return <SelectTenantScreen />;
   return <Home />;
 }
