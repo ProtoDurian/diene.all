@@ -22,15 +22,15 @@ their trigger block:
   block to see when.
 - **Reusable workflows** — `on.workflow_call` only, named with a `⚡` prefix.
   Each owns runner selection and setup and ends in a `run:` line of the form
-  `nix develop .#<shell> -c ./scripts/ci/<script>.sh`. The pre-commit workflow
-  additionally runs `skills-sync sync --tier ci` as an explicit step before its
-  script: the hook uses the warning tier, so running the hook in CI cannot stand
-  in for the guarantee tier.
+  `nix develop .#<shell> -c ./scripts/ci/<script>.sh`. The pre-commit script runs
+  every hook, including `a-skills-sync` (`skills-sync sync --frozen`), so CI
+  enforces the vendored skills without a separate step.
 
 Callers grant permissions, pass only repository-specific values, and use
-`secrets: inherit`. The `a-workflows` gate enforces that every orchestrator
-job resolves to a repository-local reusable workflow and that each reusable
-workflow calls an existing, executable `scripts/ci` entry point.
+`secrets: inherit`. The `a-workflows` gate enforces that every orchestrator job
+resolves to a repository-local reusable workflow, that each reusable workflow
+calls an existing, executable `scripts/ci` entry point, and that the release
+workflow keeps its trigger and concurrency group.
 
 `AtomiCloud/actions.setup-nix` checks out the repository, so do not add an
 adjacent `actions/checkout`.
@@ -43,14 +43,58 @@ plus its tag in a trailing comment. Which actions are trusted is one regex,
 trusted, everything else is non-trusted by default — so an action nobody thought
 about gets the strictest pin, and there is no list to maintain.
 
-Every nscloud Nix job carries exactly one shared tag:
+## Every job declares its dependencies
+
+> **Every `run:` step enters a Nix shell that declares what it needs.**
+
+In practice a `run:` step is exactly one line:
 
 ```text
-nscloud-cache-tag-atomi-nix-store-cache-linux-amd64
+nix develop .#<shell> -c <command>
 ```
 
-The organization stays constant; only runner OS and architecture vary. Never
-introduce per-platform or per-service cache tags.
+`<shell>` is one of the shells declared in
+[`nix/shells.nix`](../../../nix/shells.nix) — today `default`, `ci`, `cd` and
+`releaser`. Three things follow: a job's dependencies are visible without reading
+the job, CI and your laptop run the same tools, and every job can reuse the shared
+Nix store cache.
+
+## Runners and cache labels
+
+Every job that runs a script uses the same runner labels, written as the same
+literal in every reusable workflow:
+
+```yaml
+runs-on:
+  - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+  - nscloud-cache-size-20gb
+  - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+```
+
+This is one template value with a default. The runner and the Nix store cache
+tag are chosen once, when a repository is generated from the template, and the
+answer is written into every workflow identically. Reusable workflows take no
+runner or cache inputs and callers never pass them, so there is one value to
+change, and every workflow changes with it.
+
+Selection is 26.04-first; the 24.04 equivalents are the fallbacks. A lane that
+must **not** share the store uses the bare `nscloud-ubuntu-26.04-amd64-4x8` with
+no cache labels at all — a bare label cannot attach a cache volume, which is the
+point of using it. The cache tag
+is shared per OS and architecture: it carries no organization, platform or
+service name, and changing the OS rotates the tag and costs one cold build before
+warm reuse resumes. The merge gatekeeper is a poller with no Nix, so it stays on
+GitHub-hosted `ubuntu-26.04`.
+
+## Dependency materialisation
+
+Each lane's `run:` line enters a Nix shell, and the shell is the whole of that
+lane's dependency contract: there is no separate setup entry point to call first.
+
+A language template built from this one materialises its own ecosystem's packages
+— a .NET node its `dotnet restore`, a Node node its install — in its own
+configuration, not through an extension point here. A new language therefore
+changes one place.
 
 ## Local reproduction
 
@@ -61,8 +105,18 @@ workflow you want to reproduce and run it verbatim, for example:
 nix develop .#ci -c ./scripts/ci/pre-commit.sh
 ```
 
-A downstream runtime restores its dependencies before the skills step; this node
-declares `runtimes: [dart]`, so that restoration is real here rather than inert.
+That line reproduces the pre-commit workflow. Workspace names no runtime, so its
+`a-skills-sync` hook is deliberately inert here.
+
+The Docker and Helm scripts build locally by default. Their reusable workflows set
+the documented environment contract to enable publishing.
+
+## Artifact publishing
+
+Docker and Helm callers pass per-repository image or chart values through workflow
+`with:` inputs. Empty release versions produce commit builds; CD passes the tag as
+the version. Add another image or chart as another caller job rather than putting
+repository-specific branching into the reusable workflow.
 
 Release execution runs the real tool: `⚡reusable-release.yaml` enters the
 `releaser` shell and calls `scripts/ci/release.sh`, which invokes

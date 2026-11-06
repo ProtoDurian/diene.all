@@ -2,15 +2,13 @@
 set -euo pipefail
 
 version="${1:-}"
-[[ -z ${version} ]] && echo "❌ version argument not set" >&2 && exit 1
+[ -z "${version}" ] && echo "❌ version argument not set" >&2 && exit 1
 
-# PACKAGE_ROOT mirrors the repo-root layout (VERSION + packages/diene_problems/
-# pubspec.yaml) and is used by release-policy.sh's fixture round-trip. It matches
-# publish-version.sh's path convention exactly.
 root_dir="${PACKAGE_ROOT:-$(git rev-parse --show-toplevel)}"
-version="${version#v}"
+pubspec="${root_dir}/packages/diene_dart_lib/pubspec.yaml"
+[ -z "${PACKAGE_ROOT:-}" ] && git -C "${root_dir}" restore --source=HEAD -- packages/diene_dart_lib/pubspec.yaml
+[ -z "$(yq -r '.version // ""' "${pubspec}")" ] && echo "❌ ${pubspec} must declare a version" >&2 && exit 1
 
-printf '%s\n' "${version}" >"${root_dir}/VERSION"
-yq -i ".version = \"${version}\"" "${root_dir}/packages/diene_problems/pubspec.yaml"
+yq -i ".version = \"${version#v}\"" "${pubspec}"
 
-echo "✅ VERSION and packages/diene_problems/pubspec.yaml stamped to ${version}"
+echo "✅ packages/diene_dart_lib/pubspec.yaml stamped to ${version#v}"

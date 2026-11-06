@@ -1,9 +1,4 @@
-// The ten language-agnostic topics this node owns. Parent-owned tooling
-// standards are deliberately absent: their skill names do not track their
-// directory names, and asserting them here would be a topology check.
-// `authorization` left this node with the .NET layer that is its only user, and
-// the contributor-doc segment was removed outright, so neither is asserted here
-// any more — see the shared forward review.
+// Parent-owned tooling standards are deliberately absent.
 export const topics = [
   'datetime',
   'domain-driven-design',
@@ -15,6 +10,7 @@ export const topics = [
   'three-layer-architecture',
   'utilities',
   'validation',
+  'wire-format',
 ] as const;
 
 export default {
@@ -23,7 +19,7 @@ export default {
   probes: [
     {
       name: 'presence-standards-inventory',
-      description: 'All ten agnostic standards and their thin triggers exist.',
+      description: 'All eleven agnostic standards and their thin triggers exist.',
       kind: 'baseline',
       async run(repo: any) {
         for (const topic of topics) {
