@@ -1,40 +1,31 @@
-# Observability O1 Add-Back Checklist
+# Observability Add-Back Checklist
 
-This is chain-side conductor material. It is not a CyanPrint feature row and is
-excluded when the branch becomes a materialized repository.
+Use this when adding the observability files to the template branches that ship with observability. It is maintainer material for the template repository; it is not a probe and does not ship in generated service repos.
 
-## Preconditions
+## Before you start
 
-- The `observability` payload head is committed, clean, and locally green.
-- The direct parent of the add-back is committed and green.
-- No consumer-owned implementation has been authored on the add-back branch.
+- The `observability` branch is committed, clean and passes its checks.
+- Each target branch's own parent branch is committed and green.
+- Nobody has written service code on the target branch.
 
-## Merge each add-back
-
-Merge the same `observability` payload branch head into:
+## Target branches
 
 - `bun-base-w-observability`
 - `bun-base-wo-helm-docker-w-observability`
 - `dotnet-base-w-observability`
 - `go-base-w-observability`
 
-For each branch:
+## For each target branch
 
-1. Merge the direct parent when it has advanced.
-2. Merge the `observability` payload branch with a merge commit; never rebase,
-   squash, cherry-pick, or re-author O1 files.
-3. Confirm the add-back delta equals the payload delta exactly. This is a
-   conductor S27 sweep, not a repository probe or CI feature.
-4. Confirm the payload's probe files and `features.json` rows arrived through
-   the merge itself.
-5. Run the complete inherited CyanPrint matrix and branch CI-equivalent suite.
-6. Record the parent, payload, merge commit, reports, and zero-negative verdicts.
+1. If its parent branch has moved, merge the parent first.
+2. Merge the `observability` branch with a merge commit. Never rebase, squash, cherry-pick or rewrite the observability files.
+3. Check that the merge adds exactly the observability files: `git diff <parent> <merge>` shows the same changes as `git diff <observability base> observability`.
+4. Check that `probes/observability-*` and the `observability-standards-present` row in `probes/features.json` arrived through the merge, not by hand.
+5. Run the branch's full probe suite and CI checks; all must pass.
+6. Write down the parent commit, the observability commit, the merge commit and the check results.
 
-## Cascade after all four are green
+## After all four are green
 
-- Merge each add-back only into its direct children.
-- Re-run every child's local proof/CI suite after the merge.
-- Keep consumer OTel/Faro gates with the consumer nodes; do not move them into
-  this payload matrix.
-- Stop before any ENV-dependent Garden/preview proof until its owning graph is
-  ready.
+- Merge each target branch into its own child branches only, and re-run each child's checks.
+- Leave the language-specific OpenTelemetry and Faro tests with the branches that own that code.
+- Stop before any check that needs a live environment until that environment is ready.

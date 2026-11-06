@@ -1,19 +1,19 @@
-# {Alert base name}
+# {Alert name}
 
-> Covers: 🚨 {critical name} · ⚠️ {warning name} (whichever tiers exist)
-> Context: [System overview](../../overview.md) · [Dashboard panel]({url}) · Escalation: #{channel}
+> Covers: 🚨 {critical title} · ⚠️ {warning title} (keep the tiers that exist)
+> Context: `observability/overview.md` · [Dashboard panel]({panel url}) · Escalation: #{channel}
 
-{Meaning + user impact — 2 sentences, plain language.}
+{What this means and who is affected, in two plain sentences.}
 
 ## Triage
 
-1. {First check — the fastest discriminator:}
+1. {Fastest check that tells the causes apart:}
 
    ```bash
    {command}
    ```
 
-   {What the output means. Normal: {X}. Bad: {Y} → step {N}.}
+   {Normal: {X}. Bad: {Y} → step {N}.}
 
 2. {Next check:}
 
@@ -26,7 +26,7 @@
 - **{Likely cause 1}**: {fix steps}. Confirm with:
 
   ```bash
-  {verification command}
+  {command}
   ```
 
 - **{Likely cause 2}**: {fix}. Confirm with: `{command}`
@@ -35,4 +35,4 @@ Known cause: {YYYY-MM-DD} — {one-line incident summary}.
 
 ## Escalation
 
-If not resolved in {30m}, or {condition}, escalate to {team/escalation chain} via #{channel}. Declare an incident if {user-impact condition}.
+If not fixed in {30m}, or {condition}, escalate to {team} in #{channel}. Declare an incident if {user-impact condition}.
