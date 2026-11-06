@@ -1,14 +1,17 @@
 # Date and Time in Go
 
-## Library: `cloud.google.com/go/civil`
+## Libraries: `time`, `civil` and `sosodev/duration`
 
 `time.Time` is always an instant in some location, so it cannot hold "a calendar
-date" or "a time of day" without inventing a zone. `civil` adds the three
-wall-clock types; instants, durations and zones stay in the standard `time`
-package.
+date" or "a time of day" without inventing a zone. `cloud.google.com/go/civil`
+(module `cloud.google.com/go` v0.123.0, pinned in `go.mod`) adds the wall-clock
+types. Instants, durations and zones stay in the standard `time` package.
+`github.com/sosodev/duration` (v1.4.0, pinned in `go.mod`) reads and writes
+ISO 8601 durations, which `time` cannot.
 
 ```bash
-go get cloud.google.com/go/civil
+go get cloud.google.com/go@v0.123.0
+go get github.com/sosodev/duration@v1.4.0
 ```
 
 ```go
@@ -16,17 +19,18 @@ import (
 	"time"
 
 	"cloud.google.com/go/civil"
+	"github.com/sosodev/duration"
 )
 ```
 
-| Concept         | Go type                                   | Wire format                      |
-| --------------- | ----------------------------------------- | -------------------------------- |
-| Instant         | `time.Time`, normalized with `UTC()`      | RFC 3339 (`time.RFC3339Nano`)    |
-| Date            | `civil.Date`                              | `YYYY-MM-DD`                     |
-| Time            | `civil.Time`                              | `HH:MM:SS`                       |
-| Local date-time | `civil.DateTime`                          | `YYYY-MM-DDTHH:MM:SS`            |
-| Timezone        | `*time.Location` from `time.LoadLocation` | IANA id, e.g. `America/New_York` |
-| Duration        | `time.Duration`                           | ISO 8601, e.g. `PT9000S`         |
+| Concept         | Go type                                     | Wire format                                                 |
+| --------------- | ------------------------------------------- | ----------------------------------------------------------- |
+| Instant         | `time.Time`, normalized with `UTC()`        | `"2024-03-15T14:30:00.000Z"`                                |
+| Date            | `civil.Date`                                | `"2024-03-15"`                                              |
+| Time of day     | `civil.Time`                                | `"14:30:00"`                                                |
+| Local date-time | `civil.DateTime` (input only, never stored) | not sent                                                    |
+| Zoned value     | `time.Time` (UTC) + IANA zone `string`      | `{"at":"2024-03-15T14:30:00.000Z","zone":"Asia/Singapore"}` |
+| Duration        | `time.Duration`                             | `"PT2H30M"`, `"P1DT2H"`                                     |
 
 ## Types
 
@@ -38,19 +42,17 @@ boundary (storage, transport, logs).
 ```go
 occurredAt, err := time.Parse(time.RFC3339, "2024-03-15T14:30:00Z")
 if err != nil {
-	return err
+	return fmt.Errorf("occurred at: %w", err)
 }
 
 fromEpoch := time.UnixMilli(1710513000000).UTC()
 
-occurredAt.UTC().Format(time.RFC3339Nano) // "2024-03-15T14:30:00Z"
-
 later := occurredAt.Add(2 * time.Hour)
 
-occurredAt.Equal(fromEpoch)  // true
-occurredAt.Compare(later)    // -1, 0 or +1
-occurredAt.Before(later)     // true
-later.Sub(occurredAt)        // 2h0m0s
+occurredAt.Equal(fromEpoch) // true
+occurredAt.Compare(later)   // -1, 0 or +1
+occurredAt.Before(later)    // true
+later.Sub(occurredAt)       // 2h0m0s
 ```
 
 ### Date: `civil.Date`
@@ -60,7 +62,7 @@ A calendar date with no time and no zone.
 ```go
 date, err := civil.ParseDate("2024-03-15")
 if err != nil {
-	return err
+	return fmt.Errorf("date: %w", err)
 }
 literal := civil.Date{Year: 2024, Month: time.March, Day: 15}
 
@@ -84,14 +86,14 @@ not get from a `Parse...` function.
 civil.Date{Year: 2024, Month: time.February, Day: 30}.IsValid() // false
 ```
 
-### Time: `civil.Time`
+### Time of Day: `civil.Time`
 
 A wall-clock time with no date and no zone.
 
 ```go
 opens, err := civil.ParseTime("09:00:00")
 if err != nil {
-	return err
+	return fmt.Errorf("opens: %w", err)
 }
 closes := civil.Time{Hour: 17, Minute: 30}
 
@@ -99,50 +101,66 @@ opens.Before(closes) // true
 opens.String()       // "09:00:00"
 ```
 
-`civil.Time` has no arithmetic. When you need to add to a time of day, combine
-it with a date and do the work on a `civil.DateTime` or in a zone.
+`civil.Time` prints fractional seconds when `Nanosecond` is non-zero
+(`"14:30:00.000000005"`). Keep it zero for wire values: build them with
+`Nanosecond: 0`, or clear the field before you send one.
 
-### Local date-time: `civil.DateTime`
+`civil.Time` has no arithmetic. To add to a time of day, combine it with a date
+and a zone, and do the work on the resulting instant.
 
-A date and a time with no zone. Store it only next to the zone that gives it
-meaning.
+### Local Date-Time: `civil.DateTime`
+
+A date and a time with no zone. It is an input step only: resolve it against a
+zone straight away and keep the instant.
 
 ```go
-startsAt, err := civil.ParseDateTime("2024-03-15T14:30:00")
+startsAt, err := civil.ParseDateTime("2024-03-15T22:30:00")
 if err != nil {
-	return err
+	return fmt.Errorf("starts at: %w", err)
 }
 
 combined := civil.DateTime{Date: date, Time: opens}
-
-startsAt.Date // civil.Date{Year: 2024, Month: time.March, Day: 15}
-startsAt.Time // civil.Time{Hour: 14, Minute: 30}
 ```
 
-### Zoned date-time: `civil.DateTime` + `*time.Location`
+### Zoned Value: Instant + Zone Name
 
-Go has no zoned type of its own. Keep the local value and the IANA id as two
-fields, and resolve them into an instant with `In`.
+Go has no zoned type of its own. Store two fields: the instant, as a UTC
+`time.Time`, and the IANA zone name. Never store a `civil.DateTime` with a
+zone: the instant is what sorts and compares.
 
 ```go
+// lib/meeting/structures.go
 type Meeting struct {
-	StartsAt civil.DateTime
-	Zone     string
+	At   time.Time
+	Zone string
 }
-
-loc, err := time.LoadLocation(meeting.Zone)
-if err != nil {
-	return err
-}
-
-instant := meeting.StartsAt.In(loc).UTC()
-
-tokyo, err := time.LoadLocation("Asia/Tokyo")
-if err != nil {
-	return err
-}
-civil.DateTimeOf(instant.In(tokyo)) // the same moment on a Tokyo wall clock
 ```
+
+```go
+// lib/meeting/scheduler.go
+var ErrUnknownZone = errors.New("unknown time zone")
+
+type Scheduler struct{}
+
+func (Scheduler) Schedule(local civil.DateTime, zone string) (Meeting, error) {
+	loc, err := time.LoadLocation(zone)
+	if err != nil {
+		return Meeting{}, fmt.Errorf("%w %q: %w", ErrUnknownZone, zone, err)
+	}
+	return Meeting{At: local.In(loc).UTC(), Zone: zone}, nil
+}
+
+func (Scheduler) WallClock(meeting Meeting) (civil.DateTime, error) {
+	loc, err := time.LoadLocation(meeting.Zone)
+	if err != nil {
+		return civil.DateTime{}, fmt.Errorf("%w %q: %w", ErrUnknownZone, meeting.Zone, err)
+	}
+	return civil.DateTimeOf(meeting.At.In(loc)), nil
+}
+```
+
+`22:30` in `Asia/Singapore` stores as `At = 2024-03-15T14:30:00.000Z`,
+`Zone = "Asia/Singapore"`.
 
 `In` panics on a nil location, so always check the error from `LoadLocation`.
 Zone data comes from the operating system. If the runtime image has no
@@ -155,19 +173,31 @@ import _ "time/tzdata"
 
 ### Duration: `time.Duration`
 
+The domain uses `time.Duration`. ISO 8601 text appears only at the edge.
+
 ```go
 timeout := 30 * time.Second
 window := 2*time.Hour + 30*time.Minute
 
-parsed, err := time.ParseDuration("2h30m")
-if err != nil {
-	return err
-}
-
 deadline := clock.Now().Add(timeout)
 elapsed := end.Sub(start)
 window.Minutes() // 150
+
+duration.Format(window)         // "PT2H30M"
+duration.Format(26 * time.Hour) // "P1DT2H"
+
+parsed, err := duration.Parse("P1DT2H")
+if err != nil {
+	return fmt.Errorf("duration: %w", err)
+}
+parsed.String()         // "P1DT2H"
+parsed.ToTimeDuration() // 26h0m0s
 ```
+
+`duration.Format` counts a day as 24 hours, and folds 7 days or more into weeks
+and months (`P1W1D`). For calendar spans longer than a few days, keep the
+parsed `*duration.Duration` instead of round-tripping it through
+`time.Duration`.
 
 Never pass a bare integer for a duration: `Sleep(5)` is five nanoseconds.
 
@@ -227,8 +257,7 @@ birthday := time.Date(1990, time.March, 15, 0, 0, 0, 0, time.UTC)
 birthday := civil.Date{Year: 1990, Month: time.March, Day: 15}
 ```
 
-Work out the age from dates only. Take "today" from the user's zone, not the
-server's:
+Take "today" from the user's zone, not the server's:
 
 ```go
 today := civil.DateOf(clock.Now().In(userLoc))
@@ -243,11 +272,10 @@ if today.Month < birthday.Month || (today.Month == birthday.Month && today.Day <
 
 ```go
 createdAt := clock.Now().UTC()
-row := NoteRow{CreatedAt: createdAt.Format(time.RFC3339Nano)}
 
 loc, err := time.LoadLocation(user.Timezone)
 if err != nil {
-	return err
+	return fmt.Errorf("user zone: %w", err)
 }
 shown := createdAt.In(loc).Format("Mon, 02 Jan 2006 15:04 MST")
 ```
@@ -288,52 +316,68 @@ domain method and test it.
 
 ## JSON Serialization
 
-Every `civil` type implements `encoding.TextMarshaler`, so it encodes as the
-wire formats above. `time.Time` encodes as RFC 3339 with whatever offset it
-holds, so convert to UTC in the adapter mapper. Go has no ISO 8601 duration
-codec: the adapter owns a small named type.
+Every value crosses the wire as
+[Wire Format: Go](../../wire-format/languages/go.md) shows. `civil.Date`,
+`civil.Time` and `duration.Duration` already encode correctly. `time.Time` does
+not: its default encoding is RFC 3339 with up to nine fractional digits and
+whatever offset it holds. Adapters send instants through a small type that
+always writes UTC with exactly three fractional digits.
 
 ```go
-// adapters/api/res.go
-type EventRes struct {
-	OccurredAt time.Time   `json:"occurredAt"`
-	Day        civil.Date  `json:"day"`
-	Timeout    ISODuration `json:"timeout"`
+// adapters/api/instant.go
+const instantLayout = "2006-01-02T15:04:05.000Z07:00"
+
+type Instant time.Time
+
+func (instant Instant) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Time(instant).UTC().Format(instantLayout))
 }
 
-func NewEventRes(event Event) EventRes {
-	return EventRes{
-		OccurredAt: event.OccurredAt.UTC(),
-		Day:        event.Day,
-		Timeout:    ISODuration(event.Timeout),
+func (instant *Instant) UnmarshalJSON(data []byte) error {
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("instant: %w", err)
 	}
-}
-```
-
-```go
-// adapters/api/duration.go
-type ISODuration time.Duration
-
-func (duration ISODuration) MarshalText() ([]byte, error) {
-	seconds := strconv.FormatFloat(time.Duration(duration).Seconds(), 'f', -1, 64)
-	return []byte("PT" + seconds + "S"), nil
-}
-
-func (duration *ISODuration) UnmarshalText(text []byte) error {
-	seconds, ok := strings.CutPrefix(string(text), "PT")
-	seconds, hasSuffix := strings.CutSuffix(seconds, "S")
-	if !ok || !hasSuffix {
-		return fmt.Errorf("duration %q: want PT<seconds>S", text)
-	}
-	parsed, err := time.ParseDuration(seconds + "s")
+	parsed, err := time.Parse(instantLayout, raw)
 	if err != nil {
-		return fmt.Errorf("duration %q: %w", text, err)
+		return fmt.Errorf("instant %q: %w", raw, err)
 	}
-	*duration = ISODuration(parsed)
+	*instant = Instant(parsed.UTC())
 	return nil
 }
 ```
 
-This codec only reads and writes the seconds form (`PT9000S`). If you must
-accept full ISO 8601 durations from outside (`P1DT2H`), that parser is its own
-package with its own tests.
+The layout demands exactly three fractional digits on input, so
+`"2024-03-15T14:30:00Z"` is rejected. An offset such as `+08:00` is accepted
+and normalized to UTC; output always ends in `Z`.
+
+```go
+// adapters/api/event/res.go
+type EventRes struct {
+	OccurredAt api.Instant       `json:"occurredAt"`
+	Day        civil.Date        `json:"day"`
+	Timeout    duration.Duration `json:"timeout"`
+}
+
+func (Mapper) ToRes(event Event) EventRes {
+	return EventRes{
+		OccurredAt: api.Instant(event.OccurredAt),
+		Day:        event.Day,
+		Timeout:    *duration.FromTimeDuration(event.Timeout),
+	}
+}
+
+// {"occurredAt":"2024-03-15T14:30:00.000Z","day":"2024-03-15","timeout":"PT2H30M"}
+```
+
+A `duration.Duration` field round-trips on its own:
+
+```go
+var req struct {
+	Length duration.Duration `json:"length"`
+}
+if err := json.Unmarshal([]byte(`{"length":"PT2H30M"}`), &req); err != nil {
+	return fmt.Errorf("decode: %w", err)
+}
+req.Length.ToTimeDuration() // 2h30m0s
+```
