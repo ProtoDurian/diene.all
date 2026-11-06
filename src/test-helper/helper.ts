@@ -10,8 +10,6 @@ import {
 } from '@atomicloud/diene.config';
 import { isRecord } from '@atomicloud/diene.core-utils';
 
-const DEFAULT_PREFIX = 'ATOMI_';
-
 interface InMemoryTiers {
   base?: ConfigRecord;
   overlays?: Record<string, ConfigRecord>;
@@ -20,7 +18,7 @@ interface InMemoryTiers {
 }
 
 interface StubOptions {
-  prefix?: string;
+  prefix: string;
   landscape?: string;
 }
 
@@ -61,13 +59,11 @@ class LandscapeConfigSource extends InMemoryConfigSource {
 class ConfigStubBuilder<S extends BlockShape> {
   constructor(
     private readonly registry: SchemaRegistry<S>,
-    private readonly options: StubOptions = {},
+    private readonly options: StubOptions,
   ) {}
 
-  // Runs the real loader, so a stub can never drift from the registry.
   build(tiers: InMemoryTiers): Promise<Config<S>> {
-    const { prefix = DEFAULT_PREFIX, landscape } = this.options;
-    return new ConfigLoader(new InMemoryConfigSource(tiers), this.registry, { prefix, landscape }).load();
+    return new ConfigLoader(new InMemoryConfigSource(tiers), this.registry, this.options).load();
   }
 }
 
@@ -78,8 +74,10 @@ class ConfigAssertions<S extends BlockShape> {
     try {
       return await this.builder.build(tiers);
     } catch (error) {
-      const detail = error instanceof ConfigValidationError ? error.issues.join('; ') : String(error);
-      throw new TestHelperError(`expected a valid config, but validation failed: ${detail}`);
+      if (error instanceof ConfigValidationError) {
+        throw new TestHelperError(`expected a valid config, but validation failed: ${error.issues.join('; ')}`);
+      }
+      throw new TestHelperError(`expected a valid config, but loading failed: ${String(error)}`);
     }
   }
 

@@ -91,7 +91,7 @@ describe('LandscapeConfigSource', () => {
 
 describe('ConfigStubBuilder — invariants', () => {
   it.each([
-    { label: 'base only', tiers: GOOD, options: {}, expected: { port: 80, host: 'h' } },
+    { label: 'base only', tiers: GOOD, options: { prefix: 'ATOMI_' }, expected: { port: 80, host: 'h' } },
     {
       label: 'a custom prefix',
       tiers: { ...GOOD, runtimeEnv: { X_SERVER__PORT: '9', ATOMI_SERVER__PORT: '1' } },
@@ -101,13 +101,13 @@ describe('ConfigStubBuilder — invariants', () => {
     {
       label: 'an explicit landscape',
       tiers: { ...GOOD, overlays: { prod: { server: { host: 'prod' } } } },
-      options: { landscape: 'prod' },
+      options: { prefix: 'ATOMI_', landscape: 'prod' },
       expected: { port: 80, host: 'prod' },
     },
     {
-      label: 'the default ATOMI_ prefix',
-      tiers: { ...GOOD, runtimeEnv: { ATOMI_SERVER__PORT: '7' } },
-      options: {},
+      label: 'an app prefix, ignoring ATOMI_',
+      tiers: { ...GOOD, runtimeEnv: { APP_SERVER__PORT: '7', ATOMI_SERVER__PORT: '1' } },
+      options: { prefix: 'APP_' },
       expected: { port: 7, host: 'h' },
     },
   ])('should build a stub that passes the registry from $label', async ({ tiers, options, expected }) => {
@@ -124,7 +124,7 @@ describe('ConfigStubBuilder — invariants', () => {
 
   it('should never hand back a stub that fails the registry', async () => {
     // Arrange
-    const builder = new ConfigStubBuilder(registry);
+    const builder = new ConfigStubBuilder(registry, { prefix: 'ATOMI_' });
 
     // Act
     const act = builder.build(BAD);
@@ -134,9 +134,23 @@ describe('ConfigStubBuilder — invariants', () => {
   });
 });
 
+describe('ConfigStubBuilder — required prefix', () => {
+  it('should refuse to compile without a prefix', () => {
+    // Arrange
+    const options = {};
+
+    // Act
+    // @ts-expect-error the env prefix has no default
+    const builder = new ConfigStubBuilder(registry, options);
+
+    // Assert
+    builder.should.be.instanceof(ConfigStubBuilder);
+  });
+});
+
 describe('ConfigAssertions — assert the asserter', () => {
-  const assertions = new ConfigAssertions(new ConfigStubBuilder(registry));
-  const unsafe = new ConfigAssertions(new ConfigStubBuilder(registry, { landscape: '../bad' }));
+  const assertions = new ConfigAssertions(new ConfigStubBuilder(registry, { prefix: 'ATOMI_' }));
+  const unsafe = new ConfigAssertions(new ConfigStubBuilder(registry, { prefix: 'ATOMI_', landscape: '../bad' }));
 
   it('expectValid should return the config on known-good tiers', async () => {
     // Arrange
@@ -151,7 +165,11 @@ describe('ConfigAssertions — assert the asserter', () => {
 
   it.each([
     { label: 'known-bad tiers', subject: assertions, message: /validation failed: server\.port: / },
-    { label: 'a non-validation error', subject: unsafe, message: /LandscapeResolutionError/ },
+    {
+      label: 'a non-validation error',
+      subject: unsafe,
+      message: /^expected a valid config, but loading failed: LandscapeResolutionError/,
+    },
   ])('expectValid should fail with TestHelperError on $label', async ({ subject, message }) => {
     // Arrange
     const tiers = BAD;

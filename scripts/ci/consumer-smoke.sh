@@ -51,11 +51,11 @@ const source = new InMemoryConfigSource({ base: { server: { port: 1 } }, runtime
 const config = await new ConfigLoader(source, registry, { prefix: 'ATOMI_' }).load();
 if (config.get('server').port !== 2) throw new Error('ESM loader returned the wrong port');
 if (new BuildTimeValueMapper().map({ ATOMI_X: '1', Y: '2' }, 'ATOMI_').ATOMI_X !== '1') throw new Error('ESM build-time map is wrong');
-const error = await new ConfigAssertions(new ConfigStubBuilder(registry)).expectInvalid({ base: {} });
+const error = await new ConfigAssertions(new ConfigStubBuilder(registry, { prefix: 'ATOMI_' })).expectInvalid({ base: {} });
 if (error.issues.length === 0) throw new Error('ESM asserter missed an invalid config');
 if (!(error instanceof ConfigValidationError)) throw new Error('ESM /test-helper error is not the root ConfigValidationError');
 const cjsHelper = createRequire(import.meta.url)('${name}/test-helper');
-const mixed = await new cjsHelper.ConfigAssertions(new cjsHelper.ConfigStubBuilder(registry)).expectInvalid({ base: {} });
+const mixed = await new cjsHelper.ConfigAssertions(new cjsHelper.ConfigStubBuilder(registry, { prefix: 'ATOMI_' })).expectInvalid({ base: {} });
 if (!(mixed instanceof ConfigValidationError)) throw new Error('CJS /test-helper error is not the ESM root ConfigValidationError');
 JS
 cat >"${work}/cjs.cjs" <<JS
@@ -68,7 +68,7 @@ const source = new InMemoryConfigSource({ base: { server: { port: 1 } }, runtime
 if (new BuildTimeValueMapper().map({ ATOMI_X: '1', Y: '2' }, 'ATOMI_').ATOMI_X !== '1') throw new Error('CJS build-time map is wrong');
 Promise.all([
   new ConfigLoader(source, registry, { prefix: 'ATOMI_' }).load(),
-  new ConfigAssertions(new ConfigStubBuilder(registry)).expectInvalid({ base: {} }),
+  new ConfigAssertions(new ConfigStubBuilder(registry, { prefix: 'ATOMI_' })).expectInvalid({ base: {} }),
 ]).then(([config, error]) => {
   if (config.get('server').port !== 2) throw new Error('CJS loader returned the wrong port');
   if (error.issues.length === 0) throw new Error('CJS asserter missed an invalid config');
@@ -87,7 +87,7 @@ import { ConfigStubBuilder, InMemoryConfigSource } from '${name}/test-helper';
 import { z } from 'zod';
 const registry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
 const read = (config: Config<{ server: z.ZodObject<{ port: z.ZodNumber }> }>): number => config.get('server').port;
-const stub: Promise<number> = new ConfigStubBuilder(registry).build({}).then(read);
+const stub: Promise<number> = new ConfigStubBuilder(registry, { prefix: 'ATOMI_' }).build({}).then(read);
 const live: Promise<number> = new ConfigLoader(new InMemoryConfigSource(), registry, { prefix: 'ATOMI_' }).load().then(read);
 const map: Record<string, string> = new BuildTimeValueMapper().map({}, 'ATOMI_');
 export { live, map, stub };
