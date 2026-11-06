@@ -45,6 +45,9 @@ DH_TOKENS=(
   '](infra)' 'infra/' 'docker:build' 'docker:run'
 )
 SCAN_EXEMPT=(':!.github/named-checks/**' ':!Changelog.md' ':!probes/lib/**')
+# Any tracked D/H file wherever it lives, not only the parent's former paths.
+DH_FILE_RE='(^|/)(Dockerfile|Containerfile)([._-][^/]*)?$|\.(dockerfile|containerfile)$|(^|/)\.(docker|helm)ignore$|(^|/)(docker-)?compose([._-][^/]*)?\.ya?ml$|(^|/)Chart\.(yaml|lock)$|(^|/)helmfile[^/]*$|(^|/)(charts|root_chart)/|(^|/)skaffold[^/]*\.ya?ml$'
+DH_SURFACE_RE='^(\.github/workflows|\.github/actions|scripts|tasks|probes|nix|\.claude/skills|docs/standards)/([^/]*/)*[^/]*(docker|helm|compose|container|chart)[^/]*$'
 
 F_PATH_RE='(^|/)(android|ios|macos|linux|windows|web|gradle|Pods)/|\.(xcodeproj|xcworkspace)/|(^|/)(build|settings)\.gradle(\.kts)?$|(^|/)(gradle\.properties|gradlew|gradlew\.bat|local\.properties|Podfile|Podfile\.lock|AndroidManifest\.xml|\.metadata|\.flutter-plugins|\.flutter-plugins-dependencies)$|\.(gradle|gradle\.kts|podspec|xcconfig|pbxproj|storyboard|xib|entitlements)$'
 F_IMPORT_RE="['\"](package:flutter[a-z0-9_]*/|dart:ui['\"])"
@@ -52,6 +55,14 @@ F_TOOL_RE='flutter|gradle|gradlew|cocoapods|pod install|xcodebuild|xcrun|xcode|s
 F_TOOL_FILES=(.github/workflows scripts tasks Taskfile.yaml nix flake.nix .envrc dlint.yaml probes ':!probes/lib/**')
 
 flutter_paths() { grep -E "${F_PATH_RE}" || true; }
+dh_files() {
+  local in
+  in="$(cat)"
+  {
+    grep -E "${DH_FILE_RE}" <<<"${in}" || true
+    grep -i -E "${DH_SURFACE_RE}" <<<"${in}" || true
+  } | grep -v '^\.github/named-checks/' | LC_ALL=C sort -u || true
+}
 flutter_pubspec() { yq '[has("flutter"), (.environment // {} | has("flutter"))] + ([(.dependencies // {}), (.dev_dependencies // {}), (.dependency_overrides // {})] | map(to_entries) | flatten | map((.key | test("^flutter")) or ((.value | tag) == "!!map" and (.value.sdk // "") == "flutter"))) | map(select(.)) | length'; }
 flutter_imports() { grep -E "${F_IMPORT_RE}" || true; }
 # pkgs.flutter.dart is nixpkgs' plain Dart SDK attribute, not the Flutter SDK.
@@ -64,8 +75,14 @@ flutter_tools() { sed -E 's/flutter\.dart([^A-Za-z0-9_]|$)/\1/g' | grep -i -E "(
 [[ -n "$(echo "import 'package:flutter/material.dart';" | flutter_imports)" ]] || fail "control: the import detector misses a canary"
 [[ -n "$(echo 'run: flutter build apk' | flutter_tools)" ]] || fail "control: the tooling detector misses a canary"
 [[ -z "$(echo 'dart = flutter.dart;' | flutter_tools)" ]] || fail "control: the tooling detector flags the plain Dart SDK attribute"
+for c in Dockerfile services/api/Dockerfile.prod deploy/web.containerfile Containerfile .dockerignore docker-compose.yml compose.yaml ops/charts/app/Chart.yaml deploy/Chart.lock helmfile.yaml '.github/workflows/⚡reusable-docker-build.yaml' scripts/ci/helm-publish.sh tasks/Taskfile.compose.yaml; do
+  dh_files <<<"${c}" | grep -q . || fail "control: the D/H file detector misses ${c}"
+done
+for c in pubspec.yaml packages/diene_dart_lib/lib/src/note.dart docs/standards/ci-cd/index.md .github/workflows/ci.yaml scripts/ci/test.sh; do
+  dh_files <<<"${c}" | grep -q . && fail "control: the D/H file detector flags ${c}"
+done
 
-git ls-tree -r --name-only "${tree}" >"${work}/files"
+git -c core.quotePath=false ls-tree -r --name-only "${tree}" >"${work}/files"
 mapfile -t pubspecs < <(grep -E '(^|/)pubspec\.yaml$' "${work}/files" || true)
 mapfile -t dart_files < <(grep -E '\.dart$' "${work}/files" || true)
 [[ " ${pubspecs[*]} " == *" pubspec.yaml "* && " ${pubspecs[*]} " == *" packages/diene_dart_lib/pubspec.yaml "* ]] || fail "control: the scan does not see the root and member pubspec.yaml (${pubspecs[*]:-none})"
@@ -79,6 +96,8 @@ done
 for p in "${H_PATHS[@]}"; do
   if [[ -n "$(git ls-tree --name-only "${tree}" -- "${p}")" ]]; then fail "H path tracked: ${p}"; fi
 done
+hits="$(dh_files <"${work}/files")"
+[[ -z ${hits} ]] || fail "D/H axis files tracked:"$'\n'"${hits}"
 
 args=()
 for t in "${DH_TOKENS[@]}"; do args+=(-e "${t}"); done

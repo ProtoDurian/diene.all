@@ -17,10 +17,35 @@ ARTIFACT_RE='(^|/)(\.dart_tool|build|coverage|reports|\.pub-cache|\.pub)/|(^|/)(
 
 deps() { git show "${tree}:${pkg}/pubspec.yaml" | yq '.dependencies // {} | keys | .[]'; }
 
+# Drops // and nested /* */ comments outside string literals (Dart source on stdin).
+strip_comments() {
+  awk 'BEGIN { RS = "^$" } {
+    s = $0; n = length(s); out = ""; depth = 0; q = ""; raw = 0
+    for (i = 1; i <= n; i++) {
+      c = substr(s, i, 1); d = substr(s, i, 2)
+      if (depth > 0) {
+        if (d == "/*") { depth++; i++ } else if (d == "*/") { depth--; i++; if (depth == 0) out = out " " }
+        continue
+      }
+      if (q != "") {
+        out = out c
+        if (c == "\\" && !raw) { out = out substr(s, i + 1, 1); i++ } else if (c == q) q = ""
+        continue
+      }
+      if (d == "//") { while (i <= n && substr(s, i, 1) != "\n") i++; out = out "\n"; continue }
+      if (d == "/*") { depth = 1; i++; continue }
+      if (c == "\047" || c == "\"") { q = c; raw = (i > 1 && substr(s, i - 1, 1) == "r") }
+      out = out c
+    }
+    printf "%s", out
+  }'
+}
+
 # Prints the URIs of every import/export/part directive in one Dart source on stdin.
 directive_uris() {
-  sed -e 's#//.*$##' | tr '\n' ' ' | sed 's/;/;\n/g' |
-    grep -E '^[[:space:]]*(import|export|part)([[:space:]]|$)' |
+  strip_comments | tr '\n' ' ' | sed 's/;/;\n/g' |
+    grep -E "(^|[[:space:])])(import|export|part)[[:space:]]+(of[[:space:]]+)?['\"]" |
+    sed -E "s/^.*(^|[[:space:])])(import|export|part)[[:space:]]+(of[[:space:]]+)?(['\"])/\4/" |
     grep -oE "'[^']*'|\"[^\"]*\"" | tr -d "'\"" || true
 }
 
@@ -55,6 +80,7 @@ dep_list="$(deps | paste -sd ' ')"
 [[ -n "$(judge "${pkg}/lib/a.dart" package:test/test.dart)" ]] || fail "control: a dev-dependency import is not caught"
 [[ -z "$(judge "${pkg}/lib/src/a.dart" note.dart)" ]] || fail "control: an in-lib relative import is flagged"
 [[ "$(printf "/// import 'package:x/y.dart';\nimport 'a.dart'\n    show A;\nexport \"b.dart\";\n" | directive_uris | tr '\n' ' ')" == "a.dart b.dart " ]] || fail "control: the directive parser misreads a canary"
+[[ "$(printf "/* doc */ import 'package:test/test.dart';\n/* a /* nested */ still */import 'c.dart';\n/*\n import 'package:hidden/x.dart';\n*/\n@Tag('a//b /* c') import 'd.dart';\n" | directive_uris | tr '\n' ' ')" == "package:test/test.dart c.dart d.dart " ]] || fail "control: the directive parser misses an import after a block comment"
 echo "${pkg}/.dart_tool/package_config.json" | grep -qE "${ARTIFACT_RE}" || fail "control: the artifact matcher misses a canary"
 
 mapfile -t pkg_files < <(git ls-tree -r --name-only "${tree}" -- "${pkg}/")
