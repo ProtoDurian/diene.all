@@ -11,20 +11,24 @@ tiers=".config/bun-base.coverage.yaml"
   echo "❌ usage: $0 <$(yq '.tiers | keys | join("|")' "${tiers}")>" >&2
   exit 2
 }
-tests="$(yq ".tiers.${tier}.tests" "${tiers}")"
-scope="$(yq ".tiers.${tier}.scope" "${tiers}")"
-
-if [[ -z "$(rg --files -g '*.test.{ts,tsx}' "${tests}" 2>/dev/null || true)" ]]; then
-  echo "✅ ${tier} tier has no test files under ${tests}; nothing to run"
-  exit 0
-fi
-
-bun install --frozen-lockfile
+tests="$(yq ".tiers.${tier}.tests // \"\"" "${tiers}")"
+scope="$(yq ".tiers.${tier}.scope // \"\"" "${tiers}")"
+[[ -z ${tests} ]] && echo "❌ ${tiers} gives tier ${tier} no tests folder" >&2 && exit 2
 
 config="bunfig.${tier}.toml"
 report_dir="reports/${tier}"
 [[ ${tier} == "int" ]] && report_dir="reports/integration"
 coverage_file="${report_dir}/lcov.info"
+rm -rf "${report_dir}"
+
+# Same file names bun test discovers.
+if [[ -z "$(rg --files -g '*{.test,_test,.spec,_spec}.{ts,tsx,js,jsx}' "${tests}" 2>/dev/null || true)" ]]; then
+  echo "✅ ${tier} tier has no test files under ${tests}; nothing to run"
+  exit 0
+fi
+[[ -f ${config} ]] || { echo "❌ ${tier} tier has tests but no ${config}" >&2 && exit 1; }
+
+bun install --frozen-lockfile
 
 if [[ -z ${scope} ]]; then
   echo "🧪 Running ${tier} tests..."
@@ -34,7 +38,6 @@ if [[ -z ${scope} ]]; then
 fi
 
 echo "🧪 Running ${tier} tests with coverage..."
-rm -rf "${report_dir}"
 
 bun test --config="${config}" --coverage
 
