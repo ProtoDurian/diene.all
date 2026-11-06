@@ -220,6 +220,11 @@
     "class": "smoke"
   },
   {
+    "template": "diene/bun-base",
+    "name": "bun-biome-format",
+    "class": "gate"
+  },
+  {
     "template": "diene/bun-lib",
     "name": "pack-content",
     "class": "gate"
@@ -237,21 +242,6 @@
   {
     "template": "diene/bun-lib",
     "name": "publish-version-guard",
-    "class": "gate"
-  },
-  {
-    "template": "diene/bun-lib",
-    "name": "publish-tag-policy",
-    "class": "gate"
-  },
-  {
-    "template": "diene/bun-lib",
-    "name": "publish-credential-policy",
-    "class": "gate"
-  },
-  {
-    "template": "diene/bun-lib",
-    "name": "publish-command-policy",
     "class": "gate"
   },
   {

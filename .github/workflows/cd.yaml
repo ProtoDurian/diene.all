@@ -6,9 +6,9 @@ on:
       - v*.*.*
 
 jobs:
-  publish:
-    name: Publish to npm
+  npm-publish:
+    name: npm-publish
     permissions:
       contents: read
-    uses: ./.github/workflows/⚡reusable-publish.yaml
+    uses: ./.github/workflows/⚡reusable-npm-publish.yaml
     secrets: inherit

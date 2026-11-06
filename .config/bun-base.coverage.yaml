@@ -1,0 +1,10 @@
+tiers:
+  unit:
+    tests: tests/unit
+    scope: src/lib/
+  int:
+    tests: tests/integration
+    scope: src/adapters/
+  meta:
+    tests: tests/meta
+    scope: src/test-helper/
