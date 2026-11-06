@@ -1,4 +1,4 @@
-name: ⚡ Reusable Publish
+name: ⚡ Reusable npm-publish
 
 on:
   workflow_call:
@@ -7,8 +7,8 @@ on:
         required: true
 
 jobs:
-  publish:
-    name: Publish to npm
+  npm-publish:
+    name: npm-publish
     runs-on:
       - nscloud-ubuntu-26.04-amd64-4x8-with-cache
       - nscloud-cache-size-20gb

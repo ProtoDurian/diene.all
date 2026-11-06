@@ -73,7 +73,7 @@ for wf in .github/workflows/ci.yaml .github/workflows/cd.yaml; do
   [[ "$(show "${wf}" | yq '[.jobs[] | select(.uses // "" | test("docker|helm"))] | length')" == 0 ]] || fail "${wf} still calls a docker/helm workflow"
   [[ "$(show "${wf}" | yq '.jobs | (has("docker") or has("helm"))')" == false ]] || fail "${wf} still has a docker/helm job"
 done
-[[ "$(show .github/workflows/cd.yaml | yq '.jobs | keys | join(",")')" == publish ]] || fail "cd.yaml carries a job other than publish"
+[[ "$(show .github/workflows/cd.yaml | yq '.jobs | keys | join(",")')" == npm-publish ]] || fail "cd.yaml carries a job other than npm-publish"
 [[ "$(show Taskfile.yaml | yq '.includes | (has("docker") or has("helm"))')" == false ]] || fail "Taskfile.yaml still includes docker/helm"
 [[ "$(show .github/dependabot.yml | yq '[.updates[] | select(.package-ecosystem == "docker" or .package-ecosystem == "helm")] | length')" == 0 ]] || fail "dependabot.yml still has a docker/helm entry"
 [[ "$(show dlint.yaml | yq '[.checks["toolchain-smoke"].binaries[] | select(test("^(docker|dockerd|hadolint|helm|helm-docs|helmlint)( |$)"))] | length')" == 0 ]] || fail "dlint.yaml still smokes a D/H binary"
@@ -100,4 +100,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ strip-absence: no D/H path, reference, entry, smoke line or prose; cd.yaml is publish-only; edited files valid"
+echo "✅ strip-absence: no D/H path, reference, entry, smoke line or prose; cd.yaml is npm-publish-only; edited files valid"

@@ -13,9 +13,35 @@ let
           ".claude/skills/vendor/**"
           "Changelog.md"
           "docs/developer/CommitConventions.md"
+          "*.ts"
+          "*.tsx"
+          "*.mts"
+          "*.cts"
+          "*.js"
+          "*.jsx"
+          "*.mjs"
+          "*.cjs"
+          "*.json"
+          "*.jsonc"
         ];
       };
       shfmt.enable = true;
+    };
+
+    settings.formatter.biome = {
+      command = "./scripts/local/biome-format.sh";
+      includes = [
+        "*.ts"
+        "*.tsx"
+        "*.mts"
+        "*.cts"
+        "*.js"
+        "*.jsx"
+        "*.mjs"
+        "*.cjs"
+        "*.json"
+        "*.jsonc"
+      ];
     };
 
   };

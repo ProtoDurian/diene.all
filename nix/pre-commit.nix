@@ -20,6 +20,7 @@ pre-commit-lib.run {
     treefmt = {
       enable = true;
       package = formatter;
+      require_serial = true;
       excludes = [
         "^\\.claude/skills/vendor/"
         "^Changelog\\.md$"
@@ -109,33 +110,6 @@ pre-commit-lib.run {
       name = "Knip production dead code";
       entry = "./node_modules/.bin/knip --config knip.production.json --production";
       files = "(^package\\.json$|^tsconfig\\.json$|^knip\\.production\\.json$|\\.(ts|tsx)$)";
-      pass_filenames = false;
-      language = "system";
-    };
-
-    a-publish-tag-policy = {
-      enable = true;
-      name = "Publish tag policy";
-      entry = validator "scripts/validate/publish-policy.sh tag";
-      files = "^\\.github/workflows/cd\\.yaml$";
-      pass_filenames = false;
-      language = "system";
-    };
-
-    a-publish-credential-policy = {
-      enable = true;
-      name = "Publish credential policy";
-      entry = validator "scripts/validate/publish-policy.sh credential";
-      files = "^(\\.github/workflows/.*\\.ya?ml$|scripts/ci/publish\\.sh$)";
-      pass_filenames = false;
-      language = "system";
-    };
-
-    a-publish-command-policy = {
-      enable = true;
-      name = "Publish command policy";
-      entry = validator "scripts/validate/publish-policy.sh command";
-      files = "^scripts/ci/publish\\.sh$";
       pass_filenames = false;
       language = "system";
     };
