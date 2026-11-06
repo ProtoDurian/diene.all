@@ -1,0 +1,47 @@
+# Known answers: cond-B (the chart's shape) fires on a value-0 series, cond-A (query as condition) does not; absent fires.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: condition-check
+    folder: sandbox
+    interval: 10s
+    rules:
+      - uid: cond-a
+        title: cond-A
+        condition: A
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model: { expr: 'vector(0) < 1', instant: true }
+      - uid: cond-b
+        title: cond-B
+        condition: B
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model: { expr: 'vector(0) < 1', instant: true }
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: math, expression: 'is_number($A) || is_nan($A) || is_inf($A)' }
+      - uid: absent
+        title: absent
+        condition: B
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model: { expr: 'absent_over_time(sandbox_missing_metric[5m])', instant: true }
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: math, expression: 'is_number($A) || is_nan($A) || is_inf($A)' }

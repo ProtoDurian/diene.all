@@ -1,15 +1,10 @@
-# OpenTelemetry Alignment Contract
+# OpenTelemetry Configuration
 
-This is the shared O1 contract for `lib/bun/otel`, `lib/dotnet/otel`, and
-`lib/go/otel`. Each library owns its language implementation and engine-owned
-schema, but all three expose the same configuration concepts, resource identity,
-override behavior, lifecycle, and test boundary. Dart is frontend-only and uses
-[Faro](./faro.md) instead of a Dart OTel runtime library.
+Applies only if this repo has backend code (Bun, .NET or Go). That code comes from a CyanPrint template for its language (CyanPrint is the template generator described in `CLAUDE.md`; it will record its templates in `.cyan_state.yaml`, which this repo does not have yet, once a template has been applied), which also adds its OTel library ("the library" below), its config library and the config files. This repo has none of them yet.
 
-## Canonical block
+Backend services send logs, metrics and traces with OpenTelemetry (OTel). All three languages read the same `otel:` config block and set the same resource attributes. Frontends use Grafana Faro instead; see [Faro](/docs/standards/observability/faro.md).
 
-The configuration shape is dotnet-priority: bindable nested booleans, no
-exporter enum strings, and identical exporter sub-blocks per signal.
+## The config block
 
 ```yaml
 otel:
@@ -21,7 +16,6 @@ otel:
       otlp:
         enabled: false
         endpoint: ''
-        protocol: http/protobuf
         headers: {}
         timeout: PT10S
   metrics:
@@ -32,7 +26,6 @@ otel:
       otlp:
         enabled: false
         endpoint: ''
-        protocol: http/protobuf
         headers: {}
         timeout: PT10S
     interval: PT60S
@@ -47,97 +40,63 @@ otel:
       otlp:
         enabled: false
         endpoint: ''
-        protocol: http/protobuf
         headers: {}
         timeout: PT10S
 ```
 
-The base file enables the signal pipelines but keeps exporters off. A landscape
-overlay enables the required exporter and supplies its endpoint. O1 does not
-choose concrete landscape endpoints.
+The base config turns the three signals on and every exporter off, and keeps every trace (`ratio: 1.0`). Each landscape's config turns on the exporters it needs, e.g. `otel.traces.exporter.otlp: { enabled: true, endpoint: '{otlp-endpoint}' }` (endpoint from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you)), and lowers `otel.traces.sampler.ratio` when that landscape's trace volume is high (the platform team asks, or its traces cost more than its logs).
 
-Required invariants:
+Rules:
 
-- Signal keys are exactly `logs`, `metrics`, and `traces`.
-- Exporter selection uses independent `enabled` booleans.
-- OTLP is HTTP/protobuf on port 4318 fleet-wide.
-- Durations use ISO 8601 strings.
-- The sampler names are `parentbased_traceidratio`, `always_on`, and
-  `always_off`; ratio is in the inclusive range 0–1.
-- Empty or disabled exporters create no network clients or background workers.
-- A configured exporter with a missing endpoint fails validation before startup.
+- The signal keys are exactly `logs`, `metrics` and `traces`.
+- Each exporter is switched by its own `enabled` boolean, not by a string such as `exporter: otlp`.
+- OTLP (the OpenTelemetry Protocol) is always HTTP/protobuf (port 4318 by default); there is no protocol setting.
+- Durations are ISO 8601 strings: `PT10S` is 10 seconds.
+- The sampler `type` is `parentbased_traceidratio` (follow the caller's sampling decision if there is one, else keep the `ratio` share, 0 to 1, of new traces), `always_on` or `always_off`.
+- An enabled exporter with an empty `endpoint` fails config validation before startup.
 
-## Ownership and composition
+## Resource attributes
 
-| Surface                                                  | Owner                                    |
-| -------------------------------------------------------- | ---------------------------------------- |
-| OTel block types and schema                              | The language's OTel library              |
-| YAML/env loading, merge order, and final root validation | The language's config library            |
-| Infra presets such as postgres/kv/cache/storage          | `standard-config`, never OTel            |
-| Logging and metrics emit seams                           | The language's common interfaces library |
-| SDK-backed implementations                               | The language's OTel library              |
-| Consumer lifecycle wiring and real-export SIT            | The consumer/service                     |
+The library builds these from the `app:` block of the config. Never set them by hand.
 
-A service imports the OTel schema into its composed root schema in one line.
-`standard-config` must not duplicate or wrap the block.
+```yaml
+app:
+  landscape: raichu
+  platform: tracker
+  service: zinc
+  module: webhook
+  version: 1.4.0
+```
 
-## Resource identity
+| `app:` value | OTel attribute                |
+| ------------ | ----------------------------- |
+| landscape    | `deployment.environment.name` |
+| platform     | `service.namespace`           |
+| service      | `service.name`                |
+| version      | `service.version`             |
 
-Every implementation derives resource attributes from the validated `app:`
-service-tree block. Consumers never hand-author these attributes.
+It also sets `atomi.landscape`, `atomi.platform`, `atomi.service`, `atomi.module` and `atomi.version`. `atomi.*` is the organisation's own attribute namespace: it holds the raw values (including `module`, which has no standard attribute), so queries match the LPSM labels exactly. The collector (run by the platform team) turns the `atomi.*` values into the labels `landscape`, `platform`, `service` and `module` that every query in these docs uses; if a query finds nothing, check one series in Grafana Explore for the label names your collector produces.
 
-| Service-tree value | Semantic convention           |
-| ------------------ | ----------------------------- |
-| landscape          | `deployment.environment.name` |
-| platform           | `service.namespace`           |
-| service            | `service.name`                |
-| version            | `service.version`             |
+## Standard HTTP metrics
 
-All five raw taxonomy values are also emitted:
+HTTP servers report OTel's standard HTTP metric. Exported to Prometheus it is the histogram `http_server_request_duration_seconds`; its `_count` series counts requests. Its labels include `http_response_status_code`, `http_request_method` and `http_route` (the route template, e.g. `/orders`, not the raw path). Check one series in Grafana Explore before you use it.
 
-- `atomi.landscape`
-- `atomi.platform`
-- `atomi.service`
-- `atomi.module`
-- `atomi.version`
+## Standard `OTEL_*` environment variables win
 
-## Standard OTel environment variables win
+If a standard `OTEL_*` variable is set (endpoint, headers, resource attributes, propagators, sampler, `OTEL_SDK_DISABLED`), the library uses it instead of the config block. Whoever deploys the service can then change telemetry without a new release.
 
-The libraries configure SDKs programmatically only when the corresponding
-standard `OTEL_*` environment variable is unset. This includes exporter
-endpoints, headers, resource attributes, propagators, sampler settings, and
-`OTEL_SDK_DISABLED`. Operations must be able to override the block without a
-new application release.
+## Start and shutdown
 
-## Lifecycle and public capabilities
+Start telemetry once at startup. Call the library's flush and shutdown from the service's own shutdown hook (e.g. on `SIGTERM`); the library never installs signal handlers itself.
 
-All three libraries provide the same conceptual capabilities:
+Per language:
 
-1. Validate the engine-owned block.
-2. Build the canonical resource from `app:`.
-3. Initialize enabled signal pipelines exactly once.
-4. Expose service-scoped logger, meter, and tracer accessors or implementations
-   of the family interfaces.
-5. Expose an explicit flush/shutdown operation.
-6. Avoid registering process signal handlers; the consumer owns lifecycle
-   hooks and invokes flush/shutdown.
+- **Bun**: pino (the Bun template's JSON logger) writes JSON logs to stdout, with the trace context and fixed keys `level` (a number, e.g. `50` = error), `msg` and `time`, and Grafana Alloy (the collector) reads stdout, so leave `otel.logs.exporter.otlp.enabled: false`. Metrics and traces go over OTLP.
+- **.NET**: `Microsoft.Extensions.Logging` and the OpenTelemetry hosting integration. Logs go where `otel.logs.exporter` sends them (`console` = stdout, `otlp` = the collector); sample the stored lines and record their keys in `observability/dashboards/log-notes.md`.
+- **Go**: `slog` and the OpenTelemetry Go SDK. Logs and their keys: as for .NET.
 
-The language wrappers stay outside the canonical block:
+## Testing
 
-- Bun uses pino with trace-context injection and JSON stdout to Alloy. Metrics
-  and traces use OTLP; the Bun v1 OTLP logs bridge remains explicitly stubbed.
-- .NET uses `Microsoft.Extensions.Logging` and native OpenTelemetry hosting
-  integration.
-- Go uses `slog` and the native OpenTelemetry SDK.
-
-## Evidence boundary
-
-Unit tests use shared C0 fixtures for schema acceptance/rejection, resource
-mapping, sampler mapping, and disabled-exporter behavior. Integration tests use
-in-memory telemetry seams; they never start a fake collector. Real export is a
-consumer-owned SIT journey through the configured Alloy path.
-
-The exact S33 split between common-interface mocks, any trace-specific seam,
-and each OTel TestHelper is implementation-gated. This contract requires one
-coherent public seam and mock story, but does not pre-judge that ownership
-decision.
+- **Unit tests**: every landscape's config passes validation.
+- **Integration tests**: test with the in-memory exporter the language template's OTel library ships; never start a fake collector.
+- **Real export**: checked after deploy, in Grafana Explore.
