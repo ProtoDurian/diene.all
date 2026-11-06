@@ -18,7 +18,7 @@ for path in "${files[@]}"; do
     const ts = require(`${process.cwd()}/node_modules/typescript`);
     const file = process.env.FILE;
     const sf = ts.createSourceFile(file, await Bun.stdin.text(), ts.ScriptTarget.Latest, true, /x$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-    const kind = n => ts.isArrowFunction(n) ? "arrow" : ts.isFunctionExpression(n) || ts.isFunctionDeclaration(n) ? "function"
+    const kind = n => ts.isArrowFunction(n) ? "arrow" : ts.isFunctionExpression(n) || (ts.isFunctionDeclaration(n) && n.body) ? "function"
       : ts.isMethodDeclaration(n) || ts.isGetAccessorDeclaration(n) || ts.isSetAccessorDeclaration(n) ? "method" : undefined;
     const visit = n => {
       if (ts.isClassLike(n)) { ts.forEachChild(n, child => ts.isClassElement(child) ? undefined : visit(child)); return; }

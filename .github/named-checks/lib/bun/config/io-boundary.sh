@@ -74,6 +74,22 @@ for path in "${files[@]}"; do
       if (ts.isLabeledStatement(p) || ts.isBreakOrContinueStatement(p)) return true;
       return p.name === n && !ts.isShorthandPropertyAssignment(p);
     };
+    const binds = (b, name) => ts.isIdentifier(b) ? b.text === name : !!b.elements?.some(e => !ts.isOmittedExpression(e) && binds(e.name, name));
+    const declares = (scope, name) => {
+      if (ts.isFunctionLike(scope) && scope.parameters?.some(p => binds(p.name, name))) return true;
+      if ((ts.isFunctionExpression(scope) || ts.isClassExpression(scope)) && scope.name?.text === name) return true;
+      if (ts.isCatchClause(scope) && scope.variableDeclaration && binds(scope.variableDeclaration.name, name)) return true;
+      if ((ts.isForStatement(scope) || ts.isForInStatement(scope) || ts.isForOfStatement(scope)) && scope.initializer && ts.isVariableDeclarationList(scope.initializer) && scope.initializer.declarations.some(d => binds(d.name, name))) return true;
+      for (const st of scope.statements ?? []) {
+        if (ts.isVariableStatement(st) && st.declarationList.declarations.some(d => binds(d.name, name))) return true;
+        if ((ts.isFunctionDeclaration(st) || ts.isClassDeclaration(st) || ts.isEnumDeclaration(st)) && st.name?.text === name) return true;
+        const c = ts.isImportDeclaration(st) ? st.importClause : undefined, nb = c?.namedBindings;
+        if (c && (c.name?.text === name || (nb && (ts.isNamespaceImport(nb) ? nb.name.text === name : nb.elements.some(e => e.name.text === name))))) return true;
+      }
+      return false;
+    };
+    const local = n => { for (let p = n.parent; p; p = p.parent) if (declares(p, n.text)) return true; return false; };
+    const keyOf = k => !k ? undefined : ts.isComputedPropertyName(k) ? constant(k.expression) : ts.isIdentifier(k) || ts.isStringLiteralLike(k) || ts.isNumericLiteral(k) ? k.text : undefined;
     const hasInstanceOfFunction = n => {
       const proto = n.parent, access = proto.parent, key = access && access.argumentExpression;
       return ts.isPropertyAccessExpression(proto) && proto.name.text === "prototype" && ts.isElementAccessExpression(access) && ts.isPropertyAccessExpression(key) && key.expression.getText() === "Symbol" && key.name.text === "hasInstance";
@@ -88,14 +104,17 @@ for path in "${files[@]}"; do
       }
       else if (ts.isMetaProperty(n) && n.keywordToken === S.ImportKeyword) say("global import.meta");
       else if (ts.isPropertyAccessExpression(n) && n.name.text === "constructor") say("global .constructor");
-      else if (ts.isIdentifier(n) && GLOBALS.has(n.text) && !named(n) && !inType(n)) {
-        const p = n.parent;
-        if (n.text === "Date") { if (!(ts.isBinaryExpression(p) && p.operatorToken.kind === S.InstanceOfKeyword && p.right === n)) say("global Date"); }
+      else if ((ts.isBindingElement(n) || ts.isPropertyAssignment(n) || ts.isShorthandPropertyAssignment(n)) && FORBIDDEN_KEYS.has(keyOf(n.propertyName ?? n.name))) say("global constructor (by string key)");
+      else if (ts.isIdentifier(n) && GLOBALS.has(n.text) && !named(n) && !inType(n) && !local(n)) {
+        let top = n;
+        while (ts.isParenthesizedExpression(top.parent)) top = top.parent;
+        const p = top.parent;
+        if (n.text === "Date") { if (!(ts.isBinaryExpression(p) && p.operatorToken.kind === S.InstanceOfKeyword && p.right === top)) say("global Date"); }
         else if (n.text === "Function") { if (!hasInstanceOfFunction(n)) say("global Function"); }
         else if (n.text === "Math") { if (!(ts.isPropertyAccessExpression(p) && p.expression === n)) say("global Math"); else if (p.name.text === "random") say("global Math.random"); }
         else if (!allowGlobal.test(n.text)) say(`global ${n.text}`);
       }
-      if ((ts.isStringLiteralLike(n) || ts.isBinaryExpression(n) || ts.isTemplateExpression(n)) && FORBIDDEN_KEYS.has(constant(n)) && !ts.isImportDeclaration(n.parent)) say("global constructor (by string key)");
+      if ((ts.isStringLiteralLike(n) || ts.isBinaryExpression(n) || ts.isTemplateExpression(n)) && FORBIDDEN_KEYS.has(constant(n)) && !ts.isImportDeclaration(n.parent) && !inType(n)) say("global constructor (by string key)");
       ts.forEachChild(n, visit);
     };
     visit(sf);
