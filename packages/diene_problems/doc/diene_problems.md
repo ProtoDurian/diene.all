@@ -132,6 +132,16 @@ to its SHA-256 digest and is marked `local-regression-only`. The conformance
 test recomputes each digest and rebuilds each fixture from the code, so an
 altered fixture or a drifted implementation turns it red.
 
+`test/fixtures/c0/upstream/` holds the Problem vectors of the external
+`c0-fixtures-r2` release: the envelope, type-URI and catalog-entry cases, each
+stored as the JSON subtree of the release file. Its `manifest.json` records the
+source commit, file path and file digest, and for each vector its JSON pointer,
+the SHA-256 of the subtree as `jq -cS` prints it, the command that reproduces
+that digest from the release, and the adaptations the test applies for rules
+that came after the release (snake-case ids, `schema` in place of `data`, the
+newer `data` shapes). The test checks each digest and runs the package against
+every case.
+
 ## TestHelper
 
 ```dart
