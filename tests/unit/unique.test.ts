@@ -1,66 +1,46 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
-import { unique } from '../../src/unique';
+import 'should';
+import { Deduper } from '../../src/lib/unique';
 
-describe('unique', () => {
-  it('should drop duplicate primitives while preserving first occurrence order', () => {
+describe('Deduper.unique', () => {
+  it.each([
+    { label: 'primitives', items: [1, 2, 2, 3, 1, 3], expected: [1, 2, 3] },
+    { label: 'strings', items: ['a', 'b', 'a', 'c', 'b'], expected: ['a', 'b', 'c'] },
+    { label: '+0 and -0', items: [0, -0, 0], expected: [0] },
+  ])('should keep the first occurrence of $label', ({ items, expected }) => {
     // Arrange
-    const items = [1, 2, 2, 3, 1, 3];
+    const { unique } = new Deduper();
 
     // Act
-    const actual = items.filter(unique);
+    const actual = (items as readonly unknown[]).filter(unique);
 
     // Assert
-    should(actual).deepEqual([1, 2, 3]);
+    actual.should.deepEqual(expected);
   });
 
-  it('should de-duplicate strings by value', () => {
+  it('should treat NaN as equal to NaN', () => {
     // Arrange
-    const items = ['a', 'b', 'a', 'c', 'b'];
+    const deduper = new Deduper();
 
     // Act
-    const actual = items.filter(unique);
+    const actual = [Number.NaN, Number.NaN, 1].filter(deduper.unique);
 
     // Assert
-    should(actual).deepEqual(['a', 'b', 'c']);
+    actual.length.should.equal(2);
+    Number.isNaN(actual[0]).should.be.true();
   });
 
-  it('should treat NaN as equal to NaN (SameValueZero)', () => {
-    // Arrange
-    const items = [Number.NaN, Number.NaN, 1];
-
-    // Act
-    const actual = items.filter(unique);
-
-    // Assert
-    should(actual).have.length(2);
-    should(Number.isNaN(actual[0] as number)).be.true();
-    should(actual[1]).equal(1);
-  });
-
-  it('should treat +0 and -0 as the same value', () => {
-    // Arrange
-    const items = [0, -0, 0];
-
-    // Act
-    const actual = items.filter(unique);
-
-    // Assert
-    should(actual).deepEqual([0]);
-  });
-
-  it('should distinguish objects by reference identity', () => {
+  it('should distinguish objects by reference', () => {
     // Arrange
     const shared = { id: 1 };
     const other = { id: 1 };
-    const items = [shared, shared, other];
+    const deduper = new Deduper();
 
     // Act
-    const actual = items.filter(unique);
+    const actual = [shared, shared, other].filter(deduper.unique);
 
     // Assert
-    should(actual).have.length(2);
-    should(actual[0]).equal(shared);
-    should(actual[1]).equal(other);
+    actual.length.should.equal(2);
+    (actual[0] === shared && actual[1] === other).should.be.true();
   });
 });

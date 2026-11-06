@@ -1,25 +1,14 @@
 import { describe, it } from 'bun:test';
 import should from 'should';
-import { noop, sleep } from '../../src/timing';
+import { Timing } from '../../src/lib/timing';
 
-describe('sleep', () => {
-  it('should resolve to undefined for a zero delay', async () => {
+describe('Timing.sleep', () => {
+  it.each([{ seconds: 0 }, { seconds: 0.01 }])('should resolve to undefined after $seconds s', async ({ seconds }) => {
     // Arrange
-    const seconds = 0;
+    const timing = new Timing();
 
     // Act
-    const actual = await sleep(seconds);
-
-    // Assert
-    should(actual).be.undefined();
-  });
-
-  it('should resolve after a small positive delay', async () => {
-    // Arrange
-    const seconds = 0.01;
-
-    // Act
-    const actual = await sleep(seconds);
+    const actual = await timing.sleep(seconds);
 
     // Assert
     should(actual).be.undefined();
@@ -29,28 +18,25 @@ describe('sleep', () => {
     { seconds: -1, label: 'negative' },
     { seconds: Number.NaN, label: 'NaN' },
     { seconds: Number.POSITIVE_INFINITY, label: 'infinite' },
-  ])('should reject with a RangeError for a $label delay', async ({ seconds }) => {
+  ])('should reject a $label delay with a RangeError', async ({ seconds }) => {
     // Arrange
-    let error: unknown;
+    const timing = new Timing();
 
     // Act
-    try {
-      await sleep(seconds);
-    } catch (caught) {
-      error = caught;
-    }
+    const actual = timing.sleep(seconds);
 
     // Assert
-    should(error).be.instanceof(RangeError);
+    await actual.should.be.rejectedWith(RangeError);
   });
 });
 
-describe('noop', () => {
-  it('should return undefined and do nothing', () => {
+describe('Timing.noop', () => {
+  it('should return undefined', () => {
     // Arrange
+    const timing = new Timing();
 
     // Act
-    const actual = noop();
+    const actual = timing.noop();
 
     // Assert
     should(actual).be.undefined();

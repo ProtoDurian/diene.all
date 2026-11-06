@@ -1,101 +1,96 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
-import { mapWithConcurrency } from '../../src/concurrency';
-import { sleep } from '../../src/timing';
+import 'should';
+import { ConcurrencyMapper } from '../../src/lib/concurrency';
+import { Timing } from '../../src/lib/timing';
 
-describe('mapWithConcurrency', () => {
+const timing = new Timing();
+
+describe('ConcurrencyMapper.mapWithConcurrency', () => {
   it('should preserve input order regardless of completion order', async () => {
     // Arrange
-    const items = [40, 10, 30, 20, 0];
+    const mapper = new ConcurrencyMapper();
 
-    // Act — later items resolve sooner, yet order must follow the input
-    const actual = await mapWithConcurrency(items, 2, async item => {
-      await sleep(item / 1000);
+    // Act
+    const actual = await mapper.mapWithConcurrency([40, 10, 30, 20, 0], 2, async item => {
+      await timing.sleep(item / 1000);
       return item * 2;
     });
 
     // Assert
-    should(actual).deepEqual([80, 20, 60, 40, 0]);
+    actual.should.deepEqual([80, 20, 60, 40, 0]);
   });
 
   it('should pass the index to the mapper', async () => {
     // Arrange
-    const items = ['a', 'b', 'c'];
+    const mapper = new ConcurrencyMapper();
 
     // Act
-    const actual = await mapWithConcurrency(items, 3, (item, index) => `${index}:${item}`);
+    const actual = await mapper.mapWithConcurrency(['a', 'b', 'c'], 3, (item, index) => `${index}:${item}`);
 
     // Assert
-    should(actual).deepEqual(['0:a', '1:b', '2:c']);
+    actual.should.deepEqual(['0:a', '1:b', '2:c']);
   });
 
-  it('should never exceed the concurrency bound of active work', async () => {
+  it('should never exceed the concurrency bound', async () => {
     // Arrange
-    const items = Array.from({ length: 12 }, (_, index) => index);
-    const concurrency = 3;
+    const mapper = new ConcurrencyMapper();
     let active = 0;
     let peak = 0;
 
     // Act
-    await mapWithConcurrency(items, concurrency, async item => {
-      active += 1;
-      peak = Math.max(peak, active);
-      await sleep(0.005);
-      active -= 1;
-      return item;
-    });
+    await mapper.mapWithConcurrency(
+      Array.from({ length: 12 }, (_, index) => index),
+      3,
+      async item => {
+        active += 1;
+        peak = Math.max(peak, active);
+        await timing.sleep(0.005);
+        active -= 1;
+        return item;
+      },
+    );
 
     // Assert
-    should(peak).be.belowOrEqual(concurrency);
+    peak.should.equal(3);
   });
 
   it('should return an empty array for empty input', async () => {
     // Arrange
-    const items: number[] = [];
+    const mapper = new ConcurrencyMapper();
 
     // Act
-    const actual = await mapWithConcurrency(items, 4, async item => item);
+    const actual = await mapper.mapWithConcurrency([], 4, item => item);
 
     // Assert
-    should(actual).deepEqual([]);
+    actual.should.deepEqual([]);
   });
 
-  it.each([
-    { concurrency: 0, label: 'zero' },
-    { concurrency: -2, label: 'negative' },
-    { concurrency: 1.5, label: 'non-integer' },
-    { concurrency: Number.NaN, label: 'NaN' },
-  ])('should reject a $label concurrency with a RangeError', async ({ concurrency }) => {
-    // Arrange
-    let error: unknown;
+  it.each([{ concurrency: 0 }, { concurrency: -2 }, { concurrency: 1.5 }, { concurrency: Number.NaN }])(
+    'should reject concurrency $concurrency with a RangeError',
+    async ({ concurrency }) => {
+      // Arrange
+      const mapper = new ConcurrencyMapper();
 
-    // Act
-    try {
-      await mapWithConcurrency([1, 2, 3], concurrency, async item => item);
-    } catch (caught) {
-      error = caught;
-    }
+      // Act
+      const actual = mapper.mapWithConcurrency([1, 2, 3], concurrency, item => item);
 
-    // Assert
-    should(error).be.instanceof(RangeError);
-  });
+      // Assert
+      await actual.should.be.rejectedWith(RangeError);
+    },
+  );
 
   it('should propagate a mapper rejection', async () => {
     // Arrange
+    const mapper = new ConcurrencyMapper();
     const boom = new Error('mapper failed');
-    let error: unknown;
 
     // Act
-    try {
-      await mapWithConcurrency([1, 2, 3], 2, async item => {
-        if (item === 2) throw boom;
-        return item;
-      });
-    } catch (caught) {
-      error = caught;
-    }
+    const actual = mapper.mapWithConcurrency([1, 2, 3], 2, async item => {
+      if (item === 2) throw boom;
+      return item;
+    });
 
     // Assert
-    should(error).equal(boom);
+    await actual.should.be.rejectedWith(boom);
   });
 });
