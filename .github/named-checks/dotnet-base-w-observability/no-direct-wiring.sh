@@ -27,14 +27,17 @@ if ! git merge-base --is-ancestor "${payload_sha}" HEAD; then
   failed=1
 fi
 
-mapfile -t payload_paths < <(git -c core.quotePath=false diff --no-renames --name-only "${payload_base}" "${payload_sha}")
-is_payload_path() {
-  local p
-  for p in "${payload_paths[@]}"; do
-    [[ ${p} == "$1" ]] && return 0
-  done
-  return 1
+payload_paths_of() {
+  local base
+  base="$(git show "$1:.github/named-checks/observability/parent.sha" 2>/dev/null)" || base="${payload_base}"
+  git -c core.quotePath=false diff --no-renames --name-only "${base}" "$1"
 }
+
+declare -A former_payload=()
+while read -r _ _ second _; do
+  if [[ -z ${second:-} ]] || ! git merge-base --is-ancestor "${second}" "${payload_sha}"; then continue; fi
+  while read -r p; do former_payload["${p}"]=1; done < <(payload_paths_of "${second}")
+done < <(git rev-list --first-parent --parents "${parent_sha}..HEAD")
 
 chain=0
 last_first_parent=''
@@ -56,11 +59,16 @@ while read -r commit first second extra; do
       fi
     done
   elif git merge-base --is-ancestor "${second}" "${payload_sha}"; then
+    unset merged && declare -A merged=()
+    while read -r p; do merged["${p}"]=1; done < <(payload_paths_of "${second}")
     for path in "${touched[@]}"; do
-      if ! is_payload_path "${path}"; then
-        echo "❌ payload merge ${short} changes ${path}, which is not a payload path" >&2
-        failed=1
+      [[ -n ${merged["${path}"]:-} ]] && continue
+      # a former payload path that this payload version removed
+      if [[ -n ${former_payload["${path}"]:-} ]] && ! git cat-file -e "${second}:${path}" 2>/dev/null && ! git cat-file -e "${commit}:${path}" 2>/dev/null; then
+        continue
       fi
+      echo "❌ payload merge ${short} changes ${path}, which is not a payload path" >&2
+      failed=1
     done
   elif git merge-base --is-ancestor "${second}" "${parent_sha}"; then
     : # a dotnet-base cascade; payload-equality guards the resulting tree
@@ -74,6 +82,16 @@ if [[ ${chain} -gt 0 && ${last_first_parent} != "${parent_sha}" ]] && ! git merg
   echo "❌ the first-parent chain does not start from dotnet-base history" >&2
   failed=1
 fi
+
+declare -A current_payload=()
+while read -r p; do current_payload["${p}"]=1; done < <(payload_paths_of "${payload_sha}")
+for path in "${!former_payload[@]}"; do
+  [[ -n ${current_payload["${path}"]:-} ]] && continue
+  if git cat-file -e "HEAD:${path}" 2>/dev/null && ! git cat-file -e "${parent_sha}:${path}" 2>/dev/null; then
+    echo "❌ ${path} was removed from the payload but is still here" >&2
+    failed=1
+  fi
+done
 
 if [[ ${failed} -ne 0 ]]; then
   exit 1
