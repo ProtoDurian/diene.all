@@ -6,13 +6,32 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["bin/**/*.ts", "src/**/*.ts", "tests/**/*.ts"]
+    "includes": ["**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json,jsonc}", "!.claude/skills/vendor"]
   },
   "formatter": {
-    "enabled": false
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
   },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "arrowParentheses": "asNeeded",
+      "bracketSpacing": true
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.jsonc"],
+      "json": { "formatter": { "trailingCommas": "all" } }
+    }
+  ],
   "linter": {
     "enabled": true,
+    "includes": ["bin/**/*.ts", "src/**/*.ts", "tests/**/*.ts"],
     "rules": {
       "recommended": true
     }

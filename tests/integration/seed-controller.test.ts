@@ -26,25 +26,28 @@ describe('SeedController', () => {
       io.successes.should.deepEqual(['seeded 3 entries under "ns"']);
     });
 
-    it.each(['abc', '0', '-1', '1.5', '10001'])(
-      'should reject invalid count "%s" with exit 1 and not touch the store',
-      async input => {
-        // Arrange
-        const store = new FakeKeyValueStore();
-        const io = captureIo();
-        const progress = captureProgress();
-        const subject = new SeedController(new KvService(store), io, progress);
+    it.each([
+      'abc',
+      '0',
+      '-1',
+      '1.5',
+      '10001',
+    ])('should reject invalid count "%s" with exit 1 and not touch the store', async input => {
+      // Arrange
+      const store = new FakeKeyValueStore();
+      const io = captureIo();
+      const progress = captureProgress();
+      const subject = new SeedController(new KvService(store), io, progress);
 
-        // Act
-        const actual = await subject.handle('ns', input);
+      // Act
+      const actual = await subject.handle('ns', input);
 
-        // Assert
-        actual.should.equal(EXIT_ERROR);
-        store.setCalls.should.be.empty();
-        should(io.errors[0]).not.be.undefined();
-        (io.errors[0] as string).should.containEql('invalid input');
-      },
-    );
+      // Assert
+      actual.should.equal(EXIT_ERROR);
+      store.setCalls.should.be.empty();
+      should(io.errors[0]).not.be.undefined();
+      (io.errors[0] as string).should.containEql('invalid input');
+    });
 
     it('should stop the progress reporter and report an unreachable backend when the store fails', async () => {
       // Arrange

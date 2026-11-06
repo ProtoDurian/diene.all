@@ -45,24 +45,29 @@ describe('SetController', () => {
       io.successes.should.deepEqual(['set ns:key = v (expires in 60s)']);
     });
 
-    it.each(['abc', '1.5', '0', '-1', '0x10', '1e2', String(365 * 24 * 60 * 60 + 1)])(
-      'should reject invalid --ttl "%s" with exit 1 and not touch the store',
-      async input => {
-        // Arrange
-        const store = new FakeKeyValueStore();
-        const io = captureIo();
-        const subject = new SetController(new KvService(store), io);
+    it.each([
+      'abc',
+      '1.5',
+      '0',
+      '-1',
+      '0x10',
+      '1e2',
+      String(365 * 24 * 60 * 60 + 1),
+    ])('should reject invalid --ttl "%s" with exit 1 and not touch the store', async input => {
+      // Arrange
+      const store = new FakeKeyValueStore();
+      const io = captureIo();
+      const subject = new SetController(new KvService(store), io);
 
-        // Act
-        const actual = await subject.handle('ns', 'key', 'v', input);
+      // Act
+      const actual = await subject.handle('ns', 'key', 'v', input);
 
-        // Assert
-        actual.should.equal(EXIT_ERROR);
-        store.setCalls.should.be.empty();
-        should(io.errors[0]).not.be.undefined();
-        (io.errors[0] as string).should.containEql('invalid input');
-      },
-    );
+      // Assert
+      actual.should.equal(EXIT_ERROR);
+      store.setCalls.should.be.empty();
+      should(io.errors[0]).not.be.undefined();
+      (io.errors[0] as string).should.containEql('invalid input');
+    });
 
     it('should reject a namespace that slugifies to empty as invalid input', async () => {
       // Arrange

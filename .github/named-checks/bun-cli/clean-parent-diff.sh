@@ -142,6 +142,8 @@ MODIFIED=(
   probes/features.json
   # the store test follows the adapter into kv/data
   tests/integration/redis-kv-store.test.ts
+  # sit joins the tier list scripts/ci/test.sh reads
+  .config/bun-base.coverage.yaml
   # owner !A78/!A84: buildBunCli comes from atomipkgs.lib (flake input passed to
   # nix/packages.nix; the lock floats atomipkgs v5 to the release that ships it)
   flake.nix

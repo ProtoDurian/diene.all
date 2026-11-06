@@ -152,7 +152,7 @@ try {
   const user = UserSchema.parse(input);
 } catch (error) {
   if (error instanceof z.ZodError) {
-    console.log(error.errors);
+    console.log(error.issues);
   }
 }
 ```
@@ -167,7 +167,7 @@ const result = UserSchema.safeParse(input);
 if (result.success) {
   const user = result.data;
 } else {
-  const errors = result.error.errors;
+  const errors = result.error.issues;
 }
 ```
 
@@ -257,7 +257,7 @@ if (!result.success) {
   // }
 
   // Or flat list
-  const errors = result.error.errors;
+  const errors = result.error.issues;
   // [
   //   { path: ["email"], message: "Invalid email", code: "invalid_string" },
   //   { path: ["age"], message: "Must be a positive number", code: "too_small" }
@@ -284,12 +284,18 @@ async function createUser(req: Request, res: Response) {
   const result = CreateUserSchema.safeParse(req.body);
 
   if (!result.success) {
-    return res.status(400).json({
-      errors: result.error.errors.map(e => ({
-        field: e.path.join('.'),
-        message: e.message,
-      })),
-    });
+    return res
+      .status(400)
+      .type('application/problem+json')
+      .json({
+        type: 'https://errors.atomi.cloud/docs/lapras/nitroso/zinc/api/v1/validation_error',
+        title: 'The request is invalid',
+        status: 400,
+        errors: result.error.issues.map(e => ({
+          field: e.path.join('.'),
+          message: e.message,
+        })),
+      });
   }
 
   const user = result.data; // typed!
@@ -315,14 +321,17 @@ async function createUser(req: Request): Promise<Response> {
   if (!result.success) {
     return new Response(
       JSON.stringify({
-        errors: result.error.errors.map(e => ({
+        type: 'https://errors.atomi.cloud/docs/lapras/nitroso/zinc/api/v1/validation_error',
+        title: 'The request is invalid',
+        status: 400,
+        errors: result.error.issues.map(e => ({
           field: e.path.join('.'),
           message: e.message,
         })),
       }),
       {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/problem+json' },
       },
     );
   }

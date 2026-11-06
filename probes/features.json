@@ -220,6 +220,11 @@
     "class": "smoke"
   },
   {
+    "template": "diene/bun-base",
+    "name": "bun-biome-format",
+    "class": "gate"
+  },
+  {
     "template": "diene/bun-cli",
     "name": "cli-sit-journeys",
     "class": "gate"
