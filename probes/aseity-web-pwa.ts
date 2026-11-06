@@ -11,7 +11,7 @@ type ManifestIcon = { src?: unknown; sizes?: unknown; type?: unknown };
 
 const OUT = 'dist/web';
 const build =
-  "nix develop .#ci -c bash -lc './scripts/local/setup.sh && rm -rf dist/web && ./node_modules/.bin/vite build --config web/vite.config.ts'";
+  "nix develop .#ci -c bash -lc 'bun install --frozen-lockfile && rm -rf dist/web && ./node_modules/.bin/vite build --config web/vite.config.ts'";
 
 async function exists(repo: ProbeRepo, path: string): Promise<boolean> {
   return (await repo.glob(path)).length === 1;
