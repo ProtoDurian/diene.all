@@ -1,20 +1,13 @@
 /// Dependency-light assertions for consumers of `package:diene_result`.
-///
-/// This library deliberately depends on no test framework. A mismatch throws
-/// [TestHelperFailure], so it works with `package:test`, Flutter test, or any
-/// other runner.
 library;
 
 import 'package:diene_problems/diene_problems.dart';
 
 import 'diene_result.dart';
 
-/// Thrown when a dependency-light Result/Option assertion fails.
 final class TestHelperFailure implements Exception {
-  /// Creates an assertion failure with a consumer-facing diagnostic.
   const TestHelperFailure(this.message);
 
-  /// Failure diagnostic.
   final String message;
 
   @override

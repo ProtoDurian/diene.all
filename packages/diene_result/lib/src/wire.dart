@@ -1,10 +1,9 @@
-/// JSON-compatible C0 Result wire form: `['ok', value]` or `['err', problem]`.
+/// JSON-compatible Result wire form: `['ok', value]` or `['err', problem]`.
 typedef ResultSerial = List<Object?>;
 
-/// JSON-compatible C0 Option wire form: `['some', value]` or `['none', null]`.
+/// JSON-compatible Option wire form: `['some', value]` or `['none', null]`.
 typedef OptionSerial = List<Object?>;
 
-/// Validates and reads a two-item tagged wire value.
 (String, Object?) readTaggedWire(
   List<Object?> serial, {
   required String monad,
@@ -22,6 +21,5 @@ typedef OptionSerial = List<Object?>;
   return (rawTag, serial[1]);
 }
 
-/// Creates an immutable tagged wire value.
 List<Object?> taggedWire(String tag, Object? value) =>
     List<Object?>.unmodifiable(<Object?>[tag, value]);

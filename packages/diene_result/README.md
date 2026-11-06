@@ -1,13 +1,10 @@
 # diene_result
 
 [![pub package](https://img.shields.io/pub/v/diene_result.svg)](https://pub.dev/packages/diene_result)
-[![CI](https://github.com/AtomiCloud/diene.dart_result/actions/workflows/ci.yaml/badge.svg)](https://github.com/AtomiCloud/diene.dart_result/actions/workflows/ci.yaml)
-[![unit coverage](https://codecov.io/gh/AtomiCloud/diene.dart_result/graph/badge.svg?flag=unit)](https://codecov.io/gh/AtomiCloud/diene.dart_result)
-[![meta coverage](https://codecov.io/gh/AtomiCloud/diene.dart_result/graph/badge.svg?flag=meta)](https://codecov.io/gh/AtomiCloud/diene.dart_result)
+[![CI](https://github.com/ProtoDurian/diene.dart_result/actions/workflows/ci.yaml/badge.svg)](https://github.com/ProtoDurian/diene.dart_result/actions/workflows/ci.yaml)
 
-Sealed, synchronous `Result<T>` and `Option<T>` values for Dart, with
-C0-compatible tagged-array wire codecs and a dependency-light consumer test
-helper.
+Sealed `Result<T>` and `Option<T>` values for Dart, with a cross-language
+tagged-array wire codec and a dependency-light test helper.
 
 ```dart
 import 'package:diene_problems/diene_problems.dart';
@@ -23,25 +20,31 @@ final String message = result.match(
 );
 ```
 
-The error channel is the sole RFC 9457 `Problem` identity owned and exported by
-`diene_problems`; `diene_result` depends on that package and does not define or
-re-export a competing envelope. `serial()` emits the C0 tagged arrays:
+The error channel is the RFC 9457 `Problem` from `diene_problems`; this package
+depends on it and does not re-export it. `serial()` writes the tagged arrays:
 
 - `['ok', value]` / `['err', problemJson]`
 - `['some', value]` / `['none', null]`
 
-Import `package:diene_result/test_helper.dart` in consumer tests for
-`expectOk`, `expectErr`, `expectSome`, and `expectNone`. The sub-library has no
-test-framework dependencies and adds no runtime dependency beyond the package's
-canonical `diene_problems` edge.
+Only `unwrap` and `unwrapErr` throw (`UnwrapError`); every other combinator
+returns a value.
 
-Read the [Result standard](doc/result.md) for the complete API, wire contract,
-TestHelper guidance, and deliberate Bun-family deltas.
+Unlike the Bun package, no server-side rendering (SSR) API ships here.
+
+## TestHelper
+
+Import `package:diene_result/test_helper.dart` in consumer tests for
+`expectOk`, `expectErr`, `expectSome` and `expectNone`. They return the
+unwrapped payload, throw `TestHelperFailure` on the wrong variant, and pull in
+no test framework.
+
+Read the [package doc](doc/diene_result.md) for the full API, the wire form,
+the TestHelper and the differences from the Bun package.
 
 ## Development
 
-- `pls setup` resolves the workspace dependencies.
-- `pls test` runs unit, C0 conformance, and TestHelper meta suites.
-- `pls test:coverage` enforces the separate unit and meta ledgers.
-- `pls deadcode` runs repository and production-only dead-code passes.
-- `pls package:validate` runs the release guard, publish dry-run, and pana.
+- `task setup` resolves the workspace dependencies.
+- `task test` runs the unit, conformance and TestHelper meta suites.
+- `task test:coverage` enforces the separate unit and meta ledgers.
+- `task deadcode` runs the repository and production-only dead-code passes.
+- `task package:validate` runs the release guard, publish dry-run and pana.

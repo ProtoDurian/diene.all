@@ -1,23 +1,20 @@
 ---
 name: diene-result-usage
-description: Use diene_result Result, Option, C0 wire codecs, canonical diene_problems failures, and dependency-light consumer assertions in Dart.
+description: Use when Dart code handles fallible or optional values with package:diene_result — Result, Option, their wire codec, or the expectOk/expectErr/expectSome/expectNone test helpers.
 ---
 
-# Diene Result usage
+# diene_result usage
 
-Import `package:diene_result/diene_result.dart` for the monads and
-`package:diene_problems/diene_problems.dart` whenever code constructs or names
-the error channel. `diene_problems` owns the sole public `Problem` identity;
-Result imports it and deliberately does not re-export it. Do not reach into
-`lib/src` or copy either type into an application. Prefer `match`, `map`,
-`mapErr`, and `andThen` for ordinary control flow, reserving `unwrap` for an
-invariant already proved at the call site.
+Import `package:diene_result/diene_result.dart`, and
+`package:diene_problems/diene_problems.dart` wherever code builds or names a
+`Problem`; never import `lib/src`.
 
-Use `serial()`/`fromSerial()` only at a wire boundary. The format and deliberate
-Bun-family deltas are documented in `doc/result.md`.
+Use `map`, `mapErr`, `andThen` and `match` for control flow; keep `unwrap` for
+invariants already proved. Use `serial()` / `fromSerial()` only at a JSON
+boundary.
 
-In consumer tests, import `package:diene_result/test_helper.dart` and use
-`expectOk`, `expectErr`, `expectSome`, or `expectNone`. They throw plain
-`TestHelperFailure` values and add no test framework to the production graph.
-Import `diene_problems` directly when naming the `Problem` returned by
-`expectErr`.
+In tests, import `package:diene_result/test_helper.dart` for `expectOk`,
+`expectErr`, `expectSome` and `expectNone`.
+
+The full API, wire form and TestHelper are in `doc/diene_result.md`; patterns
+are in `patterns.md`.

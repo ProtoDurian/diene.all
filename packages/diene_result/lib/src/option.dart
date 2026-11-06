@@ -8,17 +8,15 @@ import 'wire.dart';
 sealed class Option<T> {
   const Option();
 
-  /// Creates a [Some] option.
   const factory Option.some(T value) = Some<T>;
 
-  /// Creates a [None] option.
   const factory Option.none() = None<T>;
 
   /// Converts `null` to [None] and every other value to [Some].
   factory Option.fromNullable(T? value) =>
       value == null ? None<T>() : Some<T>(value);
 
-  /// Decodes the C0 `['some', value] | ['none', null]` wire form.
+  /// Decodes `['some', value]` or `['none', null]`; throws [FormatException].
   factory Option.fromSerial(
     OptionSerial serial, {
     required T Function(Object? value) decodeSome,
@@ -35,25 +33,20 @@ sealed class Option<T> {
     return tag == 'some' ? Some<T>(decodeSome(value)) : None<T>();
   }
 
-  /// Whether this option contains a value.
   bool get isSome => this is Some<T>;
 
-  /// Whether this option is empty.
   bool get isNone => this is None<T>;
 
-  /// Transforms a [Some] value and leaves [None] untouched.
   Option<R> map<R>(R Function(T value) mapper) => switch (this) {
     Some<T>(:final value) => Some<R>(mapper(value)),
     None<T>() => None<R>(),
   };
 
-  /// Chains another optional operation after a [Some] value.
   Option<R> andThen<R>(Option<R> Function(T value) mapper) => switch (this) {
     Some<T>(:final value) => mapper(value),
     None<T>() => None<R>(),
   };
 
-  /// Folds both variants into one return type.
   R match<R>({required R Function(T value) some, required R Function() none}) =>
       switch (this) {
         Some<T>(:final value) => some(value),
@@ -70,13 +63,11 @@ sealed class Option<T> {
     ),
   };
 
-  /// Returns the [Some] value, or [fallback] for [None].
   T unwrapOr(T fallback) => switch (this) {
     Some<T>(:final value) => value,
     None<T>() => fallback,
   };
 
-  /// Returns the [Some] value, or computes a fallback for [None].
   T unwrapOrElse(T Function() fallback) => switch (this) {
     Some<T>(:final value) => value,
     None<T>() => fallback(),
@@ -103,7 +94,6 @@ sealed class Option<T> {
     None<T>() => null,
   };
 
-  /// Encodes this option using the C0 tagged-array wire contract.
   OptionSerial serial({Object? Function(T value)? encodeSome}) =>
       switch (this) {
         Some<T>(:final value) => taggedWire(
@@ -114,21 +104,16 @@ sealed class Option<T> {
       };
 }
 
-/// The populated [Option] variant.
 final class Some<T> extends Option<T> {
-  /// Creates a populated option.
   const Some(this.value);
 
-  /// Present value.
   final T value;
 
   @override
   String toString() => 'Some($value)';
 }
 
-/// The empty [Option] variant.
 final class None<T> extends Option<T> {
-  /// Creates an empty option.
   const None();
 
   @override

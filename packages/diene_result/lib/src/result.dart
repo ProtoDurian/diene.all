@@ -7,20 +7,14 @@ import 'unwrap_error.dart';
 import 'wire.dart';
 
 /// A value that is either [Ok] or [Err].
-///
-/// Dart's C0 contract fixes the error channel to [Problem], retaining the
-/// single generic parameter of the Flutter seed while matching the Bun
-/// capability names.
 sealed class Result<T> {
   const Result();
 
-  /// Creates an [Ok] result.
   const factory Result.ok(T value) = Ok<T>;
 
-  /// Creates an [Err] result.
   const factory Result.err(Problem problem) = Err<T>;
 
-  /// Decodes the C0 `['ok', value] | ['err', problem]` wire form.
+  /// Decodes `['ok', value]` or `['err', problem]`; throws [FormatException].
   factory Result.fromSerial(
     ResultSerial serial, {
     required T Function(Object? value) decodeOk,
@@ -39,31 +33,25 @@ sealed class Result<T> {
     return Err<T>((decodeErr ?? _decodeProblem)(value));
   }
 
-  /// Whether this result contains an [Ok] value.
   bool get isOk => this is Ok<T>;
 
-  /// Whether this result contains an [Err] problem.
   bool get isErr => this is Err<T>;
 
-  /// Transforms an [Ok] value and leaves an [Err] untouched.
   Result<R> map<R>(R Function(T value) mapper) => switch (this) {
     Ok<T>(:final value) => Ok<R>(mapper(value)),
     Err<T>(:final problem) => Err<R>(problem),
   };
 
-  /// Transforms an [Err] problem and leaves an [Ok] untouched.
   Result<T> mapErr(Problem Function(Problem problem) mapper) => switch (this) {
     Ok<T>(:final value) => Ok<T>(value),
     Err<T>(:final problem) => Err<T>(mapper(problem)),
   };
 
-  /// Chains another fallible operation after an [Ok] value.
   Result<R> andThen<R>(Result<R> Function(T value) mapper) => switch (this) {
     Ok<T>(:final value) => mapper(value),
     Err<T>(:final problem) => Err<R>(problem),
   };
 
-  /// Folds both variants into one return type.
   R match<R>({
     required R Function(T value) ok,
     required R Function(Problem problem) err,
@@ -119,13 +107,11 @@ sealed class Result<T> {
     Err<T>(:final problem) => problem,
   };
 
-  /// Returns the [Ok] value, or [fallback] for [Err].
   T unwrapOr(T fallback) => switch (this) {
     Ok<T>(:final value) => value,
     Err<T>() => fallback,
   };
 
-  /// Returns the [Ok] value, or computes a fallback from the [Err] problem.
   T unwrapOrElse(T Function(Problem problem) fallback) => switch (this) {
     Ok<T>(:final value) => value,
     Err<T>(:final problem) => fallback(problem),
@@ -149,7 +135,6 @@ sealed class Result<T> {
     Err<T>(:final problem) => problem,
   };
 
-  /// Encodes this result using the C0 tagged-array wire contract.
   ResultSerial serial({Object? Function(T value)? encodeOk}) => switch (this) {
     Ok<T>(:final value) => taggedWire('ok', encodeOk?.call(value) ?? value),
     Err<T>(:final problem) => taggedWire('err', problem.toJson()),
@@ -209,33 +194,26 @@ void _validateOptionalProblemData(Map<String, Object?> json, String key) {
   }
 }
 
-/// The successful [Result] variant.
 final class Ok<T> extends Result<T> {
-  /// Creates a successful result.
   const Ok(this.value);
 
-  /// Successful value.
   final T value;
 
   @override
   String toString() => 'Ok($value)';
 }
 
-/// The failed [Result] variant.
 final class Err<T> extends Result<T> {
-  /// Creates a failed result.
   const Err(this.problem);
 
-  /// Failure problem.
   final Problem problem;
 
   @override
   String toString() => 'Err($problem)';
 }
 
-/// Async composition for Dart's idiomatic `Future<Result<T>>` shape.
+/// Async forms of the [Result] combinators for `Future<Result<T>>`.
 extension FutureResult<T> on Future<Result<T>> {
-  /// Async-aware counterpart of [Result.map].
   Future<Result<R>> map<R>(FutureOr<R> Function(T value) mapper) async {
     final Result<T> result = await this;
     return switch (result) {
@@ -244,7 +222,6 @@ extension FutureResult<T> on Future<Result<T>> {
     };
   }
 
-  /// Async-aware counterpart of [Result.mapErr].
   Future<Result<T>> mapErr(
     FutureOr<Problem> Function(Problem problem) mapper,
   ) async {
@@ -255,7 +232,6 @@ extension FutureResult<T> on Future<Result<T>> {
     };
   }
 
-  /// Async-aware counterpart of [Result.andThen].
   Future<Result<R>> andThen<R>(
     FutureOr<Result<R>> Function(T value) mapper,
   ) async {
@@ -266,7 +242,6 @@ extension FutureResult<T> on Future<Result<T>> {
     };
   }
 
-  /// Async-aware counterpart of [Result.match].
   Future<R> match<R>({
     required FutureOr<R> Function(T value) ok,
     required FutureOr<R> Function(Problem problem) err,
@@ -278,9 +253,7 @@ extension FutureResult<T> on Future<Result<T>> {
     };
   }
 
-  /// Awaits the result and unwraps its [Ok] value.
   Future<T> unwrap() async => (await this).unwrap();
 
-  /// Awaits the result and unwraps its [Err] problem.
   Future<Problem> unwrapErr() async => (await this).unwrapErr();
 }

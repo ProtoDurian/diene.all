@@ -1,11 +1,9 @@
-// Production dead-code root for the published diene_result surface.
-// This is tooling, not a test: DCL otherwise assumes only diene_result.dart is
-// an entrypoint and incorrectly reports the test_helper.dart public functions.
+// Production dead-code root: references every public export.
 import 'package:diene_problems/diene_problems.dart';
 import 'package:diene_result/diene_result.dart';
 import 'package:diene_result/test_helper.dart';
 
-void main() {
+Future<void> main() async {
   final Problem problem = Problem(
     type: 'about:blank',
     title: 'Dead-code entrypoint',
@@ -16,4 +14,6 @@ void main() {
   expectErr<int>(Result<int>.err(problem));
   expectSome(const Option<int>.some(1));
   expectNone(const Option<int>.none());
+  expectOk(const Option<Problem>.none().errOr(1));
+  expectOk(await Future<Result<int>>.value(const Ok<int>(1)).map((int v) => v));
 }
