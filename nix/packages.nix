@@ -12,6 +12,7 @@ let
           atomiutils
           cyanprint
           dlint
+          helm-schema
           infralint
           infrautils
           releaser
