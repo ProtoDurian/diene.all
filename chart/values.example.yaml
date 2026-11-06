@@ -1,5 +1,7 @@
 serviceTree:
   landscape: example
 
-primordial:
-  targetLandscape: example
+upstream:
+  global:
+    commonLabels:
+      atomi.cloud/landscape: example

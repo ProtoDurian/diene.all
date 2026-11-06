@@ -48,12 +48,12 @@ checks that it names every surface.
 
 This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, Docker, Helm, secrets, release configuration, validators, and standards.
 
-# Helm wrapper
+# Sulfur
 
-This branch adds the wrapper chart, stacked values, generated schema, rendered-manifest validation, k3d proof, and dual publish modes.
+This branch materializes the Helm wrapper as `sulfur`: a pure passthrough of jetstack/cert-manager v1.20.3 (controller, cainjector, webhook) with its CRDs and Gateway API support. It ships no Issuer or ClusterIssuer; zinc owns those.
 
-- `task build` — vendor external config and build pinned chart dependencies.
-- `task test:unit` — run schema, lint, render, contracts, VAP, and publish dry-runs.
-- `task test:int` — install on ephemeral k3d and round-trip the chart through a local OCI registry.
+- `task build` — build the pinned chart dependency.
+- `task test:unit` — run schema, lint, render, Gateway API, issuer boundary, CRD, sequential-minor, VAP, and publish dry-runs.
+- `task test:int` — install on ephemeral k3d, check cert-manager health and issue a self-signed Certificate, and round-trip the chart through a local OCI registry.
 - `task example:lapras:template` — render the independent landscape + cluster stack.
-- [Helm wrapper baseline](docs/developer/helm-wrapper-baseline.md)
+- [Sulfur baseline](docs/developer/sulfur-baseline.md)
