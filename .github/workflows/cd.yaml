@@ -1,0 +1,14 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - v*.*.*
+
+jobs:
+  npm-publish:
+    name: npm-publish
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-npm-publish.yaml
+    secrets: inherit
