@@ -21,9 +21,8 @@ describe('Option construction and serialization', () => {
     (await some.isNone()).should.be.false();
     (await none.isNone()).should.be.true();
     (await none.isSome()).should.be.false();
-    should(await mapped[0]?.unwrap()).equal(0);
-    should(await mapped[1]?.isNone()).be.true();
-    should(await mapped[2]?.isNone()).be.true();
+    (await Promise.all(mapped.map(option => option.isNone()))).should.eql([false, true, true]);
+    (await Promise.all(mapped.map(option => option.native()))).should.eql([0, null, null]);
   });
 
   it('should round-trip both OptionSerial variants through JSON', async () => {
@@ -38,7 +37,7 @@ describe('Option construction and serialization', () => {
     // Assert
     (await some.unwrap()).should.equal(12);
     (await none.isNone()).should.be.true();
-    should(await some.native()).equal(12);
+    ((await some.native()) as number).should.equal(12);
     should(await none.native()).be.null();
   });
 
@@ -197,7 +196,7 @@ describe('Option to Result conversion', () => {
     });
 
     // Assert
-    should(await fromSome.unwrap()).equal('v:3');
+    ((await fromSome.unwrap()) as string).should.equal('v:3');
     (await fromNoneValue.unwrapErr()).should.equal('empty');
     (await fromNoneFunction.unwrap()).should.equal('fallback');
   });

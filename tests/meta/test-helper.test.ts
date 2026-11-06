@@ -31,7 +31,7 @@ describe('Result TestHelper assertions', () => {
     assertion.should.be.instanceof(TestHelperError);
     assertion.expected.should.equal('Ok');
     assertion.actual.should.equal('Err');
-    should(assertion.payload).eql({ code: 409 });
+    (assertion.payload as object).should.eql({ code: 409 });
     assertion.message.should.equal('Expected variant: Ok\nActual variant: Err\nActual payload:\n{\n  "code": 409\n}');
   });
 
@@ -46,7 +46,7 @@ describe('Result TestHelper assertions', () => {
     assertion.should.be.instanceof(TestHelperError);
     assertion.expected.should.equal('Err');
     assertion.actual.should.equal('Ok');
-    should(assertion.payload).equal(7);
+    (assertion.payload as number).should.equal(7);
   });
 
   it('should render an explicit undefined payload for payload-bearing variants', async () => {
@@ -89,7 +89,7 @@ describe('Option TestHelper assertions', () => {
     assertion.should.be.instanceof(TestHelperError);
     assertion.expected.should.equal('None');
     assertion.actual.should.equal('Some');
-    should(assertion.payload).equal('present');
+    (assertion.payload as string).should.equal('present');
     assertion.message.should.equal('Expected variant: None\nActual variant: Some\nActual payload:\n"present"');
   });
 
