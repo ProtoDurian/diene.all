@@ -1,7 +1,7 @@
 import { Err, Ok, type Result } from '@atomicloud/diene.result';
 import type { z } from 'zod';
 import type { ErrorPortalConfig, Problem, ProblemDefinition, ProblemInit, RegisteredProblem } from './types.js';
-import { buildProblemTypeUri } from './uri.js';
+import { ProblemTypeUriBuilder } from './uri.js';
 
 export class ProblemRegistryError extends Error {
   constructor(
@@ -14,69 +14,66 @@ export class ProblemRegistryError extends Error {
   }
 }
 
-function bindProblem<TSchema extends z.ZodType>(
-  portal: ErrorPortalConfig,
-  definition: ProblemDefinition<TSchema>,
-): RegisteredProblem<TSchema> {
-  if (!Number.isInteger(definition.status) || definition.status < 100 || definition.status > 599) {
-    throw new ProblemRegistryError(
-      'invalid',
-      `Problem status must be an integer from 100 through 599; received ${definition.status}`,
-    );
-  }
-  if (definition.title.trim() === '') {
-    throw new ProblemRegistryError('invalid', 'Problem title must not be empty');
+export class ProblemStatusPolicy {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor() {}
+
+  isStatus(value: unknown): value is number {
+    return Number.isInteger(value) && (value as number) >= 100 && (value as number) <= 599;
   }
 
-  try {
-    return Object.freeze({
-      ...definition,
-      type: buildProblemTypeUri(portal, definition.version, definition.id),
-    });
-  } catch (error: unknown) {
-    throw new ProblemRegistryError('invalid', `Invalid problem definition ${definition.id}`, { cause: error });
+  assertStatus(value: number, subject: string): void {
+    if (!this.isStatus(value)) {
+      throw new ProblemRegistryError(
+        'invalid',
+        `${subject} must be an integer from 100 through 599; received ${value}`,
+      );
+    }
   }
 }
 
-export function createProblem<TSchema extends z.ZodType>(
-  definition: RegisteredProblem<TSchema>,
-  init: ProblemInit<z.input<TSchema>>,
-): Problem<z.output<TSchema>> {
-  const parsed = definition.dataSchema.parse(init.data);
-  const status = init.status ?? definition.status;
-  if (!Number.isInteger(status) || status < 100 || status > 599) {
-    throw new ProblemRegistryError(
-      'invalid',
-      `Problem status override must be an integer from 100 through 599; received ${status}`,
-    );
+export class ProblemFactory {
+  constructor(private readonly statuses: ProblemStatusPolicy = new ProblemStatusPolicy()) {}
+
+  createProblem<TSchema extends z.ZodType>(
+    definition: RegisteredProblem<TSchema>,
+    init: ProblemInit<z.input<TSchema>>,
+  ): Problem<z.output<TSchema>> {
+    const data = definition.dataSchema.parse(init.data);
+    const status = init.status ?? definition.status;
+    this.statuses.assertStatus(status, 'Problem status override');
+    return {
+      type: definition.type,
+      title: definition.title,
+      status,
+      ...(init.detail === undefined ? {} : { detail: init.detail }),
+      ...(init.instance === undefined ? {} : { instance: init.instance }),
+      data,
+    };
   }
-  return {
-    type: definition.type,
-    title: definition.title,
-    status,
-    ...(init.detail === undefined ? {} : { detail: init.detail }),
-    ...(init.instance === undefined ? {} : { instance: init.instance }),
-    data: parsed,
-  };
 }
 
 export class ProblemRegistry {
   readonly portal: ErrorPortalConfig;
   readonly #entries = new Map<string, RegisteredProblem>();
 
-  constructor(portal: ErrorPortalConfig) {
+  constructor(
+    portal: ErrorPortalConfig,
+    private readonly uris: ProblemTypeUriBuilder = new ProblemTypeUriBuilder(),
+    private readonly statuses: ProblemStatusPolicy = new ProblemStatusPolicy(),
+  ) {
     this.portal = Object.freeze({ ...portal });
   }
 
   register<TSchema extends z.ZodType>(definition: ProblemDefinition<TSchema>): RegisteredProblem<TSchema> {
-    const key = this.#key(definition.id, definition.version);
+    const key = this.key(definition.id, definition.version);
     if (this.#entries.has(key)) {
       throw new ProblemRegistryError(
         'duplicate',
         `Problem id ${definition.id} is already registered for version ${definition.version}`,
       );
     }
-    const registered = bindProblem(this.portal, definition);
+    const registered = this.bind(definition);
     this.#entries.set(key, registered);
     return registered;
   }
@@ -93,7 +90,7 @@ export class ProblemRegistry {
 
   get(id: string, version?: string): RegisteredProblem | undefined {
     if (version !== undefined) {
-      return this.#entries.get(this.#key(id, version));
+      return this.#entries.get(this.key(id, version));
     }
 
     const matches = [...this.#entries.values()].filter(entry => entry.id === id);
@@ -118,7 +115,23 @@ export class ProblemRegistry {
     );
   }
 
-  #key(id: string, version: string): string {
+  private bind<TSchema extends z.ZodType>(definition: ProblemDefinition<TSchema>): RegisteredProblem<TSchema> {
+    this.statuses.assertStatus(definition.status, 'Problem status');
+    if (definition.title.trim() === '') {
+      throw new ProblemRegistryError('invalid', 'Problem title must not be empty');
+    }
+
+    try {
+      return Object.freeze({
+        ...definition,
+        type: this.uris.buildProblemTypeUri(this.portal, definition.version, definition.id),
+      });
+    } catch (error: unknown) {
+      throw new ProblemRegistryError('invalid', `Invalid problem definition ${definition.id}`, { cause: error });
+    }
+  }
+
+  private key(id: string, version: string): string {
     return `${version}:${id}`;
   }
 }

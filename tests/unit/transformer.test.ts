@@ -1,121 +1,148 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
+import { ProblemFactory, ProblemGuard, ProblemRegistry, ProblemTransformer } from '@atomicloud/diene.problems';
+import 'should';
 import { z } from 'zod';
-import {
-  createProblem,
-  type ErrorPortalConfig,
-  fromError,
-  fromHttpError,
-  isProblem,
-  ProblemRegistry,
-  ProblemTransformer,
-} from '../../src/index.js';
+import { portal } from './support/fixtures';
 
-const portal: ErrorPortalConfig = {
-  scheme: 'https',
-  host: 'errors.atomi.cloud',
-  landscape: 'raichu',
-  platform: 'nitroso',
-  service: 'zinc',
-  module: 'api',
-};
-
-function fixture() {
-  const registry = new ProblemRegistry(portal);
-  const fallback = registry.register({
+class TransformerFixture {
+  readonly fallback = new ProblemRegistry(portal).register({
     id: 'unexpected_error',
     title: 'Unexpected Error',
     status: 500,
+    recoverable: false,
     version: 'v1',
     dataSchema: z.object({ source: z.string() }),
   });
-  const transformer = new ProblemTransformer({
-    fallback,
+
+  readonly transformer = new ProblemTransformer({
+    fallback: this.fallback,
     fallbackData: value => ({ source: typeof value }),
     instance: () => '/operation/42',
   });
-  return { fallback, transformer };
+
+  readonly mapped = new ProblemFactory().createProblem(this.fallback, { detail: 'mapped', data: { source: 'remote' } });
 }
 
+describe('ProblemGuard', () => {
+  it('should recognise only records with the RFC 9457 members and data', () => {
+    // Arrange
+    const guard = new ProblemGuard();
+    const { mapped } = new TransformerFixture();
+    const values: readonly unknown[] = [
+      mapped,
+      null,
+      'problem',
+      { ...mapped, status: 99 },
+      { type: 'x', title: 'y', status: 400 },
+      { ...mapped, title: 1 },
+      { ...mapped, type: 1 },
+    ];
+
+    // Act
+    const actual = values.map(value => guard.isProblem(value));
+
+    // Assert
+    actual.should.eql([true, false, false, false, false, false, false]);
+  });
+});
+
 describe('ProblemTransformer.fromError', () => {
-  it('should preserve Problems and unwrap nested errors', () => {
+  it('should return an existing Problem unchanged', () => {
     // Arrange
-    const { fallback, transformer } = fixture();
-    const problem = createProblem(fallback, { detail: 'already mapped', data: { source: 'mapped' } });
+    const { mapped, transformer } = new TransformerFixture();
+    const expected = mapped;
 
     // Act
-    const preserved = transformer.fromError(problem);
-    const nested = transformer.fromError({ error: new Error('nested failure') });
+    const actual = transformer.fromError(mapped);
 
     // Assert
-    should(preserved).equal(problem);
-    should(nested.detail).equal('nested failure');
-    should(nested.instance).equal('/operation/42');
-    should(isProblem(preserved)).be.true();
-    should(isProblem(null)).be.false();
+    actual.should.equal(expected);
   });
 
-  it('should normalize Error, string, record, and unknown inputs through the fallback definition', () => {
+  it('should unwrap problem, error, and cause members to the innermost value', () => {
     // Arrange
-    const { fallback, transformer } = fixture();
+    const { mapped, transformer } = new TransformerFixture();
 
     // Act
-    const error = fromError(new Error('boom'), transformer.options);
-    const text = transformer.fromError('plain failure');
-    const detail = transformer.fromError({ detail: 'detail failure' });
-    const message = transformer.fromError({ message: 'message failure' });
-    const unknown = transformer.fromError(42);
+    const viaProblem = transformer.fromError({ problem: mapped });
+    const viaCause = transformer.fromError({ cause: { error: new Error('nested failure') } });
 
     // Assert
-    should(error.type).equal(fallback.type);
-    should(text.detail).equal('plain failure');
-    should(detail.detail).equal('detail failure');
-    should(message.detail).equal('message failure');
-    should(unknown.detail).equal('An unexpected error occurred');
+    viaProblem.should.equal(mapped);
+    viaCause.detail!.should.equal('nested failure');
+    viaCause.instance!.should.equal('/operation/42');
+    (viaCause.data as object).should.eql({ source: 'object' });
   });
 
-  it('should terminate nested error cycles at the fallback definition', () => {
+  it('should take the detail from an Error, string, detail, message, or a default', () => {
     // Arrange
-    const { fallback, transformer } = fixture();
+    const { fallback, transformer } = new TransformerFixture();
+    const inputs: readonly unknown[] = [
+      new Error('boom'),
+      'plain failure',
+      { detail: 'detail failure' },
+      { message: 'message failure' },
+      42,
+    ];
+
+    // Act
+    const actual = inputs.map(input => transformer.fromError(input));
+
+    // Assert
+    actual
+      .map(problem => problem.detail)
+      .should.eql(['boom', 'plain failure', 'detail failure', 'message failure', 'An unexpected error occurred']);
+    actual.every(problem => problem.type === fallback.type).should.be.true();
+  });
+
+  it('should stop at a nested error cycle', () => {
+    // Arrange
+    const { fallback, transformer } = new TransformerFixture();
     const self: { error?: unknown } = {};
     self.error = self;
     const first: { error?: unknown; message: string } = { message: 'first' };
-    const second: { error?: unknown; message: string } = { message: 'second' };
+    const second: { error?: unknown; message: string } = { message: 'second', error: first };
     first.error = second;
-    second.error = first;
 
     // Act
     const selfCycle = transformer.fromError(self);
-    const twoObjectCycle = transformer.fromError(first);
+    const pairCycle = transformer.fromError(first);
 
     // Assert
-    should(selfCycle.type).equal(fallback.type);
-    should(twoObjectCycle.type).equal(fallback.type);
-    should(twoObjectCycle.detail).equal('second');
+    selfCycle.type.should.equal(fallback.type);
+    pairCycle.detail!.should.equal('second');
+  });
+
+  it('should omit the instance when no instance mapper is configured', () => {
+    // Arrange
+    const { fallback } = new TransformerFixture();
+    const transformer = new ProblemTransformer({ fallback, fallbackData: () => ({ source: 'none' }) });
+
+    // Act
+    const actual = transformer.fromError('failure');
+
+    // Assert
+    actual.should.not.have.property('instance');
   });
 });
 
 describe('ProblemTransformer.fromHttpError', () => {
-  it('should parse direct and nested RFC 9457 response bodies with the transport status', async () => {
+  it('should keep direct and nested Problem bodies with the transport status', async () => {
     // Arrange
-    const { fallback, transformer } = fixture();
-    const problem = createProblem(fallback, { data: { source: 'remote' } });
+    const { mapped, transformer } = new TransformerFixture();
 
     // Act
-    const direct = await transformer.fromHttpError(
-      new Response(JSON.stringify(problem), { status: 503, headers: { 'content-type': 'application/problem+json' } }),
-    );
-    const nested = await fromHttpError(new Response(JSON.stringify({ problem }), { status: 502 }), transformer.options);
+    const direct = await transformer.fromHttpError(new Response(JSON.stringify(mapped), { status: 503 }));
+    const nested = await transformer.fromHttpError(new Response(JSON.stringify({ problem: mapped }), { status: 502 }));
 
     // Assert
-    should(direct.status).equal(503);
-    should(nested.status).equal(502);
-    should(direct.data).eql({ source: 'remote' });
+    direct.should.eql({ ...mapped, status: 503 });
+    nested.should.eql({ ...mapped, status: 502 });
   });
 
-  it('should map JSON, text, and empty HTTP errors through the fallback', async () => {
+  it('should map JSON, text, and empty bodies through the fallback', async () => {
     // Arrange
-    const { transformer } = fixture();
+    const { transformer } = new TransformerFixture();
     const located = new Response(JSON.stringify({ message: 'remote message' }), { status: 409 });
     Object.defineProperty(located, 'url', { value: 'https://api.example/notes/42' });
 
@@ -123,11 +150,15 @@ describe('ProblemTransformer.fromHttpError', () => {
     const json = await transformer.fromHttpError(located);
     const text = await transformer.fromHttpError(new Response('plain response', { status: 500 }));
     const empty = await transformer.fromHttpError(new Response(null, { status: 504, statusText: 'Gateway Timeout' }));
+    const blank = await transformer.fromHttpError(new Response(null, { status: 500 }));
 
     // Assert
-    should(json.detail).equal('remote message');
-    should(json.instance).equal('https://api.example/notes/42');
-    should(text.detail).equal('plain response');
-    should(empty.detail).equal('Gateway Timeout');
+    json.detail!.should.equal('remote message');
+    json.instance!.should.equal('https://api.example/notes/42');
+    json.status.should.equal(409);
+    text.detail!.should.equal('plain response');
+    text.instance!.should.equal('/operation/42');
+    empty.detail!.should.equal('Gateway Timeout');
+    blank.detail!.should.equal('HTTP request failed');
   });
 });

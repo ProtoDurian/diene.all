@@ -1,6 +1,6 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`registry publication should snapshot the enumerable list and a schema keyed by every versioned type URI 1`] = `
+exports[`ProblemManifestEmitter should snapshot the enumerable list and a schema keyed by every type URI 1`] = `
 {
   "problems": [
     {
@@ -21,7 +21,33 @@ exports[`registry publication should snapshot the enumerable list and a schema k
         ],
         "type": "object",
       },
+      "id": "conflict",
+      "recoverable": true,
+      "status": 409,
+      "title": "Conflict",
+      "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/conflict",
+      "version": "v1",
+    },
+    {
+      "data": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "entityType": {
+            "type": "string",
+          },
+          "id": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "entityType",
+          "id",
+        ],
+        "type": "object",
+      },
       "id": "entity_not_found",
+      "recoverable": false,
       "status": 404,
       "title": "Entity Not Found",
       "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/entity_not_found",
@@ -31,15 +57,64 @@ exports[`registry publication should snapshot the enumerable list and a schema k
       "data": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "additionalProperties": false,
+        "properties": {},
+        "type": "object",
+      },
+      "id": "invalid_json",
+      "recoverable": true,
+      "status": 400,
+      "title": "Invalid JSON",
+      "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/invalid_json",
+      "version": "v1",
+    },
+    {
+      "data": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
         "properties": {
-          "reason": {
+          "lockedBy": {
+            "type": "string",
+          },
+          "noteId": {
             "type": "string",
           },
         },
+        "required": [
+          "noteId",
+        ],
+        "type": "object",
+      },
+      "id": "note_locked",
+      "recoverable": true,
+      "status": 423,
+      "title": "Note Locked",
+      "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/note_locked",
+      "version": "v1",
+    },
+    {
+      "data": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object",
+      },
+      "id": "unauthenticated",
+      "recoverable": true,
+      "status": 401,
+      "title": "Unauthenticated",
+      "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/unauthenticated",
+      "version": "v1",
+    },
+    {
+      "data": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {},
         "type": "object",
       },
       "id": "unauthorized",
-      "status": 401,
+      "recoverable": false,
+      "status": 403,
       "title": "Unauthorized",
       "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/unauthorized",
       "version": "v1",
@@ -81,6 +156,7 @@ exports[`registry publication should snapshot the enumerable list and a schema k
         "type": "object",
       },
       "id": "validation_error",
+      "recoverable": true,
       "status": 400,
       "title": "Validation Error",
       "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/validation_error",
@@ -88,6 +164,23 @@ exports[`registry publication should snapshot the enumerable list and a schema k
     },
   ],
   "schemas": {
+    "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/conflict": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "entityType": {
+          "type": "string",
+        },
+        "id": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "entityType",
+        "id",
+      ],
+      "type": "object",
+    },
     "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/entity_not_found": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
@@ -105,14 +198,38 @@ exports[`registry publication should snapshot the enumerable list and a schema k
       ],
       "type": "object",
     },
-    "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/unauthorized": {
+    "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/invalid_json": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object",
+    },
+    "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/note_locked": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false,
       "properties": {
-        "reason": {
+        "lockedBy": {
+          "type": "string",
+        },
+        "noteId": {
           "type": "string",
         },
       },
+      "required": [
+        "noteId",
+      ],
+      "type": "object",
+    },
+    "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/unauthenticated": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object",
+    },
+    "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/unauthorized": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {},
       "type": "object",
     },
     "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/validation_error": {
@@ -154,18 +271,49 @@ exports[`registry publication should snapshot the enumerable list and a schema k
 }
 `;
 
-exports[`Problem catalog export should emit generic and service declarations as one canonical Problem row CR 1`] = `
+exports[`ProblemResourceEmitter should snapshot one Problem CR for the fixture row with generic and service entries 1`] = `
 {
   "apiVersion": "atomi.cloud/v1alpha1",
   "kind": "Problem",
   "metadata": {
-    "name": "zinc-raichu-v1",
+    "name": "zinc-api-raichu-v1",
     "namespace": "nitroso",
   },
   "spec": {
     "landscape": "raichu",
+    "module": "api",
     "platform": "nitroso",
     "problems": [
+      {
+        "endpoints": [
+          {
+            "method": "POST",
+            "path": "/notes",
+          },
+        ],
+        "id": "conflict",
+        "recoverable": true,
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {
+            "entityType": {
+              "type": "string",
+            },
+            "id": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "entityType",
+            "id",
+          ],
+          "type": "object",
+        },
+        "status": 409,
+        "title": "Conflict",
+        "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/conflict",
+      },
       {
         "endpoints": [
           {
@@ -199,23 +347,86 @@ exports[`Problem catalog export should emit generic and service declarations as 
       {
         "endpoints": [
           {
-            "method": "GET",
+            "method": "POST",
             "path": "/notes",
           },
         ],
-        "id": "unauthorized",
+        "id": "invalid_json",
+        "recoverable": true,
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object",
+        },
+        "status": 400,
+        "title": "Invalid JSON",
+        "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/invalid_json",
+      },
+      {
+        "endpoints": [
+          {
+            "method": "PUT",
+            "path": "/notes/{id}",
+          },
+        ],
+        "id": "note_locked",
         "recoverable": true,
         "schema": {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "additionalProperties": false,
           "properties": {
-            "reason": {
+            "lockedBy": {
+              "type": "string",
+            },
+            "noteId": {
               "type": "string",
             },
           },
+          "required": [
+            "noteId",
+          ],
+          "type": "object",
+        },
+        "status": 423,
+        "title": "Note Locked",
+        "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/note_locked",
+      },
+      {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/notes",
+          },
+        ],
+        "id": "unauthenticated",
+        "recoverable": true,
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {},
           "type": "object",
         },
         "status": 401,
+        "title": "Unauthenticated",
+        "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/unauthenticated",
+      },
+      {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/notes",
+          },
+        ],
+        "id": "unauthorized",
+        "recoverable": false,
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object",
+        },
+        "status": 403,
         "title": "Unauthorized",
         "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/unauthorized",
       },
@@ -224,6 +435,10 @@ exports[`Problem catalog export should emit generic and service declarations as 
           {
             "method": "POST",
             "path": "/notes",
+          },
+          {
+            "method": "PUT",
+            "path": "/notes/{id}",
           },
         ],
         "id": "validation_error",

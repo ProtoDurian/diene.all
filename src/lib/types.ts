@@ -15,6 +15,7 @@ export interface ProblemDefinition<TSchema extends z.ZodType = z.ZodType> {
   readonly id: string;
   readonly title: string;
   readonly status: number;
+  readonly recoverable: boolean;
   readonly version: string;
   readonly dataSchema: TSchema;
 }
@@ -53,6 +54,7 @@ export interface ProblemManifestEntry {
   readonly type: string;
   readonly title: string;
   readonly status: number;
+  readonly recoverable: boolean;
   readonly version: string;
   readonly data: JsonSchema;
 }
@@ -68,18 +70,19 @@ export interface ProblemCatalogEntry {
   readonly title: string;
   readonly status: number;
   readonly recoverable: boolean;
+  readonly version: string;
   readonly data: JsonSchema;
   readonly endpoints: readonly ProblemEndpoint[];
 }
 
 export interface ProblemCatalogDeclaration {
-  readonly recoverable: boolean;
   readonly endpoints: readonly ProblemEndpoint[];
 }
 
 export interface ProblemResourceIdentity {
   readonly platform: string;
   readonly service: string;
+  readonly module: string;
   readonly landscape: string;
   readonly version: string;
 }
@@ -101,11 +104,7 @@ export interface ProblemResource {
     readonly name: string;
     readonly namespace: string;
   };
-  readonly spec: {
-    readonly platform: string;
-    readonly service: string;
-    readonly landscape: string;
-    readonly version: string;
+  readonly spec: ProblemResourceIdentity & {
     readonly problems: readonly ProblemResourceEntry[];
   };
 }

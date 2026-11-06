@@ -1,42 +1,20 @@
 import { isRecord } from '@atomicloud/diene.core-utils';
 import type { z } from 'zod';
-import { createProblem } from './registry.js';
+import { ProblemFactory, ProblemStatusPolicy } from './registry.js';
 import type { Problem, RegisteredProblem } from './types.js';
 
-function isStatus(value: unknown): value is number {
-  return Number.isInteger(value) && (value as number) >= 100 && (value as number) <= 599;
-}
+export class ProblemGuard {
+  constructor(private readonly statuses: ProblemStatusPolicy = new ProblemStatusPolicy()) {}
 
-export function isProblem(value: unknown): value is Problem {
-  return (
-    isRecord(value) &&
-    typeof value.type === 'string' &&
-    typeof value.title === 'string' &&
-    isStatus(value.status) &&
-    'data' in value
-  );
-}
-
-function nestedError(value: unknown): unknown {
-  if (!isRecord(value)) {
-    return undefined;
+  isProblem(value: unknown): value is Problem {
+    return (
+      isRecord(value) &&
+      typeof value.type === 'string' &&
+      typeof value.title === 'string' &&
+      this.statuses.isStatus(value.status) &&
+      'data' in value
+    );
   }
-  return value.problem ?? value.error ?? value.cause;
-}
-
-function errorDetail(value: unknown): string {
-  if (value instanceof Error) {
-    return value.message;
-  }
-  if (isRecord(value)) {
-    if (typeof value.detail === 'string') {
-      return value.detail;
-    }
-    if (typeof value.message === 'string') {
-      return value.message;
-    }
-  }
-  return typeof value === 'string' ? value : 'An unexpected error occurred';
 }
 
 export interface ProblemTransformerOptions<TSchema extends z.ZodType> {
@@ -46,29 +24,33 @@ export interface ProblemTransformerOptions<TSchema extends z.ZodType> {
 }
 
 export class ProblemTransformer<TSchema extends z.ZodType> {
-  constructor(readonly options: ProblemTransformerOptions<TSchema>) {}
+  constructor(
+    readonly options: ProblemTransformerOptions<TSchema>,
+    private readonly guard: ProblemGuard = new ProblemGuard(),
+    private readonly factory: ProblemFactory = new ProblemFactory(),
+  ) {}
 
   fromError(error: unknown): Problem {
     const visited = new Set<object>();
     let current = error;
 
     while (true) {
-      if (isProblem(current)) {
+      if (this.guard.isProblem(current)) {
         return current;
       }
 
       if (isRecord(current)) {
         visited.add(current);
       }
-      const nested = nestedError(current);
+      const nested = this.nestedError(current);
       if (nested === undefined || (isRecord(nested) && visited.has(nested))) {
         break;
       }
       current = nested;
     }
 
-    return createProblem(this.options.fallback, {
-      detail: errorDetail(current),
+    return this.factory.createProblem(this.options.fallback, {
+      detail: this.errorDetail(current),
       instance: this.options.instance?.(current),
       data: this.options.fallbackData(current),
     });
@@ -76,43 +58,52 @@ export class ProblemTransformer<TSchema extends z.ZodType> {
 
   async fromHttpError(response: Response): Promise<Problem> {
     const text = await response.text();
-    let body: unknown = text;
-    if (text !== '') {
-      try {
-        body = JSON.parse(text);
-      } catch {
-        body = text;
-      }
-    }
+    const body = this.parseBody(text);
 
-    if (isProblem(body)) {
+    if (this.guard.isProblem(body)) {
       return { ...body, status: response.status };
     }
 
-    const nested = nestedError(body);
-    if (isProblem(nested)) {
+    const nested = this.nestedError(body);
+    if (this.guard.isProblem(nested)) {
       return { ...nested, status: response.status };
     }
 
-    return createProblem(this.options.fallback, {
-      detail: text === '' ? response.statusText || 'HTTP request failed' : errorDetail(body),
+    return this.factory.createProblem(this.options.fallback, {
+      detail: text === '' ? response.statusText || 'HTTP request failed' : this.errorDetail(body),
       status: response.status,
       instance: response.url || this.options.instance?.(body),
       data: this.options.fallbackData(body),
     });
   }
-}
 
-export function fromError<TSchema extends z.ZodType>(
-  error: unknown,
-  options: ProblemTransformerOptions<TSchema>,
-): Problem {
-  return new ProblemTransformer(options).fromError(error);
-}
+  private parseBody(text: string): unknown {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  }
 
-export async function fromHttpError<TSchema extends z.ZodType>(
-  response: Response,
-  options: ProblemTransformerOptions<TSchema>,
-): Promise<Problem> {
-  return new ProblemTransformer(options).fromHttpError(response);
+  private nestedError(value: unknown): unknown {
+    if (!isRecord(value)) {
+      return undefined;
+    }
+    return value.problem ?? value.error ?? value.cause;
+  }
+
+  private errorDetail(value: unknown): string {
+    if (value instanceof Error) {
+      return value.message;
+    }
+    if (isRecord(value)) {
+      if (typeof value.detail === 'string') {
+        return value.detail;
+      }
+      if (typeof value.message === 'string') {
+        return value.message;
+      }
+    }
+    return typeof value === 'string' ? value : 'An unexpected error occurred';
+  }
 }
