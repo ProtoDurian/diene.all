@@ -32,3 +32,9 @@
 {{- if gt (len (include "platinum.listeners" . | fromYamlArray)) 64 -}}
 {{- fail "shared Gateway exceeds the 64-listener ceiling; attach a ListenerSet instead" -}}
 {{- end -}}
+{{- if .Values.upstream.enabled -}}
+{{- $ref := dict "name" (include "platinum.resourceName" (dict "root" . "token" "proxy")) "namespace" .Release.Namespace -}}
+{{- if ne (toJson .Values.upstream.gatewayClassParametersRefs) (toJson (dict "kgateway" $ref)) -}}
+{{- fail (printf "upstream.gatewayClassParametersRefs must point the default kgateway class at %s" (toJson $ref)) -}}
+{{- end -}}
+{{- end -}}

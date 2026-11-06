@@ -40,3 +40,11 @@ spec:
           args: [netexec, --http-port=8080]
           ports:
             - containerPort: 8080
+        - name: web
+          image: registry.k8s.io/e2e-test-images/agnhost:2.53
+          args: [porter]
+          env:
+            - name: SERVE_PORT_9090
+              value: fixture-b-web
+          ports:
+            - containerPort: 9090

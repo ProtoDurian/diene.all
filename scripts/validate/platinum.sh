@@ -70,6 +70,25 @@ assert_gateway() { # GatewayClass + ONE shared Gateway bound to kgateway, genera
     (map(select(.kind == "GatewayParameters")) | length == 1 and .[0].metadata.name == "platinum-proxy" and .[0].spec.kube.service.type == "ClusterIP")'
 }
 
+assert_proxy() { # kgateway-generated envoy pods meet the fleet VAP; the default kgateway class reuses platinum-proxy
+  json "$1" | need_jq "platinum-proxy does not give generated envoy pods runAsNonRoot and CPU/memory requests and limits" '
+    map(select(.kind == "GatewayParameters"))[0].spec.kube as $k |
+    $k.podTemplate.securityContext.runAsNonRoot == true and ($k.omitDefaultSecurityContext // false) == false and
+    ([$k.envoyContainer.resources // {} | .requests.cpu, .requests.memory, .limits.cpu, .limits.memory] | all(. != null and . != ""))' || return 1
+  json "$1" | need_jq "the default kgateway GatewayClass is not bound to platinum-proxy, or Istio sidecars are enabled" '
+    map(select(.kind == "Deployment" and .metadata.name == "platinum-gateway"))[0].spec.template.spec.containers[0].env as $e |
+    ($e[] | select(.name == "KGW_GATEWAY_CLASS_PARAMETERS_REFS") | .value | fromjson) == {kgateway: {name: "platinum-proxy", namespace: "sulfoxide"}} and
+    ([$e[] | select(.name | IN("KGW_ENABLE_ISTIO_AUTO_MTLS", "KGW_ENABLE_ISTIO_INTEGRATION")) | .value] | all(. != "true"))'
+}
+
+# Upstream-named cluster RBAC (kgateway v2.5.0 has no override) and the GatewayClass host-pool names `platinum`.
+fullname_exempt='["ClusterRole/kgateway-sulfoxide", "ClusterRoleBinding/upstream-role-sulfoxide", "GatewayClass/platinum"]'
+
+assert_fullname() { # every rendered name is <service>-<token>, bar the explicit exemptions
+  json "$1" | need_jq "rendered names are not <service>-<token>: $(json "$1" | jq -c --argjson x "${fullname_exempt}" '[.[] | (.kind + "/" + .metadata.name) | select(IN($x[]) | not) | select(split("/")[1] | test("^[a-z0-9]+-[a-z0-9]+$") | not)]')" \
+    --argjson x "${fullname_exempt}" 'all(.[]; (.kind + "/" + .metadata.name) as $n | ($n | IN($x[])) or (.metadata.name | test("^[a-z0-9]+-[a-z0-9]+$")))'
+}
+
 assert_health() { # fixed /healthz route on the shared Gateway, answered 2xx by kgateway
   json "$1" | need_jq "health route contract broken (Exact /healthz on platinum-shared:http -> DirectResponse platinum-healthz 2xx)" '
     (map(select(.kind == "HTTPRoute" and .metadata.name == "platinum-healthz")) | length == 1) and
@@ -120,7 +139,7 @@ assert_entei() { # the dev-host role renders the shared edge only
       $g.listeners == [{name: "http", protocol: "HTTP", port: 80, allowedRoutes: {namespaces: {from: "Same"}}}])'
 }
 
-assert_vap() { # assert_vap <render> <label>: the inherited Q-G20 stage
+assert_vap() { # assert_vap <render> <label>: the inherited rendered-manifest stage
   kubeconform -strict -summary -schema-location default -schema-location 'schemas/{{ .ResourceKind }}.json' "$1" || { echo "❌ kubeconform rejected ${2}" >&2 && return 1; }
   yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "$1" >"$1.vap.yaml"
   kyverno apply policies/vap --resource "$1.vap.yaml" --detailed-results --remove-color >"$1.kyverno.txt" 2>&1 ||
@@ -152,6 +171,7 @@ render)
   expect_refusal 'identical lengths' --values chart/values.ruby.yaml --set 'gateway.aws.eipAllocationIds={eipalloc-1}'
   expect_refusal 'OCI gateway mode requires' --set gateway.provider=oci
   expect_refusal 'no registered-fleet Certificates' --set gateway.provider=local
+  expect_refusal 'must point the default kgateway class' --set upstream.gatewayClassParametersRefs.kgateway.name=platinum-other
   ;;
 lpsm-labels)
   render >"${tmp}/base.yaml"
@@ -172,6 +192,7 @@ gateway)
   for s in "${stacks[@]}"; do
     render_stack "${s}" "${tmp}/g.yaml"
     assert_gateway "${tmp}/g.yaml" || { echo "❌ in stack ${s%%|*}" >&2 && exit 1; }
+    assert_proxy "${tmp}/g.yaml" || { echo "❌ in stack ${s%%|*}" >&2 && exit 1; }
   done
   render --values chart/values.pichu.yaml --values chart/values.opal.yaml >"${tmp}/g.yaml"
   json "${tmp}/g.yaml" | need_jq "registered-fleet Gateway lacks its HTTP + two terminating HTTPS listeners" '
@@ -181,6 +202,12 @@ gateway)
   expect_red 'a second Gateway' 'one shared Gateway' assert_gateway "${tmp}/two.yaml"
   yq_edit "${tmp}/g.yaml" "${tmp}/lb.yaml" '(select(.kind == "GatewayParameters") | .spec.kube.service.type) = "LoadBalancer"'
   expect_red 'a second public LoadBalancer from the generated proxy' 'one shared Gateway' assert_gateway "${tmp}/lb.yaml"
+  yq_edit "${tmp}/g.yaml" "${tmp}/nores.yaml" 'del(select(.kind == "GatewayParameters") | .spec.kube.envoyContainer.resources.limits.memory)'
+  expect_red 'envoy proxy without a memory limit' 'requests and limits' assert_proxy "${tmp}/nores.yaml"
+  yq_edit "${tmp}/g.yaml" "${tmp}/root.yaml" 'del(select(.kind == "GatewayParameters") | .spec.kube.podTemplate)'
+  expect_red 'envoy pods without pod runAsNonRoot' 'runAsNonRoot' assert_proxy "${tmp}/root.yaml"
+  render --set-string upstream.controller.extraEnv.KGW_ENABLE_ISTIO_AUTO_MTLS=true >"${tmp}/istio.yaml"
+  expect_red 'Istio sidecars switched on' 'Istio sidecars are enabled' assert_proxy "${tmp}/istio.yaml"
   ;;
 health)
   for s in "${stacks[@]}"; do
@@ -235,6 +262,18 @@ entei)
   expect_refusal 'requires devHost.enabled' --set devHost.emergencyListeners.enabled=true
   expect_refusal 'renders no Certificate' "${entei[@]}" --set registeredCertificates.enabled=true
   ;;
+fullname)
+  for s in "${stacks[@]}"; do
+    render_stack "${s}" "${tmp}/n.yaml"
+    assert_fullname "${tmp}/n.yaml" || { echo "❌ in stack ${s%%|*}" >&2 && exit 1; }
+  done
+  render >"${tmp}/n.yaml"
+  json "${tmp}/n.yaml" | need_jq "a fullname exemption no longer renders; drop it" --argjson x "${fullname_exempt}" '[.[] | .kind + "/" + .metadata.name] as $n | all($x[]; IN($n[]))'
+  yq_edit "${tmp}/n.yaml" "${tmp}/twodash.yaml" '(select(.kind == "Service" and .metadata.name == "platinum-edge") | .metadata.name) = "platinum-edge-lb"'
+  expect_red 'a two-dash rendered name' 'not <service>-<token>' assert_fullname "${tmp}/twodash.yaml"
+  yq_edit "${tmp}/n.yaml" "${tmp}/nodash.yaml" '(select(.kind == "HTTPRoute") | .metadata.name) = "platinum"'
+  expect_red 'a chart-default (dash-less) rendered name' 'not <service>-<token>' assert_fullname "${tmp}/nodash.yaml"
+  ;;
 issuer-free)
   for s in "${stacks[@]}"; do
     render_stack "${s}" "${tmp}/i.yaml"
@@ -279,7 +318,7 @@ rendered-manifests)
     render_stack "${s}" "${tmp}/m-${s%%|*}.yaml"
     assert_vap "${tmp}/m-${s%%|*}.yaml" "${s%%|*}"
   done
-  # Platinum's ONE Q-G20 wiring sabotage: the edge Service type moved off LoadBalancer.
+  # Platinum's one wiring sabotage: the edge Service type moved off LoadBalancer.
   yq_edit "${tmp}/m-pichu-opal.yaml" "${tmp}/nodeport.yaml" '(select(.kind == "Service" and .metadata.name == "platinum-edge") | .spec.type) = "NodePort"'
   expect_red 'edge Service type moved to NodePort' 'NodePort services are forbidden' assert_vap "${tmp}/nodeport.yaml" nodeport
   ;;

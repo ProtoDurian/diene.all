@@ -39,6 +39,17 @@ gateway:
     # -- Fixed path the traffic controller polls once per cluster per tick.
     path: /healthz
     status: 200 # @schema minimum:200;maximum:299
+  # -- Envoy proxy pods kgateway generates for the shared Gateway (and the default `kgateway` class). The fleet VAP requires CPU and memory requests and limits.
+  proxy:
+    resources:
+      # @schema required:true
+      requests:
+        cpu: 100m # @schema required:true
+        memory: 128Mi # @schema required:true
+      # @schema required:true
+      limits:
+        cpu: '1' # @schema required:true
+        memory: 512Mi # @schema required:true
 
 # -- ENTEI dev-host shared-Gateway role. Platinum renders the shared edge only; per-host Certificate, ListenerSet, and HTTPRoute belong to the exposure materializer.
 devHost:
@@ -70,6 +81,11 @@ registeredCertificates:
 upstream:
   enabled: true
   fullnameOverride: platinum-gateway # @schema pattern:^[a-z0-9]+-[a-z0-9]+$
+  # -- kgateway's default `kgateway` GatewayClass also uses platinum-proxy, so it never gets its own LoadBalancer.
+  gatewayClassParametersRefs:
+    kgateway:
+      name: platinum-proxy
+      namespace: sulfoxide
   commonLabels: # @schema additionalProperties:true
     atomi.cloud/platform: sulfoxide
     atomi.cloud/service: platinum

@@ -45,6 +45,10 @@ refuses when the kgateway labels differ from the LPSM set.
 | HTTPRoute + DirectResponse | `platinum-healthz`                            | `Exact /healthz` answered `200` by the proxy         |
 | Certificate ×2             | `platinum-certprimary`, `platinum-certbackup` | registered fleet only                                |
 
+`platinum-proxy` also gives the generated envoy pods CPU/memory requests and limits and pod
+`runAsNonRoot`, so the fleet VAP admits them. kgateway's default `kgateway` GatewayClass points at it
+too (`upstream.gatewayClassParametersRefs`), so no Gateway gets a second LoadBalancer.
+
 `platinum-edge` selects the proxy by `gateway.networking.k8s.io/gateway-name: platinum-shared`.
 The proxy listens on the listener ports themselves (80/443); the k3d tier checks the edge
 targetPorts against kgateway's generated proxy Service.
@@ -52,7 +56,7 @@ targetPorts against kgateway's generated proxy Service.
 ## Fixed-IP LoadBalancer annotations
 
 The cloud LB is the sole public origin; NodePort and hostPort never appear. A NodePort Service is
-denied by the inherited VAP stage (platinum's one Q-G20 wiring sabotage).
+denied by the inherited VAP stage (platinum's one wiring sabotage).
 
 - AWS NLB: subnet list paired with fleet-allocated Elastic IP allocations.
 - OCI: NLB on a reserved public IP.
@@ -87,8 +91,10 @@ listener ceiling (64 listeners, render refuses beyond it) that ListenerSet avoid
 
 ## Tests
 
-- Unit (`scripts/ci/platinum.sh`): schema, lint and render over every stack, LPSM labels, gateway,
+- Unit (`scripts/ci/platinum.sh`): schema, lint and render over every stack, LPSM labels, fullnames, gateway,
   health, LB, ENTEI, issuer-free, pins, reloader opt-out, rendered-manifest VAP stage, publish modes.
+- Both k3d tiers bind the parent VAP (`Deny`) first, check the GatewayClass set and the default class,
+  and show the VAP denying a proxy without envoy resources.
 - Integration (`scripts/ci/platinum-k3d.sh`, ditto stack): Gateway Programmed, sample HTTPRoute,
   `/healthz` 2xx through `platinum-edge`, local OCI round-trip.
 - ENTEI fixtures (`scripts/ci/platinum-entei.sh`): cert-manager from `tests/fixtures/entei/`, a fixture

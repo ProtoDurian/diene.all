@@ -27,12 +27,12 @@ tasks:
       - helm dependency build chart
 
   update:
-    desc: Refresh the pinned upstream chart dependencies
+    desc: Refresh the pinned upstream chart dependency
     cmds:
       - helm dependency update chart
 
   latest:
-    desc: Resolve the latest real upstream kgateway chart and image tags
+    desc: Resolve the latest real upstream chart and image tags
     cmds:
       - ./scripts/local/latest-chart-upstreams.sh
 

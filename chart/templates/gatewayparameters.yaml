@@ -6,6 +6,13 @@ metadata:
   {{- include "platinum.metadata" . | nindent 2 }}
 spec:
   kube:
+    podTemplate:
+      # Merged onto kgateway's defaults: its low-port sysctl and envoy hardening stay.
+      securityContext:
+        runAsNonRoot: true
+    envoyContainer:
+      resources:
+        {{- toYaml .Values.gateway.proxy.resources | nindent 8 }}
     service:
       # platinum-edge is the only LoadBalancer; the generated proxy Service stays internal.
       type: ClusterIP
