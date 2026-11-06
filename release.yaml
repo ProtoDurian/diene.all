@@ -173,7 +173,6 @@ release:
       - released
   hooks:
     # A file a hook writes joins commit.assets in the same edit.
-    # bump.sh stamps `packages/diene_dart_lib/pubspec.yaml`, so `commit.assets` lists it.
     prepare:
       - phase: afterWrite
         command: './scripts/release/bump.sh ${version}'

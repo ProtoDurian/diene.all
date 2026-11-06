@@ -31,7 +31,6 @@ fi
 
 for file in \
   "${member_dir}/lib/diene_dart_lib.dart" \
-  "${member_dir}/lib/test_helper.dart" \
   "${member_dir}/doc/diene_dart_lib.md" \
   "${member_dir}/skills/diene-dart-lib-usage/SKILL.md" \
   "${member_dir}/LICENSE" \
@@ -43,7 +42,7 @@ for file in \
   }
 done
 
-if rg -n "package:(test|matcher|mockito|mocktail)/" "${member_dir}/lib/test_helper.dart"; then
+if [[ -f ${member_dir}/lib/test_helper.dart ]] && rg -n "package:(test|matcher|mockito|mocktail)/" "${member_dir}/lib/test_helper.dart"; then
   echo "❌ TestHelper must not depend on a test framework or mocking package" >&2
   exit 1
 fi

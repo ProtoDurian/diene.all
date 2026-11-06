@@ -14,10 +14,11 @@ meta_test_path="${META_TEST_PATH:-test/meta}"
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
-if [[ ${mode} == "meta" && (! -f "${member_dir}/${test_helper_path}" || ! -d "${member_dir}/${meta_test_path}") ]]; then
+if [[ ${mode} == "meta" && ! -f "${member_dir}/${test_helper_path}" ]]; then
   echo "✅ Meta tier inactive: this package has no TestHelper"
   exit 0
 fi
+[[ ${mode} == "meta" && ! -d "${member_dir}/${meta_test_path}" ]] && echo "❌ ${member_dir}/${test_helper_path} ships without its meta suite ${meta_test_path}" >&2 && exit 1
 
 dart pub get
 
@@ -53,10 +54,11 @@ dart run coverage:format_coverage \
   --packages="${package_config}" \
   --report-on=lib
 
-pattern='(^|/)lib/test_helper[.]dart$'
-[[ ${mode} == "unit" ]] && pattern='(^|/)lib/src/.*[.]dart$'
+pattern="(^|/)${test_helper_path//./[.]}$"
+exclude=''
+[[ ${mode} == "unit" ]] && pattern='(^|/)lib/.*[.]dart$' && exclude="(^|/)${test_helper_path//./[.]}$"
 
-"${root_dir}/scripts/ci/coverage-ledger.sh" "${all_ledger}" "${ledger}" "${pattern}" "${mode}"
+"${root_dir}/scripts/ci/coverage-ledger.sh" "${all_ledger}" "${ledger}" "${pattern}" "${mode}" "${exclude}"
 
 [[ ${test_status} -ne 0 ]] && echo "❌ ${mode} tests failed (exit ${test_status})" >&2 && exit "${test_status}"
 echo "✅ ${mode} coverage artifact: reports/${mode}/lcov.info"

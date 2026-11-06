@@ -1,7 +1,16 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
 const DEADCODE = 'nix develop .#ci -c ./scripts/ci/deadcode.sh';
-const FIXTURE = 'packages/diene_dart_lib/lib/src/probe_dead_whole.dart';
+const CLASS_DECLARATION = /^(?:final |base |sealed |abstract )*class \w+[^{\n]*\{\n/m;
+
+async function findClassFile(repo: any): Promise<string> {
+  for (const candidate of (await repo.glob('packages/*/lib/src/*.dart')).sort()) {
+    if (CLASS_DECLARATION.test(await repo.read(candidate))) {
+      return candidate;
+    }
+  }
+  throw new Error('deadcode-whole-package: no shipped class declaration found under lib/src');
+}
 
 export default {
   contractVersion: 1,
@@ -18,14 +27,18 @@ export default {
     },
     {
       name: 'mutation-deadcode-whole-package-caught',
-      description:
-        'the whole-package view (package + tests) flags an unused production file before the production view runs',
+      description: 'the whole-package view flags an unused private member of a used shipped class',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        await withCleanProbeState(repo, [FIXTURE], async () => {
-          await repo.write(FIXTURE, 'int _probeDeadWhole() => 1;\n\nint probeDeadWhole() => _probeDeadWhole();\n');
-          await expectRedBecause(repo, DEADCODE, 'deadcode-whole-package', ['probe_dead_whole.dart'], {
+        const target = await findClassFile(repo);
+        await withCleanProbeState(repo, [target], async () => {
+          const source = await repo.read(target);
+          await repo.write(
+            target,
+            source.replace(CLASS_DECLARATION, match => `${match}  int _probeUnused() => 1;\n\n`),
+          );
+          await expectRedBecause(repo, DEADCODE, 'deadcode-whole-package', ['unused method _probeUnused'], {
             forbidden: ['Production dead-code pass'],
           });
         });

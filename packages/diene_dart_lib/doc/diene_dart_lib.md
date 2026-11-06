@@ -52,7 +52,7 @@ import 'package:diene_dart_lib/test_helper.dart';
 (a `StateError`) on mismatch and imports no test framework, so it works with any
 runner. The meta suite dogfoods the helper: it is shown accepting a known-good
 summary and rejecting a known-bad one. Meta coverage is a separate ledger scoped
-only to `lib/test_helper.dart`; the unit ledger covers `lib/src/**`.
+only to `lib/test_helper.dart`; the unit ledger covers the rest of `lib/**`.
 
 ## Replacing the sample
 

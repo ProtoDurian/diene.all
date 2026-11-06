@@ -1,10 +1,12 @@
-import { expectGreen, withCleanProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
 const REUSABLE_TEST = '.github/workflows/⚡reusable-test.yaml';
 const UPLOAD_ACTION = 'actions/upload-artifact@';
 const GUARD = "hashFiles(format('reports/{0}/lcov.info', inputs.mode)) != ''";
 const INACTIVE_META =
   'nix develop .#ci -c bash -c \'TEST_HELPER_PATH=lib/probe_absent_helper.dart ./scripts/ci/test.sh meta coverage | grep -F "Meta tier inactive"\'';
+const HELPER_WITHOUT_SUITE =
+  'nix develop .#ci -c env META_TEST_PATH=test/probe_absent_meta ./scripts/ci/test.sh meta coverage';
 
 // Every artifact upload must be skipped when the run produced no ledger.
 function uploadsAreConditional(source: string): string | undefined {
@@ -33,7 +35,7 @@ export default {
     {
       name: 'baseline-conditional-meta-activation-green',
       description:
-        'without a TestHelper the meta tier is a successful no-op with no ledger, and CI uploads only an existing ledger',
+        'without a TestHelper the meta tier is a no-op with no ledger, a helper without its meta suite fails, and CI uploads only an existing ledger',
       kind: 'baseline',
       async run(repo: any) {
         await withCleanProbeState(repo, ['reports/meta'], async () => {
@@ -42,6 +44,9 @@ export default {
             throw new Error('conditional-meta-activation: the inactive meta tier still emitted a ledger');
           }
         });
+        await expectRedBecause(repo, HELPER_WITHOUT_SUITE, 'conditional-meta-activation', [
+          'ships without its meta suite',
+        ]);
         const violation = uploadsAreConditional(await repo.read(REUSABLE_TEST));
         if (violation) {
           throw new Error(`conditional-meta-activation: ${violation}`);

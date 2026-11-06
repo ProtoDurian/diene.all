@@ -16,12 +16,13 @@ public surface. Keep these rules:
 - Dogfood it with a **meta test** (`test/meta/`) that proves it both accepts a
   known-good case and rejects a known-bad case (expects a throw).
 - Meta coverage is a separate ledger scoped only to `lib/test_helper.dart`; the
-  unit ledger covers `lib/src/**`. Keep the two surfaces disjoint.
+  unit ledger covers the rest of `lib/**`. Keep the two surfaces disjoint.
 
-The meta tier is conditional: it activates only when a helper and a meta test
-are added **together**. A package that needs no shared assertions can delete
-`lib/test_helper.dart` and `test/meta/`, and the meta tier becomes a successful
-no-op emitting no `meta` coverage flag.
+The meta tier is conditional: it runs whenever `lib/test_helper.dart` exists,
+and a helper without `test/meta/` fails. A package that needs no shared assertions can delete
+`lib/test_helper.dart`, `test/meta/` and the helper lines in
+`tool/deadcode_entrypoints.dart`, and the meta tier becomes a successful
+no-op emitting no `reports/meta` coverage.
 
 ## Replacing the sample domain
 

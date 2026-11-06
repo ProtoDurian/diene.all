@@ -31,8 +31,8 @@ const TAG_PIN_SCRIPT: Array<string | RegExp> = [
   'exit 1',
   '}',
   'git fetch --tags --force origin',
-  'git checkout "refs/tags/${TAG}" -- packages/diene_dart_lib',
-  'git --no-pager diff --stat "refs/tags/${TAG}" -- packages/diene_dart_lib',
+  'git restore --source="refs/tags/${TAG}" --staged --worktree -- packages/diene_dart_lib',
+  'git --no-pager diff --exit-code "refs/tags/${TAG}" -- packages/diene_dart_lib',
 ];
 const CONFIGURE_SCRIPT: Array<string | RegExp> = [
   `mkdir -p "${CREDENTIAL_DIR}"`,
@@ -519,7 +519,24 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
   },
   {
     label: 'tag pin no longer restores the package from the tag',
-    build: source => source.replace('git checkout "refs/tags/${TAG}" -- packages/diene_dart_lib\n', ''),
+    build: source =>
+      source.replace('git restore --source="refs/tags/${TAG}" --staged --worktree -- packages/diene_dart_lib\n', ''),
+  },
+  {
+    label: 'tag pin overlays the tag so files added after it survive',
+    build: source =>
+      source.replace(
+        'git restore --source="refs/tags/${TAG}" --staged --worktree -- packages/diene_dart_lib',
+        'git checkout "refs/tags/${TAG}" -- packages/diene_dart_lib',
+      ),
+  },
+  {
+    label: 'tag pin reports a difference without failing',
+    build: source =>
+      source.replace(
+        'git --no-pager diff --exit-code "refs/tags/${TAG}" -- packages/diene_dart_lib',
+        'git --no-pager diff --stat "refs/tags/${TAG}" -- packages/diene_dart_lib',
+      ),
   },
   // --- the deployment environment ---------------------------------------
   {

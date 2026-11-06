@@ -14,7 +14,7 @@ trap 'rm -rf "${production_root}"' EXIT
 echo "🔎 Repository dead-code pass (library + tests + example)"
 (
   cd "${member_dir}"
-  dart run dart_code_linter:metrics check-unused-code lib test example
+  dart run dart_code_linter:metrics check-unused-code --analyze-private-members lib test example
   dart run dart_code_linter:metrics check-unused-files lib test example
 )
 
@@ -27,7 +27,7 @@ cp "${member_dir}/tool/deadcode_entrypoints.dart" "${production_root}/bin/main.d
 (
   cd "${production_root}"
   dart pub get
-  dart run dart_code_linter:metrics check-unused-code .
+  dart run dart_code_linter:metrics check-unused-code --monorepo --analyze-private-members .
   dart run dart_code_linter:metrics check-unused-files .
 )
 
