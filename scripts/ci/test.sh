@@ -26,7 +26,7 @@ elif [[ ${mode} == "meta" ]]; then
   # Without a TestHelper the meta tier is a successful no-op: there is no ledger to check.
   [[ -z "$(find src/test-helper -type f -name "*.ts" -print -quit 2>/dev/null || true)" ]] && exit 0
 else
-  # Without adapters or integration tests the int tier is a successful no-op (A121); test-int.sh owns that guard.
+  # Without adapters or integration tests the int tier is a successful no-op; test-int.sh owns that guard.
   noop_dir="$(mktemp -d)"
   trap 'rm -rf "${noop_dir}"' EXIT
   TEST_INT_NOOP_MARKER="${noop_dir}/noop" ./scripts/local/test-int.sh "${config}" coverage
