@@ -35,6 +35,9 @@ if [[ ${mode} == "content" || ${mode} == "all" ]]; then
     package/dist/test-helper.d.ts
     package/dist/test-helper.d.cts
     package/skills/diene-config-usage/SKILL.md
+    package/skills/diene-config-usage/assets/consumer.cjs
+    package/skills/diene-config-usage/assets/consumer.ts
+    package/skills/diene-config-usage/assets/test-helper.md
   )
   missing=0
   for path in "${expected[@]}"; do
@@ -44,7 +47,9 @@ if [[ ${mode} == "content" || ${mode} == "all" ]]; then
     fi
   done
   [ "${missing}" -ne 0 ] && exit 1
-  echo "✅ pack-content: all declared artifacts present"
+  extra="$(grep -vxF -e package/package.json -e package/LICENSE -e package/README.md "${expected[@]/#/-e}" <<<"${listing}" || true)"
+  [[ -n ${extra} ]] && echo "❌ tarball ships undeclared paths:"$'\n'"${extra}" >&2 && exit 1
+  echo "✅ pack-content: exactly the declared artifacts"
 fi
 
 if [[ ${mode} == "publint" || ${mode} == "all" ]]; then
