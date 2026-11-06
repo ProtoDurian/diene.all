@@ -75,20 +75,33 @@ for path in "${files[@]}"; do
       return p.name === n && !ts.isShorthandPropertyAssignment(p);
     };
     const binds = (b, name) => ts.isIdentifier(b) ? b.text === name : !!b.elements?.some(e => !ts.isOmittedExpression(e) && binds(e.name, name));
-    const declares = (scope, name) => {
-      if (ts.isFunctionLike(scope) && scope.parameters?.some(p => binds(p.name, name))) return true;
+    const ambient = st => !!(st.flags & ts.NodeFlags.Ambient) || !!st.modifiers?.some(m => m.kind === S.DeclareKeyword);
+    const hoisted = (root, name) => {
+      let found = false;
+      const walk = n => {
+        if (found || ts.isFunctionLike(n) || ts.isClassLike(n) || ts.isModuleDeclaration(n)) return;
+        if (ts.isVariableDeclarationList(n) && !(n.flags & ts.NodeFlags.BlockScoped) && !ambient(n.parent) && n.declarations.some(d => binds(d.name, name))) found = true;
+        ts.forEachChild(n, walk);
+      };
+      ts.forEachChild(root, walk);
+      return found;
+    };
+    const declares = (scope, name, from) => {
+      if (ts.isFunctionLike(scope) && (from === scope.body || scope.parameters?.includes(from)) && (scope.parameters.some(p => binds(p.name, name)) || (scope.body && hoisted(scope.body, name)))) return true;
+      if (ts.isSourceFile(scope) && hoisted(scope, name)) return true;
       if ((ts.isFunctionExpression(scope) || ts.isClassExpression(scope)) && scope.name?.text === name) return true;
       if (ts.isCatchClause(scope) && scope.variableDeclaration && binds(scope.variableDeclaration.name, name)) return true;
       if ((ts.isForStatement(scope) || ts.isForInStatement(scope) || ts.isForOfStatement(scope)) && scope.initializer && ts.isVariableDeclarationList(scope.initializer) && scope.initializer.declarations.some(d => binds(d.name, name))) return true;
       for (const st of scope.statements ?? []) {
+        if (ambient(st)) continue;
         if (ts.isVariableStatement(st) && st.declarationList.declarations.some(d => binds(d.name, name))) return true;
-        if ((ts.isFunctionDeclaration(st) || ts.isClassDeclaration(st) || ts.isEnumDeclaration(st)) && st.name?.text === name) return true;
+        if ((ts.isFunctionDeclaration(st) || ts.isClassDeclaration(st) || ts.isEnumDeclaration(st) || ts.isModuleDeclaration(st)) && st.name?.text === name) return true;
         const c = ts.isImportDeclaration(st) ? st.importClause : undefined, nb = c?.namedBindings;
         if (c && (c.name?.text === name || (nb && (ts.isNamespaceImport(nb) ? nb.name.text === name : nb.elements.some(e => e.name.text === name))))) return true;
       }
       return false;
     };
-    const local = n => { for (let p = n.parent; p; p = p.parent) if (declares(p, n.text)) return true; return false; };
+    const local = n => { for (let c = n, p = n.parent; p; c = p, p = p.parent) if (declares(p, n.text, c)) return true; return false; };
     const keyOf = k => !k ? undefined : ts.isComputedPropertyName(k) ? constant(k.expression) : ts.isIdentifier(k) || ts.isStringLiteralLike(k) || ts.isNumericLiteral(k) ? k.text : undefined;
     const hasInstanceOfFunction = n => {
       const proto = n.parent, access = proto.parent, key = access && access.argumentExpression;
