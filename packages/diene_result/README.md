@@ -26,8 +26,9 @@ depends on it and does not re-export it. `serial()` writes the tagged arrays:
 - `['ok', value]` / `['err', problemJson]`
 - `['some', value]` / `['none', null]`
 
-Only `unwrap` and `unwrapErr` throw (`UnwrapError`); every other combinator
-returns a value.
+`unwrap` and `unwrapErr` throw `UnwrapError` on the wrong variant; the
+`unwrapOr` fallbacks avoid that. Callback exceptions propagate unless `exec`
+maps them, and malformed wire input throws `FormatException`.
 
 Unlike the Bun package, no server-side rendering (SSR) API ships here.
 

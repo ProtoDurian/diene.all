@@ -13,12 +13,12 @@ fallible work with `andThen`, and consume both variants with `match`. Test the
 variant with `isOk` / `isErr`, project a channel with `ok()` / `err()`, and read
 either payload with `native()`.
 
-Only the explicit unwrap family throws: `unwrap` and `unwrapErr` throw
-`UnwrapError` (a `StateError` carrying the monad, the expected and actual
-variant, and the payload) on the wrong variant. `unwrapOr` and `unwrapOrElse`
-never throw. Ordinary composition returns a `Result`: `map`, `mapErr`,
-`andThen` and `run` let callback exceptions propagate, and `exec` turns a thrown
-object into an `Err` only through the mapper the caller passes.
+`unwrap` and `unwrapErr` throw `UnwrapError` (a `StateError` carrying the
+monad, the expected and actual variant, and the payload) on the wrong variant;
+`unwrapOr` and `unwrapOrElse` return a fallback instead. Callback exceptions
+propagate through every combinator; `exec` alone turns one into an `Err`,
+through the mapper the caller passes. Malformed wire input throws
+`FormatException` (see below).
 
 The error channel is always a `Problem` imported from
 `package:diene_problems/diene_problems.dart`. This package neither defines nor
