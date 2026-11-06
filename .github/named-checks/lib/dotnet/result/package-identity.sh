@@ -12,7 +12,7 @@ fail() {
 # evaluated, so Directory.*.props overrides count
 evaluate() {
   dotnet msbuild "$1" -getProperty:PackageId -getProperty:AssemblyName -getProperty:IsPackable \
-    -getProperty:RootNamespace -getItem:PackageReference
+    -getProperty:RootNamespace -getItem:PackageReference -getItem:ProjectReference
 }
 
 prop() {
@@ -28,7 +28,7 @@ for pair in "Lib/Lib.csproj:AtomiCloud.Diene.Result" "TestHelper/TestHelper.cspr
   [[ "$(prop "${eval_json}" IsPackable)" == true ]] || fail "${project} is not packable"
   [[ "$(prop "${eval_json}" RootNamespace)" == AtomiCloud.Diene.Results* ]] || fail "${project} RootNamespace leaves AtomiCloud.Diene.Results"
   if [[ ${project} == Lib/Lib.csproj ]]; then
-    deps="$(jq -r '[.Items.PackageReference[]?.Identity] | join(", ")' <<<"${eval_json}")"
+    deps="$(jq -r '[(.Items.PackageReference, .Items.ProjectReference)[]?.Identity] | join(", ")' <<<"${eval_json}")"
     [[ -z ${deps} ]] || fail "${project} takes a runtime dependency: ${deps}"
   fi
 done
