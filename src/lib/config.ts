@@ -3,7 +3,6 @@ import type { BlockShape } from './registry.js';
 
 type ConfigData<S extends BlockShape> = { [K in keyof S]: z.infer<S[K]> };
 
-// Structural on purpose: each entry point bundles its own class declarations.
 interface Config<S extends BlockShape> {
   get<K extends keyof S>(key: K): ConfigData<S>[K];
   all(): Readonly<ConfigData<S>>;
