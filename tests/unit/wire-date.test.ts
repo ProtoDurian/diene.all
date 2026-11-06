@@ -79,6 +79,8 @@ describe('WireDateCodec time', () => {
     { wire: '01:02:03+08:00', message: /canonical HH:mm:ss/ },
     { wire: '1:2:3', message: /canonical HH:mm:ss/ },
     { wire: '25:00:00', message: /not a valid time of day/ },
+    { wire: '23:59:60', message: /does not round-trip/ },
+    { wire: '00:00:60', message: /does not round-trip/ },
   ])('should reject wire time "$wire"', async ({ wire, message }) => {
     // Arrange
     const input = wire;

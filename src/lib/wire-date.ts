@@ -32,6 +32,8 @@ class WireDateCodec {
     }
     return this.attempt('date', `wire date "${input}" is not a valid calendar date`, () =>
       Temporal.PlainDate.from(input, { overflow: 'reject' }),
+    ).andThen(date =>
+      date.toString() === input ? Ok(date) : this.fail('date', `wire date "${input}" does not round-trip`),
     );
   }
 
@@ -50,8 +52,13 @@ class WireDateCodec {
         `wire time must be canonical HH:mm:ss with seconds and no fraction or offset, received "${input}"`,
       );
     }
+    // Temporal clamps a leap second (23:59:60) before overflow: 'reject' applies.
     return this.attempt('time', `wire time "${input}" is not a valid time of day`, () =>
       Temporal.PlainTime.from(input, { overflow: 'reject' }),
+    ).andThen(time =>
+      time.toString({ smallestUnit: 'second' }) === input
+        ? Ok(time)
+        : this.fail('time', `wire time "${input}" does not round-trip`),
     );
   }
 
