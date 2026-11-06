@@ -56,7 +56,7 @@ tasks:
   up:
     desc: Start the local MinIO ledger, detached
     cmds:
-      - docker run -d --rm --name operator-template-ledger -p 127.0.0.1:19000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin minio/minio:RELEASE.2024-01-16T16-07-38Z server /data
+      - docker run -d --rm --name operator-template-ledger -p 127.0.0.1:19000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin pgsty/minio:RELEASE.2026-08-04T00-00-00Z server /data
 
   down:
     desc: Stop the local MinIO ledger
