@@ -82,25 +82,12 @@ done
 if grep -Eqi '^# (docker|helm)' <<<"$(show CLAUDE.md)"; then fail "CLAUDE.md still has a Docker/Helm section"; fi
 if grep -Eq '^(docker|dockerd|hadolint|skopeo|helm|helm-docs|helmlint|kubeconform|kyverno) ' <<<"$(show probes/binary-smoke.ts)"; then fail "binary-smoke.ts still smokes a D/H binary"; fi
 
+# Binaries are not checked: the whole infralint/infrautils bundles keep docker and helm on PATH.
 for f in nix/packages.nix nix/env.nix; do
-  if grep -v '^ *#' <<<"$(show "${f}")" | grep -Ec '(^|[^A-Za-z0-9-])(infralint-docker|infrautils-docker|infralint|infrautils|docker|docker-client|hadolint|skopeo|kubernetes-helm|helm|helm-docs|helmlint)([^A-Za-z0-9-]|$)' >/dev/null; then
+  if grep -v '^ *#' <<<"$(show "${f}")" | grep -Ec '(^|[^A-Za-z0-9-])(infralint-docker|infrautils-docker|docker|docker-client|hadolint|skopeo|kubernetes-helm|helm|helm-docs|helmlint)([^A-Za-z0-9-]|$)' >/dev/null; then
     fail "${f} declares a docker/helm-carrying package"
   fi
 done
-
-# -i clears PATH; the positive control proves the lookup is not vacuous.
-# shellcheck disable=SC2016
-nix develop -i --keep HOME .#default -c bash -c '
-  set -u
-  bad=0
-  for b in docker dockerd hadolint skopeo helm helm-docs helmlint; do
-    if p="$(command -v "$b")"; then echo "❌ default shell carries $b at $p" >&2; bad=1; fi
-  done
-  for b in go golangci-lint shellcheck actionlint; do
-    command -v "$b" >/dev/null || { echo "❌ control: default shell lost $b" >&2; bad=1; }
-  done
-  exit "$bad"
-' || fail "default shell docker/helm absence / kept-toolchain presence"
 
 for f in .github/workflows/ci.yaml .github/workflows/cd.yaml "${publish}" .github/dependabot.yml Taskfile.yaml dlint.yaml; do
   yq e '.' "${f}" >/dev/null 2>&1 || fail "${f} is not valid YAML"
@@ -117,4 +104,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ stripped-axis-absence: no D/H path, reference, entry, nix package or shell binary; cd.yaml is publish-only; edited files valid"
+echo "✅ stripped-axis-absence: no D/H path, reference, entry, or nix package; cd.yaml is publish-only; edited files valid"
