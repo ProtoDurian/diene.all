@@ -4,7 +4,7 @@ set -euo pipefail
 kind="${1:-}"
 mode="${2:-normal}"
 
-[ "${kind}" != "unit" ] && [ "${kind}" != "int" ] && echo "❌ test tier '${kind}' is not one of unit|int (usage: dotnet-test.sh <unit|int> [--watch|--coverage])" >&2 && exit 1
+[ "${kind}" != "unit" ] && [ "${kind}" != "int" ] && [ "${kind}" != "meta" ] && echo "❌ test tier '${kind}' is not one of unit|int|meta (usage: dotnet-test.sh <unit|int|meta> [--watch|--coverage])" >&2 && exit 1
 [ "${mode}" != "normal" ] && [ "${mode}" != "--watch" ] && [ "${mode}" != "--coverage" ] && echo "❌ Unknown mode '${mode}'" >&2 && exit 1
 
 root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -106,15 +106,22 @@ valid="$(xmlstarlet sel -t -v '/coverage/@lines-valid' "${report}")"
 packages="$(xmlstarlet sel -t -m '/coverage/packages/package' -v '@name' -o $'\t' -v '@line-rate' -n "${report}")"
 [ -z "${packages}" ] && echo "❌ ${kind} coverage contains no packages" >&2 && exit 1
 
+unit_ledger="$(find "${root}" -mindepth 2 -maxdepth 2 -type f -name '*.csproj' -path "${root}/Lib*/*" -exec xmlstarlet sel -t -m '/Project/PropertyGroup/AssemblyName' -v . -n {} + || true)"
+
 while IFS=$'\t' read -r assembly line_rate; do
   if [ "${kind}" = "unit" ]; then
-    [[ ${assembly} =~ ^Lib.*$ ]] || {
+    [[ ${assembly} =~ ^Lib.*$ ]] || echo "${unit_ledger}" | rg -Fxq "${assembly}" || {
       echo "❌ unit coverage escaped its [Lib*]* ledger: ${assembly}" >&2
       exit 1
     }
-  else
+  elif [ "${kind}" = "int" ]; then
     [[ ${assembly} =~ ^App.*$ ]] || {
       echo "❌ int coverage escaped its [App*]* ledger: ${assembly}" >&2
+      exit 1
+    }
+  else
+    [[ ${assembly} =~ [.]TestHelper$ ]] || {
+      echo "❌ meta coverage escaped its [*.TestHelper]* ledger: ${assembly}" >&2
       exit 1
     }
   fi

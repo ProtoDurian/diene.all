@@ -71,7 +71,8 @@ script both restore first.
 
 ## Release
 
-Releaser stamps the version in `App/App.csproj`; its canonical
+Releaser stamps the version in the imported `Version.props` package manifest,
+which `Directory.Build.props` applies to every project; its canonical
 `release.yaml` is the single commit-type vocabulary.
 
 ## C# standards

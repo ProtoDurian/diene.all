@@ -23,7 +23,7 @@ dotnet tool restore >/dev/null
 dn-inspect --projects "$tmp/smoke/Smoke.csproj" --filter '^$' | rg -q 'Total: 0 issue\(s\)'
 
 xmlstarlet --version >/dev/null
-[ "$(xmlstarlet sel -t -v 'count(/Project/PropertyGroup/Version)' App/App.csproj)" = "1" ]
+[ "$(xmlstarlet sel -t -v 'count(/Project/PropertyGroup/Version)' Version.props)" = "1" ]
 
 echo "dotnet toolchain invocations passed"
 `;

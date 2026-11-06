@@ -32,3 +32,6 @@ desktop.ini
 *~
 .kagent/
 .kloop/
+
+### dotnet-lib
+artifacts/
