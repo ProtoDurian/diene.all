@@ -167,12 +167,19 @@ export class ProblemResourceEmitter {
 
   emitProblemResource(catalog: ProblemCatalog, identity: ProblemResourceIdentity): ProblemResource {
     const { platform, service, module, landscape, version } = identity;
+    const registryPortal = catalog.registry.portal;
+    if (registryPortal.scheme !== 'https') {
+      throw new RangeError(`Problem resource needs an https ErrorPortal; received ${registryPortal.scheme}`);
+    }
     for (const [field, value] of Object.entries({ platform, service, module, landscape })) {
-      if (value.length > DNS_LABEL_MAX || !DNS_LABEL_PATTERN.test(value)) {
+      if (typeof value !== 'string' || value.length > DNS_LABEL_MAX || !DNS_LABEL_PATTERN.test(value)) {
         throw new RangeError(`Problem resource ${field} must be a DNS-1123 label; received ${JSON.stringify(value)}`);
       }
+      if (registryPortal[field as keyof ErrorPortalConfig] !== value) {
+        throw new RangeError(`Problem resource ${field} ${value} does not match the registry ErrorPortal`);
+      }
     }
-    if (!RESOURCE_VERSION_PATTERN.test(version)) {
+    if (typeof version !== 'string' || !RESOURCE_VERSION_PATTERN.test(version)) {
       throw new RangeError(`Problem resource version must match ${RESOURCE_VERSION_PATTERN}; received ${version}`);
     }
     const name = [service, module, landscape, version].join('.');
@@ -181,12 +188,8 @@ export class ProblemResourceEmitter {
     }
 
     const entries = catalog.list();
-    if (entries.length === 0) {
-      throw new RangeError('Problem resource needs at least one declared catalog entry');
-    }
-    const portal: ErrorPortalConfig = { ...catalog.registry.portal, platform, service, module, landscape };
     for (const entry of entries) {
-      const expected = this.uris.buildProblemTypeUri(portal, version, entry.id);
+      const expected = this.uris.buildProblemTypeUri(registryPortal, version, entry.id);
       if (entry.type !== expected) {
         throw new RangeError(`Problem ${entry.type} does not belong to the resource row ${expected}`);
       }

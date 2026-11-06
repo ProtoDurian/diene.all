@@ -392,8 +392,8 @@ describe('ProblemResourceEmitter', () => {
   it('should refuse a resource name longer than 253 characters', () => {
     // Arrange
     const emitter = new ProblemResourceEmitter();
-    const catalog = new FixtureCatalog().declareAll();
     const label = 'a'.repeat(63);
+    const catalog = new RowCatalog().build({ ...portal, service: label, module: label, landscape: label });
     const identity = { ...row, service: label, module: label, landscape: label, version: `v1${'0'.repeat(60)}` };
 
     // Act
@@ -403,7 +403,20 @@ describe('ProblemResourceEmitter', () => {
     error.message.should.startWith('Problem resource name must be at most 253 characters');
   });
 
-  it('should reject an empty catalog and every identity field that drifts from the registry', () => {
+  it('should emit a valid empty row for a catalog that declares nothing', () => {
+    // Arrange
+    const empty = new FixtureCatalog().catalog;
+    const emitter = new ProblemResourceEmitter();
+
+    // Act
+    const resource = emitter.emitProblemResource(empty, row);
+
+    // Assert
+    resource.metadata.should.eql({ name: 'zinc.api.raichu.v1', namespace: 'nitroso' });
+    resource.spec.problems.should.eql([]);
+  });
+
+  it('should reject every identity field that drifts from the registry, even for an empty row', () => {
     // Arrange
     const empty = new FixtureCatalog().catalog;
     const catalog = new FixtureCatalog().declareAll();
@@ -413,19 +426,48 @@ describe('ProblemResourceEmitter', () => {
       { ...row, service: 'argon' },
       { ...row, module: 'web' },
       { ...row, landscape: 'pichu' },
-      { ...row, version: 'v2' },
     ];
 
     // Act
-    const emptyError = thrown(() => emitter.emitProblemResource(empty, row));
-    const driftErrors = drifts.map(identity => thrown(() => emitter.emitProblemResource(catalog, identity)));
+    const emptyErrors = drifts.map(identity => thrown(() => emitter.emitProblemResource(empty, identity)).message);
+    const versionError = thrown(() => emitter.emitProblemResource(catalog, { ...row, version: 'v2' }));
 
     // Assert
-    emptyError.message.should.equal('Problem resource needs at least one declared catalog entry');
-    for (const error of driftErrors) {
-      error.should.be.instanceOf(RangeError);
-      error.message.should.match(/does not belong to the resource row/);
-    }
+    emptyErrors.should.eql([
+      'Problem resource platform alcohol does not match the registry ErrorPortal',
+      'Problem resource service argon does not match the registry ErrorPortal',
+      'Problem resource module web does not match the registry ErrorPortal',
+      'Problem resource landscape pichu does not match the registry ErrorPortal',
+    ]);
+    versionError.message.should.match(/does not belong to the resource row/);
+  });
+
+  it('should refuse an identity field that is missing or not a string', () => {
+    // Arrange
+    const catalog = new FixtureCatalog().declareAll();
+    const emitter = new ProblemResourceEmitter();
+    const { module: _module, ...withoutModule } = row;
+
+    // Act
+    const missing = thrown(() => emitter.emitProblemResource(catalog, withoutModule as typeof row));
+    const numeric = thrown(() => emitter.emitProblemResource(catalog, { ...row, version: 1 as never }));
+
+    // Assert
+    missing.should.be.instanceOf(RangeError);
+    missing.message.should.equal('Problem resource module must be a DNS-1123 label; received undefined');
+    numeric.should.be.instanceOf(RangeError);
+  });
+
+  it('should refuse a registry portal that is not https', () => {
+    // Arrange
+    const catalog = new RowCatalog().build({ ...portal, scheme: 'http' });
+
+    // Act
+    const error = thrown(() => new ProblemResourceEmitter().emitProblemResource(catalog, row));
+
+    // Assert
+    error.should.be.instanceOf(RangeError);
+    error.message.should.equal('Problem resource needs an https ErrorPortal; received http');
   });
 
   it('should check rows through the injected URI builder', () => {
