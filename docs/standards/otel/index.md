@@ -1,27 +1,24 @@
 # OpenTelemetry
 
-`@atomicloud/diene.otel` owns the Bun family's OpenTelemetry wiring: the engine-owned
-configuration block schema, the canonical resource identity, the signal lifecycle, the
-standard-environment override behavior, the pino logging bridge, and the language-local
-trace seam. It ships the schema, the SDK-backed implementations, and framework-free
-telemetry test doubles. It ships no service configuration loader and chooses no landscape
-endpoints.
+`@atomicloud/diene.otel` owns OpenTelemetry for the Bun family: the config block
+schema, the resource identity, the signal lifecycle, the standard `OTEL_*`
+override rules, pino logs with trace ids, and the trace seam. It ships the schema,
+the SDK-backed implementations and framework-free test doubles. It loads no config
+files and picks no landscape endpoints.
 
-This article is the Bun implementation of the shared **O1 OpenTelemetry Alignment
-Contract**, the same contract `lib/dotnet/otel` and `lib/go/otel` implement. It builds on
-[Three-Layer Architecture](../three-layer-architecture/index.md),
-[Functional practices](../functional-practices/index.md),
+The .NET and Go otel libraries implement the same block and the same rules. This
+standard builds on [Three-Layer Architecture](../three-layer-architecture/index.md),
 [Stateless OOP and dependency injection](../stateless-oop-di/index.md),
-[Service-tree identity](../service-tree/index.md), and
+[Service-tree identity](../service-tree/index.md) and
 [Data validation](../validation/index.md).
 
 ---
 
 ## Canonical block
 
-The configuration shape is dotnet-priority: bindable nested booleans, no exporter enum
-strings, and identical exporter sub-blocks per signal. Signal keys are exactly `logs`,
-`metrics`, and `traces`.
+One shape for every language, nested the way .NET options bind: booleans per
+exporter, no exporter enum strings, the same exporter sub-block on every signal.
+Signal keys are exactly `logs`, `metrics` and `traces`.
 
 ```yaml
 otel:
@@ -64,35 +61,40 @@ otel:
         timeout: PT10S
 ```
 
-The base block enables the signal pipelines but keeps every exporter **off**. A landscape
-overlay flips the exporter it needs on and supplies the endpoint — the base file never
-carries a concrete endpoint. This is the **off-by-default, landscape-flip** convention: an
-application ships dark and a landscape lights it up without a new release.
+The base block turns the signal pipelines on but keeps every exporter **off**. A
+landscape overlay switches on the exporter it needs and sets the endpoint; the base
+file never carries a real endpoint. An app ships dark and a landscape lights it up
+without a new release.
 
-### Frozen invariants
+### Rules the schema enforces
 
-- Signal keys are exactly `logs`, `metrics`, and `traces`.
-- Exporter selection is independent per-exporter `enabled` booleans — there is no `use` or
-  `exporterType` enum.
-- OTLP is **HTTP/protobuf on port 4318** fleet-wide.
-- Durations are ISO-8601 strings (`PT10S`, `PT60S`), parsed via
-  `@atomicloud/diene.core-utils` `parseWireDuration` (Temporal). A duration must be a
-  positive, fixed-length canonical ISO-8601 duration.
-- `traces.sampler.type ∈ { parentbased_traceidratio, always_on, always_off }`; `ratio` is
-  finite and in the inclusive range `[0, 1]`. Out-of-range or `NaN` ratios are **rejected**.
-- Disabled signals and disabled/empty exporters construct **no** network clients, exporters,
-  processors, readers, or background timers.
-- An **enabled** OTLP exporter with an empty `endpoint` **fails validation before startup**.
+- Signal keys are exactly `logs`, `metrics` and `traces`, case-sensitive.
+- Each exporter has its own `enabled` boolean. There is no `use` or `exporterType` enum.
+- OTLP is **http/protobuf on port 4318** everywhere. An endpoint on any other port is
+  rejected, even on a disabled exporter.
+- An **enabled** OTLP exporter with an empty `endpoint` fails validation before startup.
+- Durations are ISO 8601 strings (`PT10S`, `PT60S`), parsed with `parseWireDuration`
+  from `@atomicloud/diene.core-utils`. They must be positive and fixed-length.
+- `traces.sampler.type` is one of `parentbased_traceidratio`, `always_on`, `always_off`;
+  `ratio` is finite and within `[0, 1]`.
 
-The schema is engine-owned: this package exports the zod block schema and the inferred
-types, and it validates its own block shape only. It never loads files.
+The package exports `otelBlockSchema`, the sub-schemas, the inferred types
+(`OtelBlock`, `OtelTraces`, …) and `defaultOtelBlock`. It validates its own block only;
+`@atomicloud/diene.config` loads, merges and validates the composed root schema.
+
+```ts
+import { otelBlockSchema } from '@atomicloud/diene.otel';
+import { z } from 'zod';
+
+const rootSchema = z.object({ app: appSchema, otel: otelBlockSchema });
+```
 
 ---
 
-## Resource identity (R14)
+## Resource identity
 
-Every implementation derives resource attributes from the validated `app:` service-tree
-block; consumers never hand-author them. The mapping is fixed:
+Resource attributes come from the validated `app:` service-tree values; consumers
+never write them by hand. The mapping is fixed:
 
 | Service-tree value | Semantic convention           |
 | ------------------ | ----------------------------- |
@@ -101,137 +103,128 @@ block; consumers never hand-author them. The mapping is fixed:
 | service            | `service.name`                |
 | version            | `service.version`             |
 
-All five raw taxonomy values are also emitted under the `atomi.*` namespace:
-
-- `atomi.landscape`
-- `atomi.platform`
-- `atomi.service`
-- `atomi.module`
-- `atomi.version`
-
-The programmatic resource only **augments**. It sets a key only when
-`OTEL_RESOURCE_ATTRIBUTES` / `OTEL_SERVICE_NAME` do not already claim it — the environment
-wins (see below).
+All five raw values are also set as `atomi.landscape`, `atomi.platform`,
+`atomi.service`, `atomi.module` and `atomi.version`.
+`ResourceIdentityMapper` builds them; `OTEL_RESOURCE_ATTRIBUTES` and then
+`OTEL_SERVICE_NAME` are layered on top.
 
 ---
 
-## Standard `OTEL_*` environment variables win
+## Standard `OTEL_*` variables win
 
-The library configures the SDK programmatically **only when the corresponding standard
-`OTEL_*` variable is unset**, and never clobbers a variable an operator set. This covers
-exporter endpoints, headers, resource attributes, sampler settings, and
-`OTEL_SDK_DISABLED`. Operations must be able to override the block without a new application
-release.
+The library sets an SDK option only when the matching standard variable is unset,
+so operators can override the block without a release.
 
-- If `OTEL_TRACES_SAMPLER` is set, the library omits the programmatic sampler entirely and
-  lets the SDK consume `OTEL_TRACES_SAMPLER` / `OTEL_TRACES_SAMPLER_ARG`.
-- If `OTEL_SDK_DISABLED` is set truthy, init is a whole no-op — no pipelines are built.
-- `OTEL_EXPORTER_OTLP_*` variables suppress the matching programmatic exporter option.
-
----
-
-## Ownership and composition
-
-Three surfaces, three owners — keep them separate:
-
-| Surface                                              | Owner                                   |
-| ---------------------------------------------------- | --------------------------------------- |
-| OTel block types and schema                          | this package (`@atomicloud/diene.otel`) |
-| YAML/env loading, merge order, final root validation | `@atomicloud/diene.config`              |
-| Infra presets (postgres, kv, cache, storage)         | `standard-config`, never OTel           |
-| Logging and metrics emit seams                       | `@atomicloud/diene.interfaces`          |
-| Trace / span seam and its test double                | this package (RB-19)                    |
-| SDK-backed implementations                           | this package                            |
-| Consumer lifecycle wiring and real-export SIT        | the consumer / service                  |
-
-A service imports this schema into its composed root schema in **one line**; `standard-config`
-must not duplicate or wrap the block. `lib/bun/config` is the sole merger and final validator.
+- `OTEL_SDK_DISABLED=true` makes init a no-op: no pipeline is built and seams are ignored.
+- `OTEL_LOGS_EXPORTER`, `OTEL_METRICS_EXPORTER`, `OTEL_TRACES_EXPORTER` (`console`, `otlp`,
+  `none`) replace the block's exporter flags for that signal.
+- `OTEL_TRACES_SAMPLER` set: no programmatic sampler; the SDK reads it.
+- `OTEL_EXPORTER_OTLP_[SIGNAL_]ENDPOINT`, `_HEADERS`, `_TIMEOUT` set: the matching option
+  is left to the SDK.
+- `OTEL_METRIC_EXPORT_INTERVAL` / `OTEL_METRIC_EXPORT_TIMEOUT` (positive milliseconds)
+  replace `metrics.interval` and the OTLP timeout for the metric reader.
 
 ---
 
-## Signal lifecycle and public capabilities
+## Design
 
-The library provides exactly these capabilities, and no more:
+The package follows three layers:
 
-1. Validate the engine-owned block.
-2. Build the canonical resource from `app:`.
-3. Return one initialized runtime for the consumer to retain; the consumer calls init once and
-   reuses that runtime rather than constructing competing global providers.
-4. Expose service-scoped `logger`, `meter`, and `tracer` accessors, plus the family-interface
-   implementations (`LoggerSink`, `MetricsCollector`) and this package's trace emitter.
-5. Expose an explicit `flush` / `shutdown` operation.
-6. Register **no** process signal handlers. The consumer owns `SIGTERM` and calls flush /
-   shutdown itself.
+- **Domain** (`src/lib`, pure): the schemas, `OtelEnvironment` (a read-only view of the
+  variables passed in), `ExporterSelector`, `ResourceIdentityMapper`,
+  `TraceSamplerFactory`, `OtlpExporterOptionsFactory`, `WireDurationConverter`, the trace
+  seam (`TraceEmitter`, `TraceRecordValidator`, `TraceError`) and `OtelPlanner`, which
+  turns a block, an identity and the variables into one `OtelPlan`. The domain never
+  reads `process.env`.
+- **Adapters** (`src/adapters`, effects): `OtelBootstrap` reads the variables
+  (`process.env` unless you pass `environment`), asks the planner for a plan and builds
+  only what the plan selects through `LoggerSignalFactory`, `MetricSignalFactory` and
+  `TraceSignalFactory`.
+- **Test helper** (`src/test-helper`): the trace double, assertions, fixtures and the
+  init harness.
 
-Init returns accessors and a flush regardless of configuration; when a signal has no selected
-exporter, the accessor is a no-op flavor and no provider, exporter, reader, processor, timer,
-or network client is constructed.
-
-### Traces and metrics
-
-- **Traces** use a hand-assembled tracer provider with the canonical resource, the mapped
-  sampler, and a batch span processor over the OTLP/protobuf trace exporter — built only when
-  `traces.enabled && traces.exporter.otlp.enabled`. A console exporter sits behind
-  `exporter.console.enabled`. The granular `@opentelemetry/sdk-trace-*` APIs are used rather
-  than `NodeSDK`, so the `OTEL_*`-wins law stays under the library's control.
-- **Sampler mapping**: `parentbased_traceidratio` →
-  `ParentBasedSampler({ root: TraceIdRatioBasedSampler(ratio) })`; `always_on` → `AlwaysOnSampler`;
-  `always_off` → `AlwaysOffSampler`. When `OTEL_TRACES_SAMPLER` is set, no programmatic sampler
-  is passed.
-- **Metrics** use a meter provider with a periodic exporting reader over the OTLP/protobuf
-  metric exporter (export interval from `metrics.interval`) when OTLP is enabled, and a console
-  reader behind the console flag.
-
-### Logs (S23): pino with a stubbed OTLP bridge
-
-The Bun wrapper logs through **pino** — JSON to stdout, scraped by Alloy — with OpenTelemetry
-trace-context injection (a mixin that pulls `trace_id`, `span_id`, and `trace_flags` from the
-active span context). The **OTLP logs bridge is explicitly stubbed** in v1: the package takes
-no `@opentelemetry/sdk-logs` dependency and exposes a documented no-op for the OTLP logs path,
-recorded as "stubbed until the JS SDK logs signal is 1.0-ready". Metrics and traces use OTLP;
-logs reach the backend through the pino → Alloy path.
+Every class is stateless and takes its collaborators in the constructor, with working
+defaults. Swap one to change behaviour, for example a `MetricSignalFactory` built with
+your own `MetricExporterFactories`.
 
 ---
 
-## Trace seam ownership (RB-19)
+## Signal lifecycle
 
-Trace and span contracts are **language-local to this package**. Per RB-19,
-`@atomicloud/diene.interfaces` has no trace port and `PortName` has no `tracing` member — the
-interfaces package owns only the `LoggerSink` and `MetricsCollector` effect seams. This package
-therefore defines its own idiomatic trace-emitter interface (span start / end / event / status
-over `TelemetryAttributes`), its own error tag, its in-memory trace double, and it documents
-trace testing here. Do not ask the interfaces package to add a trace seam.
+`new OtelBootstrap().init(block, identity, options?)` returns one `OtelRuntime`:
 
-This package **implements** `LoggerSink` (pino-backed) and `MetricsCollector` (SDK-backed),
-both returning `Result<void, PortError>` and running the shared interface validators first, so
-a real adapter rejects exactly what the interfaces mock rejects.
+- `tracer`, `meter`, `logger` scoped to the service name and version;
+- `traceEmitter`, `metricsCollector`, `loggerSink` (the seam implementations);
+- `resource`, `resourceAttributes`, `active` (which signals built a pipeline);
+- `flush()` and `shutdown()`.
+
+Call init once and keep the runtime. The library registers **no** process signal
+handlers: your framework owns `SIGTERM` and calls `shutdown()`, which flushes every
+signal, shuts the providers down and throws one `AggregateError` naming every failure.
+
+When a signal has no selected exporter, its accessors are no-ops and no provider,
+exporter, reader, processor, timer or network client is created.
+
+- **Traces**: a node tracer provider with the resource, the mapped sampler and one batch
+  span processor per exporter (OTLP proto, console). `parentbased_traceidratio` maps to
+  `ParentBasedSampler({ root: TraceIdRatioBasedSampler(ratio) })`; `always_on` and
+  `always_off` use their native samplers.
+- **Metrics**: a meter provider with one periodic reader per exporter (OTLP proto,
+  console), exporting every `metrics.interval`.
+- **Logs**: pino JSON to stdout, collected by the platform log agent, with `trace_id`,
+  `span_id` and `trace_flags` from the active span. Logs need the console exporter on.
+  The OTLP logs bridge is **stubbed** (`runtime.otlpLogsBridge === 'stubbed'`) until the
+  JS logs SDK is stable; the package does not depend on `@opentelemetry/sdk-logs`.
 
 ---
 
-## Evidence boundary and test-helper use
+## Seams
 
-Unit tests transcribe the canonical block above into accept / reject fixtures and cover
-resource mapping, sampler mapping, and disabled-exporter no-op behavior. Integration tests use
-**in-memory telemetry seams and never start a fake collector or open a network client**. Real
-`:4318` export is a consumer-owned SIT journey through the configured Alloy path, not a gate on
-this package.
+`@atomicloud/diene.interfaces` owns the `LoggerSink` and `MetricsCollector` seams. This
+package implements them (`PinoLoggerSink`, `SdkMetricsCollector`); both run the shared
+validators first, so a real adapter rejects exactly what the shared mock rejects.
 
-Framework-free telemetry test doubles ship at `@atomicloud/diene.otel/test-helper`:
+The interfaces package has no trace seam, so `TraceEmitter` and its double live here.
 
-- **Consume, do not re-implement**, the interfaces doubles for logging and metrics —
-  `InMemoryLoggerSink`, `InMemoryMetricsCollector`, and their assertions come from
-  `@atomicloud/diene.interfaces/test-helper`.
-- **Owned here (RB-19)**: `InMemoryTraceEmitter` plus OTel-specific resource and payload
-  asserters (for example span-record and resource-attribute assertions). The helpers record
-  validated interactions deterministically, enforce the same invariants as the real path, and
-  fail with precise messages.
-- Supplying a seam override selects it before signal construction. The corresponding real
-  provider, exporter, reader, processor, registration, or pino output is not created, even if
-  that signal's OTLP exporter is enabled in the block.
-- The package's own meta tier proves every shipped assertion both fails on a known-bad emission
-  and passes on a known-good one, and runs a shared behavioral suite against the real SDK-backed
-  implementation and the in-memory double where the no-collector boundary allows.
+Pass seams to init to replace a signal for a test or a custom sink:
 
-When a consumer needs a fake logger or metrics collector, it imports those from the interfaces
-test-helper; when it needs to assert traces or resource identity, it uses this package's
-test-helper. There is one coherent public seam and mock story across the two packages.
+```ts
+runtime = new OtelBootstrap().init(block, identity, { seams: { logger, metrics, traces } });
+```
+
+A seam is chosen before anything is built, so that signal gets no provider, exporter or
+pino output even when its OTLP exporter is on.
+
+---
+
+## Testing
+
+- **Unit** (`src/lib`, 100%): the accept/reject block table, the resource mapping, the
+  sampler mapping, the variable rules and the planner. No SDK pipeline runs.
+- **Integration** (`src/adapters`, 100%): adapters run in-process with in-memory SDK
+  exporters and the shared mocks injected. **No collector and no network.**
+- **Meta** (`src/test-helper`, 100%): every assertion is shown to fail on bad input and
+  pass on good; the SDK-backed seams and the in-memory doubles give the same outcomes on
+  one shared scenario list; the fixtures pass the schema.
+- **SIT** (`tests/sit`): real OTLP http/protobuf export of a span and a metric to a
+  loopback receiver started by the test on `127.0.0.1`. The receiver decodes the
+  protobuf body and checks `service.name`, `deployment.environment.name`, the `atomi.*`
+  attributes and the emitted span and metric. The block keeps port 4318; the test
+  points the exporters at the receiver through `OTEL_EXPORTER_OTLP_ENDPOINT`. The receiver
+  is test-only and never ships.
+
+### Test helper
+
+`@atomicloud/diene.otel/test-helper` ships:
+
+- `InMemoryTraceEmitter`: records validated trace records and calls, with `failNext`.
+- `OtelAssertions`: `traceRecords`, `traceCalls`, `resourceAttributes`,
+  `identityResource` and `payload`, each throwing `OtelAssertionError` with both sides.
+- `OtelBlockFixtures`: `canonical()`, `disabled()`, `console()`, `otlp()` blocks.
+- `AppIdentityBuilder`: a valid identity, `with(...)` overrides and the mapped `attributes()`.
+- `OtelTestHarness`: `start(block?, identity?, environment?)` inits the runtime with the
+  shared logger and metrics mocks and the trace double injected.
+
+The logger and metrics mocks (`InMemoryLoggerSink`, `InMemoryMetricsCollector`) and their
+assertions come **only** from `@atomicloud/diene.interfaces/test-helper`; import them from
+there. This package does not re-export them.

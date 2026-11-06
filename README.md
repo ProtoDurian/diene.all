@@ -14,42 +14,39 @@ boundary. TypeScript variants accompany the shared standards for
 
 ## Library package
 
-`@atomicloud/diene.bun-lib` is the publishable Bun library baseline: a small
-TypeScript package shipped as dual **ESM + CommonJS** with bundled type
-declarations, validated on every push and published on `v*.*.*` tags. Library
-children rescope the package name, description, keywords, and badge URLs from
-this scaffold.
+`@atomicloud/diene.otel` wires OpenTelemetry for the AtomiCloud Bun family. It
+ships the one OTel config block schema (per-signal `logs`, `metrics`, `traces`),
+the resource identity mapping (landscape, platform, service, module and version
+onto semantic-convention and `atomi.*` attributes), the init / flush / shutdown
+lifecycle, OTLP http/protobuf export on port 4318 for metrics and traces, and pino
+JSON logs with trace ids. Exporters are off by default. Shipped as dual
+**ESM + CommonJS** with bundled types and two entry points: the package root and
+`/test-helper`.
 
-See the [npm release runbook](https://github.com/AtomiCloud/diene.bun-lib/blob/main/docs/developer/npm-release.md)
-for tag publishing, API-key rotation, retry behavior, and the deliberate
-no-provenance policy.
+See the [otel standard](docs/standards/otel/index.md) for the contract and the
+[npm release runbook](docs/developer/npm-release.md) for publishing.
 
-[![npm version](https://img.shields.io/npm/v/@atomicloud/diene.bun-lib)](https://www.npmjs.com/package/@atomicloud/diene.bun-lib)
-[![npm downloads](https://img.shields.io/npm/dm/@atomicloud/diene.bun-lib)](https://www.npmjs.com/package/@atomicloud/diene.bun-lib)
-[![CI](https://github.com/AtomiCloud/diene.bun-lib/actions/workflows/ci.yaml/badge.svg)](https://github.com/AtomiCloud/diene.bun-lib/actions/workflows/ci.yaml)
+[![npm version](https://img.shields.io/npm/v/@atomicloud/diene.otel)](https://www.npmjs.com/package/@atomicloud/diene.otel)
+[![CI](https://github.com/AtomiCloud/diene.bun-otel/actions/workflows/ci.yaml/badge.svg)](https://github.com/AtomiCloud/diene.bun-otel/actions/workflows/ci.yaml)
 
 ### Installation
 
 ```bash
-bun add @atomicloud/diene.bun-lib
-# or
-npm install @atomicloud/diene.bun-lib
+bun add @atomicloud/diene.otel
 ```
-
-`ioredis`, `pino` and `zod` are runtime dependencies and are installed automatically.
 
 ### Usage
 
 ```ts
-// ESM
-import { KeyComposer, RedisKeyValueStore, SampleService } from '@atomicloud/diene.bun-lib';
-import type { IKeyValueStore, RedisConnection } from '@atomicloud/diene.bun-lib';
+import { OtelBootstrap, otelBlockSchema } from '@atomicloud/diene.otel';
+
+const runtime = new OtelBootstrap().init(otelBlockSchema.parse(config.otel), config.app);
+runtime.tracer.startActiveSpan('work', span => span.end());
+await runtime.shutdown(); // call from your SIGTERM handler; the library registers none
 ```
 
-```js
-// CommonJS
-const { KeyComposer, RedisKeyValueStore, SampleService } = require('@atomicloud/diene.bun-lib');
-```
+In tests, inject the shared mocks from `@atomicloud/diene.interfaces/test-helper`
+with `OtelTestHarness` from `@atomicloud/diene.otel/test-helper`.
 
 # Commands
 
