@@ -33,7 +33,9 @@ const otlp = {
   headers: { tenant: 'review' },
   timeoutMillis: 1234,
   compression: 'gzip' as const,
+  tls: {},
 };
+const agent = { keepAlive: true };
 const settings = { intervalMillis: 60_000, timeoutMillis: 1_000, temporality: 'cumulative' as const, otlp };
 
 function realProvider(exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE)) {
@@ -48,7 +50,7 @@ describe('SdkMetricExporterFactories', () => {
 
     // Act
     const consoleExporter = factories.console();
-    const otlpExporter = factories.otlp(settings.otlp, 'cumulative');
+    const otlpExporter = factories.otlp(settings.otlp, 'cumulative', agent);
 
     // Assert
     (consoleExporter instanceof ConsoleMetricExporter).should.be.true();
@@ -70,7 +72,7 @@ describe('SdkMetricExporterFactories', () => {
         OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: 'cumulative',
       },
       async () => {
-        const exporter = factories.otlp(otlp, 'delta');
+        const exporter = factories.otlp(otlp, 'delta', agent);
         const read = await exporterSettings(exporter);
         const temporality = exporter.selectAggregationTemporality?.(InstrumentType.COUNTER);
         await exporter.shutdown();
@@ -96,7 +98,7 @@ describe('SdkMetricExporterFactories', () => {
     const factories = new SdkMetricExporterFactories();
 
     // Act
-    const exporter = factories.otlp(otlp, preference);
+    const exporter = factories.otlp(otlp, preference, agent);
 
     // Assert
     exporter.selectAggregationTemporality?.(InstrumentType.COUNTER)?.should.eql(counter);
@@ -195,6 +197,7 @@ describe('MetricSignalFactory', () => {
 
     // Act
     const signal = new MetricSignalFactory(exporters).create({
+      agent,
       selection: { console: false, otlp: false },
       resource,
       scope,
@@ -211,6 +214,7 @@ describe('MetricSignalFactory', () => {
     // Arrange
     const exporters = new RecordingMetricExporters();
     const signal = new MetricSignalFactory(exporters).create({
+      agent,
       selection: { console: true, otlp: true },
       resource,
       scope,
@@ -225,6 +229,7 @@ describe('MetricSignalFactory', () => {
     signal.active.should.be.true();
     exporters.calls.should.eql(['console', 'otlp']);
     exporters.otlpOptions.should.eql([settings.otlp]);
+    exporters.agents.should.eql([agent]);
     exporters.temporalities.should.eql(['cumulative']);
     const exported = exporters.exporter.getMetrics();
     exported.length.should.eql(2);
@@ -238,7 +243,7 @@ describe('MetricSignalFactory', () => {
     const factory = new MetricSignalFactory();
 
     // Act
-    const signal = factory.create({ selection: { console: true, otlp: false }, resource, scope, settings });
+    const signal = factory.create({ agent, selection: { console: true, otlp: false }, resource, scope, settings });
 
     // Assert
     signal.active.should.be.true();

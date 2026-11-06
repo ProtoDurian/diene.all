@@ -41,13 +41,31 @@ describe('OtelPlanner', () => {
       intervalMillis: 30_000,
       timeoutMillis: 10_000,
       temporality: 'cumulative',
-      otlp: { url: 'http://collector:4318/v1/metrics', headers: {}, timeoutMillis: 10_000, compression: 'none' },
+      otlp: {
+        url: 'http://collector:4318/v1/metrics',
+        headers: {},
+        timeoutMillis: 10_000,
+        compression: 'none',
+        tls: {},
+      },
     });
     actual.traces.otlp.should.eql({
       url: 'http://collector:4318/v1/traces',
       headers: {},
       timeoutMillis: 10_000,
       compression: 'none',
+      tls: {},
+    });
+    actual.traces.limits.should.eql({
+      general: { attributeCountLimit: 128, attributeValueLengthLimit: Number.POSITIVE_INFINITY },
+      span: {
+        attributeCountLimit: 128,
+        attributeValueLengthLimit: Number.POSITIVE_INFINITY,
+        attributePerEventCountLimit: 128,
+        attributePerLinkCountLimit: 128,
+        eventCountLimit: 128,
+        linkCountLimit: 128,
+      },
     });
     actual.traces.batch.should.eql({
       exportTimeoutMillis: 30_000,
@@ -109,6 +127,46 @@ describe('OtelPlanner', () => {
       scheduledDelayMillis: 4,
     });
     actual.metrics.temporality.should.eql('delta');
+  });
+
+  it('should resolve the span limits from the injected variables, letting a span limit win', () => {
+    // Arrange
+    const environment = {
+      OTEL_ATTRIBUTE_COUNT_LIMIT: '10',
+      OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT: '20',
+      OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: '0',
+      OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT: '3',
+      OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT: '4',
+      OTEL_SPAN_EVENT_COUNT_LIMIT: '5',
+      OTEL_SPAN_LINK_COUNT_LIMIT: '6',
+    };
+
+    // Act
+    const actual = planner.plan(block, identity, environment);
+
+    // Assert
+    actual.traces.limits.should.eql({
+      general: { attributeCountLimit: 10, attributeValueLengthLimit: 20 },
+      span: {
+        attributeCountLimit: 0,
+        attributeValueLengthLimit: 20,
+        attributePerEventCountLimit: 3,
+        attributePerLinkCountLimit: 4,
+        eventCountLimit: 5,
+        linkCountLimit: 6,
+      },
+    });
+  });
+
+  it('should prefer the span value length limit over the general one', () => {
+    // Arrange
+    const environment = { OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT: '20', OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT: '7' };
+
+    // Act
+    const actual = planner.plan(block, identity, environment);
+
+    // Assert
+    actual.traces.limits.span.attributeValueLengthLimit.should.eql(7);
   });
 
   it('should fall back to cumulative for an unknown temporality', () => {

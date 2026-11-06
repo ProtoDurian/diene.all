@@ -1,3 +1,4 @@
+import type { AgentOptions } from 'node:https';
 import {
   type Context,
   type ContextManager,
@@ -31,6 +32,7 @@ class RecordingMetricExporters implements MetricExporterFactories {
   readonly exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
   readonly calls: string[] = [];
   readonly otlpOptions: OtlpExporterOptions[] = [];
+  readonly agents: AgentOptions[] = [];
   readonly temporalities: MetricTemporality[] = [];
 
   console(): PushMetricExporter {
@@ -38,8 +40,9 @@ class RecordingMetricExporters implements MetricExporterFactories {
     return this.exporter;
   }
 
-  otlp(options: OtlpExporterOptions, temporality: MetricTemporality): PushMetricExporter {
+  otlp(options: OtlpExporterOptions, temporality: MetricTemporality, agent: AgentOptions): PushMetricExporter {
     this.calls.push('otlp');
+    this.agents.push(agent);
     this.otlpOptions.push(options);
     this.temporalities.push(temporality);
     return this.exporter;
@@ -51,6 +54,7 @@ class RecordingTraceFactories implements TraceSignalFactories {
   readonly calls: string[] = [];
   readonly providers: TraceProviderOptions[] = [];
   readonly batches: SpanBatchSettings[] = [];
+  readonly agents: AgentOptions[] = [];
 
   constructor(
     private readonly failures: { readonly flush?: boolean; readonly shutdown?: boolean } = {},
@@ -62,8 +66,9 @@ class RecordingTraceFactories implements TraceSignalFactories {
     return this.exporter;
   }
 
-  otlp(): SpanExporter {
+  otlp(_options: OtlpExporterOptions, agent: AgentOptions): SpanExporter {
     this.calls.push('otlp');
+    this.agents.push(agent);
     return this.exporter;
   }
 
@@ -76,6 +81,8 @@ class RecordingTraceFactories implements TraceSignalFactories {
   provider(options: TraceProviderOptions): TraceProvider {
     this.providers.push(options);
     const provider = new BasicTracerProvider({
+      generalLimits: { ...options.limits.general },
+      spanLimits: { ...options.limits.span },
       resource: options.resource,
       ...(options.sampler === undefined ? {} : { sampler: options.sampler }),
       spanProcessors: [...options.spanProcessors],
@@ -201,6 +208,7 @@ async function exporterSettings(exporter: unknown): Promise<{
   timeoutMillis: number;
   compression: string;
   headers: Record<string, string>;
+  agent: Record<string, unknown>;
 }> {
   const delegate = (exporter as { _delegate: { _timeout: number; _transport: { _transport: { _parameters: never } } } })
     ._delegate;
@@ -208,8 +216,11 @@ async function exporterSettings(exporter: unknown): Promise<{
     url: string;
     compression: string;
     headers: () => Promise<Record<string, string>>;
+    agentFactory: (protocol: string) => Promise<{ options: Record<string, unknown> }>;
   };
+  const agent = await parameters.agentFactory('https:');
   return {
+    agent: agent.options,
     url: parameters.url,
     timeoutMillis: delegate._timeout,
     compression: parameters.compression,

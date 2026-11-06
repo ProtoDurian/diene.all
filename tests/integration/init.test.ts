@@ -1,4 +1,8 @@
 import { describe, it } from 'bun:test';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import type { AgentOptions } from 'node:https';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { type MetricsCollector, type MetricsError, portError } from '@atomicloud/diene.interfaces';
 import {
   assertLogRecords,
@@ -14,6 +18,7 @@ import 'should';
 import { OtelBootstrap, type OtelRuntime, TelemetryLifecycleError } from '../../src/adapters/init';
 import { LoggerSignalFactory } from '../../src/adapters/signals/logs';
 import { MetricSignalFactory, SdkMetricExporterFactories } from '../../src/adapters/signals/metrics';
+import { OtlpTlsFileError } from '../../src/adapters/signals/tls';
 import { SdkTraceSignalFactories, TraceSignalFactory } from '../../src/adapters/signals/traces';
 import type { OtlpExporterOptions } from '../../src/lib/endpoint';
 import type { AppIdentity } from '../../src/lib/resource';
@@ -89,8 +94,8 @@ async function lifecycleFailure(run: () => Promise<void>): Promise<readonly Tele
 class CapturingSdkTraceFactories extends SdkTraceSignalFactories {
   readonly exporters: unknown[] = [];
 
-  override otlp(options: OtlpExporterOptions) {
-    const exporter = super.otlp(options);
+  override otlp(options: OtlpExporterOptions, agent: AgentOptions) {
+    const exporter = super.otlp(options, agent);
     this.exporters.push(exporter);
     return exporter;
   }
@@ -99,8 +104,8 @@ class CapturingSdkTraceFactories extends SdkTraceSignalFactories {
 class CapturingSdkMetricExporters extends SdkMetricExporterFactories {
   readonly exporters: unknown[] = [];
 
-  override otlp(options: OtlpExporterOptions, temporality: 'cumulative' | 'delta' | 'lowmemory') {
-    const exporter = super.otlp(options, temporality);
+  override otlp(options: OtlpExporterOptions, temporality: 'cumulative' | 'delta' | 'lowmemory', agent: AgentOptions) {
+    const exporter = super.otlp(options, temporality, agent);
     this.exporters.push(exporter);
     return exporter;
   }
@@ -300,7 +305,9 @@ describe('OtelBootstrap with SDK pipelines', () => {
       headers: {},
       timeoutMillis: 10_000,
       compression: 'none',
+      tls: {},
     });
+    [...metricExporters.agents, ...traceFactories.agents].should.eql([{ keepAlive: true }, { keepAlive: true }]);
     runtime.resource.attributes.should.eql(semantic);
     await runtime.shutdown();
     globalTracerRecords().should.be.false();
@@ -387,6 +394,69 @@ describe('OtelBootstrap uses only the injected environment', () => {
     // Assert
     runtime.active.traces.should.be.true();
     recording.should.be.true();
+  });
+});
+
+describe('OtelBootstrap TLS files', () => {
+  const tracesOnly = { OTEL_METRICS_EXPORTER: 'none', OTEL_TRACES_EXPORTER: 'otlp' };
+
+  it('should read the injected certificate files into the trace agent options', async () => {
+    // Arrange
+    const directory = mkdtempSync(join(tmpdir(), 'otel-init-tls-'));
+    writeFileSync(join(directory, 'ca.pem'), 'generic');
+    writeFileSync(join(directory, 'traces.pem'), 'traces');
+    const { bootstrap, traceFactories } = recordingBootstrap();
+
+    // Act
+    const runtime = bootstrap.init(liveBlock, identity, {
+      environment: {
+        ...tracesOnly,
+        OTEL_EXPORTER_OTLP_CERTIFICATE: join(directory, 'ca.pem'),
+        OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE: join(directory, 'traces.pem'),
+      },
+    });
+    await runtime.shutdown();
+
+    // Assert
+    traceFactories.agents.should.eql([{ keepAlive: true, ca: Buffer.from('traces') }]);
+  });
+
+  it('should refuse to start, naming the variable, when an injected file is unreadable', () => {
+    // Arrange
+    const { bootstrap, traceFactories } = recordingBootstrap();
+
+    // Act
+    const actual = (() => {
+      try {
+        bootstrap.init(liveBlock, identity, {
+          environment: { ...tracesOnly, OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY: '/nonexistent/otel/client.key' },
+        });
+        return undefined;
+      } catch (error) {
+        return error;
+      }
+    })();
+
+    // Assert
+    (actual instanceof OtlpTlsFileError).should.be.true();
+    (actual as OtlpTlsFileError).variable.should.eql('OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY');
+    traceFactories.calls.should.eql([]);
+    globalTracerRecords().should.be.false();
+  });
+
+  it('should read no file for a signal served by a seam override', async () => {
+    // Arrange
+    const { bootstrap } = recordingBootstrap();
+
+    // Act
+    const runtime = bootstrap.init(liveBlock, identity, {
+      environment: { ...tracesOnly, OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY: '/nonexistent/otel/client.key' },
+      seams: { traces: new InMemoryTraceEmitter() },
+    });
+    await runtime.shutdown();
+
+    // Assert
+    runtime.globalRegistered.should.be.false();
   });
 });
 

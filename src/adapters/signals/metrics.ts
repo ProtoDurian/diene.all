@@ -1,3 +1,4 @@
+import type { AgentOptions } from 'node:https';
 import {
   checkMetricRecord,
   type MetricRecord,
@@ -16,10 +17,9 @@ import {
   PeriodicExportingMetricReader,
   type PushMetricExporter,
 } from '@opentelemetry/sdk-metrics';
-import type { ExporterSelection } from '../../lib/environment.js';
-import type { OtelPlan } from '../../lib/plan.js';
 import type { OtlpExporterOptions } from '../../lib/endpoint.js';
-import type { MetricTemporality } from '../../lib/plan.js';
+import type { ExporterSelection } from '../../lib/environment.js';
+import type { MetricTemporality, OtelPlan } from '../../lib/plan.js';
 
 type Instrument = Counter | Gauge | Histogram;
 type OtlpMetricExporterConfig = NonNullable<ConstructorParameters<typeof OTLPMetricExporter>[0]>;
@@ -32,7 +32,7 @@ const TEMPORALITY: Readonly<Record<MetricTemporality, number>> = Object.freeze({
 
 interface MetricExporterFactories {
   console(): PushMetricExporter;
-  otlp(options: OtlpExporterOptions, temporality: MetricTemporality): PushMetricExporter;
+  otlp(options: OtlpExporterOptions, temporality: MetricTemporality, agent: AgentOptions): PushMetricExporter;
 }
 
 interface MetricSignal {
@@ -43,6 +43,7 @@ interface MetricSignal {
 }
 
 interface MetricSignalInput {
+  readonly agent: AgentOptions;
   readonly selection: ExporterSelection;
   readonly resource: Resource;
   readonly scope: Readonly<{ name: string; version: string }>;
@@ -57,10 +58,13 @@ class SdkMetricExporterFactories implements MetricExporterFactories {
     return new ConsoleMetricExporter();
   }
 
-  otlp(options: OtlpExporterOptions, temporality: MetricTemporality): PushMetricExporter {
+  otlp(options: OtlpExporterOptions, temporality: MetricTemporality, agent: AgentOptions): PushMetricExporter {
     return new OTLPMetricExporter({
-      ...options,
       compression: options.compression as NonNullable<OtlpMetricExporterConfig['compression']>,
+      headers: { ...options.headers },
+      httpAgentOptions: agent,
+      timeoutMillis: options.timeoutMillis,
+      url: options.url,
       temporalityPreference: TEMPORALITY[temporality] as NonNullable<OtlpMetricExporterConfig['temporalityPreference']>,
     });
   }
@@ -127,7 +131,9 @@ class MetricSignalFactory {
   create(input: MetricSignalInput): MetricSignal {
     const exporters = [
       ...(input.selection.console ? [this.exporters.console()] : []),
-      ...(input.selection.otlp ? [this.exporters.otlp(input.settings.otlp, input.settings.temporality)] : []),
+      ...(input.selection.otlp
+        ? [this.exporters.otlp(input.settings.otlp, input.settings.temporality, input.agent)]
+        : []),
     ];
     if (exporters.length === 0) return this.inactive();
     const readers = exporters.map(

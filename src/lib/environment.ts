@@ -25,6 +25,11 @@ class OtelEnvironment {
     return value !== undefined && /^\d+$/.test(value) && Number(value) > 0 ? Number(value) : undefined;
   }
 
+  count(name: string): number | undefined {
+    const value = this.value(name);
+    return value !== undefined && /^\d+$/.test(value) ? Number(value) : undefined;
+  }
+
   pairs(name: string): Readonly<Record<string, string>> | undefined {
     const value = this.value(name);
     if (value === undefined) return undefined;

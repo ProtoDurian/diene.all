@@ -1,6 +1,7 @@
 export * from './adapters/init.js';
 export * from './adapters/signals/logs.js';
 export * from './adapters/signals/metrics.js';
+export * from './adapters/signals/tls.js';
 export * from './adapters/signals/traces.js';
 export * from './lib/duration.js';
 export * from './lib/endpoint.js';

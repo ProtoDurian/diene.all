@@ -1,4 +1,7 @@
 import { afterEach, describe, it } from 'bun:test';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { resourceFromAttributes } from '@opentelemetry/resources';
@@ -35,13 +38,50 @@ const otlp = {
   headers: { tenant: 'review' },
   timeoutMillis: 1234,
   compression: 'none' as const,
+  tls: {},
+};
+const agent = { keepAlive: true };
+const limits = {
+  general: { attributeCountLimit: 128, attributeValueLengthLimit: Number.POSITIVE_INFINITY },
+  span: {
+    attributeCountLimit: 128,
+    attributeValueLengthLimit: Number.POSITIVE_INFINITY,
+    attributePerEventCountLimit: 128,
+    attributePerLinkCountLimit: 128,
+    eventCountLimit: 128,
+    linkCountLimit: 128,
+  },
 };
 const batch = { exportTimeoutMillis: 1000, maxExportBatchSize: 8, maxQueueSize: 16, scheduledDelayMillis: 10 };
-const settings = { sampler: new AlwaysOnSampler(), batch, otlp };
+const settings = { sampler: new AlwaysOnSampler(), batch, limits, otlp };
+
+const link = { context: { traceId: 'ab'.repeat(16), spanId: 'cd'.repeat(8), traceFlags: 1 } };
+
+async function limitedSpan(spanLimits: typeof limits, ambient: Record<string, string> = {}) {
+  const exporter = new InMemorySpanExporter();
+  return withProcessEnv(ambient, async () => {
+    const provider = new SdkTraceSignalFactories().provider({
+      limits: spanLimits,
+      resource,
+      sampler: new AlwaysOnSampler(),
+      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    });
+    const span = provider.getTracer('svc').startSpan('limited', {
+      attributes: { first: 'long', second: 'value' },
+      links: [{ ...link, attributes: { kind: 'peer' } }],
+    });
+    span.addEvent('paid', { amount: 3 });
+    span.end();
+    const [finished] = exporter.getFinishedSpans();
+    await provider.shutdown();
+    return finished;
+  });
+}
 
 function liveSignal(failures: { flush?: boolean; shutdown?: boolean } = {}) {
   const factories = new RecordingTraceFactories(failures);
   const signal = new TraceSignalFactory(factories).create({
+    agent,
     selection: { console: false, otlp: true },
     resource,
     scope,
@@ -70,9 +110,14 @@ describe('SdkTraceSignalFactories', () => {
 
     // Act
     const consoleExporter = factories.console();
-    const otlpExporter = factories.otlp(otlp);
+    const otlpExporter = factories.otlp(otlp, agent);
     const processor = factories.processor(new InMemorySpanExporter(), batch);
-    const provider = factories.provider({ resource, sampler: new AlwaysOffSampler(), spanProcessors: [processor] });
+    const provider = factories.provider({
+      limits,
+      resource,
+      sampler: new AlwaysOffSampler(),
+      spanProcessors: [processor],
+    });
 
     // Assert
     (consoleExporter instanceof ConsoleSpanExporter).should.be.true();
@@ -97,7 +142,7 @@ describe('SdkTraceSignalFactories', () => {
         OTEL_EXPORTER_OTLP_TRACES_COMPRESSION: 'gzip',
       },
       async () => {
-        const exporter = factories.otlp(otlp);
+        const exporter = factories.otlp(otlp, agent);
         const read = await exporterSettings(exporter);
         await exporter.shutdown();
         return read;
@@ -108,13 +153,87 @@ describe('SdkTraceSignalFactories', () => {
     actual.should.match({ url: otlp.url, timeoutMillis: 1234, compression: 'none', headers: { tenant: 'review' } });
   });
 
+  it('should hand the agent options to the real exporter, not the process certificate variables', async () => {
+    // Arrange
+    const factories = new SdkTraceSignalFactories();
+    const directory = mkdtempSync(join(tmpdir(), 'otel-tls-'));
+    writeFileSync(join(directory, 'process.pem'), 'process');
+    const ca = Buffer.from('injected');
+
+    // Act
+    const actual = await withProcessEnv(
+      {
+        OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE: join(directory, 'process.pem'),
+        OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE: join(directory, 'process.pem'),
+        OTEL_EXPORTER_OTLP_CLIENT_KEY: join(directory, 'process.pem'),
+      },
+      async () => {
+        const exporter = factories.otlp(otlp, { keepAlive: true, ca });
+        const read = await exporterSettings(exporter);
+        await exporter.shutdown();
+        return { ...read.agent };
+      },
+    );
+
+    // Assert
+    actual.should.match({ keepAlive: true, ca });
+    [actual.cert, actual.key].should.eql([undefined, undefined]);
+  });
+
+  it('should keep spans whole under the default limits even when the process limits are tight', async () => {
+    // Arrange
+    const ambient = {
+      OTEL_ATTRIBUTE_COUNT_LIMIT: '1',
+      OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT: '1',
+      OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: '1',
+      OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT: '1',
+      OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT: '0',
+      OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT: '0',
+      OTEL_SPAN_EVENT_COUNT_LIMIT: '0',
+      OTEL_SPAN_LINK_COUNT_LIMIT: '0',
+    };
+
+    // Act
+    const actual = await limitedSpan(limits, ambient);
+
+    // Assert
+    actual?.attributes.should.eql({ first: 'long', second: 'value' });
+    actual?.events.map(event => event.attributes).should.eql([{ amount: 3 }]);
+    actual?.links.map(item => item.attributes).should.eql([{ kind: 'peer' }]);
+    [actual?.droppedAttributesCount, actual?.droppedEventsCount, actual?.droppedLinksCount].should.eql([0, 0, 0]);
+  });
+
+  it('should enforce the injected span limits', async () => {
+    // Arrange
+    const tight = {
+      general: { attributeCountLimit: 1, attributeValueLengthLimit: 2 },
+      span: {
+        attributeCountLimit: 1,
+        attributeValueLengthLimit: 2,
+        attributePerEventCountLimit: 0,
+        attributePerLinkCountLimit: 0,
+        eventCountLimit: 1,
+        linkCountLimit: 1,
+      },
+    };
+
+    // Act
+    const actual = await limitedSpan(tight);
+
+    // Assert
+    actual?.attributes.should.eql({ first: 'lo' });
+    actual?.droppedAttributesCount.should.eql(1);
+    actual?.events.map(event => event.attributes).should.eql([{}]);
+    actual?.links.map(item => item.attributes ?? {}).should.eql([{}]);
+  });
+
   it('should sample with the given sampler even when OTEL_TRACES_SAMPLER says otherwise', async () => {
     // Arrange
     const factories = new SdkTraceSignalFactories();
 
     // Act
     const recording = await withProcessEnv({ OTEL_TRACES_SAMPLER: 'always_on' }, async () => {
-      const provider = factories.provider({ resource, sampler: new AlwaysOffSampler(), spanProcessors: [] });
+      const provider = factories.provider({ limits, resource, sampler: new AlwaysOffSampler(), spanProcessors: [] });
       const span = provider.getTracer('svc').startSpan('x');
       const recording = span.isRecording();
       span.end();
@@ -201,6 +320,7 @@ describe('TraceSignalFactory', () => {
 
     // Act
     const signal = new TraceSignalFactory(factories).create({
+      agent,
       selection: { console: false, otlp: false },
       resource,
       scope,
@@ -222,6 +342,7 @@ describe('TraceSignalFactory', () => {
 
     // Act
     const signal = new TraceSignalFactory(factories).create({
+      agent,
       selection: { console: true, otlp: true },
       resource,
       scope,
@@ -233,6 +354,8 @@ describe('TraceSignalFactory', () => {
     signal.registration.tracer.should.be.true();
     factories.calls.should.eql(['console', 'processor', 'otlp', 'processor']);
     factories.batches.should.eql([batch, batch]);
+    factories.agents.should.eql([agent]);
+    factories.providers[0]?.limits.should.equal(limits);
     factories.providers[0]?.sampler.should.equal(sampler);
     factories.providers[0]?.spanProcessors.length.should.eql(2);
     signal.registration.release();
@@ -243,7 +366,7 @@ describe('TraceSignalFactory', () => {
     const factory = new TraceSignalFactory();
 
     // Act
-    const signal = factory.create({ selection: { console: true, otlp: false }, resource, scope, settings });
+    const signal = factory.create({ agent, selection: { console: true, otlp: false }, resource, scope, settings });
 
     // Assert
     signal.active.should.be.true();

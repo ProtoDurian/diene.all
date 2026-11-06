@@ -10,6 +10,7 @@ import type { OtelBlock } from '../lib/schema.js';
 import type { TraceEmitter } from '../lib/trace-seam.js';
 import { LoggerSignalFactory, type OTLP_LOGS_BRIDGE_STATUS } from './signals/logs.js';
 import { type MetricSignal, MetricSignalFactory } from './signals/metrics.js';
+import { OtlpAgentOptionsFactory } from './signals/tls.js';
 import { type TraceSignal, TraceSignalFactory } from './signals/traces.js';
 
 interface OtelSeamOverrides {
@@ -25,6 +26,7 @@ interface OtelInitOptions {
 }
 
 interface OtelBootstrapCollaborators {
+  readonly agents?: OtlpAgentOptionsFactory;
   readonly planner?: OtelPlanner;
   readonly logs?: LoggerSignalFactory;
   readonly metrics?: MetricSignalFactory;
@@ -158,12 +160,14 @@ class OtelSession implements OtelRuntime {
 }
 
 class OtelBootstrap {
+  private readonly agents: OtlpAgentOptionsFactory;
   private readonly planner: OtelPlanner;
   private readonly logs: LoggerSignalFactory;
   private readonly metrics: MetricSignalFactory;
   private readonly traces: TraceSignalFactory;
 
   constructor(collaborators: OtelBootstrapCollaborators = {}) {
+    this.agents = collaborators.agents ?? new OtlpAgentOptionsFactory();
     this.planner = collaborators.planner ?? new OtelPlanner();
     this.logs = collaborators.logs ?? new LoggerSignalFactory();
     this.metrics = collaborators.metrics ?? new MetricSignalFactory();
@@ -178,6 +182,12 @@ class OtelBootstrap {
       metrics: plan.live.metrics ? options.seams?.metrics : undefined,
       traces: plan.live.traces ? options.seams?.traces : undefined,
     };
+    const agents = {
+      metrics: this.agents.create(
+        seams.metrics === undefined && plan.selections.metrics.otlp ? plan.metrics.otlp.tls : {},
+      ),
+      traces: this.agents.create(seams.traces === undefined && plan.selections.traces.otlp ? plan.traces.otlp.tls : {}),
+    };
     const loggerSignal = this.logs.create(
       seams.logger === undefined && plan.selections.logs.console,
       plan.resourceAttributes,
@@ -186,6 +196,7 @@ class OtelBootstrap {
     const metricSignal =
       seams.metrics === undefined
         ? this.metrics.create({
+            agent: agents.metrics,
             selection: plan.selections.metrics,
             resource: plan.resource,
             scope,
@@ -195,6 +206,7 @@ class OtelBootstrap {
     const traceSignal =
       seams.traces === undefined
         ? this.traces.create({
+            agent: agents.traces,
             selection: plan.selections.traces,
             resource: plan.resource,
             scope,

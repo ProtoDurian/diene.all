@@ -116,6 +116,23 @@ describe('OtelEnvironment numbers and pairs', () => {
     (actual ?? 'none').should.eql(expected ?? 'none');
   });
 
+  it.each([
+    ['a count', '42', 42],
+    ['zero', '0', 0],
+    ['a negative number', '-1', undefined],
+    ['a decimal', '1.5', undefined],
+    ['nothing', undefined, undefined],
+  ])('should read %s as a non-negative count or nothing', (_label, raw, expected) => {
+    // Arrange
+    const environment = new OtelEnvironment({ N: raw });
+
+    // Act
+    const actual = environment.count('N');
+
+    // Assert
+    (actual ?? 'none').should.eql(expected ?? 'none');
+  });
+
   it('should parse percent-encoded pairs and keep a bad escape as written', () => {
     // Arrange
     const environment = new OtelEnvironment({ P: 'a=x%20y, =skip,bad,b = %E0%A4%A ,c=1=2' });

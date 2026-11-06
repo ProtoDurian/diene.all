@@ -17,6 +17,18 @@ interface SpanBatchSettings {
   readonly scheduledDelayMillis: number;
 }
 
+interface SpanLimitSettings {
+  readonly general: Readonly<{ attributeCountLimit: number; attributeValueLengthLimit: number }>;
+  readonly span: Readonly<{
+    attributeCountLimit: number;
+    attributeValueLengthLimit: number;
+    attributePerEventCountLimit: number;
+    attributePerLinkCountLimit: number;
+    eventCountLimit: number;
+    linkCountLimit: number;
+  }>;
+}
+
 interface OtelPlan {
   readonly block: OtelBlock;
   readonly identity: AppIdentity;
@@ -30,7 +42,12 @@ interface OtelPlan {
     temporality: MetricTemporality;
     otlp: OtlpExporterOptions;
   }>;
-  readonly traces: Readonly<{ sampler: Sampler; batch: SpanBatchSettings; otlp: OtlpExporterOptions }>;
+  readonly traces: Readonly<{
+    sampler: Sampler;
+    batch: SpanBatchSettings;
+    limits: SpanLimitSettings;
+    otlp: OtlpExporterOptions;
+  }>;
 }
 
 const TEMPORALITIES: readonly string[] = ['cumulative', 'delta', 'lowmemory'];
@@ -79,11 +96,30 @@ class OtelPlanner {
           maxQueueSize: environment.positiveInteger('OTEL_BSP_MAX_QUEUE_SIZE') ?? 2048,
           scheduledDelayMillis: environment.positiveInteger('OTEL_BSP_SCHEDULE_DELAY') ?? 5000,
         }),
+        limits: this.limits(environment),
         otlp: this.exporters.create(validBlock.traces.exporter.otlp, 'traces', environment),
+      }),
+    });
+  }
+
+  private limits(environment: OtelEnvironment): SpanLimitSettings {
+    const attributeCountLimit = environment.count('OTEL_ATTRIBUTE_COUNT_LIMIT') ?? 128;
+    const attributeValueLengthLimit =
+      environment.count('OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT') ?? Number.POSITIVE_INFINITY;
+    return Object.freeze({
+      general: Object.freeze({ attributeCountLimit, attributeValueLengthLimit }),
+      span: Object.freeze({
+        attributeCountLimit: environment.count('OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT') ?? attributeCountLimit,
+        attributeValueLengthLimit:
+          environment.count('OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT') ?? attributeValueLengthLimit,
+        attributePerEventCountLimit: environment.count('OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT') ?? 128,
+        attributePerLinkCountLimit: environment.count('OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT') ?? 128,
+        eventCountLimit: environment.count('OTEL_SPAN_EVENT_COUNT_LIMIT') ?? 128,
+        linkCountLimit: environment.count('OTEL_SPAN_LINK_COUNT_LIMIT') ?? 128,
       }),
     });
   }
 }
 
-export type { MetricTemporality, OtelPlan, SpanBatchSettings };
+export type { MetricTemporality, OtelPlan, SpanBatchSettings, SpanLimitSettings };
 export { OtelPlanner };

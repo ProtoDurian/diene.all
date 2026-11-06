@@ -1,3 +1,4 @@
+import type { AgentOptions } from 'node:https';
 import { Err, Ok, Res, type Result } from '@atomicloud/diene.result';
 import {
   type ContextManager,
@@ -25,10 +26,10 @@ import {
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import type { OtlpExporterOptions } from '../../lib/endpoint.js';
 import type { ExporterSelection } from '../../lib/environment.js';
-import type { OtelPlan, SpanBatchSettings } from '../../lib/plan.js';
+import type { OtelPlan, SpanBatchSettings, SpanLimitSettings } from '../../lib/plan.js';
 import {
-  TraceError,
   type TraceEmitter,
+  TraceError,
   type TraceRecord,
   TraceRecordValidator,
   type TraceStatus,
@@ -49,6 +50,7 @@ interface TraceProvider extends TracerProvider {
 }
 
 interface TraceProviderOptions {
+  readonly limits: SpanLimitSettings;
   readonly resource: Resource;
   readonly sampler: Sampler;
   readonly spanProcessors: readonly SpanProcessor[];
@@ -56,7 +58,7 @@ interface TraceProviderOptions {
 
 interface TraceSignalFactories {
   console(): SpanExporter;
-  otlp(options: OtlpExporterOptions): SpanExporter;
+  otlp(options: OtlpExporterOptions, agent: AgentOptions): SpanExporter;
   processor(exporter: SpanExporter, batch: SpanBatchSettings): SpanProcessor;
   provider(options: TraceProviderOptions): TraceProvider;
 }
@@ -70,6 +72,7 @@ interface TraceSignal {
 }
 
 interface TraceSignalInput {
+  readonly agent: AgentOptions;
   readonly selection: ExporterSelection;
   readonly resource: Resource;
   readonly scope: Readonly<{ name: string; version: string }>;
@@ -121,10 +124,13 @@ class SdkTraceSignalFactories implements TraceSignalFactories {
     return new ConsoleSpanExporter();
   }
 
-  otlp(options: OtlpExporterOptions): SpanExporter {
+  otlp(options: OtlpExporterOptions, agent: AgentOptions): SpanExporter {
     return new OTLPTraceExporter({
-      ...options,
       compression: options.compression as NonNullable<OtlpTraceExporterConfig['compression']>,
+      headers: { ...options.headers },
+      httpAgentOptions: agent,
+      timeoutMillis: options.timeoutMillis,
+      url: options.url,
     });
   }
 
@@ -134,8 +140,10 @@ class SdkTraceSignalFactories implements TraceSignalFactories {
 
   provider(options: TraceProviderOptions): TraceProvider {
     return new NodeTracerProvider({
+      generalLimits: { ...options.limits.general },
       resource: options.resource,
       sampler: options.sampler,
+      spanLimits: { ...options.limits.span },
       spanProcessors: [...options.spanProcessors],
     });
   }
@@ -222,11 +230,12 @@ class TraceSignalFactory {
     const processors = [
       ...(input.selection.console ? [this.factories.processor(this.factories.console(), input.settings.batch)] : []),
       ...(input.selection.otlp
-        ? [this.factories.processor(this.factories.otlp(input.settings.otlp), input.settings.batch)]
+        ? [this.factories.processor(this.factories.otlp(input.settings.otlp, input.agent), input.settings.batch)]
         : []),
     ];
     if (processors.length === 0) return this.inactive(input.scope);
     const provider = this.factories.provider({
+      limits: input.settings.limits,
       resource: input.resource,
       sampler: input.settings.sampler,
       spanProcessors: processors,

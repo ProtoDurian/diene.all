@@ -68,6 +68,7 @@ describe('OtlpExporterOptionsFactory', () => {
       headers: { authorization: 'token' },
       timeoutMillis: 5000,
       compression: 'none',
+      tls: {},
     });
   });
 
@@ -100,6 +101,7 @@ describe('OtlpExporterOptionsFactory', () => {
       headers: { tenant: 'a b', team: 'core' },
       timeoutMillis: 1500,
       compression: 'gzip',
+      tls: {},
     });
   });
 
@@ -125,6 +127,45 @@ describe('OtlpExporterOptionsFactory', () => {
       headers: { tenant: 'review', team: 'core' },
       timeoutMillis: 1234,
       compression: 'none',
+      tls: {},
+    });
+  });
+
+  it('should name the generic certificate files for the exporter', () => {
+    // Arrange
+    const environment = new OtelEnvironment({
+      OTEL_EXPORTER_OTLP_CERTIFICATE: '/certs/ca.pem',
+      OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE: '/certs/client.pem',
+      OTEL_EXPORTER_OTLP_CLIENT_KEY: '/certs/client.key',
+    });
+
+    // Act
+    const actual = factory.create(config, 'metrics', environment);
+
+    // Assert
+    actual.tls.should.eql({
+      ca: { path: '/certs/ca.pem', variable: 'OTEL_EXPORTER_OTLP_CERTIFICATE' },
+      cert: { path: '/certs/client.pem', variable: 'OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE' },
+      key: { path: '/certs/client.key', variable: 'OTEL_EXPORTER_OTLP_CLIENT_KEY' },
+    });
+  });
+
+  it('should let a signal certificate variable win and leave unnamed files out', () => {
+    // Arrange
+    const environment = new OtelEnvironment({
+      OTEL_EXPORTER_OTLP_CERTIFICATE: '/certs/generic-ca.pem',
+      OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE: '/certs/traces-ca.pem',
+      OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY: '/certs/traces.key',
+      OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE: ' ',
+    });
+
+    // Act
+    const actual = factory.create(config, 'traces', environment);
+
+    // Assert
+    actual.tls.should.eql({
+      ca: { path: '/certs/traces-ca.pem', variable: 'OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE' },
+      key: { path: '/certs/traces.key', variable: 'OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY' },
     });
   });
 
