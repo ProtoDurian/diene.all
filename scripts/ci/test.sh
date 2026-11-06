@@ -10,16 +10,18 @@ cd "${root_dir}"
 bun install --frozen-lockfile
 
 config="bunfig.${mode}.toml"
+# Bun ignores the bunfig [test] timeout, so the tier timeout goes on the command line.
+timeout=30000
 report_dir="reports/unit"
 scope="src/lib/"
-[[ ${mode} == "int" ]] && report_dir="reports/integration" && scope="src/adapters/"
-[[ ${mode} == "e2e" ]] && report_dir="reports/e2e" && scope=""
+[[ ${mode} == "int" ]] && report_dir="reports/integration" && scope="src/adapters/" && timeout=120000
+[[ ${mode} == "e2e" ]] && report_dir="reports/e2e" && scope="" && timeout=240000
 coverage_file="${report_dir}/lcov.info"
 
 echo "🧪 Running ${mode} tests with coverage..."
 rm -rf "${report_dir}"
 
-bun test --config="${config}" --coverage
+bun test --config="${config}" --timeout "${timeout}" --coverage
 
 # rg exits 2 on a missing file, so absence needs its own refusal.
 [[ -f ${coverage_file} ]] || {

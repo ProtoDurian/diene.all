@@ -7,7 +7,7 @@ interface ProbeRepo {
 }
 
 const command =
-  "nix develop .#ci -c bash -lc 'bun install --frozen-lockfile && bun test --config=bunfig.unit.toml tests/unit/architecture/hyperdrive-only.test.ts'";
+  "nix develop .#ci -c bash -lc 'bun install --frozen-lockfile && bun test --config=bunfig.unit.toml --timeout 30000 tests/unit/architecture/hyperdrive-only.test.ts'";
 
 export default {
   contractVersion: 1,
