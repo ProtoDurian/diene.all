@@ -23,8 +23,7 @@ writer, `skills-sync sync`. Setup is repair-capable; the pre-commit hook
 (`skills-sync sync --frozen`, which CI runs) refuses rather than silently staging or
 repairing a commit.
 
-Docker and Helm tasks are keyed by the artifact they act on — one task set per
-Dockerfile and per chart. See [the Docker standard](../docker/index.md) and
+Helm tasks are keyed by the artifact they act on — one task set per chart. See
 [the Helm standard](../helm/index.md) for that naming convention.
 
 ## Rules

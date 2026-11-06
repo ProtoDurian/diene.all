@@ -58,10 +58,6 @@ See **[docs/standards/nix/index.md](docs/standards/nix/index.md)** for the full 
 - Formatters and pre-commit hooks
 - Adding registries
 
-# Docker build and publishing
-
-See [docs/standards/docker/index.md](docs/standards/docker/index.md).
-
 # Helm charts and publishing
 
 See [docs/standards/helm/index.md](docs/standards/helm/index.md).
