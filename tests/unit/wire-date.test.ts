@@ -7,21 +7,22 @@ import { expectErr, expectOk } from './support/result';
 const codec = new WireDateCodec();
 
 describe('WireDateCodec date', () => {
-  it.each([{ wire: '2020-02-29' }, { wire: '1999-12-31' }, { wire: '2026-07-24' }])(
-    'should round-trip Temporal.PlainDate for $wire',
-    async ({ wire }) => {
-      // Arrange
-      const domain = await expectOk(codec.parseDate(wire));
+  it.each([
+    { wire: '2020-02-29' },
+    { wire: '1999-12-31' },
+    { wire: '2026-07-24' },
+  ])('should round-trip Temporal.PlainDate for $wire', async ({ wire }) => {
+    // Arrange
+    const domain = await expectOk(codec.parseDate(wire));
 
-      // Act
-      const formatted = await expectOk(codec.formatDate(domain));
+    // Act
+    const formatted = await expectOk(codec.formatDate(domain));
 
-      // Assert
-      domain.should.be.instanceof(Temporal.PlainDate);
-      formatted.should.equal(wire);
-      (await expectOk(codec.parseDate(formatted))).equals(domain).should.be.true();
-    },
-  );
+    // Assert
+    domain.should.be.instanceof(Temporal.PlainDate);
+    formatted.should.equal(wire);
+    (await expectOk(codec.parseDate(formatted))).equals(domain).should.be.true();
+  });
 
   it.each([
     { wire: '2020-2-3', message: /canonical YYYY-MM-DD/ },
@@ -56,21 +57,22 @@ describe('WireDateCodec date', () => {
 });
 
 describe('WireDateCodec time', () => {
-  it.each([{ wire: '00:00:00' }, { wire: '13:37:00' }, { wire: '23:59:59' }])(
-    'should round-trip Temporal.PlainTime for $wire',
-    async ({ wire }) => {
-      // Arrange
-      const domain = await expectOk(codec.parseTime(wire));
+  it.each([
+    { wire: '00:00:00' },
+    { wire: '13:37:00' },
+    { wire: '23:59:59' },
+  ])('should round-trip Temporal.PlainTime for $wire', async ({ wire }) => {
+    // Arrange
+    const domain = await expectOk(codec.parseTime(wire));
 
-      // Act
-      const formatted = await expectOk(codec.formatTime(domain));
+    // Act
+    const formatted = await expectOk(codec.formatTime(domain));
 
-      // Assert
-      domain.should.be.instanceof(Temporal.PlainTime);
-      formatted.should.equal(wire);
-      (await expectOk(codec.parseTime(formatted))).equals(domain).should.be.true();
-    },
-  );
+    // Assert
+    domain.should.be.instanceof(Temporal.PlainTime);
+    formatted.should.equal(wire);
+    (await expectOk(codec.parseTime(formatted))).equals(domain).should.be.true();
+  });
 
   it.each([
     { wire: '01:02', message: /canonical HH:mm:ss/ },
@@ -182,21 +184,24 @@ describe('WireDateCodec datetime', () => {
 });
 
 describe('WireDateCodec duration', () => {
-  it.each([{ wire: 'PT0S' }, { wire: 'P1DT2H' }, { wire: 'P1Y2M3DT4H5M6S' }, { wire: 'PT1.5S' }, { wire: '-P1D' }])(
-    'should round-trip Temporal.Duration for $wire',
-    async ({ wire }) => {
-      // Arrange
-      const domain = await expectOk(codec.parseDuration(wire));
+  it.each([
+    { wire: 'PT0S' },
+    { wire: 'P1DT2H' },
+    { wire: 'P1Y2M3DT4H5M6S' },
+    { wire: 'PT1.5S' },
+    { wire: '-P1D' },
+  ])('should round-trip Temporal.Duration for $wire', async ({ wire }) => {
+    // Arrange
+    const domain = await expectOk(codec.parseDuration(wire));
 
-      // Act
-      const formatted = codec.formatDuration(domain);
+    // Act
+    const formatted = codec.formatDuration(domain);
 
-      // Assert
-      domain.should.be.instanceof(Temporal.Duration);
-      formatted.should.equal(wire);
-      codec.formatDuration(await expectOk(codec.parseDuration(formatted))).should.equal(wire);
-    },
-  );
+    // Assert
+    domain.should.be.instanceof(Temporal.Duration);
+    formatted.should.equal(wire);
+    codec.formatDuration(await expectOk(codec.parseDuration(formatted))).should.equal(wire);
+  });
 
   it.each([
     { wire: 'P', message: /not a valid ISO 8601 duration/ },

@@ -65,19 +65,21 @@ describe('ConcurrencyMapper.mapWithConcurrency', () => {
     actual.should.deepEqual([]);
   });
 
-  it.each([{ concurrency: 0 }, { concurrency: -2 }, { concurrency: 1.5 }, { concurrency: Number.NaN }])(
-    'should reject concurrency $concurrency with a RangeError',
-    async ({ concurrency }) => {
-      // Arrange
-      const mapper = new ConcurrencyMapper();
+  it.each([
+    { concurrency: 0 },
+    { concurrency: -2 },
+    { concurrency: 1.5 },
+    { concurrency: Number.NaN },
+  ])('should reject concurrency $concurrency with a RangeError', async ({ concurrency }) => {
+    // Arrange
+    const mapper = new ConcurrencyMapper();
 
-      // Act
-      const actual = mapper.mapWithConcurrency([1, 2, 3], concurrency, item => item);
+    // Act
+    const actual = mapper.mapWithConcurrency([1, 2, 3], concurrency, item => item);
 
-      // Assert
-      await actual.should.be.rejectedWith(RangeError);
-    },
-  );
+    // Assert
+    await actual.should.be.rejectedWith(RangeError);
+  });
 
   it('should propagate a mapper rejection', async () => {
     // Arrange
