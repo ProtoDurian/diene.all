@@ -1,8 +1,8 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
 const PANA =
-  "nix develop .#ci -c bash -c 'cd packages/diene_dart_lib && dart doc --dry-run && ../../scripts/validate/pana-score.sh'";
-const MEMBER_PUBSPEC = 'packages/diene_dart_lib/pubspec.yaml';
+  "nix develop .#ci -c bash -c 'cd packages/diene_problems && dart doc --dry-run && ../../scripts/validate/pana-score.sh'";
+const MEMBER_PUBSPEC = 'packages/diene_problems/pubspec.yaml';
 
 export default {
   contractVersion: 1,

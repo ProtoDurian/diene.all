@@ -3,15 +3,15 @@ import { expectGreen, withCleanProbeState } from './lib/helpers.ts';
 const CONSUMER = '.probe-consumer';
 const CONSUMER_PUBSPEC =
   'name: probe_consumer\npublish_to: none\nenvironment:\n  sdk: ">=3.12.0 <4.0.0"\n' +
-  'dependencies:\n  diene_dart_lib:\n    path: @ROOT@/packages/diene_dart_lib\n';
+  'dependencies:\n  diene_problems:\n    path: @ROOT@/packages/diene_problems\n';
 const CONSUMER_MAIN =
-  "import 'package:diene_dart_lib/diene_dart_lib.dart';\n\n" +
+  "import 'package:diene_problems/diene_problems.dart';\n\n" +
   "void main() {\n  print(summarizeNote(const Note(title: 'Probe', body: 'consumer')));\n}\n";
 
 // The consumer is copied outside the workspace so pub resolves it as a stranger would.
 const RUN =
   "nix develop .#ci -c bash -c 'set -euo pipefail; root=$(pwd -P); " +
-  '(cd packages/diene_dart_lib && for example in example/*.dart; do dart run "$example"; done); ' +
+  '(cd packages/diene_problems && for example in example/*.dart; do dart run "$example"; done); ' +
   `consumer=$(mktemp -d); cp -R ${CONSUMER}/. "$consumer"/; sed -i "s|@ROOT@|$root|" "$consumer/pubspec.yaml"; ` +
   'cd "$consumer"; dart pub get --offline; dart run bin/main.dart | grep -F "Probe"\'';
 
