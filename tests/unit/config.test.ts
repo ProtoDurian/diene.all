@@ -1,73 +1,63 @@
 import { describe, it } from 'bun:test';
 import 'should';
-import { RedisConfigParser } from '../../src/lib/sample/config';
+import type { z } from 'zod';
+import { FrozenConfig } from '../../src/lib/config.js';
 
-const DEFAULT_PORT = 6379;
+type Shape = { server: z.ZodType<{ port: number }>; client: z.ZodType<{ name: string }> };
 
-describe('RedisConfigParser', () => {
-  it.each([
-    { label: 'no variables at all', input: {} },
-    { label: 'an empty host', input: { REDIS_HOST: '' } },
-    { label: 'a whitespace-only host', input: { REDIS_HOST: '   ' } },
-    { label: 'a tab-only host', input: { REDIS_HOST: '\t\n' } },
-    { label: 'an explicitly undefined host', input: { REDIS_HOST: undefined } },
-    { label: 'a port but no host', input: { REDIS_PORT: '6380' } },
-  ])('should report no connection for $label', ({ input }) => {
+describe('FrozenConfig', () => {
+  it('should serve one block by key and every block via all', () => {
     // Arrange
-    const subject = new RedisConfigParser(input);
+    const config = new FrozenConfig<Shape>({ server: { port: 80 }, client: { name: 'app' } });
 
     // Act
-    const actual = subject.parse();
+    const server = config.get('server');
+    const all = config.all();
 
     // Assert
-    actual.should.deepEqual({ ok: true, connection: undefined });
+    server.should.deepEqual({ port: 80 });
+    all.should.deepEqual({ server: { port: 80 }, client: { name: 'app' } });
   });
 
-  it.each([
-    { label: 'an unset port', input: { REDIS_HOST: 'cache' }, expected: DEFAULT_PORT },
-    { label: 'a blank port', input: { REDIS_HOST: 'cache', REDIS_PORT: '   ' }, expected: DEFAULT_PORT },
-    { label: 'an explicit port', input: { REDIS_HOST: 'cache', REDIS_PORT: '6380' }, expected: 6380 },
-    { label: 'a padded port', input: { REDIS_HOST: 'cache', REDIS_PORT: ' 6380 ' }, expected: 6380 },
-    { label: 'the lowest port', input: { REDIS_HOST: 'cache', REDIS_PORT: '1' }, expected: 1 },
-    { label: 'the highest port', input: { REDIS_HOST: 'cache', REDIS_PORT: '65535' }, expected: 65535 },
-  ])('should resolve $label to port $expected', ({ input, expected }) => {
+  it('should freeze the served object without freezing the caller input', () => {
     // Arrange
-    const subject = new RedisConfigParser(input);
+    const input = { server: { port: 80 }, client: { name: 'app' } };
 
     // Act
-    const actual = subject.parse();
+    const all = new FrozenConfig<Shape>(input).all();
 
     // Assert
-    actual.should.deepEqual({ ok: true, connection: { host: 'cache', port: expected } });
+    Object.isFrozen(all).should.be.true();
+    Object.isFrozen(input).should.be.false();
+  });
+});
+
+describe('FrozenConfig deep freeze', () => {
+  type Nested = { server: z.ZodType<{ port: number; tags: string[]; tls: { ca: string[] } }> };
+
+  it('should freeze every nested object and array', () => {
+    // Arrange
+    const config = new FrozenConfig<Nested>({ server: { port: 80, tags: ['a'], tls: { ca: ['x'] } } });
+
+    // Act
+    const server = config.get('server');
+
+    // Assert
+    [server, server.tags, server.tls, server.tls.ca]
+      .map(node => Object.isFrozen(node))
+      .should.deepEqual([true, true, true, true]);
   });
 
-  it('should trim surrounding whitespace from the host', () => {
+  it('should leave the caller input mutable', () => {
     // Arrange
-    const subject = new RedisConfigParser({ REDIS_HOST: '  cache  ' });
-    const expected = { ok: true, connection: { host: 'cache', port: DEFAULT_PORT } };
+    const input = { server: { port: 80, tags: ['a'], tls: { ca: ['x'] } } };
 
     // Act
-    const actual = subject.parse();
+    new FrozenConfig<Nested>(input);
 
     // Assert
-    actual.should.deepEqual(expected);
-  });
-
-  it.each([
-    { input: { REDIS_PORT: 'abc' }, expected: 'REDIS_PORT must be a whole number, for example 6379' },
-    { input: { REDIS_PORT: '6379.5' }, expected: 'REDIS_PORT must be a whole number, for example 6379' },
-    { input: { REDIS_PORT: '-1' }, expected: 'REDIS_PORT must be a whole number, for example 6379' },
-    { input: { REDIS_PORT: '0' }, expected: 'REDIS_PORT must be between 1 and 65535' },
-    { input: { REDIS_PORT: '65536' }, expected: 'REDIS_PORT must be between 1 and 65535' },
-    { input: { REDIS_HOST: 'cache', REDIS_PORT: '0' }, expected: 'REDIS_PORT must be between 1 and 65535' },
-  ])('should reject REDIS_PORT "$input.REDIS_PORT" with a named issue', ({ input, expected }) => {
-    // Arrange
-    const subject = new RedisConfigParser(input);
-
-    // Act
-    const actual = subject.parse();
-
-    // Assert
-    actual.should.deepEqual({ ok: false, issues: [expected] });
+    [input.server, input.server.tags, input.server.tls]
+      .map(node => Object.isFrozen(node))
+      .should.deepEqual([false, false, false]);
   });
 });

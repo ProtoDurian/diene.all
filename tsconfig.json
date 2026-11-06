@@ -7,6 +7,9 @@
     "allowJs": true,
 
     "moduleResolution": "bundler",
+    "paths": {
+      "@atomicloud/diene.config": ["./src/index.ts"]
+    },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,

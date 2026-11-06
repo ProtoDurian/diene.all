@@ -14,41 +14,33 @@ boundary. TypeScript variants accompany the shared standards for
 
 ## Library package
 
-`@atomicloud/diene.bun-lib` is the publishable Bun library baseline: a small
-TypeScript package shipped as dual **ESM + CommonJS** with bundled type
-declarations, validated on every push and published on `v*.*.*` tags. Library
-children rescope the package name, description, keywords, and badge URLs from
-this scaffold.
+`@atomicloud/diene.config` is the config-loading engine for the AtomiCloud
+TypeScript family: a 4-tier merge (base YAML → landscape overlay → build-time →
+runtime env), zod validation of the final layer, and `$schema` generation.
+Shipped as dual **ESM + CommonJS** with bundled types and three entry points:
+the package root, `/build-time` and `/test-helper`.
 
-See the [npm release runbook](https://github.com/AtomiCloud/diene.bun-lib/blob/main/docs/developer/npm-release.md)
-for tag publishing, API-key rotation, retry behavior, and the deliberate
-no-provenance policy.
+See the [config standard](docs/standards/config/index.md) for the contract and
+the [npm release runbook](docs/developer/npm-release.md) for publishing.
 
-[![npm version](https://img.shields.io/npm/v/@atomicloud/diene.bun-lib)](https://www.npmjs.com/package/@atomicloud/diene.bun-lib)
-[![npm downloads](https://img.shields.io/npm/dm/@atomicloud/diene.bun-lib)](https://www.npmjs.com/package/@atomicloud/diene.bun-lib)
-[![CI](https://github.com/AtomiCloud/diene.bun-lib/actions/workflows/ci.yaml/badge.svg)](https://github.com/AtomiCloud/diene.bun-lib/actions/workflows/ci.yaml)
+[![npm version](https://img.shields.io/npm/v/@atomicloud/diene.config)](https://www.npmjs.com/package/@atomicloud/diene.config)
+[![CI](https://github.com/AtomiCloud/diene.bun-config/actions/workflows/ci.yaml/badge.svg)](https://github.com/AtomiCloud/diene.bun-config/actions/workflows/ci.yaml)
 
 ### Installation
 
 ```bash
-bun add @atomicloud/diene.bun-lib
-# or
-npm install @atomicloud/diene.bun-lib
+bun add @atomicloud/diene.config
 ```
-
-`ioredis`, `pino` and `zod` are runtime dependencies and are installed automatically.
 
 ### Usage
 
 ```ts
-// ESM
-import { KeyComposer, RedisKeyValueStore, SampleService } from '@atomicloud/diene.bun-lib';
-import type { IKeyValueStore, RedisConnection } from '@atomicloud/diene.bun-lib';
-```
+import { ConfigLoader, ConfigRegistry, YamlConfigSource } from '@atomicloud/diene.config';
+import { z } from 'zod';
 
-```js
-// CommonJS
-const { KeyComposer, RedisKeyValueStore, SampleService } = require('@atomicloud/diene.bun-lib');
+const registry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
+const config = await new ConfigLoader(new YamlConfigSource({ dir: 'config' }), registry, { prefix: 'ATOMI_' }).load();
+config.get('server').port;
 ```
 
 # Commands

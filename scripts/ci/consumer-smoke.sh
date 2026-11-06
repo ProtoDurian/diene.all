@@ -4,7 +4,7 @@ set -euo pipefail
 # The node-owned consumer fixture: a throwaway package that `bun add`s the
 # library, then proves `import`, `require()` and the TypeScript types of both
 # conditions resolve. With no argument it consumes this tree's packed tarball;
-# pass a registry spec (e.g. @atomicloud/diene.bun-lib@1.4.0) to consume a real
+# pass a registry spec (e.g. @atomicloud/diene.config@2.0.0) to consume a real
 # publish instead.
 
 root_dir="$(git rev-parse --show-toplevel)"
@@ -16,6 +16,7 @@ if [[ -z ${spec} ]]; then
   spec="${root_dir}/pkg.tgz"
 fi
 name="$(jq -r .name package.json)"
+zod="zod@$(jq -r .dependencies.zod package.json)"
 tsc="${root_dir}/node_modules/.bin/tsc"
 [[ ! -x ${tsc} ]] && echo "❌ ${tsc} is missing; install dependencies first" >&2 && exit 1
 
@@ -23,9 +24,9 @@ work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
 
 cat >"${work}/package.json" <<JSON
-{ "name": "bun-lib-consumer-fixture", "private": true, "version": "0.0.0" }
+{ "name": "bun-config-consumer-fixture", "private": true, "version": "0.0.0" }
 JSON
-# The public types reference pino's, which need Node's: give the fixture the repo's pinned @types/node.
+# The public types reference node:fs: give the fixture the repo's pinned @types/node.
 cat >"${work}/tsconfig.json" <<JSON
 {
   "compilerOptions": {
@@ -40,28 +41,63 @@ cat >"${work}/tsconfig.json" <<JSON
 }
 JSON
 cat >"${work}/esm.mjs" <<JS
-import { KeyComposer } from '${name}';
-if (new KeyComposer('Consumer Proof').compose('ESM') !== 'consumer-proof:esm') throw new Error('ESM import returned the wrong key');
+import { createRequire } from 'node:module';
+import { ConfigLoader, ConfigRegistry, ConfigValidationError } from '${name}';
+import { BuildTimeValueMapper } from '${name}/build-time';
+import { ConfigAssertions, ConfigStubBuilder, InMemoryConfigSource } from '${name}/test-helper';
+import { z } from 'zod';
+const registry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
+const source = new InMemoryConfigSource({ base: { server: { port: 1 } }, runtimeEnv: { ATOMI_SERVER__PORT: '2' } });
+const config = await new ConfigLoader(source, registry, { prefix: 'ATOMI_' }).load();
+if (config.get('server').port !== 2) throw new Error('ESM loader returned the wrong port');
+if (Object.keys(new BuildTimeValueMapper().map({ ATOMI_CLIENT__X: '1', ATOMI_CLIENT__FARO__BUILD__KEY: 's', ATOMI_SERVER__Y: '2' }, 'ATOMI_')).join() !== 'ATOMI_CLIENT__X') throw new Error('ESM build-time map kept a non-client value');
+const error = await new ConfigAssertions(new ConfigStubBuilder(registry, { prefix: 'ATOMI_' })).expectInvalid({ base: {} });
+if (error.issues.length === 0) throw new Error('ESM asserter missed an invalid config');
+if (!(error instanceof ConfigValidationError)) throw new Error('ESM /test-helper error is not the root ConfigValidationError');
+const cjsHelper = createRequire(import.meta.url)('${name}/test-helper');
+const mixed = await new cjsHelper.ConfigAssertions(new cjsHelper.ConfigStubBuilder(registry, { prefix: 'ATOMI_' })).expectInvalid({ base: {} });
+if (!(mixed instanceof ConfigValidationError)) throw new Error('CJS /test-helper error is not the ESM root ConfigValidationError');
 JS
 cat >"${work}/cjs.cjs" <<JS
-const { KeyComposer } = require('${name}');
-if (new KeyComposer('Consumer Proof').compose('CJS') !== 'consumer-proof:cjs') throw new Error('CJS require returned the wrong key');
+const { ConfigLoader, ConfigRegistry, ConfigValidationError } = require('${name}');
+const { BuildTimeValueMapper } = require('${name}/build-time');
+const { ConfigAssertions, ConfigStubBuilder, InMemoryConfigSource } = require('${name}/test-helper');
+const { z } = require('zod');
+const registry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
+const source = new InMemoryConfigSource({ base: { server: { port: 1 } }, runtimeEnv: { ATOMI_SERVER__PORT: '2' } });
+if (Object.keys(new BuildTimeValueMapper().map({ ATOMI_CLIENT__X: '1', ATOMI_CLIENT__FARO__BUILD__KEY: 's', ATOMI_SERVER__Y: '2' }, 'ATOMI_')).join() !== 'ATOMI_CLIENT__X') throw new Error('CJS build-time map kept a non-client value');
+Promise.all([
+  new ConfigLoader(source, registry, { prefix: 'ATOMI_' }).load(),
+  new ConfigAssertions(new ConfigStubBuilder(registry, { prefix: 'ATOMI_' })).expectInvalid({ base: {} }),
+]).then(([config, error]) => {
+  if (config.get('server').port !== 2) throw new Error('CJS loader returned the wrong port');
+  if (error.issues.length === 0) throw new Error('CJS asserter missed an invalid config');
+  if (!(error instanceof ConfigValidationError)) throw new Error('CJS /test-helper error is not the root ConfigValidationError');
+}).catch(error => {
+  console.error(error);
+  process.exit(1);
+});
 JS
-cat >"${work}/types-esm.mts" <<TS
-import { KeyComposer } from '${name}';
-const key: string = new KeyComposer('Consumer Proof').compose('ESM');
-export { key };
+for ext in mts cts; do
+  # A root-entry Config and registry must interoperate with the /test-helper ones.
+  cat >"${work}/types.${ext}" <<TS
+import { type Config, ConfigLoader, ConfigRegistry } from '${name}';
+import { BuildTimeValueMapper } from '${name}/build-time';
+import { ConfigStubBuilder, InMemoryConfigSource } from '${name}/test-helper';
+import { z } from 'zod';
+const registry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
+const read = (config: Config<{ server: z.ZodObject<{ port: z.ZodNumber }> }>): number => config.get('server').port;
+const stub: Promise<number> = new ConfigStubBuilder(registry, { prefix: 'ATOMI_' }).build({}).then(read);
+const live: Promise<number> = new ConfigLoader(new InMemoryConfigSource(), registry, { prefix: 'ATOMI_' }).load().then(read);
+const map: Record<string, string> = new BuildTimeValueMapper().map({}, 'ATOMI_');
+export { live, map, stub };
 TS
-cat >"${work}/types-cjs.cts" <<TS
-import { KeyComposer } from '${name}';
-const key: string = new KeyComposer('Consumer Proof').compose('CJS');
-export { key };
-TS
+done
 
-echo "📥 bun add ${spec}..."
-(cd "${work}" && bun add --no-progress "${spec}")
+echo "📥 bun add ${spec} ${zod}..."
+(cd "${work}" && bun add --no-progress "${spec}" "${zod}")
 
 echo "🔎 import, require() and types..."
 (cd "${work}" && node esm.mjs && node cjs.cjs && "${tsc}" -p tsconfig.json)
 
-echo "✅ consumer fixture: ${spec} installs; import, require() and both type conditions resolve"
+echo "✅ consumer fixture: ${spec} installs; import, require() and both type conditions resolve for all three entry points"
