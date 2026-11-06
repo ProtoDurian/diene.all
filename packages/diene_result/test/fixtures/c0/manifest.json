@@ -1,0 +1,14 @@
+{
+  "contract": "diene.result.wire.v1",
+  "authority": "local-regression-only",
+  "provenance": "Locally derived Result and Option wire fixtures for cases the upstream vectors do not cover; not a source-owned fixture set.",
+  "algorithm": "sha256",
+  "fixtures": {
+    "err_not_object.json": "97ab3b6147d8d33566057baf3c22dd7d28e3c77a706ec15e815b6a95453b76ba",
+    "err_problem_no_detail.json": "945c1b70af00b85a77a002ea46e44d729cc5186cc19af7eef9c15efbe687f6e1",
+    "err_problem_string_status.json": "5f5f812dcc678deaa5a72eaa8a1202c6f559311172d25f6bce6535c4db49f36f",
+    "ok_object.json": "7ee0010060c0ebd8eeb9f07124db06d3dabe7ae7d0cdcf86a013d8224bb11c09",
+    "some_object.json": "50a0b60bb2539c308d5bbbadd15dfaa4ae76dc52d6a078f4b96f24d4af675054",
+    "some_three_items.json": "4e6c71961c994335f8b6d8951be51e6c8452473414c977978596e5d131897ed6"
+  }
+}
