@@ -29,7 +29,7 @@ for path in "${files[@]}"; do
     allow_global='^process$'
   fi
   # shellcheck disable=SC2016
-  report="$(git show "${tree}:${path}" | ALLOWED="${allowed}" ALLOW_GLOBAL="${allow_global}" bun -e '
+  report="$(git show "${tree}:${path}" | ALLOWED="${allowed}" ALLOW_GLOBAL="${allow_global}" FILE="${path}" bun -e '
     const src = await Bun.stdin.text();
     const strings = [];
     let out = "", i = 0, prev = "";
@@ -68,8 +68,14 @@ for path in "${files[@]}"; do
     const allowed = new RegExp(process.env.ALLOWED);
     const specifier = /(?:\bfrom|\bimport|\bimport\s*\(|\brequire\s*\()\s*"S(\d+)"/g;
     for (const m of out.matchAll(specifier)) if (!allowed.test(strings[+m[1]])) console.log(`import ${strings[+m[1]]}`);
+    const { dirname, join } = require("node:path/posix");
+    for (const m of out.matchAll(specifier)) {
+      const spec = strings[+m[1]];
+      if (/^\.{1,2}\//.test(spec) && !process.env.FILE.startsWith("src/adapters/") && process.env.FILE !== "src/index.ts" && join(dirname(process.env.FILE), spec).startsWith("src/adapters/")) console.log(`import ${spec} (the domain reaches into src/adapters/)`);
+    }
+    for (const m of out.matchAll(/\bimport\s*\.\s*meta\b|\bMath\s*\.\s*random\b|(?<![.\w$])Function\s*\(/g)) console.log(`global ${m[0].replace(/\s+/g, "")}`);
     for (const m of out.matchAll(/\b(import|require)\s*\(\s*(?!"S\d+"\s*\))/g)) console.log(`non-literal ${m[1]}()`);
-    const globals = /(?<![.\w$])(process|Bun|Deno|globalThis|global|window|self|console|Buffer|fetch|require|module|exports|__dirname|__filename|setInterval|setImmediate|queueMicrotask|performance|navigator|XMLHttpRequest|WebSocket)(?![\w$])(?!\s*:)/g;
+    const globals = /(?<![.\w$])(process|Bun|Deno|globalThis|global|window|self|console|Buffer|fetch|require|module|exports|__dirname|__filename|setInterval|setTimeout|setImmediate|queueMicrotask|Date|eval|crypto|performance|navigator|XMLHttpRequest|WebSocket)(?![\w$])(?!\s*:)/g;
     const allowGlobal = new RegExp(process.env.ALLOW_GLOBAL);
     for (const m of out.matchAll(globals)) if (!allowGlobal.test(m[1])) console.log(`global ${m[1]}`);
   ')"

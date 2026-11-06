@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# src/ is stateless OOP + DI, so no module declares a top-level
-# function or binds a function to a top-level const/let/var.
+# src/ is stateless OOP + DI: outside class bodies, interfaces and type aliases
+# no arrow or function expression appears anywhere at module level.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -38,46 +38,37 @@ for path in "${files[@]}"; do
       i++;
     }
     const text = code.join("");
-    const close = { "(": ")", "[": "]", "{": "}", "<": ">" };
-    const skipBalanced = at => {
-      const open = text[at], end = close[open];
+    const out = text.split("");
+    const lineOf = at => text.slice(0, at).split("\n").length;
+    const matchBrace = at => {
       let depth = 0;
       for (let k = at; k < text.length; k++) {
-        if (text[k] === open) depth++;
-        else if (text[k] === end && --depth === 0) return k + 1;
+        if (text[k] === "{") depth++;
+        else if (text[k] === "}" && --depth === 0) return k;
       }
-      return -1;
+      return text.length - 1;
     };
-    const lineOf = at => text.slice(0, at).split("\n").length;
-    const declared = /(?:export\s+)?(?:default\s+)?(?:declare\s+)?(?:async\s+)?function\b\s*\*?\s*([A-Za-z_$][\w$]*)?/y;
-    const binding = /(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::(?:[^=;]|=>)*?)?=(?!>)\s*/y;
-    const isFunction = at => {
-      const rest = text.slice(at);
-      const head = /^(?:async\s+)?/.exec(rest)[0].length;
-      let k = at + head;
-      if (/^function\b/.test(text.slice(k)) || /^[A-Za-z_$][\w$]*\s*=>/.test(text.slice(k))) return true;
-      if (text[k] === "<") { k = skipBalanced(k); if (k < 0) return false; }
-      if (text[k] !== "(") return false;
-      k = skipBalanced(k);
-      return k >= 0 && /^\s*(?::[^;]*?)?=>/.test(text.slice(k));
-    };
-    let depth = 0;
-    for (let k = 0; k < text.length; k++) {
-      const c = text[k];
-      if (c === "(" || c === "[" || c === "{") { depth++; continue; }
-      if (c === ")" || c === "]" || c === "}") { depth--; continue; }
-      if (depth !== 0 || !/[A-Za-z_$]/.test(c) || /[\w$.]/.test(text[k - 1] ?? "")) continue;
-      declared.lastIndex = k;
-      let m = declared.exec(text);
-      if (m && !/=\s*(?:async\s+)?$/.test(text.slice(Math.max(0, k - 200), k))) { console.log(`${lineOf(k)}:${m[1] ?? "default"}`); k = declared.lastIndex - 1; continue; }
-      binding.lastIndex = k;
-      m = binding.exec(text);
-      if (m) { if (isFunction(binding.lastIndex)) console.log(`${lineOf(k)}:${m[1]}`); k = binding.lastIndex - 1; continue; }
-      while (/[\w$]/.test(text[k + 1] ?? "")) k++;
+    const wipe = (from, to) => { for (let k = from; k <= to; k++) if (out[k] !== "\n") out[k] = " "; };
+    // Class bodies hold the methods; interfaces and type aliases hold only types.
+    for (const m of text.matchAll(/\b(class|interface)\b[^{;]*\{/g)) {
+      const open = m.index + m[0].length - 1;
+      if (out[open] === "{") wipe(open, matchBrace(open));
     }
+    for (const m of text.matchAll(/(^|[\s;}])(?:export\s+)?(?:declare\s+)?type\s+[A-Za-z_$][\w$]*\s*(<[^=]*>)?\s*=/g)) {
+      let depth = 0, k = m.index + m[0].length;
+      for (; k < text.length; k++) {
+        const c = text[k];
+        if ("([{<".includes(c)) depth++;
+        else if (")]}".includes(c) || (c === ">" && text[k - 1] !== "=")) depth--;
+        else if (c === ";" && depth <= 0) break;
+      }
+      wipe(m.index + m[0].length, k);
+    }
+    const rest = out.join("");
+    for (const m of rest.matchAll(/=>|\bfunction\b/g)) console.log(`${lineOf(m.index)}:${m[0] === "=>" ? "arrow" : "function"}`);
   ')"
   if [[ -n ${report} ]]; then
-    while IFS=: read -r line name; do echo "❌ ${path}:${line}: free function ${name}" >&2; done <<<"${report}"
+    while IFS=: read -r line name; do echo "❌ ${path}:${line}: free ${name} outside a class body" >&2; done <<<"${report}"
     failed=1
   fi
 done
@@ -86,4 +77,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ stateless-oop: ${#files[@]} src/ modules declare no top-level function or function-valued binding"
+echo "✅ stateless-oop: ${#files[@]} src/ modules hold functions only inside class bodies"
