@@ -1,86 +1,60 @@
 # diene_problems
 
-<!-- ### dart-lib-readme -->
-<!-- #### source: lib/dart/problems -->
+[![pub package](https://img.shields.io/pub/v/diene_problems.svg)](https://pub.dev/packages/diene_problems)
+[![CI](https://github.com/ProtoDurian/diene.dart_problems/actions/workflows/ci.yaml/badge.svg)](https://github.com/ProtoDurian/diene.dart_problems/actions/workflows/ci.yaml)
 
-RFC 9457 problem-details machinery for the Dart family: the envelope with the
-`data` extension, a single-source type-URI builder, a typed registry, an
-error→Problem transformer, `LocalError` wrapping, and per-endpoint catalog
-export including the `recoverable` flag.
-
-This is the Dart port of the L-bun `problems` contract (C0 §2/§14). It is
-frontend-only machinery: there is no runtime error-info HTTP surface, and
-telemetry rides Faro via the frontend path, not an otel exporter.
-
-## Install
-
-```yaml
-dependencies:
-  diene_problems: ^0.1.0
-```
-
-## Usage
+RFC 9457 problem details for Dart: the envelope with the `data` and
+`recoverable` extensions, the one type-URI builder, a typed registry with the
+generic baseline, `LocalError` wrapping, and the Problem catalog export that
+the edge error portal publishes. It has no runtime dependencies and no runtime
+error-info API.
 
 ```dart
 import 'package:diene_problems/diene_problems.dart';
 
-final portal = ErrorPortal(
+const ErrorPortal portal = ErrorPortal(
   scheme: 'https',
-  host: 'docs.raichu.cluster.atomi.cloud',
+  host: 'errors.atomi.cloud',
   landscape: 'raichu',
-  platform: 'dotnet',
-  service: 'user',
+  platform: 'nitroso',
+  service: 'zinc',
   module: 'api',
 );
 
-// The ONE place a problem type URI is built.
-final type = problemTypeUri(portal: portal, version: 'v1', id: 'entity_not_found');
+// https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/entity_not_found
+final String type = problemTypeUri(
+  portal: portal,
+  version: 'v1',
+  id: 'entity_not_found',
+);
 
-final registry = ProblemRegistry(portal)..register(GenericProblems.entityNotFound);
-final catalog = ProblemCatalog(portal: portal)..addGenerics();
-final crdContent = catalog.toCrdContent(); // C0 §14 Problem CR payload
+final ProblemCatalog catalog = ProblemCatalog(portal: portal)..addGenerics();
+final Map<String, Object?> cr = catalog.toProblemResource(version: 'v1');
 ```
 
-Wrap an unexpected client exception:
+## Public surface
 
-```dart
-final problem = await LocalError(sink).wrap(error, StackTrace.current);
-```
+- `Problem` — the envelope; `data` is omitted on the wire when absent.
+- `problemTypeUri` / `ErrorPortal` — the only type-URI builder.
+- `ProblemType` / `ProblemRegistry` / `GenericProblems` — versioned
+  declarations and the generic baseline.
+- `CatalogEntry` / `CatalogEndpoint` / `ProblemCatalog` — per-endpoint catalog
+  entries and the Problem CR for one row.
+- `fromObject` / `TransformOptions` — fold any value into a `Problem`.
+- `LocalError` / `ErrorSink` — wrap unexpected client exceptions.
 
 ## TestHelper
 
-`package:diene_problems/test_helper.dart` ships framework-free helpers
-(`expectProblem`, `aProblem`, `aCatalogEntry`) usable from any test runner
-without adding a test-framework dependency. See
-[doc/diene_problems.md](doc/diene_problems.md) and the shipped usage
-skill at [skills/diene-problems-usage/SKILL.md](skills/diene-problems-usage/SKILL.md).
+Consumer tests may import `package:diene_problems/test_helper.dart` for
+`expectProblem` (a plain-throw matcher) and the `aProblem`, `anErrorPortal` and
+`aCatalogEntry` builders. It pulls in no test framework.
 
-## Commands
+Read the [package doc](doc/diene_problems.md) for the full contract.
 
-- `pls setup` — resolve dependencies and sync vendored skills.
-- `pls analyze` — `dart analyze`.
-- `pls test` — `dart test`.
-- `pls test:coverage` — tests with lcov coverage.
-- `pls test:meta` — meta tier over `test_helper.dart`.
-- `pls lint` — every pre-commit gate.
+## Development
 
-<!-- ### workspace -->
-<!-- #### source: workspace -->
-
-## Shared standards
-
-- [CI/CD workflows](docs/standards/ci-cd/index.md)
-- [conventional commits](docs/standards/conventional-commits/index.md)
-- [linting and pre-commit](docs/standards/linting/index.md)
-- [Nix flakes and development shells](docs/standards/nix/index.md)
-- [release automation](docs/standards/semantic-release/index.md)
-- [Taskfile conventions](docs/standards/taskfile/index.md)
-
-<!-- ### shared -->
-<!-- #### source: shared -->
-
-- [Authorization](docs/standards/authorization/index.md)
-- [Date and time](docs/standards/datetime/index.md)
-- [Functional practices](docs/standards/functional-practices/index.md)
-- [Testing](docs/standards/testing/index.md)
-- [Data validation](docs/standards/validation/index.md)
+- `task setup` resolves the workspace dependencies.
+- `task test` runs the unit, conformance and TestHelper meta suites.
+- `task test:coverage` enforces the separate unit and meta ledgers.
+- `task deadcode` runs the repository and production-only dead-code passes.
+- `task package:validate` runs the release guard, publish dry-run and pana.

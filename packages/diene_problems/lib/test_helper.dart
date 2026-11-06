@@ -1,38 +1,47 @@
-/// TestHelper for diene_problems — dependency-light sub-library.
+/// Framework-free Problem matcher and builders for consumer tests.
 ///
-/// Import via `package:diene_problems/test_helper.dart`. It is framework-free:
-/// every helper throws a plain [ProblemMatcherError] (an [AssertionError]) on
-/// mismatch, so it works from `package:test`, `flutter_test`, or any other
-/// runner without adding a test-framework dependency to a consumer's prod graph.
-///
-/// Ships:
-/// - [expectProblem] — plain-throw matcher over the envelope fields;
-/// - [aProblem] / [anErrorPortal] / [aCatalogEntry] — registry-aware builders
-///   that mint valid instances so consumer tests stop hand-rolling URIs.
+/// A failed match throws [ProblemMatcherError]; no test package is imported.
 library;
 
-import 'package:diene_problems/diene_problems.dart';
+import 'diene_problems.dart';
 
-/// Thrown by [expectProblem] when an assertion fails.
-///
-/// Extends [AssertionError] so any test framework reports it as a failure.
+/// Thrown by [expectProblem] on a mismatch.
 final class ProblemMatcherError extends AssertionError {
   ProblemMatcherError(super.message);
 }
 
-Never _fail(String message) => throw ProblemMatcherError(message);
-
-void _check(bool ok, String message) {
-  if (!ok) {
-    _fail(message);
+void _expectField(String field, Object? expected, Object? actual) {
+  if (!_deepEquals(expected, actual)) {
+    throw ProblemMatcherError(
+      'Problem.$field mismatch: expected <$expected> got <$actual>',
+    );
   }
 }
 
-/// Asserts the [actual] envelope matches the expected fields.
+bool _deepEquals(Object? a, Object? b) {
+  if (a is Map<Object?, Object?> && b is Map<Object?, Object?>) {
+    return a.length == b.length &&
+        a.keys.every(
+          (Object? key) => b.containsKey(key) && _deepEquals(a[key], b[key]),
+        );
+  }
+  if (a is List<Object?> && b is List<Object?>) {
+    if (a.length != b.length) {
+      return false;
+    }
+    for (int i = 0; i < a.length; i++) {
+      if (!_deepEquals(a[i], b[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return a == b;
+}
+
+/// Asserts [actual] is a [Problem] whose given fields match.
 ///
-/// Every argument is optional; only the fields passed are checked. A `null`
-/// actual always fails. The matcher deliberately validates each field
-/// independently so the failure message names the first mismatched field.
+/// Omitted fields are not checked; [noData] asserts the problem has no data.
 void expectProblem(
   Object? actual, {
   String? type,
@@ -42,103 +51,47 @@ void expectProblem(
   String? detail,
   String? instance,
   Map<String, Object?>? data,
+  bool noData = false,
 }) {
   if (actual is! Problem) {
-    _fail('expected a Problem but got ${actual.runtimeType}');
-  }
-  final Problem problem = actual;
-  if (type != null) {
-    _check(
-      problem.type == type,
-      'Problem.type mismatch: expected <$type> got <${problem.type}>',
+    throw ProblemMatcherError(
+      'expected a Problem but got ${actual.runtimeType}',
     );
   }
-  if (title != null) {
-    _check(
-      problem.title == title,
-      'Problem.title mismatch: expected <$title> got <${problem.title}>',
-    );
-  }
-  if (status != null) {
-    _check(
-      problem.status == status,
-      'Problem.status mismatch: expected <$status> got <${problem.status}>',
-    );
-  }
-  if (recoverable != null) {
-    _check(
-      problem.recoverable == recoverable,
-      'Problem.recoverable mismatch: expected <$recoverable> got <${problem.recoverable}>',
-    );
-  }
-  if (detail != null) {
-    _check(
-      problem.detail == detail,
-      'Problem.detail mismatch: expected <$detail> got <${problem.detail}>',
-    );
-  }
-  if (instance != null) {
-    _check(
-      problem.instance == instance,
-      'Problem.instance mismatch: expected <$instance> got <${problem.instance}>',
-    );
-  }
-  if (data != null) {
-    _check(
-      _mapsEqual(problem.data, data),
-      'Problem.data mismatch: expected <$data> got <${problem.data}>',
-    );
-  }
-}
-
-bool _mapsEqual(Map<String, Object?> a, Map<String, Object?> b) {
-  if (a.length != b.length) {
-    return false;
-  }
-  for (final MapEntry<String, Object?> entry in a.entries) {
-    final Object? other = b[entry.key];
-    final Object? value = entry.value;
-    if (other is Map<String, Object?> && value is Map<String, Object?>) {
-      if (!_mapsEqual(value, other)) {
-        return false;
-      }
-    } else if (other is List<Object?> && value is List<Object?>) {
-      if (!_listsEqual(value, other)) {
-        return false;
-      }
-    } else if (other != value) {
-      return false;
+  final Map<String, Object?> expected = <String, Object?>{
+    'type': type,
+    'title': title,
+    'status': status,
+    'recoverable': recoverable,
+    'detail': detail,
+    'instance': instance,
+    'data': data,
+  };
+  final Map<String, Object?> found = <String, Object?>{
+    'type': actual.type,
+    'title': actual.title,
+    'status': actual.status,
+    'recoverable': actual.recoverable,
+    'detail': actual.detail,
+    'instance': actual.instance,
+    'data': actual.data,
+  };
+  expected.forEach((String field, Object? value) {
+    if (value != null) {
+      _expectField(field, value, found[field]);
     }
+  });
+  if (noData) {
+    _expectField('data', null, actual.data);
   }
-  return true;
 }
 
-bool _listsEqual(List<Object?> a, List<Object?> b) {
-  if (a.length != b.length) {
-    return false;
-  }
-  for (int i = 0; i < a.length; i++) {
-    final Object? av = a[i];
-    final Object? bv = b[i];
-    if (av is Map<String, Object?> && bv is Map<String, Object?>) {
-      if (!_mapsEqual(av, bv)) {
-        return false;
-      }
-    } else if (av is List<Object?> && bv is List<Object?>) {
-      if (!_listsEqual(av, bv)) {
-        return false;
-      }
-    } else if (av != bv) {
-      return false;
-    }
-  }
-  return true;
-}
+const Map<String, Object?> _entityReference = <String, Object?>{
+  'entityType': 'user',
+  'id': '42',
+};
 
-/// Builds a valid [Problem], defaulting to a single-source type URI.
-///
-/// When [type] is omitted, the URI is minted by [problemTypeUri] so test
-/// problems never hand-format the template either.
+/// Builds a valid `entity_not_found` [Problem]; pass `data: null` for none.
 Problem aProblem({
   ErrorPortal portal = ErrorPortal.localError,
   String id = 'entity_not_found',
@@ -148,20 +101,18 @@ Problem aProblem({
   bool recoverable = false,
   String? detail,
   String? instance,
-  Map<String, Object?> data = const <String, Object?>{},
-}) {
-  return Problem(
-    type: problemTypeUri(portal: portal, version: version, id: id),
-    title: title,
-    status: status,
-    detail: detail,
-    instance: instance,
-    recoverable: recoverable,
-    data: data,
-  );
-}
+  Map<String, Object?>? data = _entityReference,
+}) => Problem(
+  type: problemTypeUri(portal: portal, version: version, id: id),
+  title: title,
+  status: status,
+  detail: detail,
+  instance: instance,
+  recoverable: recoverable,
+  data: data,
+);
 
-/// Builds an [ErrorPortal] for tests, defaulting to a stable, realistic shape.
+/// Builds a valid [ErrorPortal].
 ErrorPortal anErrorPortal({
   String scheme = 'https',
   String host = 'docs.raichu.cluster.atomi.cloud',
@@ -169,19 +120,16 @@ ErrorPortal anErrorPortal({
   String platform = 'dotnet',
   String service = 'user',
   String module = 'api',
-}) {
-  return ErrorPortal(
-    scheme: scheme,
-    host: host,
-    landscape: landscape,
-    platform: platform,
-    service: service,
-    module: module,
-  );
-}
+}) => ErrorPortal(
+  scheme: scheme,
+  host: host,
+  landscape: landscape,
+  platform: platform,
+  service: service,
+  module: module,
+);
 
-/// Builds a [CatalogEntry] whose type URI is minted by the single-source
-/// builder, so catalog fixtures stay consistent with the runtime registry.
+/// Builds a [CatalogEntry] whose type URI comes from `problemTypeUri`.
 CatalogEntry aCatalogEntry({
   ErrorPortal portal = ErrorPortal.localError,
   required String id,
@@ -189,16 +137,14 @@ CatalogEntry aCatalogEntry({
   String title = 'Entity not found',
   int status = 404,
   bool recoverable = false,
-  Map<String, Object?> dataSchema = const <String, Object?>{},
+  Map<String, Object?>? dataSchema,
   List<CatalogEndpoint> endpoints = const <CatalogEndpoint>[],
-}) {
-  return CatalogEntry(
-    id: id,
-    typeUri: problemTypeUri(portal: portal, version: version, id: id),
-    title: title,
-    status: status,
-    recoverable: recoverable,
-    dataSchema: dataSchema,
-    endpoints: endpoints,
-  );
-}
+}) => CatalogEntry(
+  id: id,
+  typeUri: problemTypeUri(portal: portal, version: version, id: id),
+  title: title,
+  status: status,
+  recoverable: recoverable,
+  dataSchema: dataSchema,
+  endpoints: endpoints,
+);

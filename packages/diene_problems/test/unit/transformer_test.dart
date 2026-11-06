@@ -1,7 +1,7 @@
 import 'package:diene_problems/diene_problems.dart';
 import 'package:test/test.dart';
 
-const _portal = ErrorPortal(
+const ErrorPortal _portal = ErrorPortal(
   scheme: 'https',
   host: 'docs.raichu.cluster.atomi.cloud',
   landscape: 'raichu',
@@ -12,64 +12,100 @@ const _portal = ErrorPortal(
 
 void main() {
   group('fromObject', () {
-    test('returns an already-typed Problem unchanged', () {
-      const problem = Problem(type: 't', title: 'T', status: 500);
-      expect(fromObject(problem), same(problem));
+    test('returns a Problem unchanged', () {
+      // Arrange
+      const Problem problem = Problem(type: 't', title: 'T', status: 500);
+
+      // Act
+      final Problem folded = fromObject(problem);
+
+      // Assert
+      expect(folded, same(problem));
     });
 
-    test('maps a known id on a Map to the registry type', () {
+    test('maps a known problemId to the registry type and keeps data', () {
       // Arrange
-      final registry = ProblemRegistry(_portal)
+      final ProblemRegistry registry = ProblemRegistry(_portal)
         ..register(GenericProblems.entityNotFound);
-      final error = <String, Object?>{
+      final Map<String, Object?> error = <String, Object?>{
         'problemId': 'entity_not_found',
-        'data': <String, Object?>{'resource': 'user'},
+        'data': <String, Object?>{'entityType': 'user', 'id': '42'},
       };
+
       // Act
-      final p = fromObject(
+      final Problem problem = fromObject(
         error,
         options: TransformOptions(registry: registry, portal: _portal),
       );
+
       // Assert
-      expect(p.status, 404);
-      expect(p.recoverable, false);
-      expect(p.type, contains('/v1/entity_not_found'));
-      expect(p.data, {'resource': 'user'});
+      expect(problem.status, 404);
+      expect(problem.recoverable, isFalse);
+      expect(problem.type, registry.typeUriFor(GenericProblems.entityNotFound));
+      expect(problem.data, <String, Object?>{'entityType': 'user', 'id': '42'});
     });
 
-    test('falls back to an uncatalogued problem for an unknown value', () {
-      final p = fromObject(
+    test('uses the default status and no data when the type has neither', () {
+      // Arrange
+      final ProblemRegistry registry = ProblemRegistry(_portal)
+        ..register(const ProblemType(id: 'odd', title: 'Odd', version: 'v1'));
+
+      // Act
+      final Problem problem = fromObject(<String, Object?>{
+        'problemId': 'odd',
+        'data': 'not a map',
+      }, options: TransformOptions(registry: registry, defaultStatus: 502));
+
+      // Assert
+      expect(problem.status, 502);
+      expect(problem.data, isNull);
+      expect(problem.toJson().containsKey('data'), isFalse);
+    });
+
+    test('falls back to the uncatalogued problem', () {
+      // Arrange
+      final ProblemRegistry registry = ProblemRegistry(_portal);
+      final List<Object?> values = <Object?>[
         StateError('boom'),
-        options: const TransformOptions(portal: _portal),
-      );
-      expect(p.status, 500);
-      expect(p.recoverable, false);
-      expect(p.type, contains('/$uncataloguedProblemId'));
-      expect(p.detail, contains('boom'));
+        <String, Object?>{'problemId': 'nope'},
+        <String, Object?>{'problemId': 7},
+        null,
+      ];
+
+      // Act
+      final List<Problem> problems = values
+          .map(
+            (Object? value) => fromObject(
+              value,
+              options: TransformOptions(portal: _portal, registry: registry),
+            ),
+          )
+          .toList();
+
+      // Assert
+      for (final Problem problem in problems) {
+        expect(problem.type, endsWith('/v1/$uncataloguedProblemId'));
+        expect(problem.status, 500);
+        expect(problem.data, isNull);
+      }
+      expect(problems.first.detail, contains('boom'));
+      expect(problems.last.detail, isNull);
     });
 
-    test('falls back to uncatalogued when no registry is supplied', () {
-      final p = fromObject(<String, Object?>{'problemId': 'entity_not_found'});
-      expect(p.type, contains('/$uncataloguedProblemId'));
-    });
+    test('ignores a problemId when no registry is given', () {
+      // Arrange
+      final Map<String, Object?> error = <String, Object?>{
+        'problemId': 'entity_not_found',
+      };
 
-    test(
-      'falls back to uncatalogued when the registry does not know the id',
-      () {
-        final registry = ProblemRegistry(_portal);
-        final p = fromObject(<String, Object?>{
-          'problemId': 'nope',
-        }, options: TransformOptions(registry: registry, portal: _portal));
-        expect(p.type, contains('/$uncataloguedProblemId'));
-      },
-    );
+      // Act
+      final Problem problem = fromObject(error);
 
-    test('honours a custom default status', () {
-      final p = fromObject(
-        'oops',
-        options: const TransformOptions(portal: _portal, defaultStatus: 503),
+      // Assert
+      expect(
+        problem.type,
+        'https://local.atomi.cloud/docs/local/flutter/app/core/v1/uncatalogued',
       );
-      expect(p.status, 503);
     });
   });
 }

@@ -1,7 +1,7 @@
 import 'package:diene_problems/diene_problems.dart';
 import 'package:test/test.dart';
 
-const _portal = ErrorPortal(
+const ErrorPortal _portal = ErrorPortal(
   scheme: 'https',
   host: 'docs.raichu.cluster.atomi.cloud',
   landscape: 'raichu',
@@ -10,117 +10,142 @@ const _portal = ErrorPortal(
   module: 'api',
 );
 
+const Map<String, Object?> _entityReference = <String, Object?>{
+  'type': 'object',
+  'properties': <String, Object?>{
+    'entityType': <String, Object?>{'type': 'string'},
+    'id': <String, Object?>{'type': 'string'},
+  },
+  'required': <String>['entityType', 'id'],
+  'additionalProperties': false,
+};
+
 void main() {
   group('ProblemRegistry', () {
-    test('registers, looks up, and requires types', () {
-      final registry = ProblemRegistry(_portal)
-        ..register(
-          const ProblemType(id: 'x', title: 'X', version: 'v1', status: 400),
-        );
+    test('registers, looks up and requires types in order', () {
+      // Arrange
+      final ProblemRegistry registry = ProblemRegistry(_portal, <ProblemType>[
+        GenericProblems.conflict,
+      ]);
 
-      expect(registry.lookup('x')?.id, 'x');
-      expect(registry.require('x').id, 'x');
-      expect(
-        () => registry.require('missing'),
-        throwsA(isA<UnknownProblemTypeError>()),
-      );
+      // Act
+      registry.register(GenericProblems.unauthorized);
+
+      // Assert
+      expect(registry.lookup('conflict'), same(GenericProblems.conflict));
+      expect(registry.lookup('missing'), isNull);
+      expect(registry.require('unauthorized'), GenericProblems.unauthorized);
+      expect(registry.entries.map((ProblemType type) => type.id), <String>[
+        'conflict',
+        'unauthorized',
+      ]);
     });
 
-    test('rejects duplicate ids', () {
-      final registry = ProblemRegistry(_portal)
-        ..register(const ProblemType(id: 'dup', title: 'D', version: 'v1'));
-      expect(
-        () => registry.register(
-          const ProblemType(id: 'dup', title: 'D2', version: 'v1'),
-        ),
-        throwsA(isA<DuplicateProblemTypeError>()),
-      );
+    test('rejects a duplicate id and an unknown required id', () {
+      // Arrange
+      final ProblemRegistry registry = ProblemRegistry(_portal)
+        ..register(GenericProblems.conflict);
+
+      // Act
+      void duplicate() => registry.register(GenericProblems.conflict);
+      void unknown() => registry.require('missing');
+
+      // Assert
+      expect(duplicate, throwsA(isA<DuplicateProblemTypeError>()));
+      expect(unknown, throwsA(isA<UnknownProblemTypeError>()));
     });
 
-    test('typeUriFor builds the URI through the single-source builder', () {
-      final registry = ProblemRegistry(_portal)
-        ..register(
-          const ProblemType(id: 'entity_not_found', title: 'X', version: 'v1'),
-        );
+    test('builds the type URI through the one builder', () {
+      // Arrange
+      final ProblemRegistry registry = ProblemRegistry(_portal);
+
+      // Act
+      final String uri = registry.typeUriFor(GenericProblems.entityNotFound);
+
+      // Assert
       expect(
-        registry.typeUriFor(registry.require('entity_not_found')),
+        uri,
         'https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/entity_not_found',
       );
-    });
-
-    test('entries preserve insertion order', () {
-      final registry = ProblemRegistry(_portal)
-        ..register(const ProblemType(id: 'a', title: 'A', version: 'v1'))
-        ..register(const ProblemType(id: 'b', title: 'B', version: 'v1'));
-      expect(registry.entries.map((ProblemType t) => t.id).toList(), [
-        'a',
-        'b',
-      ]);
     });
   });
 
   group('GenericProblems', () {
-    test('registers the full baseline set with versioned URIs', () {
-      final registry = ProblemRegistry(_portal);
+    test('ships the baseline ids, statuses and recoverable flags', () {
+      // Arrange
+      final ProblemRegistry registry = ProblemRegistry(_portal);
+
+      // Act
       GenericProblems.registerAll(registry);
 
-      final ids = registry.entries.map((ProblemType t) => t.id).toSet();
-      expect(
-        ids,
-        containsAll(<String>[
-          'validation_error',
-          'entity_not_found',
-          'conflict',
-          'unauthenticated',
-          'unauthorized',
-          'invalid_json',
-        ]),
-      );
-    });
-
-    test('every generic carries a versioned type URI', () {
-      final registry = ProblemRegistry(_portal);
-      GenericProblems.registerAll(registry);
-      for (final ProblemType type in registry.entries) {
-        expect(type.version, 'v1');
-        expect(registry.typeUriFor(type), contains('/v1/${type.id}'));
-      }
-    });
-
-    test('seeds itself from the types passed to the constructor', () {
-      // Arrange / Act
-      final registry = ProblemRegistry(_portal, const <ProblemType>[
-        ProblemType(id: 'seeded_one', title: 'One', version: 'v1'),
-        ProblemType(id: 'seeded_two', title: 'Two', version: 'v2'),
-      ]);
       // Assert
-      expect(registry.entries.map((ProblemType t) => t.id), <String>[
-        'seeded_one',
-        'seeded_two',
+      expect(
+        registry.entries.map(
+          (ProblemType type) =>
+              '${type.id} ${type.status} ${type.recoverable} ${type.version}',
+        ),
+        <String>[
+          'validation_error 400 true v1',
+          'entity_not_found 404 false v1',
+          'conflict 409 true v1',
+          'unauthenticated 401 true v1',
+          'unauthorized 403 false v1',
+          'invalid_json 400 true v1',
+        ],
+      );
+    });
+
+    test('gives conflict the same data schema as entity_not_found', () {
+      // Arrange
+      const ProblemType conflict = GenericProblems.conflict;
+
+      // Act
+      final Map<String, Object?>? schema = conflict.dataSchema;
+
+      // Assert
+      expect(schema, _entityReference);
+      expect(GenericProblems.entityNotFound.dataSchema, _entityReference);
+    });
+
+    test('describes validation issues as path, message and optional code', () {
+      // Arrange
+      const ProblemType validation = GenericProblems.validationError;
+
+      // Act
+      final Map<String, Object?> issue =
+          ((validation.dataSchema!['properties']!
+                      as Map<String, Object?>)['issues']!
+                  as Map<String, Object?>)['items']!
+              as Map<String, Object?>;
+
+      // Assert
+      expect(validation.dataSchema!['required'], <String>['issues']);
+      expect(issue['required'], <String>['path', 'message']);
+      expect((issue['properties']! as Map<String, Object?>).keys, <String>[
+        'path',
+        'message',
+        'code',
       ]);
-      expect(
-        registry.typeUriFor(registry.require('seeded_two')),
-        endsWith('/v2/seeded_two'),
-      );
     });
 
-    test('rejects a duplicate seeded id at construction time', () {
-      expect(
-        () => ProblemRegistry(_portal, const <ProblemType>[
-          ProblemType(id: 'dup', title: 'A', version: 'v1'),
-          ProblemType(id: 'dup', title: 'B', version: 'v1'),
-        ]),
-        throwsA(isA<DuplicateProblemTypeError>()),
-      );
-    });
+    test('gives the data-less generics no data schema', () {
+      // Arrange
+      const List<ProblemType> dataLess = <ProblemType>[
+        GenericProblems.unauthenticated,
+        GenericProblems.unauthorized,
+        GenericProblems.invalidJson,
+      ];
 
-    test('status defaults match RFC expectations', () {
-      expect(GenericProblems.validationError.status, 400);
-      expect(GenericProblems.entityNotFound.status, 404);
-      expect(GenericProblems.conflict.status, 409);
-      expect(GenericProblems.unauthenticated.status, 401);
-      expect(GenericProblems.unauthorized.status, 403);
-      expect(GenericProblems.invalidJson.status, 400);
+      // Act
+      final Iterable<Object?> schemas = dataLess.map(
+        (ProblemType type) => type.dataSchema,
+      );
+
+      // Assert
+      expect(schemas, everyElement(isNull));
+      expect(noProblemDataSchema, <String, Object?>{
+        'not': <String, Object?>{},
+      });
     });
   });
 }

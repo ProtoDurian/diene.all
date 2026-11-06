@@ -1,0 +1,163 @@
+{
+  "apiVersion": "atomi.cloud/v1alpha1",
+  "kind": "Problem",
+  "metadata": {
+    "name": "zinc.api.raichu.v1",
+    "namespace": "nitroso"
+  },
+  "spec": {
+    "platform": "nitroso",
+    "service": "zinc",
+    "module": "api",
+    "landscape": "raichu",
+    "version": "v1",
+    "problems": [
+      {
+        "id": "conflict",
+        "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/conflict",
+        "title": "Conflict",
+        "status": 409,
+        "recoverable": true,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "entityType": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": ["entityType", "id"],
+          "additionalProperties": false
+        },
+        "endpoints": [
+          {
+            "method": "POST",
+            "path": "/notes"
+          }
+        ]
+      },
+      {
+        "id": "entity_not_found",
+        "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/entity_not_found",
+        "title": "Entity not found",
+        "status": 404,
+        "recoverable": false,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "entityType": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": ["entityType", "id"],
+          "additionalProperties": false
+        },
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/notes/{id}"
+          }
+        ]
+      },
+      {
+        "id": "invalid_json",
+        "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/invalid_json",
+        "title": "Invalid JSON",
+        "status": 400,
+        "recoverable": true,
+        "schema": {
+          "not": {}
+        },
+        "endpoints": [
+          {
+            "method": "POST",
+            "path": "/notes"
+          }
+        ]
+      },
+      {
+        "id": "unauthenticated",
+        "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/unauthenticated",
+        "title": "Unauthenticated",
+        "status": 401,
+        "recoverable": true,
+        "schema": {
+          "not": {}
+        },
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/notes"
+          }
+        ]
+      },
+      {
+        "id": "unauthorized",
+        "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/unauthorized",
+        "title": "Unauthorized",
+        "status": 403,
+        "recoverable": false,
+        "schema": {
+          "not": {}
+        },
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/notes"
+          }
+        ]
+      },
+      {
+        "id": "validation_error",
+        "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/validation_error",
+        "title": "Validation error",
+        "status": 400,
+        "recoverable": true,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": ["path", "message"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["issues"],
+          "additionalProperties": false
+        },
+        "endpoints": [
+          {
+            "method": "POST",
+            "path": "/notes"
+          },
+          {
+            "method": "PUT",
+            "path": "/notes/{id}"
+          }
+        ]
+      }
+    ]
+  }
+}

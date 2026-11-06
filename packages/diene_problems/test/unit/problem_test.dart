@@ -2,119 +2,109 @@ import 'package:diene_problems/diene_problems.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('Problem envelope', () {
-    test(
-      'toJson serializes RFC 9457 members plus the data/recoverable extensions',
-      () {
-        // Arrange
-        const problem = Problem(
-          type:
-              'https://docs.example/docs/raichu/dotnet/user/api/v1/entity_not_found',
-          title: 'Entity not found',
-          status: 404,
-          detail: 'user 42 missing',
-          instance: '/user/42',
-          recoverable: false,
-          data: <String, Object?>{'resource': 'user', 'id': 42},
-        );
-        // Act
-        final json = problem.toJson();
-        // Assert
-        expect(json['type'], problem.type);
-        expect(json['title'], 'Entity not found');
-        expect(json['status'], 404);
-        expect(json['detail'], 'user 42 missing');
-        expect(json['instance'], '/user/42');
-        expect(json['recoverable'], false);
-        expect(json['data'], {'resource': 'user', 'id': 42});
-      },
-    );
-
-    test('fromJson round-trips a serialized envelope (data included)', () {
-      const problem = Problem(
-        type: 'https://h/docs/l/p/s/m/v1/id',
-        title: 'Conflict',
-        status: 409,
-        recoverable: true,
-        data: <String, Object?>{
-          'nested': <String, Object?>{'a': 1},
-        },
+  group('Problem', () {
+    test('serializes every member and the data extension', () {
+      // Arrange
+      const Problem problem = Problem(
+        type: 'https://h/docs/l/p/s/m/v1/entity_not_found',
+        title: 'Entity not found',
+        status: 404,
+        detail: 'User 42 does not exist',
+        instance: '/user/42',
+        data: <String, Object?>{'entityType': 'user', 'id': '42'},
       );
-      final Problem roundTripped = Problem.fromJson(problem.toJson());
-      expect(roundTripped, problem);
-    });
 
-    test('fromJson applies RFC 9457 defaults for missing members', () {
-      final Problem p = Problem.fromJson(const <String, Object?>{});
-      expect(p.type, 'about:blank');
-      expect(p.title, 'Unexpected problem');
-      expect(p.status, 500);
-      expect(p.recoverable, false);
-      expect(p.data, <String, Object?>{});
-    });
+      // Act
+      final Map<String, Object?> json = problem.toJson();
 
-    test('fromJson coerces a non-typed data map into Map<String,Object?>', () {
-      final Problem p = Problem.fromJson(<String, Object?>{
-        'type': 't',
-        'title': 't',
-        'status': 400,
-        'data': <Object?, Object?>{'k': 'v'},
+      // Assert
+      expect(json, <String, Object?>{
+        'type': 'https://h/docs/l/p/s/m/v1/entity_not_found',
+        'title': 'Entity not found',
+        'status': 404,
+        'detail': 'User 42 does not exist',
+        'instance': '/user/42',
+        'recoverable': false,
+        'data': <String, Object?>{'entityType': 'user', 'id': '42'},
       });
-      expect(p.data, <String, Object?>{'k': 'v'});
+      expect(Problem.fromJson(json), problem);
+      expect(Problem.fromJson(json).hashCode, problem.hashCode);
+      expect(problem.toString(), contains('404'));
     });
 
-    test('equality is structural across all fields', () {
-      const a = Problem(
+    test('omits data, detail and instance when absent', () {
+      // Arrange
+      const Problem problem = Problem(
         type: 't',
         title: 'T',
-        status: 500,
-        data: <String, Object?>{'x': 1},
+        status: 401,
+        recoverable: true,
       );
-      const b = Problem(
-        type: 't',
-        title: 'T',
-        status: 500,
-        data: <String, Object?>{'x': 1},
-      );
-      const c = Problem(
-        type: 't',
-        title: 'T',
-        status: 500,
-        data: <String, Object?>{'x': 2},
-      );
-      expect(a, b);
-      expect(a.hashCode, b.hashCode);
-      expect(a == c, isFalse);
-    });
 
-    test('omits nullable members when absent', () {
-      const problem = Problem(type: 't', title: 'T', status: 500);
-      final json = problem.toJson();
+      // Act
+      final Map<String, Object?> json = problem.toJson();
+
+      // Assert
+      expect(json.containsKey('data'), isFalse);
       expect(json.containsKey('detail'), isFalse);
       expect(json.containsKey('instance'), isFalse);
+      expect(json['recoverable'], isTrue);
     });
 
-    test('is identical to itself and unequal to a non-Problem', () {
+    test('reads a null or non-object data member as no data', () {
       // Arrange
-      const problem = Problem(type: 't', title: 'T', status: 500);
-      final Object same = problem;
-      const Object other = 't';
-      // Act / Assert
-      expect(problem == same, isTrue);
-      expect(problem == other, isFalse);
-    });
+      final List<Map<String, Object?>> wires = <Map<String, Object?>>[
+        <String, Object?>{'type': 't', 'title': 'T', 'status': 400},
+        <String, Object?>{
+          'type': 't',
+          'title': 'T',
+          'status': 400,
+          'data': null,
+        },
+        <String, Object?>{'type': 't', 'title': 'T', 'status': 400, 'data': 1},
+      ];
 
-    test('toString names the type, status, and title for diagnostics', () {
-      // Arrange
-      const problem = Problem(
-        type: 'https://h/docs/l/p/s/m/v1/x',
-        title: 'T',
-        status: 418,
-      );
       // Act
-      final rendered = problem.toString();
+      final List<Problem> problems = wires.map(Problem.fromJson).toList();
+
       // Assert
-      expect(rendered, 'Problem(https://h/docs/l/p/s/m/v1/x, 418, T)');
+      for (final Problem problem in problems) {
+        expect(problem.data, isNull);
+      }
+    });
+
+    test('defaults missing members and stringifies data keys', () {
+      // Arrange
+      final Map<String, Object?> wire = <String, Object?>{
+        'status': 503.0,
+        'data': <Object?, Object?>{1: 'one'},
+      };
+
+      // Act
+      final Problem problem = Problem.fromJson(wire);
+
+      // Assert
+      expect(problem.type, 'about:blank');
+      expect(problem.title, 'Unexpected problem');
+      expect(problem.status, 503);
+      expect(problem.recoverable, isFalse);
+      expect(problem.data, <String, Object?>{'1': 'one'});
+      expect(Problem.fromJson(const <String, Object?>{}).status, 500);
+    });
+
+    test('compares by wire form', () {
+      // Arrange
+      const Problem a = Problem(type: 't', title: 'T', status: 400);
+      const Problem b = Problem(type: 't', title: 'T', status: 409);
+
+      // Act
+      final bool same = a == a;
+      final bool different = a == b;
+
+      // Assert
+      expect(same, isTrue);
+      expect(different, isFalse);
+      expect(a == Object(), isFalse);
     });
   });
 }

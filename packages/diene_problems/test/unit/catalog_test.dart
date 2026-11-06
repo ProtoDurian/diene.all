@@ -1,172 +1,259 @@
 import 'package:diene_problems/diene_problems.dart';
 import 'package:test/test.dart';
 
-const _portal = ErrorPortal(
+const ErrorPortal _portal = ErrorPortal(
   scheme: 'https',
-  host: 'docs.raichu.cluster.atomi.cloud',
+  host: 'errors.atomi.cloud',
   landscape: 'raichu',
-  platform: 'dotnet',
-  service: 'user',
+  platform: 'nitroso',
+  service: 'zinc',
+  module: 'api',
+);
+
+const String _base = 'https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api';
+
+ErrorPortal _portalWith({
+  String scheme = 'https',
+  String platform = 'nitroso',
+  String service = 'zinc',
+}) => ErrorPortal(
+  scheme: scheme,
+  host: 'errors.atomi.cloud',
+  landscape: 'raichu',
+  platform: platform,
+  service: service,
   module: 'api',
 );
 
 void main() {
-  group('CatalogEndpoint', () {
-    test('renders method + path', () {
-      final json = const CatalogEndpoint(
-        method: 'POST',
-        path: '/user',
-      ).toJson();
-      expect(json, {'method': 'POST', 'path': '/user'});
-    });
-  });
-
   group('CatalogEntry', () {
-    test('toCrdContent renders the C0 §14 problems[] shape', () {
-      final crd = const CatalogEntry(
-        id: 'validation_error',
-        typeUri: 'https://h/docs/raichu/dotnet/user/api/v1/validation_error',
-        title: 'Validation error',
-        status: 400,
+    test('renders a CR entry with the data schema under schema', () {
+      // Arrange
+      const CatalogEntry entry = CatalogEntry(
+        id: 'note_locked',
+        typeUri: '$_base/v1/note_locked',
+        title: 'Note locked',
+        status: 423,
         recoverable: true,
         dataSchema: <String, Object?>{'type': 'object'},
         endpoints: <CatalogEndpoint>[
-          CatalogEndpoint(method: 'POST', path: '/user'),
+          CatalogEndpoint(method: 'PUT', path: '/notes/{id}'),
         ],
-      ).toCrdContent();
-
-      expect(crd['id'], 'validation_error');
-      expect(
-        crd['type'],
-        'https://h/docs/raichu/dotnet/user/api/v1/validation_error',
       );
-      expect(crd['title'], 'Validation error');
-      expect(crd['status'], 400);
-      expect(crd['recoverable'], true);
-      expect(crd['data'], {'type': 'object'});
-      expect(crd['endpoints'], [
-        {'method': 'POST', 'path': '/user'},
-      ]);
+
+      // Act
+      final Map<String, Object?> crd = entry.toCrdContent();
+
+      // Assert
+      expect(crd, <String, Object?>{
+        'id': 'note_locked',
+        'type': '$_base/v1/note_locked',
+        'title': 'Note locked',
+        'status': 423,
+        'recoverable': true,
+        'schema': <String, Object?>{'type': 'object'},
+        'endpoints': <Object?>[
+          <String, Object?>{'method': 'PUT', 'path': '/notes/{id}'},
+        ],
+      });
+    });
+
+    test('publishes not-anything as the schema of a data-less problem', () {
+      // Arrange
+      const CatalogEntry entry = CatalogEntry(
+        id: 'unauthorized',
+        typeUri: '$_base/v1/unauthorized',
+        title: 'Unauthorized',
+        status: 403,
+        recoverable: false,
+      );
+
+      // Act
+      final Map<String, Object?> crd = entry.toCrdContent();
+
+      // Assert
+      expect(crd['schema'], <String, Object?>{'not': <String, Object?>{}});
+      expect(crd['endpoints'], isEmpty);
     });
   });
 
   group('ProblemCatalog', () {
-    test('addType builds the type URI via the single-source builder', () {
-      final catalog = ProblemCatalog(portal: _portal)
-        ..addType(GenericProblems.entityNotFound);
+    test('adds types through the one builder and keeps insertion order', () {
+      // Arrange
+      final ProblemCatalog catalog = ProblemCatalog(portal: _portal);
 
-      final entry = catalog.lookup('entity_not_found')!;
-      expect(
-        entry.typeUri,
-        'https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/entity_not_found',
-      );
-      expect(entry.status, 404);
-      expect(entry.recoverable, GenericProblems.entityNotFound.recoverable);
-    });
-
-    test(
-      'addGenerics emits all baseline entries with the recoverable flag',
-      () {
-        final catalog = ProblemCatalog(portal: _portal)..addGenerics();
-        final crd = catalog.toCrdContent();
-
-        final byId = {
-          for (final Map<String, Object?> e in crd) e['id'] as String: e,
-        };
-        expect(
-          byId.keys,
-          containsAll(GenericProblems.all.map((ProblemType t) => t.id)),
-        );
-        // recoverable flag is present and reflects the declared type
-        expect(byId['validation_error']!['recoverable'], true);
-        expect(byId['entity_not_found']!['recoverable'], false);
-      },
-    );
-
-    test('toCrdContent carries endpoints declared per entry', () {
-      final catalog = ProblemCatalog(portal: _portal)
+      // Act
+      catalog
+        ..addType(GenericProblems.validationError)
         ..addType(
-          GenericProblems.validationError,
-          endpoints: const <CatalogEndpoint>[
-            CatalogEndpoint(method: 'POST', path: '/user'),
-            CatalogEndpoint(method: 'PATCH', path: '/user/{id}'),
-          ],
+          const ProblemType(id: 'no_status', title: 'No status', version: 'v1'),
         );
-      final crd = catalog.toCrdContent().single;
-      expect((crd['endpoints'] as List<Object?>).length, 2);
+
+      // Assert
+      expect(
+        catalog.lookup('validation_error')?.typeUri,
+        '$_base/v1/validation_error',
+      );
+      expect(catalog.lookup('no_status')?.status, 500);
+      expect(catalog.lookup('missing'), isNull);
+      expect(
+        catalog.toCrdContent().map((Map<String, Object?> e) => e['id']),
+        <String>['validation_error', 'no_status'],
+      );
     });
 
-    test('add replaces an existing entry by id', () {
-      final catalog = ProblemCatalog(portal: _portal)
-        ..add(
+    test('seeds from entries and replaces an entry with the same id', () {
+      // Arrange
+      final ProblemCatalog catalog = ProblemCatalog(
+        portal: _portal,
+        entries: <CatalogEntry>[
           const CatalogEntry(
             id: 'x',
-            typeUri: 'u1',
+            typeUri: '$_base/v1/x',
             title: 'X',
             status: 400,
             recoverable: false,
           ),
-        )
-        ..add(
-          const CatalogEntry(
-            id: 'x',
-            typeUri: 'u2',
-            title: 'X2',
-            status: 422,
-            recoverable: true,
-          ),
-        );
-      expect(catalog.entries.length, 1);
-      expect(catalog.lookup('x')?.status, 422);
-      expect(catalog.toCrdContent().length, 1);
-    });
-
-    test('seeds itself from the entries passed to the constructor', () {
-      // Arrange / Act
-      final catalog = ProblemCatalog(
-        portal: _portal,
-        entries: <CatalogEntry>[
-          CatalogEntry(
-            id: 'seeded_one',
-            typeUri: problemTypeUri(
-              portal: _portal,
-              version: 'v1',
-              id: 'seeded_one',
-            ),
-            title: 'One',
-            status: 500,
-            recoverable: false,
-          ),
-          CatalogEntry(
-            id: 'seeded_two',
-            typeUri: problemTypeUri(
-              portal: _portal,
-              version: 'v1',
-              id: 'seeded_two',
-            ),
-            title: 'Two',
-            status: 503,
-            recoverable: true,
-          ),
         ],
       );
+
+      // Act
+      catalog.add(
+        const CatalogEntry(
+          id: 'x',
+          typeUri: '$_base/v1/x',
+          title: 'X2',
+          status: 422,
+          recoverable: true,
+        ),
+      );
+
       // Assert
-      expect(catalog.entries.map((CatalogEntry e) => e.id), <String>[
-        'seeded_one',
-        'seeded_two',
-      ]);
-      expect(catalog.lookup('seeded_two')?.recoverable, isTrue);
+      expect(catalog.entries.single.title, 'X2');
     });
 
-    test('toCrdContent preserves insertion order', () {
-      final catalog = ProblemCatalog(portal: _portal)
-        ..addType(GenericProblems.validationError)
-        ..addType(GenericProblems.entityNotFound);
-      final ids = catalog
-          .toCrdContent()
-          .map((Map<String, Object?> e) => e['id'] as String)
-          .toList();
-      expect(ids, ['validation_error', 'entity_not_found']);
+    test('emits one Problem CR per row, named with dots', () {
+      // Arrange
+      final ProblemCatalog catalog = ProblemCatalog(portal: _portal)
+        ..addGenerics()
+        ..addType(
+          GenericProblems.conflict,
+          endpoints: const <CatalogEndpoint>[
+            CatalogEndpoint(method: 'POST', path: '/notes'),
+          ],
+        );
+
+      // Act
+      final Map<String, Object?> resource = catalog.toProblemResource(
+        version: 'v1',
+      );
+
+      // Assert
+      expect(resource['apiVersion'], 'atomi.cloud/v1alpha1');
+      expect(resource['kind'], 'Problem');
+      expect(resource['metadata'], <String, Object?>{
+        'name': 'zinc.api.raichu.v1',
+        'namespace': 'nitroso',
+      });
+      final Map<String, Object?> spec =
+          resource['spec']! as Map<String, Object?>;
+      expect(spec['platform'], 'nitroso');
+      expect(spec['service'], 'zinc');
+      expect(spec['module'], 'api');
+      expect(spec['landscape'], 'raichu');
+      expect(spec['version'], 'v1');
+      final List<Object?> problems = spec['problems']! as List<Object?>;
+      expect(
+        problems.map((Object? p) => (p! as Map<String, Object?>)['id']),
+        <String>[
+          'conflict',
+          'entity_not_found',
+          'invalid_json',
+          'unauthenticated',
+          'unauthorized',
+          'validation_error',
+        ],
+      );
+      expect((problems.first! as Map<String, Object?>)['endpoints'], <Object?>[
+        <String, Object?>{'method': 'POST', 'path': '/notes'},
+      ]);
+    });
+
+    test('refuses a row that cannot name a Problem CR', () {
+      // Arrange
+      final Map<String, ProblemCatalog> catalogs = <String, ProblemCatalog>{
+        'http portal': ProblemCatalog(portal: _portalWith(scheme: 'http')),
+        'uppercase platform': ProblemCatalog(
+          portal: _portalWith(platform: 'Nitroso'),
+        ),
+        'dotted service': ProblemCatalog(portal: _portalWith(service: 'a.b')),
+      };
+
+      // Act
+      void act(String reason, ProblemCatalog catalog) => expect(
+        () => catalog.toProblemResource(version: 'v1'),
+        throwsA(isA<ProblemResourceError>()),
+        reason: reason,
+      );
+
+      // Assert
+      catalogs.forEach(act);
+      expect(
+        () => ProblemCatalog(portal: _portal).toProblemResource(version: 'v0'),
+        throwsA(isA<ProblemResourceError>()),
+      );
+    });
+
+    test('refuses an entry built for another row', () {
+      // Arrange
+      final ProblemCatalog catalog = ProblemCatalog(portal: _portal)
+        ..addType(
+          const ProblemType(
+            id: 'gone',
+            title: 'Gone',
+            version: 'v2',
+            status: 410,
+          ),
+        );
+
+      // Act
+      void act() => catalog.toProblemResource(version: 'v1');
+
+      // Assert
+      expect(
+        act,
+        throwsA(
+          isA<ProblemResourceError>().having(
+            (ProblemResourceError error) => error.message,
+            'message',
+            contains('/v2/gone'),
+          ),
+        ),
+      );
+    });
+
+    test('refuses an invalid or repeated endpoint', () {
+      // Arrange
+      final List<List<CatalogEndpoint>> endpointSets = <List<CatalogEndpoint>>[
+        <CatalogEndpoint>[const CatalogEndpoint(method: 'get', path: '/notes')],
+        <CatalogEndpoint>[const CatalogEndpoint(method: 'GET', path: 'notes')],
+        <CatalogEndpoint>[
+          const CatalogEndpoint(method: 'GET', path: '/notes'),
+          const CatalogEndpoint(method: 'GET', path: '/notes'),
+        ],
+      ];
+
+      // Act
+      void act(List<CatalogEndpoint> endpoints) => expect(
+        () =>
+            (ProblemCatalog(portal: _portal)
+                  ..addType(GenericProblems.conflict, endpoints: endpoints))
+                .toProblemResource(version: 'v1'),
+        throwsA(isA<ProblemResourceError>()),
+      );
+
+      // Assert
+      endpointSets.forEach(act);
     });
   });
 }

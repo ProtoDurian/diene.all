@@ -2,206 +2,143 @@ import 'package:diene_problems/diene_problems.dart';
 import 'package:diene_problems/test_helper.dart';
 import 'package:test/test.dart';
 
-/// Meta tier — assert-the-asserter: prove [expectProblem] FAILS on every
-/// known-bad case and PASSES on the known-good case. A matcher that cannot fail
-/// is worthless; this is the test of the test helper.
+const Problem _good = Problem(
+  type: 'https://h/docs/l/p/s/m/v1/conflict',
+  title: 'Conflict',
+  status: 409,
+  detail: 'Note 7 changed',
+  instance: '/notes/7',
+  recoverable: true,
+  data: <String, Object?>{
+    'entityType': 'note',
+    'id': '7',
+    'tags': <Object?>[
+      'a',
+      <String, Object?>{'b': 1},
+    ],
+  },
+);
+
+Matcher _mismatch(String text) => throwsA(
+  isA<ProblemMatcherError>()
+      .having(
+        (ProblemMatcherError e) => e,
+        'is an AssertionError',
+        isA<AssertionError>(),
+      )
+      .having((ProblemMatcherError e) => e.message, 'message', contains(text)),
+);
+
 void main() {
-  const good = Problem(
-    type: 'https://h/docs/l/p/s/m/v1/entity_not_found',
-    title: 'Entity not found',
-    status: 404,
-    recoverable: false,
-    detail: 'missing',
-    instance: '/x',
-    data: <String, Object?>{'resource': 'user', 'id': 42},
-  );
-
-  test('passes when every checked field matches', () {
-    expectProblem(
-      good,
-      type: good.type,
-      title: good.title,
-      status: good.status,
-      recoverable: good.recoverable,
-      detail: good.detail,
-      instance: good.instance,
-      data: good.data,
-    );
-  });
-
-  test('passes when only a subset of fields is checked', () {
-    expectProblem(good, status: 404);
-  });
-
-  test('fails when the value is not a Problem', () {
-    expect(
-      () => expectProblem('not a problem'),
-      throwsA(isA<ProblemMatcherError>()),
-    );
-    expect(() => expectProblem(null), throwsA(isA<ProblemMatcherError>()));
-  });
-
-  test('fails on a type mismatch', () {
-    expect(
-      () => expectProblem(good, type: 'https://other'),
-      throwsA(isA<ProblemMatcherError>()),
-    );
-  });
-
-  test('fails on a title mismatch', () {
-    expect(
-      () => expectProblem(good, title: 'Wrong'),
-      throwsA(isA<ProblemMatcherError>()),
-    );
-  });
-
-  test('fails on a status mismatch', () {
-    expect(
-      () => expectProblem(good, status: 500),
-      throwsA(isA<ProblemMatcherError>()),
-    );
-  });
-
-  test('fails on a recoverable mismatch', () {
-    expect(
-      () => expectProblem(good, recoverable: true),
-      throwsA(isA<ProblemMatcherError>()),
-    );
-  });
-
-  test('fails on a detail mismatch', () {
-    expect(
-      () => expectProblem(good, detail: 'other'),
-      throwsA(isA<ProblemMatcherError>()),
-    );
-  });
-
-  test('fails on an instance mismatch', () {
-    expect(
-      () => expectProblem(good, instance: '/other'),
-      throwsA(isA<ProblemMatcherError>()),
-    );
-  });
-
-  test('fails on a data mismatch (different value)', () {
-    expect(
-      () => expectProblem(
-        good,
-        data: <String, Object?>{'resource': 'user', 'id': 99},
-      ),
-      throwsA(isA<ProblemMatcherError>()),
-    );
-  });
-
-  test('fails on a data mismatch (missing key)', () {
-    expect(
-      () => expectProblem(good, data: <String, Object?>{'resource': 'user'}),
-      throwsA(isA<ProblemMatcherError>()),
-    );
-  });
-
-  test('matches nested data structures deeply', () {
-    const nested = Problem(
-      type: 't',
-      title: 'T',
-      status: 400,
-      data: <String, Object?>{
-        'outer': <String, Object?>{
-          'inner': <String>['a', 'b'],
-        },
-      },
-    );
-    expectProblem(
-      nested,
-      data: <String, Object?>{
-        'outer': <String, Object?>{
-          'inner': <String>['a', 'b'],
-        },
-      },
-    );
-    expect(
-      () => expectProblem(
-        nested,
-        data: <String, Object?>{
-          'outer': <String, Object?>{
-            'inner': <String>['a', 'c'],
-          },
-        },
-      ),
-      throwsA(isA<ProblemMatcherError>()),
-    );
-  });
-
-  test('compares maps nested inside lists element by element', () {
-    // A validation problem's `data.fields` is exactly this shape, so a matcher
-    // that only compared list lengths would silently pass a wrong payload.
-    const problem = Problem(
-      type: 't',
-      title: 'T',
-      status: 400,
-      data: <String, Object?>{
-        'fields': <Object?>[
-          <String, Object?>{'path': 'name', 'message': 'required'},
+  group('expectProblem', () {
+    test('passes on a known-good Problem with every field given', () {
+      // Arrange
+      final Map<String, Object?> data = <String, Object?>{
+        'entityType': 'note',
+        'id': '7',
+        'tags': <Object?>[
+          'a',
+          <String, Object?>{'b': 1},
         ],
-      },
-    );
+      };
 
-    expectProblem(
-      problem,
-      data: <String, Object?>{
-        'fields': <Object?>[
-          <String, Object?>{'path': 'name', 'message': 'required'},
-        ],
-      },
-    );
-    expect(
-      () => expectProblem(
-        problem,
-        data: <String, Object?>{
-          'fields': <Object?>[
-            <String, Object?>{'path': 'name', 'message': 'too short'},
+      // Act
+      void act() => expectProblem(
+        _good,
+        type: 'https://h/docs/l/p/s/m/v1/conflict',
+        title: 'Conflict',
+        status: 409,
+        recoverable: true,
+        detail: 'Note 7 changed',
+        instance: '/notes/7',
+        data: data,
+      );
+
+      // Assert
+      expect(act, returnsNormally);
+      expect(() => expectProblem(_good), returnsNormally);
+    });
+
+    test('fails on a value that is not a Problem', () {
+      // Arrange
+      const Object notAProblem = 'boom';
+
+      // Act
+      void act() => expectProblem(notAProblem);
+
+      // Assert
+      expect(act, _mismatch('expected a Problem but got String'));
+      expect(() => expectProblem(null), _mismatch('got Null'));
+    });
+
+    test('names the first mismatched envelope field', () {
+      // Arrange
+      final Map<String, void Function()> bad = <String, void Function()>{
+        'Problem.type mismatch': () => expectProblem(_good, type: 'x'),
+        'Problem.title mismatch': () => expectProblem(_good, title: 'x'),
+        'Problem.status mismatch': () => expectProblem(_good, status: 500),
+        'Problem.recoverable mismatch': () =>
+            expectProblem(_good, recoverable: false),
+        'Problem.detail mismatch': () => expectProblem(_good, detail: 'x'),
+        'Problem.instance mismatch': () => expectProblem(_good, instance: 'x'),
+      };
+
+      // Act
+      void act(String text, void Function() call) =>
+          expect(call, _mismatch(text));
+
+      // Assert
+      bad.forEach(act);
+    });
+
+    test('compares data deeply and fails on any difference', () {
+      // Arrange
+      final List<Map<String, Object?>> wrong = <Map<String, Object?>>[
+        <String, Object?>{'entityType': 'note'},
+        <String, Object?>{
+          'entityType': 'note',
+          'id': '7',
+          'other': <Object?>[],
+        },
+        <String, Object?>{'entityType': 'note', 'id': '8', 'tags': <Object?>[]},
+        <String, Object?>{
+          'entityType': 'note',
+          'id': '7',
+          'tags': <Object?>['a'],
+        },
+        <String, Object?>{
+          'entityType': 'note',
+          'id': '7',
+          'tags': <Object?>[
+            'a',
+            <String, Object?>{'b': 2},
           ],
         },
-      ),
-      throwsA(isA<ProblemMatcherError>()),
-      reason: 'a differing map inside a list must fail',
-    );
-  });
+      ];
 
-  test('compares lists nested inside lists element by element', () {
-    const problem = Problem(
-      type: 't',
-      title: 'T',
-      status: 400,
-      data: <String, Object?>{
-        'matrix': <Object?>[
-          <Object?>[1, 2],
-          <Object?>[3, 4],
-        ],
-      },
-    );
+      // Act
+      void act(Map<String, Object?> data) => expect(
+        () => expectProblem(_good, data: data),
+        _mismatch('Problem.data'),
+      );
 
-    expectProblem(
-      problem,
-      data: <String, Object?>{
-        'matrix': <Object?>[
-          <Object?>[1, 2],
-          <Object?>[3, 4],
-        ],
-      },
-    );
-    expect(
-      () => expectProblem(
-        problem,
-        data: <String, Object?>{
-          'matrix': <Object?>[
-            <Object?>[1, 2],
-            <Object?>[3, 5],
-          ],
-        },
-      ),
-      throwsA(isA<ProblemMatcherError>()),
-      reason: 'a differing list inside a list must fail',
-    );
+      // Assert
+      wrong.forEach(act);
+    });
+
+    test('noData passes on a data-less Problem and fails otherwise', () {
+      // Arrange
+      const Problem dataLess = Problem(type: 't', title: 'T', status: 401);
+
+      // Act
+      void act() => expectProblem(dataLess, noData: true);
+
+      // Assert
+      expect(act, returnsNormally);
+      expect(
+        () => expectProblem(_good, noData: true),
+        _mismatch('Problem.data mismatch: expected <null>'),
+      );
+    });
   });
 }

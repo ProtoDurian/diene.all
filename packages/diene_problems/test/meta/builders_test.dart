@@ -2,82 +2,130 @@ import 'package:diene_problems/diene_problems.dart';
 import 'package:diene_problems/test_helper.dart';
 import 'package:test/test.dart';
 
-/// Meta tier — builder invariants: the registry-aware builders in
-/// `test_helper.dart` always mint valid shapes with single-source type URIs.
 void main() {
   group('aProblem', () {
-    test('mints a type URI via problemTypeUri (never hand-formatted)', () {
-      final p = aProblem(id: 'entity_not_found', version: 'v1');
-      expect(
-        p.type,
-        'https://local.atomi.cloud/docs/local/flutter/app/core/v1/entity_not_found',
+    test('builds a valid entity_not_found envelope by default', () {
+      // Arrange
+      final ProblemRegistry registry = ProblemRegistry(ErrorPortal.localError);
+
+      // Act
+      final Problem problem = aProblem();
+
+      // Assert
+      expectProblem(
+        problem,
+        type: registry.typeUriFor(GenericProblems.entityNotFound),
+        status: GenericProblems.entityNotFound.status,
+        recoverable: GenericProblems.entityNotFound.recoverable,
+        data: <String, Object?>{'entityType': 'user', 'id': '42'},
       );
+      expect(Problem.fromJson(problem.toJson()), problem);
     });
 
-    test('honours status/recoverable/data overrides', () {
-      final p = aProblem(
-        status: 409,
+    test('honours overrides and builds a data-less envelope', () {
+      // Arrange
+      final ErrorPortal portal = anErrorPortal(service: 'billing');
+
+      // Act
+      final Problem problem = aProblem(
+        portal: portal,
+        id: 'unauthenticated',
+        title: 'Unauthenticated',
+        status: 401,
         recoverable: true,
-        data: <String, Object?>{'k': 'v'},
+        detail: 'sign in',
+        instance: '/me',
+        data: null,
       );
-      expect(p.status, 409);
-      expect(p.recoverable, true);
-      expect(p.data, {'k': 'v'});
+
+      // Assert
+      expectProblem(
+        problem,
+        type: problemTypeUri(
+          portal: portal,
+          version: 'v1',
+          id: 'unauthenticated',
+        ),
+        status: 401,
+        recoverable: true,
+        detail: 'sign in',
+        instance: '/me',
+        noData: true,
+      );
+      expect(problem.toJson().containsKey('data'), isFalse);
     });
 
-    test('round-trips through Problem.fromJson', () {
-      final p = aProblem();
-      expect(Problem.fromJson(p.toJson()), p);
-    });
+    test('refuses an id the one builder rejects', () {
+      // Arrange
+      const String kebab = 'entity-not-found';
 
-    test('accepts a custom portal', () {
-      const portal = ErrorPortal(
-        scheme: 'https',
-        host: 'h',
-        landscape: 'l',
-        platform: 'p',
-        service: 's',
-        module: 'm',
-      );
-      expect(
-        aProblem(portal: portal, id: 'x').type,
-        'https://h/docs/l/p/s/m/v1/x',
-      );
+      // Act
+      void act() => aProblem(id: kebab);
+
+      // Assert
+      expect(act, throwsA(isA<InvalidProblemTypeSegmentError>()));
     });
   });
 
   group('anErrorPortal', () {
-    test('builds a portal whose URI is well-formed', () {
-      final portal = anErrorPortal();
-      final uri = problemTypeUri(portal: portal, version: 'v1', id: 'x');
-      expect(uri, startsWith('https://'));
-      expect(uri, contains('/docs/'));
+    test('builds a portal the one builder accepts', () {
+      // Arrange
+      final ErrorPortal portal = anErrorPortal(
+        scheme: 'http',
+        host: 'localhost:8080',
+        landscape: 'pichu',
+        platform: 'go',
+        module: 'svc',
+      );
+
+      // Act
+      final String uri = problemTypeUri(portal: portal, version: 'v1', id: 'x');
+
+      // Assert
+      expect(uri, 'http://localhost:8080/docs/pichu/go/user/svc/v1/x');
     });
   });
 
   group('aCatalogEntry', () {
-    test('mints a single-source type URI and renders valid CR content', () {
-      final entry = aCatalogEntry(
-        id: 'validation_error',
-        status: 400,
-        recoverable: true,
-      );
-      expect(entry.typeUri, contains('/v1/validation_error'));
-      final crd = entry.toCrdContent();
-      expect(crd['id'], 'validation_error');
-      expect(crd['status'], 400);
-      expect(crd['recoverable'], true);
-      expect(crd['endpoints'], <Object?>[]);
-    });
+    test('builds an entry whose type URI comes from the one builder', () {
+      // Arrange
+      final ErrorPortal portal = anErrorPortal();
 
-    test('carries declared endpoints', () {
-      final entry = aCatalogEntry(
-        id: 'x',
+      // Act
+      final CatalogEntry entry = aCatalogEntry(
+        portal: portal,
+        id: 'conflict',
+        title: 'Conflict',
+        status: 409,
+        recoverable: true,
+        dataSchema: GenericProblems.conflict.dataSchema,
         endpoints: const <CatalogEndpoint>[
-          CatalogEndpoint(method: 'GET', path: '/x'),
+          CatalogEndpoint(method: 'POST', path: '/user'),
         ],
       );
-      expect((entry.toCrdContent()['endpoints'] as List<Object?>).length, 1);
+
+      // Assert
+      expect(
+        entry.typeUri,
+        ProblemRegistry(portal).typeUriFor(GenericProblems.conflict),
+      );
+      expect(
+        entry.toCrdContent()['schema'],
+        GenericProblems.conflict.dataSchema,
+      );
+      expect(entry.endpoints.single.method, 'POST');
+    });
+
+    test('defaults to a data-less entry on the local-error portal', () {
+      // Arrange
+      const String id = 'unauthorized';
+
+      // Act
+      final CatalogEntry entry = aCatalogEntry(id: id);
+
+      // Assert
+      expect(entry.typeUri, endsWith('/core/v1/unauthorized'));
+      expect(entry.toCrdContent()['schema'], noProblemDataSchema);
     });
   });
 }
