@@ -30,9 +30,8 @@ export interface ProblemDefinition<TSchema extends ProblemDataSchema = ProblemDa
   readonly dataSchema?: TSchema;
 }
 
-export interface RegisteredProblem<
-  TSchema extends ProblemDataSchema = ProblemDataSchema,
-> extends ProblemDefinition<TSchema> {
+export interface RegisteredProblem<TSchema extends ProblemDataSchema = ProblemDataSchema>
+  extends ProblemDefinition<TSchema> {
   readonly type: string;
   readonly schema: JsonSchema;
 }
