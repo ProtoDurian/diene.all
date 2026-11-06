@@ -22,7 +22,7 @@ q() { jq -r "$1" <<<"${manifest}"; }
 deps_want="@atomicloud/diene.core-utils,@atomicloud/diene.result,yaml,zod"
 [[ "$(q '(.dependencies // {}) | keys | join(",")')" == "${deps_want}" ]] || fail "runtime dependencies must be exactly ${deps_want}, got: $(q '(.dependencies // {}) | keys | join(",")')"
 for dep in @atomicloud/diene.core-utils @atomicloud/diene.result; do
-  [[ "$(q ".dependencies[\"${dep}\"]")" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "${dep} must pin an exact published version, got $(q ".dependencies[\"${dep}\"]")"
+  [[ "$(q ".dependencies[\"${dep}\"]")" =~ ^\^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "${dep} must use a caret range on a published version, got $(q ".dependencies[\"${dep}\"]")"
 done
 for field in peerDependencies optionalDependencies bundleDependencies bundledDependencies; do
   [[ "$(q "(.${field} // []) | length")" == 0 ]] || fail "${field} declared"
