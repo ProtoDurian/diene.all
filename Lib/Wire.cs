@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 namespace AtomiCloud.Diene.CoreUtils;
 
 /// <summary>
-/// The C0 §1 serialization contract as Result-returning codecs, for the call
+/// The cross-language wire contract as Result-returning codecs, for the call
 /// sites that are not System.Text.Json: config values, CLI arguments, headers,
 /// and tests. JSON payloads get the same forms through
 /// <see cref="Json.AtomiJson" />.

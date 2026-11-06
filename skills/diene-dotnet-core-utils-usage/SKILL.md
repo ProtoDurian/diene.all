@@ -10,7 +10,7 @@ description: Put dates, times, durations, timezones, decimals, and int64s on the
 `AtomiCloud.Diene.CoreUtils` is a pure value library. It holds the three things
 the .NET family could not get from the BCL:
 
-1. **Wire codecs** for the C0 §1 serialization contract — the one spelling of
+1. **Wire codecs** for the cross-language wire contract — the one spelling of
    every date, time, instant, duration, timezone, decimal, and 64-bit integer
    that crosses a service boundary.
 2. **Slug and namespaced-key helpers**, byte-parity with the sibling
@@ -151,8 +151,8 @@ There is no `AtomiCloud.Diene.CoreUtils.TestHelper`, on purpose. Every member
 here is a deterministic value function: there is no port to fake, no clock to
 inject, and the outputs are plain strings and BCL temporal types that stock
 `Should().Be(...)` already asserts well. A helper would only re-export this
-library's own round-trip tests. Consequently `pls test:meta` is a no-op in this
-repository and no empty `meta` flag is uploaded to codecov.
+library's own round-trip tests. Consequently `task test:meta` is a no-op in this
+repository and writes no coverage report.
 
 Re-open the decision when — and only when — one of these becomes true:
 
@@ -174,10 +174,10 @@ To add one at that point:
 3. Nothing else needs configuring: `.config/dotnet-base.test.yaml` already
    registers the meta ledger at `[*.TestHelper]*` @ 100, `scripts/local/dotnet-test.sh`
    activates the meta tier the moment a `TestHelper*.csproj` exists, and the
-   `meta` CI job and codecov flag are already wired.
+   `meta` CI job is already wired.
 4. Write the meta suite: assert-the-asserter (every helper proven to FAIL on a
    known-bad case and pass on a known-good one), plus fixture invariants.
-5. Add the second package id to `scripts/validate/dotnet-package.sh`
-   (`package_ids`), raise its artifact count from two to four, and add the
-   `dotnet add package` line back to `scripts/ci/pkg-validate.sh`.
+5. In `scripts/ci/pkg-validate.sh`, add the TestHelper `dotnet add package` line
+   and its pattern to the scratch `packageSourceMapping`.
+   `scripts/validate/dotnet-package.sh` derives the package ids from the solution.
 6. Update this section and the README to cover the helper's usage.

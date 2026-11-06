@@ -1,7 +1,7 @@
 namespace AtomiCloud.Diene.CoreUtils;
 
 /// <summary>
-/// A wire payload that does not obey the C0 §1 serialization contract.
+/// A wire payload that does not obey the cross-language wire contract.
 /// Parsing is total: every codec in <see cref="Wire" /> reports a rejection with
 /// this record rather than throwing.
 /// </summary>

@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace AtomiCloud.Diene.CoreUtils.Json;
 
 /// <summary>
-/// The System.Text.Json entry point for the C0 §1 wire contract. Register these
+/// The System.Text.Json entry point for the cross-language wire contract. Register these
 /// options once at composition and every date, time, instant, duration,
 /// timezone, decimal, and 64-bit integer in the payload obeys the contract
 /// without a single per-property attribute.

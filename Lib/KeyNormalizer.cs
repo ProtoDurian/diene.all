@@ -3,7 +3,7 @@ using System.Text;
 namespace AtomiCloud.Diene.CoreUtils;
 
 /// <summary>
-/// The one canonical key-matching rule from the C0 §3 config contract:
+/// The one canonical key-matching rule shared by every config library:
 /// <c>snake_case</c>, <c>kebab-case</c>, <c>camelCase</c>, and <c>PascalCase</c>
 /// spellings of the same key all match.
 /// </summary>

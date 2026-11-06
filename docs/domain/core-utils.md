@@ -11,7 +11,7 @@ if .NET lacks a native or LINQ answer.
 
 | Member                                | Why it exists                                                                                                                     |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `Wire` + `AtomiJson` converters       | The C0 §1 serialization contract — one spelling of every date, time, instant, duration, timezone, decimal, and int64 on the wire. |
+| `Wire` + `AtomiJson` converters       | The cross-language wire contract — one spelling of every date, time, instant, duration, timezone, decimal, and int64 on the wire. |
 | `Slug.Slugify` / `Slug.NamespacedKey` | Identifiers derived in C# must equal identifiers derived in TypeScript, Go, and Dart.                                             |
 | `KeyNormalizer`                       | The one canonical key-matching rule; consumed by the Config lib's YAML provider.                                                  |
 | `WireAttributes`                      | Bridges the wire forms onto the `ILoggerSink` / `IMetricsCollector` attribute maps declared by `AtomiCloud.Diene.Interfaces`.     |
