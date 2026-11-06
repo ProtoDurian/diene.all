@@ -19,17 +19,27 @@ export default {
     },
     {
       name: 'mutation-bun-integration-coverage-caught',
-      description: 'An uncovered adapter source file turns the integration coverage ledger red.',
+      description: 'An adapter no integration test touches turns the integration coverage ledger red.',
       kind: 'mutation',
-      expectedImpact: ['bun-deadcode', 'bun-integration-tests'],
+      expectedImpact: ['bun-deadcode'],
       async run(repo: any) {
         await repo.write(
           'src/adapters/__probe_uncovered__.ts',
           'export function probeAdapterUncovered(): number {\n  return 1;\n}\n',
         );
         await repo.write(
-          'src/index.ts',
-          `${await repo.read('src/index.ts')}\nexport { probeAdapterUncovered } from './adapters/__probe_uncovered__';\n`,
+          'tests/integration/__probe__.test.ts',
+          [
+            "import { describe, it } from 'bun:test';",
+            "import 'should';",
+            '',
+            "describe('integration probe passing', () => {",
+            "  it('passes without the adapter', () => {",
+            '    (1).should.equal(1);',
+            '  });',
+            '});',
+            '',
+          ].join('\n'),
         );
         await expectBunRed(repo, command, 'bun-integration-coverage');
       },
