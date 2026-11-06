@@ -2,14 +2,8 @@ using AtomiCloud.Diene.Results;
 
 namespace AtomiCloud.DotnetBase.App;
 
-/// <summary>
-/// Exercises the full published surface of <c>AtomiCloud.Diene.Result</c> as an
-/// in-repo consumer. Each method is a compilable usage example; results are
-/// discarded because the demonstration is the call itself, not its output.
-/// </summary>
 public static class Samples
 {
-    /// <summary>Runs every demonstration.</summary>
     public static void RunAll()
     {
         ResultCore();

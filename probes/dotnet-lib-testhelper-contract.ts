@@ -23,7 +23,7 @@ export default defineGate({
         replace: '.ForCondition(true)',
       });
       await expectRedBecause(repo, UNIT, 'dotnet-lib-testhelper-contract', [
-        'Result_assertions_should_accept_and_reject_both_variants',
+        'Result_assertions_should_reject_a_success_expected_to_be_a_failure',
       ]);
     },
   },
