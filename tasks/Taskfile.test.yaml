@@ -11,7 +11,7 @@ tasks:
         if [ "{{.MODE}}" = "meta" ]; then
           ./scripts/local/test-meta.sh "{{.CONFIG}}"
         elif [ "{{.MODE}}" = "int" ]; then
-          ./scripts/local/test-int.sh "{{.CONFIG}}"
+          ./scripts/ci/test.sh int
         else
           bun test --config={{.CONFIG}}
         fi
@@ -23,7 +23,7 @@ tasks:
         if [ "{{.MODE}}" = "meta" ]; then
           ./scripts/local/test-meta.sh "{{.CONFIG}}" coverage
         elif [ "{{.MODE}}" = "int" ]; then
-          ./scripts/local/test-int.sh "{{.CONFIG}}" coverage
+          ./scripts/ci/test.sh int
         else
           bun test --config={{.CONFIG}} --coverage
         fi
