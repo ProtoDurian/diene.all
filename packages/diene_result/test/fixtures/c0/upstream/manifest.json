@@ -1,0 +1,21 @@
+{
+  "authority": "c0-fixtures-r2",
+  "source": {
+    "commit": "fe77520d591f81a9762c40ebf68dc9c0106502d3",
+    "path": "contracts/c0/cases/result-wire.json",
+    "sha256": "7a72a9ad48435771141a927057ea117d0f50786b07f8cb5bfef07812b936f821"
+  },
+  "algorithm": "sha256 of the subtree printed by jq -cS (sorted keys, no whitespace, trailing newline)",
+  "vectors": {
+    "result_wire.json": {
+      "pointer": "/cases",
+      "sha256": "ea5d73d0d6c9288362f4daeee4f78c0e39ca4cb97587f3c8366bf095f377986e",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/result-wire.json | jq -cS .cases | sha256sum",
+      "adaptations": [
+        "None for the codec: every valid Result and Option vector must decode and encode back unchanged, and every invalid one must be rejected.",
+        "The err-problem envelope sets every Problem member, so the diene_problems 0.1.1 codec writes it back unchanged; that codec writes a problem without data as data {} and recoverable false, and no vector covers that.",
+        "The combinator and tag lists are checked against the Dart method names and wire tags, which are the same."
+      ]
+    }
+  }
+}
