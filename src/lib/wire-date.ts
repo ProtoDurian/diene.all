@@ -79,14 +79,15 @@ class WireDateCodec {
     return this.attempt('datetime', `wire datetime "${input}" is not a valid instant`, () =>
       Temporal.Instant.from(input),
     ).andThen(instant =>
-      instant.toString() === input
+      // Temporal clamps a leap second (:60) to :59, so the whole seconds must survive the parse.
+      instant.toString({ smallestUnit: 'second' }).slice(0, 19) === input.slice(0, 19)
         ? Ok(instant)
-        : this.fail('datetime', `wire datetime must use canonical fractional precision, received "${input}"`),
+        : this.fail('datetime', `wire datetime "${input}" is not a valid instant`),
     );
   }
 
   formatDateTime(instant: Temporal.Instant): Result<string, WireDateError> {
-    const formatted = instant.toString();
+    const formatted = instant.toString({ fractionalSecondDigits: 3 });
     if (!INSTANT_PATTERN.test(formatted)) {
       return this.fail('datetime', 'wire datetime domain value is outside the canonical RFC 3339 year range');
     }

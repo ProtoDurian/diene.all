@@ -69,20 +69,22 @@ below is that contract's complete wire rule set. It follows the repository's
 [date/time standard](../datetime/index.md). These are wire values, not display
 formats.
 
-| Domain value         | Canonical wire form                | Methods                            |
-| -------------------- | ---------------------------------- | ---------------------------------- |
-| `Temporal.PlainDate` | `YYYY-MM-DD`                       | `parseDate` / `formatDate`         |
-| `Temporal.PlainTime` | `HH:mm:ss`                         | `parseTime` / `formatTime`         |
-| `Temporal.Instant`   | RFC 3339 UTC instant ending in `Z` | `parseDateTime` / `formatDateTime` |
-| `Temporal.Duration`  | ISO 8601 duration                  | `parseDuration` / `formatDuration` |
-| `WireTimeZone`       | case-normalized IANA id            | `parseTimeZone` / `formatTimeZone` |
+| Domain value         | Canonical wire form                  | Methods                            |
+| -------------------- | ------------------------------------ | ---------------------------------- |
+| `Temporal.PlainDate` | `YYYY-MM-DD`                         | `parseDate` / `formatDate`         |
+| `Temporal.PlainTime` | `HH:mm:ss`                           | `parseTime` / `formatTime`         |
+| `Temporal.Instant`   | RFC 3339 UTC, 3 fraction digits, `Z` | `parseDateTime` / `formatDateTime` |
+| `Temporal.Duration`  | ISO 8601 duration                    | `parseDuration` / `formatDuration` |
+| `WireTimeZone`       | case-normalized IANA id              | `parseTimeZone` / `formatTimeZone` |
 
 Every `parse*` method, and every `format*` method that can meet an
 unrepresentable value, returns `Result<…, WireDateError>`; `formatDuration` is
 total and returns a string. `WireDateError` extends `RangeError` and names the
 `form` that failed. Parsing rejects non-canonical spellings; formatting emits the
-one canonical spelling. Fractional instant seconds are kept, while `HH:mm:ss`
-rejects a sub-second time rather than dropping precision. Fixed offsets and
+one canonical spelling. An instant is written with exactly three fraction digits
+(`2026-11-06T03:00:00.000Z`, the shared wire format) and read with zero to nine;
+finer precision is truncated to milliseconds. `HH:mm:ss` rejects a sub-second
+time rather than dropping precision. Fixed offsets and
 abbreviations are not timezones. A timezone id is case-normalized only: links
 such as `Asia/Calcutta` are accepted as given, not resolved.
 

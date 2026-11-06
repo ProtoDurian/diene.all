@@ -107,10 +107,9 @@ describe('WireDateCodec time', () => {
 
 describe('WireDateCodec datetime', () => {
   it.each([
-    { wire: '1970-01-01T00:00:00Z' },
-    { wire: '2020-01-02T03:04:05Z' },
-    { wire: '2026-07-24T23:59:59Z' },
-    { wire: '2026-07-24T23:59:59.123456789Z' },
+    { wire: '1970-01-01T00:00:00.000Z' },
+    { wire: '2020-01-02T03:04:05.120Z' },
+    { wire: '2026-07-24T23:59:59.999Z' },
   ])('should round-trip Temporal.Instant for $wire', async ({ wire }) => {
     // Arrange
     const domain = await expectOk(codec.parseDateTime(wire));
@@ -125,12 +124,28 @@ describe('WireDateCodec datetime', () => {
   });
 
   it.each([
+    { wire: '2020-01-02T03:04:05Z', expected: '2020-01-02T03:04:05.000Z', label: 'no fraction digits' },
+    { wire: '2020-01-02T03:04:05.1Z', expected: '2020-01-02T03:04:05.100Z', label: 'one fraction digit' },
+    { wire: '2020-01-02T03:04:05.123456789Z', expected: '2020-01-02T03:04:05.123Z', label: 'nine fraction digits' },
+  ])('should parse $label leniently and format exactly three digits', async ({ wire, expected }) => {
+    // Arrange
+    const domain = await expectOk(codec.parseDateTime(wire));
+
+    // Act
+    const actual = await expectOk(codec.formatDateTime(domain));
+
+    // Assert
+    actual.should.equal(expected);
+  });
+
+  it.each([
     { wire: '2020-01-02T03:04:05', message: /canonical RFC 3339 UTC instant/ },
     { wire: '2020-01-02T03:04:05+08:00', message: /canonical RFC 3339 UTC instant/ },
     { wire: '2020-01-02 03:04:05Z', message: /canonical RFC 3339 UTC instant/ },
     { wire: '2020-01-02T03:04Z', message: /canonical RFC 3339 UTC instant/ },
     { wire: '2020-13-01T00:00:00Z', message: /not a valid instant/ },
-    { wire: '2020-01-02T03:04:05.120Z', message: /canonical fractional precision/ },
+    { wire: '2020-01-02T03:04:05.1234567890Z', message: /canonical RFC 3339 UTC instant/ },
+    { wire: '2026-07-24T23:59:60Z', message: /not a valid instant/ },
   ])('should reject wire datetime "$wire"', async ({ wire, message }) => {
     // Arrange
     const input = wire;

@@ -90,7 +90,7 @@ const zone = await wire.parseTimeZone('Europe/London').unwrap(); // WireTimeZone
 ```
 
 Accepted wire spellings: date `YYYY-MM-DD`, time `HH:mm:ss`, a UTC RFC 3339
-instant ending in `Z` (minimal fractional seconds when needed), an ISO 8601
+instant ending in `Z` (written with exactly three fraction digits, read with 0-9), an ISO 8601
 duration in canonical Temporal spelling, and a case-normalized IANA timezone id.
 Never put localized dates, offsets or abbreviations such as `PST` on the wire.
 
