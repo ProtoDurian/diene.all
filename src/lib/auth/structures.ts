@@ -2,7 +2,7 @@ export type TenantStatus = 'pending' | 'approved' | 'suspended';
 
 export type TenantApprovalMode = 'manual' | 'auto';
 
-export type CredentialKind = 'session' | 'apiKey' | 'oauth';
+type CredentialKind = 'session' | 'apiKey' | 'oauth';
 
 export interface TenantRecord {
   readonly slug: string;
