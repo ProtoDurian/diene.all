@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, it } from 'bun:test';
+import { randomUUID } from 'node:crypto';
 import { expectErr, expectOk } from '@atomicloud/diene.result/test-helper';
 import 'should';
 import { CopyBucketForker } from '../../../src/adapters/fork/copy-bucket-forker';
@@ -128,8 +129,8 @@ describe('TigrisBucketForker', () => {
     const s3 = new S3Client({
       endpoint: `http://127.0.0.1:${server.port}/`,
       region: 'auto',
-      accessKeyId: 'tid',
-      secretAccessKey: 'tsec',
+      accessKeyId: randomUUID(),
+      secretAccessKey: randomUUID(),
     });
     subject = new TigrisBucketForker(
       new S3ForkBuckets(s3, new ForkNaming({ database: 'app', bucket: 'files' })),

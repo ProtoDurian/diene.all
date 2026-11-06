@@ -8,12 +8,13 @@ import { ForkSeeder } from './seed';
 
 describe('PgForkSanitizer (Testcontainers Postgres)', () => {
   let db: PostgresFixture;
+  let seededSecret: string;
   const subject = new PgForkSanitizer(new RandomSecretGenerator());
 
   beforeAll(async () => {
     db = await PostgresFixture.start();
     const tenantId = await db.createTenant('acme');
-    await db.admin(client => new ForkSeeder().seed(client, tenantId));
+    seededSecret = (await db.admin(client => new ForkSeeder().seed(client, tenantId))).clientSecret;
   }, 120_000);
 
   afterAll(async () => {
@@ -59,7 +60,7 @@ describe('PgForkSanitizer (Testcontainers Postgres)', () => {
       { id: 'i2', status: 'accepted' },
     ]);
     state.clients[0].clientId.should.equal('confidential');
-    state.clients[0].clientSecret.should.not.equal('client-secret-live');
+    state.clients[0].clientSecret.should.not.equal(seededSecret);
     state.clients[0].clientSecret.length.should.be.above(20);
     state.clients[1].should.deepEqual({ clientId: 'public-cli', clientSecret: null });
     state.jobs.should.deepEqual([

@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, it } from 'bun:test';
+import { randomUUID } from 'node:crypto';
 import { expectErr, expectOk } from '@atomicloud/diene.result/test-helper';
 import 'should';
 import { type NeonConnection, NeonBrancher } from '../../../src/adapters/fork/neon-brancher';
@@ -65,11 +66,12 @@ describe('NeonBrancher (fake Neon API)', () => {
   const neon = new FakeNeon();
   let connection: NeonConnection;
   const naming = new ForkNaming({ database: 'app', bucket: 'files' });
+  const apiKey = randomUUID();
 
   beforeAll(() => {
     neon.start();
     connection = {
-      apiKey: 'neon-key',
+      apiKey,
       projectId: 'proj-1',
       parentBranchId: 'br-main',
       databaseName: 'app',
@@ -111,7 +113,7 @@ describe('NeonBrancher (fake Neon API)', () => {
       branch: { name: 'fork-demo', parent_id: 'br-main' },
       endpoints: [{ type: 'read_write' }],
     });
-    neon.calls.every(call => call.auth === 'Bearer neon-key').should.be.true();
+    neon.calls.every(call => call.auth === `Bearer ${apiKey}`).should.be.true();
   });
 
   it('should branch from the project default when no parent is set', async () => {

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { AwsClient } from 'aws4fetch';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import type { S3Connection } from '../../../src/adapters/fork/s3-client';
@@ -15,9 +16,10 @@ export class MinioFixture {
   }
 
   static async start(): Promise<MinioFixture> {
+    const password = randomUUID();
     const container = await new GenericContainer(MINIO_IMAGE)
       .withCommand(['server', '/data'])
-      .withEnvironment({ MINIO_ROOT_USER: 'aseity', MINIO_ROOT_PASSWORD: 'aseity-secret' })
+      .withEnvironment({ MINIO_ROOT_USER: 'aseity', MINIO_ROOT_PASSWORD: password })
       .withExposedPorts(9000)
       .withWaitStrategy(Wait.forHttp('/minio/health/ready', 9000))
       .start();
@@ -25,7 +27,7 @@ export class MinioFixture {
       endpoint: `http://${container.getHost()}:${container.getMappedPort(9000)}`,
       region: 'us-east-1',
       accessKeyId: 'aseity',
-      secretAccessKey: 'aseity-secret',
+      secretAccessKey: password,
     });
   }
 
