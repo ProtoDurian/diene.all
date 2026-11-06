@@ -1,5 +1,9 @@
 import { describe, it } from 'bun:test';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import Ajv2020 from 'ajv/dist/2020';
 import 'should';
+import { parse } from 'yaml';
 import { z } from 'zod';
 import { ConfigRegistry } from '../../src/lib/registry.js';
 import { JsonSchemaGenerator } from '../../src/lib/schema.js';
@@ -52,5 +56,27 @@ describe('JsonSchemaGenerator.generate', () => {
 
     // Assert
     actual.should.deepEqual(expected);
+  });
+});
+
+describe('JsonSchemaGenerator.generate — editor validation of a sample YAML', () => {
+  const ajv = new Ajv2020({ allErrors: true, strict: true });
+  const fixtures = resolve(import.meta.dir, '../fixtures/schema');
+
+  it.each([
+    { file: 'config.yaml', valid: true, errors: [] },
+    { file: 'invalid.config.yaml', valid: false, errors: ['/server/port must be number'] },
+  ])('should judge $file with the generated draft 2020-12 schema', async ({ file, valid, errors }) => {
+    // Arrange
+    const text = await readFile(resolve(fixtures, file), 'utf8');
+    const validate = ajv.compile(generator.generate(registry));
+
+    // Act
+    const actual = validate(parse(text));
+
+    // Assert
+    (text.split('\n')[0] ?? '').should.equal('# yaml-language-server: $schema=./schema.json');
+    actual.should.equal(valid);
+    (validate.errors ?? []).map(error => `${error.instancePath} ${error.message}`).should.deepEqual(errors);
   });
 });
