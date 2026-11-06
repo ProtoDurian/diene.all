@@ -11,7 +11,7 @@ with packages;
   lint = [
     actionlint
     dlint
-    infralint-core
+    infralint
     pre-commit
     shellcheck
     skills-sync
@@ -35,7 +35,7 @@ with packages;
 
   system = [
     atomiutils
-    infrautils-core
+    infrautils
     nix
   ];
 }

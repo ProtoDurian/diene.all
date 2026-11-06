@@ -12,9 +12,8 @@ let
           atomiutils
           cyanprint
           dlint
-          # Axis-pure slices: the infralint/infrautils aggregates ship helm, helm-docs and helmlint.
-          infralint-core
-          infrautils-core
+          infralint
+          infrautils
           releaser
           skills-sync
           ;
