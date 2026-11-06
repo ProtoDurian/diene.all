@@ -10,6 +10,7 @@ describe('Hasher.sha256', () => {
       input: 'The quick brown fox jumps over the lazy dog',
       expected: 'd7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592',
     },
+    { input: 'é', expected: '4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c' },
   ])('should hash "$input" to its known lowercase hex digest', async ({ input, expected }) => {
     // Arrange
     const hasher = new Hasher();
