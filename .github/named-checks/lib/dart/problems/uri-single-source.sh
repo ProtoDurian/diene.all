@@ -14,57 +14,77 @@ pkg="packages/diene_problems"
 mapfile -t files < <(git ls-tree -r --name-only "${tree}" -- "${pkg}/lib" "${pkg}/example" | grep -E '\.dart$' || true)
 [[ ${#files[@]} -gt 0 ]] || { echo "❌ no Dart sources under ${pkg}/lib or ${pkg}/example" >&2 && exit 1; }
 
+# Reads a Dart source on stdin; prints "DOCS" when a string (adjacent literals
+# joined) builds a URI with a `docs` path segment, then "SEG <name>" for each
+# segment its interpolations name.
+parser="$(mktemp -d)/parse.dart"
+cat >"${parser}" <<'DART'
+import 'dart:convert';
+import 'dart:io';
+
+class Run { final pieces = <String>[]; var code = ''; }
+
+late String src;
+final runs = <Run>[];
+var i = 0;
+String at(int k) => k >= 0 && k < src.length ? src[k] : '';
+String js(int k) => k < src.length ? src[k] : 'undefined';
+bool has(String p, String s) => RegExp(p).hasMatch(s);
+
+String lex(bool inner) {
+  final out = StringBuffer();
+  var depth = 0, after = -1;
+  while (i < src.length) {
+    final c = src[i], n = at(i + 1);
+    if (c == '/' && n == '/') { while (i < src.length && src[i] != '\n') i++; continue; }
+    if (c == '/' && n == '*') { var d = 0; do { if (src.startsWith('/*', i)) { d++; i += 2; } else if (src.startsWith('*/', i)) { d--; i += 2; } else i++; } while (d > 0 && i < src.length); out.write(' '); continue; }
+    if (inner && c == '{') depth++;
+    if (inner && c == '}' && depth-- == 0) { i++; return out.toString(); }
+    final raw = (c == 'r' || c == 'R') && (n == "'" || n == '"') && !has(r'[\w$]', at(i - 1));
+    if (c == "'" || c == '"' || raw) {
+      final adjacent = after >= 0 && has(r'^\s*$', src.substring(after, i));
+      if (raw) i++;
+      final run = adjacent ? runs.last : Run();
+      if (!adjacent) runs.add(run);
+      str(raw, run);
+      after = i; out.write(' S '); continue;
+    }
+    out.write(c); i++;
+  }
+  return out.toString();
+}
+
+void str(bool raw, Run run) {
+  final q = src.startsWith(src[i] * 3, i) ? src[i] * 3 : src[i];
+  final s = StringBuffer();
+  void put() { run.pieces.add(s.toString()); s.clear(); }
+  for (i += q.length; i < src.length && !src.startsWith(q, i); ) {
+    if (!raw && src[i] == r'\') { s.write(js(i + 1)); i += 2; continue; }
+    if (!raw && src[i] == r'$' && at(i + 1) == '{') { put(); i += 2; run.code += ' (${lex(true)}) '; continue; }
+    if (!raw && src[i] == r'$' && has(r'[A-Za-z_]', js(i + 1))) { put(); var j = i + 1; while (has(r'\w', at(j))) j++; run.code += ' (${src.substring(i + 1, j)}) '; i = j; continue; }
+    s.write(src[i++]);
+  }
+  i += q.length; put();
+}
+
+void main() async {
+  src = await stdin.transform(const Utf8Decoder(allowMalformed: true)).join();
+  if (src.startsWith('﻿')) src = src.substring(1);
+  lex(false);
+  final constant = RegExp(r'^[a-z][a-z0-9+.-]*:\/\/[^/\s]+\/docs\/');
+  final builds = runs.where((r) => r.pieces.any((p) => has(r'(^|\/)docs(\/|$)', p)) && (r.code != '' || !constant.hasMatch(r.pieces.join()))).toList();
+  if (builds.isNotEmpty) print('DOCS');
+  final code = builds.map((r) => r.code).join(' ');
+  for (final seg in ['scheme', 'host', 'landscape', 'platform', 'service', 'module', 'version', 'id']) {
+    if (has('(?<![\\w\$])$seg(?![\\w\$])', code)) print('SEG $seg');
+  }
+}
+DART
+
 failed=0
 builders=()
 for path in "${files[@]}"; do
-  # Prints "DOCS" when a string (adjacent literals joined) builds a URI with a
-  # `docs` path segment, then "SEG <name>" for each segment its interpolations name.
-  # shellcheck disable=SC2016
-  report="$(git show "${tree}:${path}" | bun -e '
-    const src = await Bun.stdin.text();
-    const runs = [];
-    let i = 0;
-    const lex = inner => {
-      let out = "", depth = 0, after = -1;
-      while (i < src.length) {
-        const c = src[i], n = src[i + 1];
-        if (c === "/" && n === "/") { while (i < src.length && src[i] !== "\n") i++; continue; }
-        if (c === "/" && n === "*") { let d = 0; do { if (src.startsWith("/*", i)) { d++; i += 2; } else if (src.startsWith("*/", i)) { d--; i += 2; } else i++; } while (d > 0 && i < src.length); out += " "; continue; }
-        if (inner && c === "{") depth++;
-        if (inner && c === "}" && depth-- === 0) { i++; return out; }
-        const raw = (c === "r" || c === "R") && (n === "\x27" || n === "\"") && !/[\w$]/.test(src[i - 1] ?? "");
-        if (c === "\x27" || c === "\"" || raw) {
-          const adjacent = after >= 0 && /^\s*$/.test(src.slice(after, i));
-          if (raw) i++;
-          const run = adjacent ? runs[runs.length - 1] : { pieces: [], code: "" };
-          if (!adjacent) runs.push(run);
-          str(raw, run);
-          after = i; out += " S "; continue;
-        }
-        out += c; i++;
-      }
-      return out;
-    };
-    const str = (raw, run) => {
-      const q = src.startsWith(src[i].repeat(3), i) ? src[i].repeat(3) : src[i];
-      let s = "";
-      const put = () => { run.pieces.push(s); s = ""; };
-      for (i += q.length; i < src.length && !src.startsWith(q, i); ) {
-        if (!raw && src[i] === "\\") { s += src[i + 1]; i += 2; continue; }
-        if (!raw && src[i] === "$" && src[i + 1] === "{") { put(); i += 2; run.code += ` (${lex(true)}) `; continue; }
-        if (!raw && src[i] === "$" && /[A-Za-z_]/.test(src[i + 1])) { put(); let j = i + 1; while (/\w/.test(src[j] ?? "")) j++; run.code += ` (${src.slice(i + 1, j)}) `; i = j; continue; }
-        s += src[i++];
-      }
-      i += q.length; put();
-    };
-    lex(false);
-    const constant = /^[a-z][a-z0-9+.-]*:\/\/[^/\s]+\/docs\//;
-    const builds = runs.filter(r => r.pieces.some(p => /(^|\/)docs(\/|$)/.test(p)) && (r.code !== "" || !constant.test(r.pieces.join(""))));
-    if (builds.length > 0) console.log("DOCS");
-    const code = builds.map(r => r.code).join(" ");
-    for (const seg of ["scheme", "host", "landscape", "platform", "service", "module", "version", "id"])
-      if (new RegExp(`(?<![\\w$])${seg}(?![\\w$])`).test(code)) console.log(`SEG ${seg}`);
-  ')"
+  report="$(git show "${tree}:${path}" | dart "${parser}")"
   if grep -qx DOCS <<<"${report}"; then
     builders+=("${path}")
     for seg in scheme host landscape platform service module version id; do
