@@ -1,5 +1,3 @@
-// Pins the publish workflow's whole execution shape: the ProtoDurian org PUB_CREDENTIALS_JSON
-// window must hold nothing but the approved publish, and substring filters cannot certify that.
 import { withCleanProbeState } from './lib/helpers.ts';
 
 const REUSABLE_PUBLISH = '.github/workflows/⚡reusable-publish.yaml';
@@ -280,9 +278,7 @@ function replaceNonEmptyGuard(source: string, replacement: string): string {
   return lines.join('\n');
 }
 
-// Negative controls: each is valid Actions YAML that some earlier predicate accepted.
 const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
-  // --- arbitrary execution inside the credential window -------------------
   {
     label: 'credential directory exfiltrated by glob, never naming the file',
     build: source =>
@@ -300,7 +296,6 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
     label: 'benign-looking extra step executes while the credential exists',
     build: source => insertAfterConfigure(source, '      - name: Unrelated\n        run: echo hello\n'),
   },
-  // --- control flow that neutralizes the guard ---------------------------
   {
     label: 'continue-on-error on Configure (an empty-credential failure no longer blocks publish)',
     build: source => source.replace(CONFIGURE_ENV, `        continue-on-error: true\n${CONFIGURE_ENV}`),
@@ -309,7 +304,6 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
     label: 'if: always() on Verify (publishes even after Configure fails)',
     build: source => source.replace(VERIFY_HEADER, `${VERIFY_HEADER}        if: always()\n`),
   },
-  // --- relocating or reinterpreting the credential -----------------------
   {
     label: 'job-level HOME override relocates the supposedly canonical credential path',
     build: source =>
@@ -386,7 +380,6 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
     label: 'setup-nix action unpinned from its major version',
     build: source => source.replace(`uses: ${SETUP_NIX}`, 'uses: AtomiCloud/actions.setup-nix@main'),
   },
-  // --- credential scope -------------------------------------------------
   {
     label: 'credential hoisted from the step to job-level env (exposed to every step)',
     build: source =>
@@ -425,7 +418,6 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
     label: 'credential written outside the canonical HOME path',
     build: source => source.split(CREDENTIAL_PATH).join('./pub-credentials.json'),
   },
-  // --- OIDC, in every syntax that parses to an id-token key --------------
   {
     label: 'OIDC re-requested with a plain id-token key',
     build: source => source.replace('      contents: read', '      id-token: write\n      contents: read'),
@@ -458,7 +450,6 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
     label: 'workflow-level write-all inherited by a second job',
     build: source => source.replace('jobs:\n', `permissions: write-all\n\njobs:\n${DECOY_JOB}`),
   },
-  // --- the guard and the cleanup ----------------------------------------
   {
     label: 'non-empty guard deleted (an empty secret reaches dart pub)',
     build: source => replaceNonEmptyGuard(source, ''),
@@ -504,7 +495,6 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
     label: 'cleanup reordered before the publish step',
     build: source => source.replace(CLEANUP_STEP, '').replace(VERIFY_HEADER, `${CLEANUP_STEP}${VERIFY_HEADER}`),
   },
-  // --- the publish entrypoint and the tag pin ---------------------------
   {
     label: 'publish entrypoint replaced so the credential is used by something else',
     build: source => source.replace('./scripts/ci/publish.sh "${TAG}"', './scripts/ci/rogue.sh "${TAG}"'),
@@ -538,7 +528,6 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
         'git --no-pager diff --stat "refs/tags/${TAG}" -- packages/diene_dart_lib',
       ),
   },
-  // --- the deployment environment ---------------------------------------
   {
     label: 'pub.dev deployment environment unpinned',
     build: source => source.replace(`    environment: ${DEPLOY_ENVIRONMENT}\n`, ''),
