@@ -11,6 +11,10 @@ with packages;
   lint = [
     actionlint
     dlint
+    go-tools
+    gofumpt
+    golangci-lint
+    gotools
     infralint
     pre-commit
     shellcheck
@@ -21,7 +25,10 @@ with packages;
   main = [
     cyanprint
     git
+    go
     go-task
+    gotestsum
+    govulncheck
     infisical
     releaser
     shellcheck

@@ -62,6 +62,14 @@ See **[docs/standards/nix/index.md](docs/standards/nix/index.md)** for the full 
 
 See [docs/standards/docker/index.md](docs/standards/docker/index.md).
 
+# Go base template
+
+Read [the Go baseline](docs/developer/go-baseline.md) before changing the Go
+toolchain, task surface, test tiers, coverage ledgers, dead-code passes or
+illustrative sample. Follow the Go variants under each standard's
+`languages/go.md` alongside the shared engineering standards. Keep every Go test
+in an external `_test` package and never add `export_test.go`.
+
 # Helm charts and publishing
 
 See [docs/standards/helm/index.md](docs/standards/helm/index.md).

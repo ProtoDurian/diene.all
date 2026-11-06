@@ -12,6 +12,7 @@ let
           atomiutils
           cyanprint
           dlint
+          go
           infralint
           infrautils
           releaser
@@ -27,6 +28,12 @@ let
           actionlint
           git
           go-task
+          go-tools
+          gofumpt
+          golangci-lint
+          gotestsum
+          gotools
+          govulncheck
           infisical
           nix
           pre-commit
