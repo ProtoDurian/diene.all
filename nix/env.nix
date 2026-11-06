@@ -13,8 +13,7 @@ with packages;
     dlint
     dn-inspect
     dotnetlint
-    infralint-core
-    infralint-docker
+    infralint
     pre-commit
     shellcheck
     skills-sync
@@ -38,8 +37,7 @@ with packages;
 
   system = [
     atomiutils
-    infrautils-core
-    infrautils-docker
+    infrautils
     nix
   ];
 }

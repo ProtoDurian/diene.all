@@ -115,16 +115,10 @@ apply_H() {
   # shellcheck disable=SC2016
   edit docs/developer/dotnet-baseline.md sed_z 's#The Dockerfile and the Helm chart are the parent template.s stubs, unchanged, for\ndescendants to replace; the Helm surface (chart, lint hook, tasks, OCI packaging,\nCI/CD jobs, dependabot entry) is identical to `bun-base`.s\. #The Dockerfile is the parent template'"'"'s stub, unchanged, for descendants to\nreplace. #'
 
-  # nix: the aggregates carry H by content; take the axis-pure slices. Docker
-  # (D) keeps its slices. kubectl and k3d ship only in infrautils-k8s, beside
-  # helm, so they leave with the aggregate and their declared smokes go too.
-  edit nix/packages.nix sed_e 's/^          infralint$/          # Axis-pure slices: the infralint\/infrautils aggregates ship helm, helm-docs and helmlint.\n          infralint-core\n          infralint-docker/'
-  edit nix/packages.nix sed_e 's/^          infrautils$/          infrautils-core\n          infrautils-docker/'
-  edit nix/env.nix sed_e 's/^    infralint$/    infralint-core\n    infralint-docker/'
-  edit nix/env.nix sed_e 's/^    infrautils$/    infrautils-core\n    infrautils-docker/'
-  edit dlint.yaml sed_e '/^      - k3d$/d'
-  edit dlint.yaml sed_e '/^      - kubectl version --client$/d'
-  edit probes/binary-smoke.ts drop_lines '^k3d version' '^printf .* kyverno jp query'
+  # nix keeps the whole infralint + infrautils bundles; only prose loses its Helm words.
+  edit docs/standards/ci-cd/index.md sed_z 's#The Docker and Helm scripts build#The Docker scripts build#;s#Docker and Helm callers pass per-repository image or chart values#Docker callers pass per-repository image values#;s#Add another image or chart as another caller job#Add another image as another caller job#'
+  edit README.md sed_e 's/split CI\/CD, Docker, Helm, secrets,/split CI\/CD, Docker, secrets,/'
+  edit docs/standards/taskfile/index.md sed_e 's/^5\. Put repository-specific image and chart values in Taskfile/5. Put repository-specific image values in Taskfile/'
 }
 
 # --- recompute from the parent ------------------------------------------------

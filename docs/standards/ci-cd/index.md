@@ -108,14 +108,14 @@ nix develop .#ci -c ./scripts/ci/pre-commit.sh
 That line reproduces the pre-commit workflow. Workspace names no runtime, so its
 `a-skills-sync` hook is deliberately inert here.
 
-The Docker and Helm scripts build locally by default. Their reusable workflows set
+The Docker scripts build locally by default. Their reusable workflows set
 the documented environment contract to enable publishing.
 
 ## Artifact publishing
 
-Docker and Helm callers pass per-repository image or chart values through workflow
+Docker callers pass per-repository image values through workflow
 `with:` inputs. Empty release versions produce commit builds; CD passes the tag as
-the version. Add another image or chart as another caller job rather than putting
+the version. Add another image as another caller job rather than putting
 repository-specific branching into the reusable workflow.
 
 Release execution runs the real tool: `⚡reusable-release.yaml` enters the
