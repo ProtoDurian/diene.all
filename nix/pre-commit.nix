@@ -58,6 +58,15 @@ pre-commit-lib.run {
       language = "system";
     };
 
+    a-markdownlint = {
+      enable = true;
+      name = "Markdown lint";
+      entry = "${pkgs.markdownlint-cli2}/bin/markdownlint-cli2";
+      files = "^(docs/standards/.*\\.md|\\.claude/skills/[^/]+/SKILL\\.md)$";
+      pass_filenames = true;
+      language = "system";
+    };
+
     a-releaser-commit = {
       enable = true;
       name = "Conventional commit";

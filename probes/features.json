@@ -153,5 +153,25 @@
     "template": "diene/workspace",
     "name": "hook-releaser-commit",
     "class": "gate"
+  },
+  {
+    "template": "diene/shared",
+    "name": "docs-markdownlint",
+    "class": "gate"
+  },
+  {
+    "template": "diene/shared",
+    "name": "docs-prettier",
+    "class": "gate"
+  },
+  {
+    "template": "diene/shared",
+    "name": "standards-inventory",
+    "class": "presence"
+  },
+  {
+    "template": "diene/shared",
+    "name": "thin-skills",
+    "class": "presence"
   }
 ]
