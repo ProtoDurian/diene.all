@@ -99,7 +99,12 @@ working defaults.
   `@atomicloud/diene.result`. IO failures throw from both.
 - An empty `prefix` throws `ConfigLoaderError`.
 - `JsonSchemaGenerator` emits the JSON Schema a config YAML's first line points
-  at: `# yaml-language-server: $schema=./schema.json`.
+  at: `# yaml-language-server: $schema=./schema.json`. A unit test runs a sample
+  YAML through ajv's draft 2020-12 validator (the draft zod emits): the good file
+  passes and a wrong-typed field fails at its path. That proves the schema works
+  in a standard JSON-Schema validator; it does not launch an editor.
+- Only blocks you register are allowed at the root (`additionalProperties: false`),
+  so register every top-level key a config YAML carries, including `app:`.
 - `DeepMerger`, `EnvOverrides` and the coercion classes live here; this lib is
   their only consumer-facing home (moved out of core-utils).
 
@@ -125,6 +130,8 @@ rebuild:
   each throws `TestHelperError` when the expectation fails.
 
 The fakes feed the same loader as production, so one behavioural suite proves
-real-vs-fake parity. Helper-only dependencies are optional peerDependencies,
+real-vs-fake parity. `/test-helper` imports the package root instead of bundling
+its own copy, so `expectInvalid` returns the root's `ConfigValidationError`; its
+`instanceof` also holds between the ESM and CommonJS builds. Helper-only dependencies are optional peerDependencies,
 never regular dependencies. The meta tier measures coverage over TestHelper code
 only.
