@@ -2,9 +2,15 @@ tiers:
   unit:
     tests: tests/unit
     scope: src/lib/
+    timeout: 30000
   int:
     tests: tests/integration
     scope: src/adapters/
+    timeout: 120000
+  e2e:
+    tests: tests/e2e
+    scope: src/
+    timeout: 240000
   meta:
     tests: tests/meta
     scope: ''

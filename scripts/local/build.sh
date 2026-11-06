@@ -4,10 +4,13 @@ set -euo pipefail
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
-artifact="dist/index.js"
+echo "🔨 Building the web app..."
+./node_modules/.bin/vite build --config web/vite.config.ts
 
-echo "🔨 Building validation bundle..."
-bun build ./src/index.ts --outdir ./dist --target bun
+echo "🔨 Bundling the Worker..."
+wrangler deploy --dry-run --outdir dist/worker
 
-[[ ! -f ${artifact} ]] && echo "❌ Build artifact missing: ${artifact}" >&2 && exit 1
-echo "✅ Build artifact present: ${artifact}"
+for artifact in dist/web/index.html dist/worker/index.js; do
+  [[ ! -f ${artifact} ]] && echo "❌ Build artifact missing: ${artifact}" >&2 && exit 1
+done
+echo "✅ Build artifacts present: dist/web/index.html, dist/worker/index.js"

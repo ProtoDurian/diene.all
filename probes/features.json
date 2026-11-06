@@ -215,6 +215,71 @@
     "class": "smoke"
   },
   {
+    "template": "diene/aseity",
+    "name": "aseity-hyperdrive-only",
+    "class": "gate"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-worker-safe",
+    "class": "gate"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-rls",
+    "class": "gate"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-job-runner",
+    "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-local-worker",
+    "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-tenant-approval",
+    "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-fork",
+    "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-cli-release",
+    "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-web-pwa",
+    "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-admin-grant",
+    "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-tofu-validate",
+    "class": "gate"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-sealed-secrets",
+    "class": "gate"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-wrangler-config",
+    "class": "gate"
+  },
+  {
     "template": "diene/bun-base",
     "name": "bun-biome-format",
     "class": "gate"

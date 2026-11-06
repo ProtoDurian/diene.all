@@ -114,8 +114,8 @@ pre-commit-lib.run {
     typecheck = {
       enable = true;
       name = "TypeScript typecheck";
-      entry = "./node_modules/.bin/tsc --noEmit";
-      files = "(^package\\.json$|^tsconfig\\.json$|\\.(ts|tsx|mts|cts)$)";
+      entry = "${packages.atomiutils}/bin/bash -c './node_modules/.bin/tsc --noEmit && ./node_modules/.bin/tsc -p web/tsconfig.json --noEmit'";
+      files = "(^package\\.json$|^tsconfig\\.json$|^web/tsconfig\\.json$|\\.(ts|tsx|mts|cts)$)";
       pass_filenames = false;
       language = "system";
     };

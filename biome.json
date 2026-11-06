@@ -31,7 +31,7 @@
   ],
   "linter": {
     "enabled": true,
-    "includes": ["src/**/*.ts", "tests/**/*.ts"],
+    "includes": ["src/**/*.ts", "tests/**/*.ts", "cli/**/*.ts", "web/**/*.ts", "web/**/*.tsx", "probes/aseity-*.ts"],
     "rules": {
       "recommended": true
     }

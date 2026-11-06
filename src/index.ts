@@ -1,31 +1,30 @@
-// ─── DOMAIN WIRING · the illustrative sample (delete through END to replace the sample) ──────────
-import { PinoLogger } from './adapters/pino-logger';
-import { RedisKeyValueStore } from './adapters/redis-kv-store';
-import { Cleanup } from './lib/sample/cleanup';
-import { RedisConfigParser } from './lib/sample/config';
-import { KeyComposer } from './lib/sample/key';
-import { SampleService } from './lib/sample/service';
+import type { ExecutionContext, ScheduledController } from '@cloudflare/workers-types';
+import type { IdentityGate, RouteModule } from './adapters/api/env';
+import { type AuthProvider, type RuntimeScope, WorkerRuntime, type WorkerEnv } from './adapters/api/runtime';
+import { AuthModule } from './adapters/auth/module';
+import { AuthSettingsParser } from './lib/auth/settings';
 
-const KEY = 'sample key';
-
-if (import.meta.main) {
-  const logger = new PinoLogger();
-  const keys = new KeyComposer('Bun Base');
-  const config = new RedisConfigParser(process.env).parse();
-
-  if (!config.ok) {
-    logger.error({ issues: config.issues }, 'invalid redis configuration');
-    process.exitCode = 1;
-  } else if (config.connection === undefined) {
-    logger.info({ key: keys.compose(KEY) }, 'composed key');
-  } else {
-    const store = new RedisKeyValueStore(config.connection, logger);
-    const service = new SampleService(store, keys);
-    const value = await new Cleanup(logger).run(
-      () => service.roundTrip(KEY, 'sample value'),
-      () => store.close(),
-    );
-    logger.info({ value }, 'round-tripped value');
+class BetterAuthProvider implements AuthProvider {
+  async create(scope: RuntimeScope): Promise<{ gate: IdentityGate; modules: readonly RouteModule[] }> {
+    const settings = await new AuthSettingsParser().parse(scope.env).unwrap();
+    const module = new AuthModule({
+      db: scope.db,
+      settings,
+      mailer: scope.mailer,
+      registry: scope.registry,
+      notes: scope.notes,
+    });
+    return { gate: module.gate.handler, modules: [module.routes, module.mcp] };
   }
 }
-// ─── END DOMAIN WIRING ────────────────────────────────────────────────────────────────────────────
+
+const runtime = new WorkerRuntime(new BetterAuthProvider());
+
+export default {
+  fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
+    return runtime.fetch(request, env, ctx);
+  },
+  scheduled(_controller: ScheduledController, env: WorkerEnv, ctx: ExecutionContext): Promise<void> {
+    return runtime.scheduled(env, ctx);
+  },
+};

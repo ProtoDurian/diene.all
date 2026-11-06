@@ -1,0 +1,14 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  goreleaser:
+    name: GoReleaser Publish
+    permissions:
+      contents: write
+    uses: ./.github/workflows/⚡reusable-goreleaser.yaml
+    secrets: inherit

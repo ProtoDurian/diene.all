@@ -1,0 +1,8 @@
+[test]
+root = "tests/e2e"
+coverageReporter = ["text", "lcov"]
+coverageDir = "reports/e2e"
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = ["tests/**"]
+
+timeout = 240000

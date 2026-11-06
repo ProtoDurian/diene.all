@@ -13,6 +13,8 @@ tiers=".config/bun-base.coverage.yaml"
 }
 tests="$(yq ".tiers.${tier}.tests // \"\"" "${tiers}")"
 scope="$(yq ".tiers.${tier}.scope // \"\"" "${tiers}")"
+# Bun ignores the bunfig [test] timeout, so the tier timeout goes on the command line.
+timeout="$(yq ".tiers.${tier}.timeout // 30000" "${tiers}")"
 [[ -z ${tests} ]] && echo "❌ ${tiers} gives tier ${tier} no tests folder" >&2 && exit 2
 [[ "$(yq ".tiers.${tier} | has(\"scope\")" "${tiers}")" == "true" ]] || {
   echo "❌ ${tiers} gives tier ${tier} no scope; use '' to opt out of coverage" >&2
@@ -36,14 +38,14 @@ bun install --frozen-lockfile
 
 if [[ -z ${scope} ]]; then
   echo "🧪 Running ${tier} tests..."
-  bun test --config="${config}"
+  bun test --config="${config}" --timeout "${timeout}"
   echo "✅ ${tier} tests passed"
   exit 0
 fi
 
 echo "🧪 Running ${tier} tests with coverage..."
 
-bun test --config="${config}" --coverage
+bun test --config="${config}" --timeout "${timeout}" --coverage
 
 # rg exits 2 on a missing file, so absence needs its own refusal.
 [[ -f ${coverage_file} ]] || {

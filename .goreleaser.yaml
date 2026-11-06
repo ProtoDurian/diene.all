@@ -1,0 +1,73 @@
+version: 2
+
+project_name: aseity
+
+builds:
+  - id: aseity
+    builder: bun
+    binary: aseity
+    main: ./cli/index.ts
+    # -baseline (no AVX2) so x64 also runs under QEMU and on older CPUs.
+    targets:
+      - linux-x64-baseline
+      - linux-arm64
+      - darwin-arm64
+      - windows-x64-baseline
+    # Setting flags drops the builder's default --compile.
+    flags:
+      - --compile
+      - --minify
+
+archives:
+  - id: archive
+    ids: [aseity]
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}'
+
+checksum:
+  name_template: 'checksums.txt'
+
+release:
+  extra_files:
+    - glob: scripts/release/install.sh
+
+nfpms:
+  - id: packages
+    ids: [aseity]
+    package_name: aseity
+    formats: [deb]
+    maintainer: AtomiCloud <ops@atomi.cloud>
+    description: Command-line tool for an aseity app (migrate, fork create, list and delete)
+    license: MIT
+    bindir: /usr/bin
+
+homebrew_casks:
+  - name: aseity
+    ids: [archive]
+    binaries: [aseity]
+    repository:
+      owner: AtomiCloud
+      name: homebrew-tap
+      token: '{{ .Env.HOMEBREW_TAP_TOKEN }}'
+    homepage: https://github.com/AtomiCloud/diene.aseity
+    description: Command-line tool for an aseity app (migrate, fork create, list and delete)
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/aseity"]
+          end
+
+scoops:
+  - name: aseity
+    ids: [archive]
+    repository:
+      owner: AtomiCloud
+      name: scoop-bucket
+      token: '{{ .Env.SCOOP_BUCKET_TOKEN }}'
+    homepage: https://github.com/AtomiCloud/diene.aseity
+    description: Command-line tool for an aseity app (migrate, fork create, list and delete)
+    license: MIT

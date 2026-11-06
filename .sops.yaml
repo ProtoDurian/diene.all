@@ -1,0 +1,7 @@
+# The shipped recipient's private key exists nowhere: run scripts/local/secrets-init.sh to re-seal to yours.
+creation_rules:
+  - path_regex: (^|/)secrets/[^/]+\.yaml$
+    age: age190fu4m9lwd9lg7c5ajzh238q0q4kgj47wx6wp27xg0hxk5ftwguqave6uc
+stores:
+  yaml:
+    indent: 2

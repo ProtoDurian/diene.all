@@ -6,12 +6,12 @@ export default {
   probes: [
     {
       name: 'baseline-bun-run-green',
-      description: 'The source run task executes with forwarded arguments.',
+      description: 'The source run task runs the CLI with forwarded arguments.',
       kind: 'baseline',
       async run(repo: any) {
         await expectBunGreen(
           repo,
-          "nix develop .#ci -c bash -lc './scripts/local/setup.sh && task run -- smoke'",
+          "nix develop .#ci -c bash -lc './scripts/local/setup.sh && task run -- --version'",
           'bun-run',
         );
       },

@@ -51,3 +51,19 @@ jobs:
       contents: read
     uses: ./.github/workflows/⚡reusable-build.yaml
     secrets: inherit
+
+  e2e:
+    name: E2E Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-test.yaml
+    secrets: inherit
+    with:
+      mode: e2e
+
+  infra:
+    name: Infra Validation
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-infra.yaml
+    secrets: inherit

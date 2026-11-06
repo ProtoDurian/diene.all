@@ -1,0 +1,47 @@
+name: ${ASEITY_DEV_STACK:-aseity-dev}
+
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_USER: ${ASEITY_DEV_PG_USER:-aseity}
+      POSTGRES_PASSWORD: ${ASEITY_DEV_PG_PASSWORD:-aseity}
+      POSTGRES_DB: ${ASEITY_DEV_PG_DATABASE:-aseity}
+    ports:
+      - 127.0.0.1:${ASEITY_DEV_PG_PORT:-5432}:5432
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    environment:
+      MINIO_ROOT_USER: ${ASEITY_DEV_S3_ACCESS_KEY_ID:-aseity}
+      MINIO_ROOT_PASSWORD: ${ASEITY_DEV_S3_SECRET_ACCESS_KEY:-aseity-dev}
+      S3_BUCKET: ${ASEITY_DEV_S3_BUCKET:-aseity}
+    # The bucket is created beside the server, so `up --wait` only returns once it exists.
+    entrypoint:
+      - bash
+      - -c
+      - >-
+        (until mc alias set local http://127.0.0.1:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1;
+        do sleep 1; done; mc mb --ignore-existing "local/$${S3_BUCKET}") &
+        exec minio server /data --console-address :9001
+    ports:
+      - 127.0.0.1:${ASEITY_DEV_S3_PORT:-9000}:9000
+      - 127.0.0.1:${ASEITY_DEV_S3_CONSOLE_PORT:-9001}:9001
+    volumes:
+      - minio:/data
+    healthcheck:
+      test: [CMD-SHELL, 'mc stat "local/$${S3_BUCKET}" >/dev/null']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  postgres:
+  minio:
