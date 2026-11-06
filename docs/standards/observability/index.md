@@ -53,7 +53,7 @@ The platform team also owns, outside this repo: who is notified for each tier an
 | [OpenTelemetry](/docs/standards/observability/otel.md)             | configure logs, metrics and traces in a backend service            |
 | [Faro](/docs/standards/observability/faro.md)                      | add telemetry to a Next.js or Flutter frontend                     |
 
-Skills, in the order you use them: `observability-check` (decide signals) → `grafana-dashboards` → `grafana-alert-set` → `grafana-alert` (one file) → `grafana-runbook`.
+Skills, in the order you use them: `observability-check` (decide signals) → `grafana-dashboards` → `grafana-alert-set`, which runs `grafana-alert` (one file) and then `grafana-runbook` inside it.
 
 ## Folder layout
 

@@ -33,15 +33,15 @@ description: 'Check downstream health; the queue drains only if endpoints are up
 panel: 2
 ```
 
-| Field         | Where people see it                            | Rule                                                                                                                                                                   |
-| ------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `title`       | The notification title: lock screen, chat line | Required. The symptom, ≤48 characters, no emoji (🚨/⚠️/ℹ️ is added from the file name). Tiers of one set may share a title                                             |
-| `datasource`  | —                                              | Required. `metrics` (PromQL) or `logs` (LogQL)                                                                                                                         |
-| `expr`        | —                                              | Required. A query that is true while the problem lasts; its shape comes from the type below                                                                            |
-| `for`         | —                                              | Required. How long it must stay true before firing; `0m` fires at once                                                                                                 |
-| `summary`     | First line of the notification body            | Required. What and how bad; put the value in with `{{ $values.A.Value }}` (`{{ humanizePercentage $values.A.Value }}` for a ratio)                                     |
-| `description` | Alert detail view                              | Required. The first thing to do                                                                                                                                        |
-| `panel`       | The "view panel" link                          | Optional integer: a panel id in `observability/dashboards/overview.json`. Leave it out to link the generic dashboard, e.g. for a burn rate on the standard HTTP metric |
+| Field         | Where people see it                            | Rule                                                                                                                                                                                      |
+| ------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`       | The notification title: lock screen, chat line | Required. The symptom, ≤48 characters, no emoji (🚨/⚠️/ℹ️ is added from the file name). Tiers of one set may share a title                                                                |
+| `datasource`  | —                                              | Required. `metrics` (PromQL) or `logs` (LogQL)                                                                                                                                            |
+| `expr`        | —                                              | Required. A query that is true while the problem lasts; its shape comes from the type below. Any series the `expr` returns fires, even with value 0 (the chart adds a condition for this) |
+| `for`         | —                                              | Required. How long it must stay true before firing; `0m` fires at once                                                                                                                    |
+| `summary`     | First line of the notification body            | Required. What and how bad; put the value in with `{{ $values.A.Value }}` (`{{ humanizePercentage $values.A.Value }}` for a ratio)                                                        |
+| `description` | Alert detail view                              | Required. The first thing to do                                                                                                                                                           |
+| `panel`       | The "view panel" link                          | Optional integer: a panel id in `observability/dashboards/overview.json`. Leave it out to link the generic dashboard, e.g. for a burn rate on the standard HTTP metric                    |
 
 Front-load the symptom: `Retry queue saturated`, not `The webhook delivery retry queue has become saturated`. Keep LPSM names and query values out of the title. Route and silence by the `severity` label, never by emoji. Moving an alert to another tier changes its name, so silences on the old name stop working.
 
@@ -118,9 +118,9 @@ histogram_quantile(0.99, sum by (le, pod) (rate(webhook_delivery_duration_second
 
 Before merge:
 
-1. **Structure**: the [structural checks](/docs/standards/observability/shipping.md#structural-checks).
-2. **Review**: tier gaps, `panel` points at the right panel, runbook complete, slug correct, and the Gate 5 Owner is not `pending`.
-3. **Fire it offline** (metric alerts). `promtool` (from `prometheus.cli` in the `dev` group of `nix/env.nix`, so in the default shell) runs the tier file's `expr` and `for` against made-up series: it must stay quiet while healthy and fire when bad. `yq` (from the atomiutils [bundle](/docs/standards/grafana-dashboards/sandbox.md#tools); check with `command -v yq`) pulls both from the tier file, so nothing is copied by hand. The example tests the burn-rate `critical.yaml` above: no errors for an hour, then 10% errors. Change the series labels to match every selector in your `expr`, or the bad case never fires.
+1. **Structure**, once the set's `runbook.md` exists: the [structural checks](/docs/standards/observability/shipping.md#structural-checks).
+2. **Review**: tier gaps, `panel` points at the right panel, runbook complete, slug correct, and the Gate 5 Owner follows [Gate 5, check 3](/docs/standards/observability/signals.md#gate-5--alerts-default-no).
+3. **Fire it offline** (metric alerts). `promtool` (from `prometheus.cli` in the `dev` group of `nix/env.nix`, so in the default shell) runs the tier file's `expr` and `for` against made-up series: it must stay quiet while healthy and fire when bad. `yq` (expected from the atomiutils [bundle](/docs/standards/grafana-dashboards/sandbox.md#tools); check with `command -v yq`) pulls both from the tier file, so nothing is copied by hand. The example tests the burn-rate `critical.yaml` above: errors just under the 0.1% budget for an hour, so a threshold set too low fails the test, then 10% errors. Change the series labels to match every selector in your `expr`, or the bad case never fires.
 
    ```bash
    tier=observability/alerts/errors/critical.yaml
@@ -134,7 +134,7 @@ Before merge:
          - series: http_server_request_duration_seconds_count{service="zinc",http_response_status_code="200"}
            values: 0+600x120
          - series: http_server_request_duration_seconds_count{service="zinc",http_response_status_code="500"}
-           values: 0x60 60+60x60
+           values: 0+0.6x60 96+60x59
        alert_rule_test:
          - { eval_time: 60m, alertname: tier, exp_alerts: [] }
          - { eval_time: 90m, alertname: tier, exp_alerts: [{ exp_labels: {} }] }
@@ -142,7 +142,7 @@ Before merge:
    promtool test rules "$t/test.yaml"
    ```
 
-   For a threshold alert, one series is enough, e.g. `values: 100x20 6000x20` with `exp_labels` holding the labels its `expr` keeps.
+   A test for an `[Nh]` window needs more than N hours of samples. For `warning.yaml` (`[6h]`), use `values: 0+600x600` and `0+0.6x420 312+60x179`, and expect no alert at `eval_time: 420m` and the alert at `600m`. For a threshold alert, one series is enough, e.g. `values: 100x20 6000x20` with `exp_labels` holding the labels its `expr` keeps.
 
 4. **Preview against real data**, for a metric or log stream that already exists. In the landscape's Grafana: Alerting → Alert rules → New alert rule, pick the datasource, paste `expr`, press **Preview**, then leave without saving. It must return data; this catches a misspelled metric or label.
 

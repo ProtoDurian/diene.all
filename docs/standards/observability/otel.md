@@ -1,6 +1,6 @@
 # OpenTelemetry Configuration
 
-Applies only if this repo has backend code (Bun, .NET or Go). That code comes from a CyanPrint template for its language (CyanPrint is the template generator this repo was made with; it records its templates in `.cyan_state.yaml` once a template has been applied), which also adds its OTel library ("the library" below), its config library and the config files. This repo has none of them yet.
+Applies only if this repo has backend code (Bun, .NET or Go). That code comes from a CyanPrint template for its language (CyanPrint is the template generator described in `CLAUDE.md`; it will record its templates in `.cyan_state.yaml`, which this repo does not have yet, once a template has been applied), which also adds its OTel library ("the library" below), its config library and the config files. This repo has none of them yet.
 
 Backend services send logs, metrics and traces with OpenTelemetry (OTel). All three languages read the same `otel:` config block and set the same resource attributes. Frontends use Grafana Faro instead; see [Faro](/docs/standards/observability/faro.md).
 
@@ -44,7 +44,7 @@ otel:
         timeout: PT10S
 ```
 
-The base config turns the three signals on and every exporter off. Each landscape's config turns on the exporters it needs, e.g. `otel.traces.exporter.otlp: { enabled: true, endpoint: '{otlp-endpoint}' }` (endpoint from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you)).
+The base config turns the three signals on and every exporter off, and keeps every trace (`ratio: 1.0`). Each landscape's config turns on the exporters it needs, and lowers `otel.traces.sampler.ratio` when that landscape's trace volume is high, e.g. `otel.traces.exporter.otlp: { enabled: true, endpoint: '{otlp-endpoint}' }` (endpoint from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you)).
 
 Rules:
 
@@ -79,7 +79,7 @@ It also sets `atomi.landscape`, `atomi.platform`, `atomi.service`, `atomi.module
 
 ## Standard HTTP metrics
 
-HTTP servers report OTel's standard HTTP metric. Exported to Prometheus it is the histogram `http_server_request_duration_seconds`; its `_count` series counts requests. Its labels include `http_response_status_code` and `http_route`. Check one series in Grafana Explore before you use it.
+HTTP servers report OTel's standard HTTP metric. Exported to Prometheus it is the histogram `http_server_request_duration_seconds`; its `_count` series counts requests. Its labels include `http_response_status_code`, `http_request_method` and `http_route` (the route template, e.g. `/orders`, not the raw path). Check one series in Grafana Explore before you use it.
 
 ## Standard `OTEL_*` environment variables win
 
@@ -91,7 +91,7 @@ Start telemetry once at startup. Call the library's flush and shutdown from the 
 
 Per language:
 
-- **Bun**: pino writes JSON logs to stdout, with the trace context and fixed keys `level` (a number, e.g. `50` = error), `msg` and `time`, and Grafana Alloy (the collector) reads stdout, so leave `otel.logs.exporter.otlp.enabled: false`. Metrics and traces go over OTLP.
+- **Bun**: pino (the Bun template's JSON logger) writes JSON logs to stdout, with the trace context and fixed keys `level` (a number, e.g. `50` = error), `msg` and `time`, and Grafana Alloy (the collector) reads stdout, so leave `otel.logs.exporter.otlp.enabled: false`. Metrics and traces go over OTLP.
 - **.NET**: `Microsoft.Extensions.Logging` and the OpenTelemetry hosting integration. Logs go where `otel.logs.exporter` sends them (`console` = stdout, `otlp` = the collector); sample the stored lines and record their keys in `observability/dashboards/log-notes.md`.
 - **Go**: `slog` and the OpenTelemetry Go SDK. Logs and their keys: as for .NET.
 

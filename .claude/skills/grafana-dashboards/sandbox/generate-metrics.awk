@@ -7,7 +7,7 @@ BEGIN {
   buckets = "0.01 0.025 0.05 0.1 0.25 0.5 1 2.5"
 
   # One line per metric and label set: type, name, labels (or -), normal value, incident value.
-  # counter: per second (name ends in _total); gauge: the value, decimals kept; histogram: mean seconds, 10 per second.
+  # counter: per second (name ends in _total); gauge: the value, decimals kept, not scaled by landscape traffic; histogram: mean seconds, 10 per second.
   # -v rows=FILE reads these lines from FILE instead (one per line; lines starting with # are skipped).
   metrics = \
     "counter   sample_requests_total            outcome=success  300   270\n" \
@@ -58,10 +58,10 @@ function series(row, landscape,    f, scale, labels, t, i, wave, value, total, c
     wave = 1 + 0.2 * sin(i * 3)
     value = (i > incident_from && i < incident_to ? f[5] : f[4]) * wave
     if (f[1] == "gauge") {
-      out[t] = sprintf("%s{%s} %.4g %d", f[2], labels, value * scale[2], t)
+      out[t] = sprintf("%s{%s} %.4g %d", f[2], labels, value, t)
     } else if (f[1] == "counter") {
       total += value * scale[2] * step
-      out[t] = sprintf("%s{%s} %.0f %d", f[2], labels, total, t)
+      out[t] = sprintf("%s{%s} %.3f %d", f[2], labels, total, t)
     } else {
       obs = int(10 * scale[2] * step * wave + 0.5)
       count += obs; sum += obs * value

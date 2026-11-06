@@ -4,7 +4,7 @@ How to write this service's dashboards as code, and how to check them by looking
 
 **Never ship a dashboard you have not seen rendered.** Valid JSON can still be unreadable: wrong units, flat lines, "No data". Only a render shows that.
 
-Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashboard, `overview.json` first. Write them in the format Grafana's Dashboard → Export → JSON gives you (the classic schema, not the newer v2 schema). The primordial chart turns each file into a Grafana dashboard ([Shipping](/docs/standards/observability/shipping.md)).
+Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashboard, `overview.json` first. Write them in the format Grafana's Dashboard → Export → JSON gives you (the classic schema, not the newer v2 schema). Copy exact JSON keys (variables, log panel options, `schemaVersion`) from [the sandbox fixture](/.claude/skills/grafana-dashboards/sandbox/dashboards/sample.json). The primordial chart turns each file into a Grafana dashboard ([Shipping](/docs/standards/observability/shipping.md)).
 
 - `overview.json` (uid `<platform>-<service>-overview`) is the one alerts link to with their [`panel`](/docs/standards/observability/alerts.md#the-tier-file) field.
 - A deep-dive gets its own file (uid `<platform>-<service>-<purpose>`), linked from the overview.
@@ -21,27 +21,27 @@ Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashbo
 
 - A row is one horizontal band of panels, made with `type: row` panels. Use **RED** (rate, errors, duration) for request-driven views and **USE** (utilization, saturation, errors) for resources.
 - The first row (the **overview row**) answers "is it healthy?" in under 5 seconds, with trend panels and threshold colors. The rows below (**detail rows**) follow in the order a responder triages.
-- Open with a text panel: purpose, audience, and links to `{repo-url}/observability/overview.md` ([placeholders](/docs/standards/observability/index.md#values-the-platform-team-gives-you)) and the generic dashboard (`/d/{generic-dashboard-uid}`). The chart does not template dashboard JSON: write the real values into the JSON once you know them.
+- Open with a text panel: purpose, audience, and links to `{repo-url}/observability/overview.md` ([placeholders](/docs/standards/observability/index.md#values-the-platform-team-gives-you)) and the generic dashboard (`/d/{generic-dashboard-uid}?{generic-dashboard-vars}`). The chart does not template dashboard JSON: write the real values into the JSON once you know them.
 - One dashboard, one purpose. Put deep dives on a linked dashboard, not in row 12.
 
 ### Panels
 
 - Every panel has a title, a description and an explicit unit (`reqps`, `ms`, `percentunit`). The description says what the panel shows and what bad looks like.
 - Prefer trend panels. Use a stat or gauge only when one number is the whole story, e.g. days until a cert expires.
-- Color by threshold: green is good, red is bad. For line colors to follow thresholds, set `fieldConfig.defaults.custom.gradientMode: scheme`. Exception: a split by category (e.g. `outcome` = `success`/`error`) gives each series a fixed color, error red.
+- Color by threshold: green is good, red is bad. For line colors to follow thresholds, set `fieldConfig.defaults.custom.gradientMode: scheme`. Exception: a split by category (e.g. `outcome` = `success`/`error`) gives each series a fixed color, error red. When every category is bad, color by severity: red worst, then orange, then yellow.
 - Draw the alert threshold on any panel an alert links to.
 - Legends show only the label that differs (`{{status}}`). Hide the legend on single-series panels; give each percentile its own panel or a clear legend name.
 
 ### Queries
 
 - Use `$__rate_interval` in `rate()` and `increase()`. Rate first, then sum: `sum by (status) (rate(x_total[$__rate_interval]))`, never `rate(sum(...))`.
-- Always aggregate by the labels you want to see; never a bare `sum(rate(...))` and never an unaggregated query. (Dashboards only: an alert `expr` may sum everything.)
+- Always aggregate by the labels you want to see; never a bare `sum(rate(...))` and never an unaggregated query. Aggregate gauges with `max` for saturation and `min` for headroom (the worst pod either way), `sum` for totals. (Dashboards only: an alert `expr` may sum everything.)
 - Cap anything with many label values: `topk(10, ...)`.
 - Show latency as percentiles (p50, p95, p99) from histograms, not averages.
 
 ### Variables and links
 
-- `$landscape` is required on every dashboard, with `refresh: 2` (reload on time change), so one dashboard works whether a Grafana's datasource holds one landscape or several; in a one-landscape Grafana it has one value. Add the datasource variable `prometheus_datasource` labeled `Prometheus data source` and, with log panels, `loki_datasource` labeled `Loki data source`; these names pass strict lint. Set `editable: false`.
+- `$landscape` is required on every dashboard, with `refresh: 2` (reload on time change), so one dashboard works whether a Grafana's datasource holds one landscape or several; in a one-landscape Grafana it has one value. Every query selects `landscape="$landscape"`, e.g. `sum by (outcome) (rate(x_total{service="zinc",landscape="$landscape"}[$__rate_interval]))`. Add the datasource variable `prometheus_datasource` labeled `Prometheus data source` and, with log panels, `loki_datasource` labeled `Loki data source`; these names pass strict lint. Set `editable: false`.
 - Log panels also get a `$filter` text variable, applied as `|~ "$filter"`.
 - Link panels to the next view: a log line to its trace (set up by the platform team's logs datasource, not in dashboard JSON), a service tile to `/d/<platform>-<service>-overview`. Carry the scope in the URL: `?var-landscape=${landscape}`.
 
@@ -49,10 +49,10 @@ Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashbo
 
 The log line in the store is not what the app wrote: the logging library's JSON wrapper changes it, and the collector turns some fields into labels ("label promotion"). So build log panels from real stored lines:
 
-1. **Sample** 50–100 stored lines per stream (a stream is the lines that share one set of log labels) for this service, from the real landscape with Grafana Explore. Include an error window. No access? Mark the panel `UNVERIFIED` in its description and check it after the first deploy.
+1. **Sample** 50–100 stored lines per stream (a stream is the lines that share one set of log labels) for this service, from the real landscape with Grafana Explore. Include an error window. No access? Mark the panel `UNVERIFIED` in its description, check it after the first deploy, and still create `log-notes.md` (step 9) saying nothing was sampled yet.
 2. **Test the query engine.** LogQL support differs between backend versions. Compare row counts for a raw query, `|~`, `| json`, `| logfmt` and `line_format`, and use only what works. Re-test when the backend is upgraded.
 3. **Split by label first**: `sum by (module) (count_over_time({service="zinc"}[1h]))`. Parse line bodies only when labels cannot answer.
-4. **Note each stream's format and level encoding**, e.g. `level=error` (logfmt), `"level":"error"` (JSON), `"level":50` (pino numeric).
+4. **Note each stream's format and level encoding**, e.g. `level=error` (logfmt), `"level":"error"` (JSON), `"level":50` (numeric, from pino, the Bun template's JSON logger).
 5. **Filter the noise** with one targeted negative filter per noisy line type, e.g. `!= "grpc.health"`.
 6. **One panel per failure class**, taken from the failures named in `SIGNALS.md` (Gates 2 and 5), e.g. "Server errors (5xx)", "Auth denials (401/403)". An alert that sets `panel` links to the panel showing the data it fires on. The last panel is "all errors minus the classes above", so nothing hides. An empty class panel on a healthy service is correct; say so in its description.
 7. **Place log evidence in the row of the metric it explains**, or in the detail row directly under it when that metric is in the overview row; never in a generic logs row at the bottom.
@@ -75,7 +75,7 @@ Run this for every new or changed dashboard file. Tools and the sandbox: [Dashbo
    done
    ```
 
-   Fix every finding, or justify it in `observability/dashboards/.lint` (the linter reads `.lint` from the dashboard's folder). Start that file as a copy of `.claude/skills/grafana-dashboards/sandbox/dashboards/.lint` and keep only the exclusions your dashboards need: drop one, lint again, and put it back only if the lint fails.
+   Fix every finding, or justify it in `observability/dashboards/.lint` (the linter reads `.lint` from the dashboard's folder). Start that file as a copy of `.claude/skills/grafana-dashboards/sandbox/dashboards/.lint` A dashboard that selects only by LPSM labels (no `job` or `instance`) needs all four of its exclusions. For any exclusion you add beyond them: drop it, lint again, and put it back only if the lint fails.
 
 2. Render in the sandbox with synthetic data and read the PNGs.
 3. Fix what the checklist below finds and repeat from step 1.

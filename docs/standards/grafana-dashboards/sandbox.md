@@ -10,19 +10,19 @@ A local Grafana, image renderer and Prometheus, so you can render a dashboard wi
 
 ## Tools
 
-Every tool comes from this repo's nix shell. Run `command -v jq curl file awk sed docker dashboard-linter promtool`; that is the check: each must print a `/nix/store/…` path. In `nix/env.nix`, `dashboard-linter` is in the `lint` group, `promtool` comes from `prometheus.cli` in the `dev` group (default shell), and the rest come from atomiutils and infrautils: tool bundles from the nix registry this repo's `flake.nix` uses (input `atomipkgs`); `command -v <tool>` shows which bundle a tool comes from. The Docker CLI comes from infrautils; the Docker daemon comes from your Docker install (`CLAUDE.md`, Prerequisites) and must be running.
+Every tool comes from this repo's nix shell. Run `command -v jq curl file awk sed docker dashboard-linter promtool`; that is the check: each must print a `/nix/store/…` path. In `nix/env.nix`, `dashboard-linter` is in the `lint` group, `promtool` comes from `prometheus.cli` in the `dev` group (default shell), and the rest are expected from atomiutils and infrautils: tool bundles from the nix registry this repo's `flake.nix` uses (input `atomipkgs`); `command -v <tool>` shows which bundle a tool comes from. If `command -v` prints nothing or a non-`/nix/store` path, add the tool to `nix/packages.nix`. The Docker CLI comes from infrautils; the Docker daemon comes from your Docker install (`CLAUDE.md`, Prerequisites) and must be running.
 
 ## Files
 
 Everything lives in `.claude/skills/grafana-dashboards/sandbox/`:
 
-| File                     | What it is                                                                                         |
-| ------------------------ | -------------------------------------------------------------------------------------------------- |
-| `compose.yaml`           | The three containers, pinned by digest, bound to `127.0.0.1` only                                  |
-| `provisioning/`          | Adds the Prometheus datasource (uid `prometheus`) and loads `dashboards/`                          |
-| `generate-metrics.awk`   | Writes 6 hours of synthetic metrics for two landscapes, with an incident, from the list at its top |
-| `dashboards/sample.json` | A small fixture dashboard that passes strict lint and renders with that data                       |
-| `dashboards/.lint`       | Example `dashboard-linter` exclusions, each with a reason                                          |
+| File                     | What it is                                                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `compose.yaml`           | The three containers, pinned by digest, bound to `127.0.0.1` only                                                   |
+| `provisioning/`          | Adds the Prometheus datasource (uid `prometheus`), loads `dashboards/` and the alert-condition rules in `alerting/` |
+| `generate-metrics.awk`   | Writes 6 hours of synthetic metrics for two landscapes, with an incident, from the list at its top                  |
+| `dashboards/sample.json` | A small fixture dashboard that passes strict lint and renders with that data                                        |
+| `dashboards/.lint`       | Example `dashboard-linter` exclusions, each with a reason                                                           |
 
 For your own dashboard, write one line per metric and label set its queries use to `$sb/rows.txt`, in the format of the list at the top of `generate-metrics.awk` (type, name, labels, normal value, incident value), including error series and values near your thresholds, so threshold colors show. Pass it with `-v rows=`, and pass your platform, service and module, as your queries select them, with `-v identity=`; if your queries still say `{service}`, set `service=sandbox` (the `sed` line below puts `sandbox` there).
 
@@ -58,6 +58,17 @@ done
 - The unique project name keeps the containers and volumes apart from other stacks.
 - Grafana is anonymous admin, which is why every port is bound to `127.0.0.1`.
 - Grafana re-reads `$sb/dashboards/` about every 10 seconds: copy an edited JSON there and render again.
+
+## Check the alert condition
+
+`provisioning/alerting/condition-check.yaml` loads three known-answer alert rules, evaluated every 10 seconds. `cond-A` uses its query as the condition; `cond-B` uses the condition the chart renders for every rule ([Shipping](/docs/standards/observability/shipping.md#what-the-chart-adds-to-each-alert)). Both query `vector(0) < 1`, which returns one series with value 0, as in a total outage. `absent` is an `absent_over_time` rule on a metric that does not exist. Grafana must show `cond-B` and `absent` firing and `cond-A` not; the last line prints `true`:
+
+```bash
+rules=http://127.0.0.1:3000/api/prometheus/grafana/api/v1/rules
+check='[.data.groups[].rules[] | {(.name): .state}] | add | .["cond-A"] == "inactive" and .["cond-B"] == "firing" and .absent == "firing"'
+for _ in $(seq 30); do curl -fsS "$rules" | jq -e "$check" >/dev/null && break; sleep 2; done
+curl -fsS "$rules" | jq -e "$check"
+```
 
 ## Render and look
 

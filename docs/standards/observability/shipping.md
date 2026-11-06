@@ -7,7 +7,7 @@ The files in `observability/` are plain Grafana content. The service's **primord
 - **One Grafana per landscape.** The chart is installed once per landscape, onto Primordial, into that landscape's namespace `{grafana-namespace}`. Each install targets that landscape's Grafana through the operator's `instanceSelector` (`{instance-selector}`; both values from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you)). Installs never share a Grafana, so uids and names carry no landscape and never collide.
 - Each install stamps its landscape on the alert rules and points them at that landscape's datasources, so one rule file works everywhere and `expr` never selects `landscape`. Dashboards use the `$landscape` variable.
 - The app chart, `infra/root_chart/`, only runs the service. It never renders observability files.
-- Build the rendering with `helm-wrapper`, not with CI scripts or kustomize.
+- Build the rendering with `helm-wrapper`, not with CI scripts.
 
 ## The chart copy
 
@@ -28,18 +28,21 @@ Helm can only read files inside its chart folder and rejects symlinks that point
 
 ## What the chart adds to each alert
 
-| Rendered field                                                                      | Comes from                                                                                                     |
-| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `severity` label and the 🚨/⚠️/ℹ️ title prefix                                      | The file name                                                                                                  |
-| Rule `uid` and group name                                                           | `<platform>-<service>-<slug>-<severity>`                                                                       |
-| `metadata.namespace`, `instanceSelector`                                            | This landscape's `{grafana-namespace}` and `{instance-selector}`                                               |
-| `folderRef`, `interval: 1m`                                                         | The service folder; a fixed evaluation interval                                                                |
-| `condition: A`, `refId: A`, `noDataState: OK`, `execErrState: Error`, instant query | Fixed values                                                                                                   |
-| `relativeTimeRange`                                                                 | Always `{ from: 600, to: 0 }`                                                                                  |
-| `datasourceUid`                                                                     | `datasource: metrics` or `logs` → this landscape's `{metrics-datasource-uid}` or `{logs-datasource-uid}`       |
-| `landscape`, `platform`, `service`, `module` labels                                 | The chart's `serviceTree` values                                                                               |
-| `runbook_url`                                                                       | `{repo-url}/observability/alerts/<slug>/runbook.md`                                                            |
-| `__dashboardUid__`, `__panelId__`                                                   | `panel` set → `<platform>-<service>-overview` and that panel id as a string; unset → `{generic-dashboard-uid}` |
+The chart renders every rule the same way, so every rule has query `A` and condition `B` below.
+
+| Rendered field                                                                   | Comes from                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `severity` label and the 🚨/⚠️/ℹ️ title prefix                                   | The file name                                                                                                                                                                                                                                                                                                                                                              |
+| Rule `uid` and group name                                                        | `<platform>-<service>-<slug>-<severity>`                                                                                                                                                                                                                                                                                                                                   |
+| `metadata.namespace`, `instanceSelector`                                         | This landscape's `{grafana-namespace}` and `{instance-selector}`                                                                                                                                                                                                                                                                                                           |
+| `folderRef`, `interval: 1m`                                                      | The service folder; a fixed evaluation interval                                                                                                                                                                                                                                                                                                                            |
+| `condition: B`, `noDataState: OK`, `execErrState: Error`                         | Fixed values                                                                                                                                                                                                                                                                                                                                                               |
+| `data` query `A`: the `expr`, instant, `relativeTimeRange: { from: 600, to: 0 }` | The tier file                                                                                                                                                                                                                                                                                                                                                              |
+| `data` query `A`: `datasourceUid`                                                | `datasource: metrics` or `logs` → this landscape's `{metrics-datasource-uid}` or `{logs-datasource-uid}`                                                                                                                                                                                                                                                                   |
+| `data` query `B`                                                                 | Fixed: the math expression in the example below, true when `$A` is a number, NaN or infinite. A plain query condition fires only on non-zero values; `B` makes any series `A` returns fire, even with value 0, as in Prometheus (which the offline `promtool` test uses); the [sandbox](/docs/standards/grafana-dashboards/sandbox.md#check-the-alert-condition) proves it |
+| `landscape`, `platform`, `service`, `module` labels                              | The chart's `serviceTree` values                                                                                                                                                                                                                                                                                                                                           |
+| `runbook_url`                                                                    | `{repo-url}/observability/alerts/<slug>/runbook.md`                                                                                                                                                                                                                                                                                                                        |
+| `__dashboardUid__`, `__panelId__`                                                | `panel` set → `<platform>-<service>-overview` and that panel id as a string; unset → `{generic-dashboard-uid}`                                                                                                                                                                                                                                                             |
 
 **Example.** The `critical.yaml` in [Alerts](/docs/standards/observability/alerts.md#the-tier-file), with `serviceTree: {landscape: raichu, platform: tracker, service: zinc, module: webhook}` and the example values namespace `raichu-grafana`, instance selector `{dashboards: raichu}`, metrics datasource uid `raichu-metrics` and repo URL `https://github.com/example/zinc/blob/main`, must render exactly as:
 
@@ -57,7 +60,7 @@ spec:
   rules:
     - uid: tracker-zinc-retry-queue-critical
       title: 🚨 Retry queue saturated
-      condition: A
+      condition: B
       for: 10m
       noDataState: OK
       execErrState: Error
@@ -66,6 +69,9 @@ spec:
           relativeTimeRange: { from: 600, to: 0 }
           datasourceUid: raichu-metrics
           model: { expr: 'webhook_retry_queue_depth{service="zinc"} > 5000', instant: true }
+        - refId: B
+          datasourceUid: __expr__
+          model: { type: math, expression: 'is_number($A) || is_nan($A) || is_inf($A)' }
       labels:
         severity: critical
         landscape: raichu
@@ -82,7 +88,7 @@ spec:
 
 ## Structural checks
 
-The chart uses Helm's `required` and `fail`, so `helm template` stops with an error, before emitting anything, when:
+Check for each of these errors (by hand until the chart exists; the chart then enforces them with Helm's `required`/`fail`, so `helm template` stops before emitting anything):
 
 - a tier file is not named `critical.yaml`, `warning.yaml` or `info.yaml`;
 - a tier file breaks [the tier file](/docs/standards/observability/alerts.md#the-tier-file) table: a required field is missing, the title is too long, or `panel` is not an integer;

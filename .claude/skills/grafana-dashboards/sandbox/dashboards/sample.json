@@ -68,7 +68,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Sandbox fixture (its links keep their placeholders; a real dashboard holds the real values): request rate, errors and latency of the `sample` service. For whoever checks that the sandbox renders. Next: [System overview]({repo-url}/observability/overview.md) · [Generic dashboard](/d/{generic-dashboard-uid})"
+        "content": "Sandbox fixture (its links keep their placeholders; a real dashboard holds the real values): request rate, errors and latency of the `sample` service. For whoever checks that the sandbox renders. Next: [System overview]({repo-url}/observability/overview.md) · [Generic dashboard](/d/{generic-dashboard-uid}?{generic-dashboard-vars})"
       }
     },
     {

@@ -14,6 +14,7 @@ const requiredArtifacts = [
   '.claude/skills/grafana-dashboards/sandbox/compose.yaml',
   '.claude/skills/grafana-dashboards/sandbox/provisioning/datasources/datasources.yaml',
   '.claude/skills/grafana-dashboards/sandbox/provisioning/dashboards/default.yaml',
+  '.claude/skills/grafana-dashboards/sandbox/provisioning/alerting/condition-check.yaml',
   '.claude/skills/grafana-dashboards/sandbox/generate-metrics.awk',
   '.claude/skills/grafana-dashboards/sandbox/dashboards/sample.json',
   '.claude/skills/grafana-dashboards/sandbox/dashboards/.lint',

@@ -13,7 +13,7 @@ Both frontends must:
 3. Do nothing, and make no network calls, when disabled.
 4. Fail visibly when enabled with invalid config. Never swallow a start-up failure and pretend telemetry works.
 5. Attach the full LPSM and version identity to every event, error, session and span (table below).
-6. Send unexpected exceptions and expected app errors through the same reporter, after the UI error boundary has shown them. Expected errors are RFC 9457 Problems, as in [Wire format](/docs/standards/wire-format/index.md).
+6. Send unexpected exceptions and expected app errors through the same reporter, after the UI error boundary (the component that catches render errors and shows a fallback; in Flutter, `FlutterError.onError`/`ErrorWidget`) has shown them. Expected errors are RFC 9457 Problems, as in [Wire format](/docs/standards/wire-format/index.md).
 7. Redact secrets; send user and context attributes only from an explicit allowlist, e.g. `user.id` yes, `user.email` no.
 8. Flush when the page is hidden or the app is paused, where the SDK supports it.
 

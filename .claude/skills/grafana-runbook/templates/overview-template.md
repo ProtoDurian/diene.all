@@ -23,13 +23,17 @@
 
 ## Common commands
 
-| Purpose                                                     | Command                                                                                                                             |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Pod status                                                  | `kubectl get pods -n {namespace}`                                                                                                   |
-| Recent errors (LogQL; the responder fills in `{landscape}`) | `{service="{service}", landscape="{landscape}"} \| json \| {error filter from log-notes.md, or the expected one marked UNVERIFIED}` |
-| {Key domain query}                                          | `{query}`                                                                                                                           |
-| Slow traces (TraceQL)                                       | `{ resource.service.name="{service}" && duration > 2s }`                                                                            |
-| Restart                                                     | `kubectl rollout restart {workload} -n {namespace}`                                                                                 |
+| Purpose                                                     | Command                                                  |
+| ----------------------------------------------------------- | -------------------------------------------------------- |
+| Pod status                                                  | `kubectl get pods -n {namespace}`                        |
+| Recent errors (LogQL; the responder fills in `{landscape}`) | the `logql` block below the table                        |
+| {Key domain query}                                          | `{query}`                                                |
+| Slow traces (TraceQL)                                       | `{ resource.service.name="{service}" && duration > 2s }` |
+| Restart                                                     | `kubectl rollout restart {workload} -n {namespace}`      |
+
+```logql
+{service="{service}", landscape="{landscape}"} | json | {error filter from log-notes.md, or the expected one marked UNVERIFIED}
+```
 
 ## Links
 
