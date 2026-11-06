@@ -194,12 +194,6 @@ describe('EnvOverrides.apply — schema-directed coercion', () => {
     },
     { label: 'a defaulted boolean', env: { ATOMI_SVC__DEBUG: 'TRUE' }, path: ['svc', 'debug'], expected: true },
     {
-      label: 'a non-boolean word into a boolean',
-      env: { ATOMI_SVC__DEBUG: 'yes' },
-      path: ['svc', 'debug'],
-      expected: 'yes',
-    },
-    {
       label: 'a non-numeric word into a number',
       env: { ATOMI_SVC__MAX_RETRIES: '1e3' },
       path: ['svc', 'maxRetries'],
@@ -317,5 +311,154 @@ describe('EnvOverrides.apply — exact bigint through the loader schema', () => 
 
     // Assert
     actual.ids.big.toString().should.equal('9007199254740993');
+  });
+});
+
+enum Level {
+  Debug = 0,
+  Info = 1,
+}
+
+describe('EnvOverrides.apply — through unions, intersections, records, tuples and catchall', () => {
+  const schema = z.object({
+    svc: z.object({
+      auth: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('a'), maxRetries: z.number().optional(), token: z.string() }),
+        z.object({ kind: z.literal('b'), token: z.string() }),
+      ]),
+      joined: z.object({ host: z.string() }).and(z.object({ maxRetries: z.number().optional() })),
+      tenants: z.record(z.string(), z.object({ maxRetries: z.number().optional(), name: z.string() })),
+      labels: z.record(z.string(), z.string()),
+      pair: z.tuple([z.string(), z.number()]),
+      extra: z.object({}).catchall(z.string()),
+      level: z.enum(Level).optional(),
+      on: z.coerce.boolean().optional(),
+    }),
+  });
+  const base: ConfigRecord = {
+    svc: {
+      auth: { kind: 'a', token: 'x' },
+      joined: { host: 'h' },
+      tenants: { t1: { name: 'n' } },
+      labels: {},
+      pair: ['a', 1],
+      extra: {},
+    },
+  };
+
+  it.each([
+    {
+      label: 'an absent key in a discriminated union',
+      name: 'ATOMI_SVC__AUTH__MAX_RETRIES',
+      raw: '3',
+      path: ['auth', 'maxRetries'],
+      expected: 3,
+    },
+    {
+      label: 'an absent key in an intersection',
+      name: 'ATOMI_SVC__JOINED__MAX_RETRIES',
+      raw: '3',
+      path: ['joined', 'maxRetries'],
+      expected: 3,
+    },
+    {
+      label: 'an absent key in a record of objects',
+      name: 'ATOMI_SVC__TENANTS__T1__MAX_RETRIES',
+      raw: '3',
+      path: ['tenants', 't1', 'maxRetries'],
+      expected: 3,
+    },
+    {
+      label: 'a union string leaf',
+      name: 'ATOMI_SVC__AUTH__TOKEN',
+      raw: '123456',
+      path: ['auth', 'token'],
+      expected: '123456',
+    },
+    {
+      label: 'an intersection string leaf',
+      name: 'ATOMI_SVC__JOINED__HOST',
+      raw: '0123',
+      path: ['joined', 'host'],
+      expected: '0123',
+    },
+    {
+      label: 'a record string value',
+      name: 'ATOMI_SVC__LABELS__TEAM',
+      raw: '123',
+      path: ['labels', 'team'],
+      expected: '123',
+    },
+    { label: 'a tuple string item', name: 'ATOMI_SVC__PAIR__0', raw: '0123', path: ['pair', '0'], expected: '0123' },
+    { label: 'a tuple number item', name: 'ATOMI_SVC__PAIR__1', raw: '7', path: ['pair', '1'], expected: 7 },
+    {
+      label: 'a catchall string value',
+      name: 'ATOMI_SVC__EXTRA__CODE',
+      raw: '0123',
+      path: ['extra', 'code'],
+      expected: '0123',
+    },
+    { label: 'a numeric TS enum', name: 'ATOMI_SVC__LEVEL', raw: '1', path: ['level'], expected: 1 },
+    { label: 'false into a coerce boolean', name: 'ATOMI_SVC__ON', raw: 'false', path: ['on'], expected: false },
+  ])('should reach $label', ({ name, raw, path, expected }) => {
+    // Arrange
+    const env = { [name]: raw };
+
+    // Act
+    const actual = schema.parse(overrides.apply(base, env, PREFIX, schema));
+
+    // Assert
+    const leaf = path.reduce<unknown>((node, key) => (node as Record<string, unknown>)[key], actual.svc);
+    (leaf as object).should.equal(expected);
+  });
+
+  it.each(['0', 'no'])('should refuse "%s" for a boolean instead of letting z.coerce.boolean read it as true', raw => {
+    // Arrange
+    const env = { ATOMI_SVC__ON: raw };
+
+    // Act
+    const act = () => overrides.apply(base, env, PREFIX, schema);
+
+    // Assert
+    act.should.throw(ConfigLoaderError, { message: /ATOMI_SVC__ON: expected true or false/ });
+  });
+});
+
+describe('EnvOverrides.apply — nodes the schema cannot see into', () => {
+  const schema = z.object({ blob: z.custom<object>(() => true), meta: z.unknown() });
+
+  it('should throw rather than drop a key under a schema it cannot walk', () => {
+    // Arrange
+    const env = { ATOMI_BLOB__MAX_RETRIES: '3' };
+
+    // Act
+    const act = () => overrides.apply({}, env, PREFIX, schema);
+
+    // Assert
+    act.should.throw(ConfigLoaderError, { message: /ATOMI_BLOB__MAX_RETRIES/ });
+  });
+
+  it('should keep the plain rule under z.unknown()', () => {
+    // Arrange
+    const env = { ATOMI_META__MAX_RETRIES: '3' };
+
+    // Act
+    const actual = overrides.apply({}, env, PREFIX, schema);
+
+    // Assert
+    actual.should.deepEqual({ meta: { max_retries: 3 } });
+  });
+});
+
+describe('EnvOverrides.apply — plain booleans', () => {
+  it('should refuse a non-boolean word for z.boolean()', () => {
+    // Arrange
+    const schema = z.object({ svc: z.object({ debug: z.boolean() }) });
+
+    // Act
+    const act = () => overrides.apply({}, { ATOMI_SVC__DEBUG: 'yes' }, PREFIX, schema);
+
+    // Assert
+    act.should.throw(ConfigLoaderError, { message: 'ATOMI_SVC__DEBUG: expected true or false, got "yes"' });
   });
 });

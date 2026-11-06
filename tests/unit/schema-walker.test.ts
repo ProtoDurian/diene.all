@@ -5,21 +5,34 @@ import { SchemaWalker } from '../../src/lib/schema-walker.js';
 
 const walker = new SchemaWalker();
 
+enum Level {
+  Debug = 0,
+  Info = 1,
+}
+
 describe('SchemaWalker.kind', () => {
   it.each([
     { label: 'a string', schema: z.string(), expected: 'string' },
-    { label: 'an enum', schema: z.enum(['a', 'b']), expected: 'string' },
+    { label: 'a string enum', schema: z.enum(['a', 'b']), expected: 'string' },
+    { label: 'a numeric TS enum', schema: z.enum(Level), expected: 'number' },
+    { label: 'a mixed enum', schema: z.enum({ a: 'a', b: 1 }), expected: 'unknown' },
     { label: 'a coerced number', schema: z.coerce.number(), expected: 'number' },
     { label: 'a boolean', schema: z.boolean(), expected: 'boolean' },
+    { label: 'a coerced boolean', schema: z.coerce.boolean(), expected: 'boolean' },
     { label: 'an array', schema: z.array(z.string()), expected: 'array' },
+    { label: 'a tuple', schema: z.tuple([z.string()]), expected: 'array' },
     { label: 'an object', schema: z.object({}), expected: 'object' },
+    { label: 'a record', schema: z.record(z.string(), z.string()), expected: 'object' },
     { label: 'a string literal', schema: z.literal('a'), expected: 'string' },
     { label: 'a number literal', schema: z.literal(1), expected: 'number' },
     { label: 'a mixed literal', schema: z.literal(['a', 1]), expected: 'unknown' },
     { label: 'a bigint literal', schema: z.literal(1n), expected: 'string' },
     { label: 'an undefined literal', schema: z.literal(undefined), expected: 'unknown' },
-    { label: 'a union', schema: z.union([z.string(), z.number()]), expected: 'unknown' },
-    { label: 'no schema', schema: undefined, expected: 'unknown' },
+    { label: 'a coerced bigint', schema: z.coerce.bigint(), expected: 'string' },
+    { label: 'a coerced date', schema: z.coerce.date(), expected: 'string' },
+    { label: 'a union of strings', schema: z.union([z.string(), z.enum(['a'])]), expected: 'string' },
+    { label: 'a union of string and number', schema: z.union([z.string(), z.number()]), expected: 'unknown' },
+    { label: 'an intersection of objects', schema: z.object({}).and(z.object({})), expected: 'object' },
     {
       label: 'an optional nullable default string',
       schema: z.string().nullable().optional().default('x'),
@@ -33,14 +46,13 @@ describe('SchemaWalker.kind', () => {
     { label: 'a required optional boolean', schema: z.boolean().optional().nonoptional(), expected: 'boolean' },
     { label: 'the input side of a pipe', schema: z.string().pipe(z.coerce.number()), expected: 'string' },
     { label: 'a lazy string', schema: z.lazy(() => z.string()), expected: 'string' },
-    { label: 'a coerced bigint, kept as text for an exact parse', schema: z.coerce.bigint(), expected: 'string' },
-    { label: 'a coerced date, kept as text', schema: z.coerce.date(), expected: 'string' },
+    { label: 'no schema', schema: undefined, expected: 'unknown' },
   ])('should classify $label', ({ schema, expected }) => {
     // Arrange
-    const target = schema;
+    const node = walker.root(schema);
 
     // Act
-    const actual = walker.kind(target);
+    const actual = walker.kind(node);
 
     // Assert
     actual.should.equal(expected);
@@ -48,16 +60,28 @@ describe('SchemaWalker.kind', () => {
 });
 
 describe('SchemaWalker.keys and child', () => {
-  const schema = z.object({ svc: z.object({ maxRetries: z.number() }).optional(), tags: z.array(z.string()) });
+  const schema = z.object({
+    svc: z.object({ maxRetries: z.number() }).optional(),
+    tags: z.array(z.string()),
+    auth: z.union([z.object({ token: z.string() }), z.object({ user: z.string() })]),
+    joined: z.object({ host: z.string() }).and(z.object({ port: z.number() })),
+    labels: z.record(z.string(), z.number()),
+    pair: z.tuple([z.string()], z.boolean()),
+    extra: z.object({ id: z.string() }).catchall(z.number()),
+    strict: z.strictObject({ id: z.string() }),
+  });
+  const root = walker.root(schema);
 
   it.each([
-    { label: 'an object', target: schema, expected: ['svc', 'tags'] },
-    { label: 'a wrapped object', target: schema.shape.svc, expected: ['maxRetries'] },
-    { label: 'a non-object', target: z.string(), expected: [] },
-    { label: 'no schema', target: undefined, expected: [] },
-  ])('should list the keys of $label', ({ target, expected }) => {
+    { label: 'an object', path: [], expected: ['svc', 'tags', 'auth', 'joined', 'labels', 'pair', 'extra', 'strict'] },
+    { label: 'a wrapped object', path: ['svc'], expected: ['maxRetries'] },
+    { label: 'a union of objects', path: ['auth'], expected: ['token', 'user'] },
+    { label: 'an intersection', path: ['joined'], expected: ['host', 'port'] },
+    { label: 'a record', path: ['labels'], expected: [] },
+    { label: 'a leaf', path: ['tags', 0], expected: [] },
+  ])('should list the keys of $label', ({ path, expected }) => {
     // Arrange
-    const node = target;
+    const node = path.reduce((current, key) => walker.child(current, key), root);
 
     // Act
     const actual = walker.keys(node);
@@ -67,28 +91,52 @@ describe('SchemaWalker.keys and child', () => {
   });
 
   it.each([
-    { label: 'an object key', key: 'svc', expected: 'object' },
-    { label: 'an unknown key', key: 'missing', expected: 'unknown' },
-    { label: 'an array element', key: 'tags', index: 0, expected: 'string' },
-  ])('should find the child for $label', ({ key, index, expected }) => {
+    { label: 'an object key', path: ['svc'], expected: 'object' },
+    { label: 'an unknown key', path: ['missing'], expected: 'unknown' },
+    { label: 'a numeric key of an object', path: [0], expected: 'unknown' },
+    { label: 'an array element', path: ['tags', 0], expected: 'string' },
+    { label: 'a union member key', path: ['auth', 'user'], expected: 'string' },
+    { label: 'an intersection member key', path: ['joined', 'port'], expected: 'number' },
+    { label: 'a record value', path: ['labels', 'any'], expected: 'number' },
+    { label: 'a numeric key of a record', path: ['labels', 0], expected: 'number' },
+    { label: 'a tuple item', path: ['pair', 0], expected: 'string' },
+    { label: 'a tuple rest item', path: ['pair', 3], expected: 'boolean' },
+    { label: 'a tuple by name', path: ['pair', 'x'], expected: 'unknown' },
+    { label: 'a catchall shape key', path: ['extra', 'id'], expected: 'string' },
+    { label: 'a catchall value', path: ['extra', 'other'], expected: 'number' },
+    { label: 'an unknown key of a strict object', path: ['strict', 'other'], expected: 'unknown' },
+  ])('should find the child for $label', ({ path, expected }) => {
     // Arrange
-    const parent = index === undefined ? schema : walker.child(schema, key);
+    const node = path.reduce((current, key) => walker.child(current, key), root);
 
     // Act
-    const actual = walker.kind(walker.child(parent, index ?? key));
+    const actual = walker.kind(node);
 
     // Assert
     actual.should.equal(expected);
   });
+});
 
-  it('should find no child under a numeric key of an object', () => {
+describe('SchemaWalker.opaque', () => {
+  it.each([
+    { label: 'a custom schema', schema: z.custom<object>(() => true), expected: true },
+    { label: 'a map', schema: z.map(z.string(), z.string()), expected: true },
+    {
+      label: 'a union holding a custom schema',
+      schema: z.union([z.object({}), z.custom<object>(() => true)]),
+      expected: true,
+    },
+    { label: 'an object', schema: z.object({}), expected: false },
+    { label: 'z.unknown()', schema: z.unknown(), expected: false },
+    { label: 'no schema', schema: undefined, expected: false },
+  ])('should report $expected for $label', ({ schema, expected }) => {
     // Arrange
-    const parent = schema;
+    const node = walker.root(schema);
 
     // Act
-    const actual = walker.child(parent, 0);
+    const actual = walker.opaque(node);
 
     // Assert
-    (actual === undefined).should.be.true();
+    actual.should.equal(expected);
   });
 });
