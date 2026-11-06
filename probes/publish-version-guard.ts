@@ -1,11 +1,19 @@
-import { expectGreen, expectRed, preserveMutationBeforeRestore } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-// Gate: `scripts/validate/publish-version.sh` refuses to publish unless the
-// member pubspec version and the VERSION ledger agree with the release tag.
-// Sabotage drifts the member pubspec version away from VERSION and proves the
-// guard rejects the mismatch.
-const GUARD =
-  "nix develop .#ci --no-write-lock-file -c bash -lc 'GITHUB_REF_NAME=v$(cat VERSION) ./scripts/validate/publish-version.sh'";
+const MEMBER_PUBSPEC = 'packages/diene_dart_lib/pubspec.yaml';
+
+function manifestVersion(source: string): string {
+  const version = source.match(/^version:\s*(\S+)\s*$/m)?.[1];
+  if (!version) {
+    throw new Error('publish-version-guard: member pubspec has no version');
+  }
+  return version;
+}
+
+// An unroutable hosted URL keeps a broken guard from ever reaching pub.dev.
+function publishAt(tag: string): string {
+  return `nix develop .#ci -c bash -c 'PUB_HOSTED_URL=http://127.0.0.1:9 ./scripts/ci/publish.sh ${tag}'`;
+}
 
 export default {
   contractVersion: 1,
@@ -13,30 +21,38 @@ export default {
   probes: [
     {
       name: 'baseline-publish-version-guard-green',
-      description: 'the version guard passes when pubspec, VERSION, and tag agree',
+      description: 'the guard accepts the tag that equals the member pubspec version and leaves the manifest untouched',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, GUARD, 'publish-version-guard');
+        const before = await repo.read(MEMBER_PUBSPEC);
+        await expectGreen(
+          repo,
+          `nix develop .#ci -c ./scripts/validate/publish-version.sh v${manifestVersion(before)}`,
+          'publish-version-guard',
+        );
+        if ((await repo.read(MEMBER_PUBSPEC)) !== before) {
+          throw new Error('publish-version-guard: the guard mutated the member pubspec');
+        }
       },
     },
     {
       name: 'mutation-publish-version-guard-caught',
-      description: 'the version guard fails once the member pubspec version drifts',
+      description: 'publish.sh exits 1 before publication once the manifest and tag disagree, without restamping',
       kind: 'mutation',
-      expectedImpact: ['pub-workspace-metadata-validator'],
+      expectedImpact: [],
       async run(repo: any) {
-        const version = (await repo.read('VERSION')).trim();
-        const path = 'packages/diene_dart_lib/pubspec.yaml';
-        const original = await repo.read(path);
-        try {
-          await repo.patch(path, {
-            find: `version: ${version}`,
-            replace: `version: ${version}-probe-drift`,
+        await withCleanProbeState(repo, [MEMBER_PUBSPEC], async () => {
+          const original = await repo.read(MEMBER_PUBSPEC);
+          const version = manifestVersion(original);
+          const drifted = original.replace(/^version:.*$/m, `version: ${version}-probe.drift`);
+          await repo.write(MEMBER_PUBSPEC, drifted);
+          await expectRedBecause(repo, publishAt(`v${version}`), 'publish-version-guard', ['!= tag version'], {
+            forbidden: ['Publishing diene_dart_lib'],
           });
-          await expectRed(repo, GUARD, 'publish-version-guard');
-        } finally {
-          await preserveMutationBeforeRestore(repo, 'publish-version-guard', path, original);
-        }
+          if ((await repo.read(MEMBER_PUBSPEC)) !== drifted) {
+            throw new Error('publish-version-guard: publish restamped the member pubspec');
+          }
+        });
       },
     },
   ],

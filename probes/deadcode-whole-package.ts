@@ -1,39 +1,34 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-// Gate: the whole-package dead-code pass (`dart_code_linter` check-unused-code /
-// check-unused-files over lib+test+example) forbids unreferenced declarations.
-// Sabotage appends an unused private production member and proves the pass flags
-// it as dead code.
-const MEMBER = 'packages/diene_dart_lib';
-const WHOLE_PASS =
-  "nix develop .#ci --no-write-lock-file -c bash -lc 'cd packages/diene_dart_lib && dart run dart_code_linter:metrics check-unused-code lib test example && dart run dart_code_linter:metrics check-unused-files lib test example'";
+const DEADCODE = 'nix develop .#ci -c ./scripts/ci/deadcode.sh';
+const FIXTURE = 'packages/diene_dart_lib/lib/src/probe_dead_whole.dart';
 
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: {
-    post: ['nix develop .#ci --no-write-lock-file -c dart pub get --offline'],
-  },
+  setup: { post: ['nix develop .#ci -c dart pub get --offline'] },
   probes: [
     {
       name: 'baseline-deadcode-whole-package-green',
-      description: 'the whole-package dead-code pass is clean on the pristine template',
+      description: 'both no-exclusion dead-code views are clean',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, WHOLE_PASS, 'deadcode-whole-package');
+        await expectGreen(repo, DEADCODE, 'deadcode-whole-package');
       },
     },
     {
       name: 'mutation-deadcode-whole-package-caught',
-      description: 'the whole-package dead-code pass flags an unused private member',
+      description:
+        'the whole-package view (package + tests) flags an unused production file before the production view runs',
       kind: 'mutation',
-      expectedImpact: ['deadcode-production-only'],
+      expectedImpact: [],
       async run(repo: any) {
-        // Drop an orphan source under the member's lib/src that nothing
-        // references. dart_code_linter surfaces it as unused code AND an unused
-        // file, so the whole-package pass reddens.
-        await repo.write(`${MEMBER}/lib/src/__probe_dead_whole.dart`, 'int probeDeadWhole() => 1;\n');
-        await expectRed(repo, WHOLE_PASS, 'deadcode-whole-package');
+        await withCleanProbeState(repo, [FIXTURE], async () => {
+          await repo.write(FIXTURE, 'int _probeDeadWhole() => 1;\n\nint probeDeadWhole() => _probeDeadWhole();\n');
+          await expectRedBecause(repo, DEADCODE, 'deadcode-whole-package', ['probe_dead_whole.dart'], {
+            forbidden: ['Production dead-code pass'],
+          });
+        });
       },
     },
   ],
