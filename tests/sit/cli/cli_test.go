@@ -14,7 +14,6 @@ func TestCompiledArtifactReportsItsInterface(t *testing.T) {
 	// Act
 	// #nosec G204 -- the executable is fixed and nothing in the invocation is dynamic.
 	output, err := exec.CommandContext(ctx, "../../../dist/manager", "--help").CombinedOutput()
-
 	// Assert
 	if err != nil {
 		t.Fatalf("run compiled artifact: %v\n%s", err, output)
