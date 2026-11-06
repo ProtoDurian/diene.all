@@ -1,0 +1,143 @@
+@import 'tailwindcss';
+
+/* Theme tokens: ferretry's Studio family (light + dark). Literal colours live here only;
+   components use the token utilities below. */
+:root {
+  color-scheme: light;
+  --font-body: 'Inter var', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'SFMono-Regular', 'Cascadia Mono', Menlo, Consolas, monospace;
+
+  --bg: #fbfbfc;
+  --surface: #ffffff;
+  --surface-2: #f5f5f7;
+  --surface-3: #ededf1;
+  --fg: #17171b;
+  --fg-soft: #45454e;
+  --muted: #666673;
+  --border: #e7e7ec;
+  --border-strong: #868689;
+
+  --accent: #4f52d6;
+  --accent-fg: #ffffff;
+  --accent-soft: #eeeffc;
+  --accent-border: #d6d8f5;
+  --accent-strong: #3f42c4;
+
+  --ok: #3d7b50;
+  --ok-bg: #eef4f0;
+  --ok-border: #cfe2d6;
+  --warn: #8a6420;
+  --warn-bg: #f7f1e6;
+  --warn-border: #e7dac0;
+  --err: #a14040;
+  --err-bg: #f7eded;
+  --err-border: #e6cfcf;
+
+  --ring: rgba(79, 82, 214, 0.38);
+  --focus-color: #4f52d6;
+  --shadow-sm: 0 1px 1px rgba(24, 24, 27, 0.04);
+  --shadow-md: 0 1px 2px rgba(24, 24, 27, 0.06), 0 4px 12px rgba(24, 24, 27, 0.05);
+  --selection-bg: #d9daf8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0b0b0d;
+    --surface: #141417;
+    --surface-2: #1a1a1e;
+    --surface-3: #232329;
+    --fg: #f2f2f4;
+    --fg-soft: #c9c9d1;
+    --muted: #90909c;
+    --border: #2a2a30;
+    --border-strong: #6f6f73;
+
+    --accent: #8f93ee;
+    --accent-fg: #0b0b0e;
+    --accent-soft: #1b1b2b;
+    --accent-border: #34345c;
+    --accent-strong: #a6a9f4;
+
+    --ok: #6fae82;
+    --ok-bg: #14241a;
+    --ok-border: #234630;
+    --warn: #c79a52;
+    --warn-bg: #241d11;
+    --warn-border: #463719;
+    --err: #cc7d7d;
+    --err-bg: #251616;
+    --err-border: #482a2a;
+
+    --ring: rgba(143, 147, 238, 0.42);
+    --focus-color: #8f93ee;
+    --shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.45), 0 4px 14px rgba(0, 0, 0, 0.42);
+    --selection-bg: #2f2f5c;
+  }
+}
+
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-fg: var(--fg);
+  --color-fg-soft: var(--fg-soft);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-border: var(--accent-border);
+  --color-accent-strong: var(--accent-strong);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-ok-border: var(--ok-border);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-border: var(--warn-border);
+  --color-err: var(--err);
+  --color-err-bg: var(--err-bg);
+  --color-err-border: var(--err-border);
+  --radius-control: 6px;
+  --radius-panel: 13px;
+  --shadow-panel: var(--shadow-md);
+  --shadow-control: var(--shadow-sm);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.55;
+    overflow-x: hidden;
+  }
+  ::selection {
+    background: var(--selection-bg);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus-color);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
