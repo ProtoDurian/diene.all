@@ -10,12 +10,10 @@ import (
 	"github.com/AtomiCloud/diene.go-base/adapters/operator/ledgerstore"
 )
 
-// TestIsBucketExistsRace pins the MakeBucket race tolerance: the two already-exists
-// codes a losing concurrent creator sees are success, everything else propagates.
-// A real MinIO cannot deterministically schedule the concurrent-startup race, so
-// the classification is exercised directly with the S3 error responses minio-go
-// surfaces.
 func TestIsBucketExistsRace(t *testing.T) {
+	// Arrange
+	// Act
+	// Assert
 	require.True(t, ledgerstore.IsBucketExistsRace(minio.ErrorResponse{Code: "BucketAlreadyOwnedByYou"}))
 	require.True(t, ledgerstore.IsBucketExistsRace(minio.ErrorResponse{Code: "BucketAlreadyExists"}))
 	require.False(t, ledgerstore.IsBucketExistsRace(minio.ErrorResponse{Code: "AccessDenied"}))

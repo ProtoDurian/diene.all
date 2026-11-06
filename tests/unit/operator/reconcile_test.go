@@ -25,7 +25,11 @@ func condition(conds []reconcile.Condition, typ string) *reconcile.Condition {
 }
 
 func TestDecideConvergeFresh(t *testing.T) {
+	// Arrange
+	// Act
 	d := reconcile.Decide(reconcile.Input{Owner: "n", Spec: spec(2), BrakeCap: 20})
+
+	// Assert
 	require.True(t, d.Write)
 	require.Equal(t, reconcile.LedgerPreIntent, d.LedgerPre)
 	require.True(t, d.ConfirmAfter)
@@ -37,6 +41,8 @@ func TestDecideConvergeFresh(t *testing.T) {
 }
 
 func TestDecideContentUpdate(t *testing.T) {
+	// Arrange
+	// Act
 	d := reconcile.Decide(reconcile.Input{
 		Owner:    "n",
 		Spec:     spec(1),
@@ -44,12 +50,16 @@ func TestDecideContentUpdate(t *testing.T) {
 		Ledger:   reconcile.LedgerState{Exists: true, Phase: ledger.PhaseConfirmed},
 		BrakeCap: 20,
 	})
+
+	// Assert
 	require.Equal(t, reconcile.LedgerPreNone, d.LedgerPre)
 	require.Len(t, d.Upserts, 1)
 	require.Equal(t, payload(), d.Upserts[0].Payload)
 }
 
 func TestDecideNoChange(t *testing.T) {
+	// Arrange
+	// Act
 	d := reconcile.Decide(reconcile.Input{
 		Owner:    "n",
 		Spec:     spec(1),
@@ -57,11 +67,15 @@ func TestDecideNoChange(t *testing.T) {
 		Ledger:   reconcile.LedgerState{Exists: true, Phase: ledger.PhaseConfirmed},
 		BrakeCap: 20,
 	})
+
+	// Assert
 	require.Empty(t, d.Upserts)
 	require.Empty(t, d.Deletes)
 }
 
 func TestDecideDeleteUnderCap(t *testing.T) {
+	// Arrange
+	// Act
 	d := reconcile.Decide(reconcile.Input{
 		Owner:    "n",
 		Spec:     spec(1),
@@ -69,24 +83,35 @@ func TestDecideDeleteUnderCap(t *testing.T) {
 		Ledger:   reconcile.LedgerState{Exists: true, Phase: ledger.PhaseConfirmed},
 		BrakeCap: 100,
 	})
+
+	// Assert
 	require.Equal(t, []string{"n-copy-1"}, d.Deletes)
 }
 
 func TestDecideBrakeTrips(t *testing.T) {
+	// Arrange
 	existing := []reconcile.Owned{
 		{Name: "n-copy-0", Payload: payload()},
 		{Name: "n-copy-1", Payload: payload()},
 		{Name: "n-copy-2", Payload: payload()},
 		{Name: "n-copy-3", Payload: payload()},
 	}
+
+	// Act
 	d := reconcile.Decide(reconcile.Input{Owner: "n", Spec: spec(1), Existing: existing, BrakeCap: 20})
+
+	// Assert
 	require.False(t, d.Write)
 	require.NotNil(t, condition(d.Conditions, plan.TypeBlastBrakeTripped))
 	require.Equal(t, int32(4), d.OwnedCount)
 }
 
 func TestDecideObserveDrift(t *testing.T) {
+	// Arrange
+	// Act
 	d := reconcile.Decide(reconcile.Input{Owner: "n", Spec: spec(2), Observe: true, BrakeCap: 20})
+
+	// Assert
 	require.False(t, d.Write)
 	drift := condition(d.Conditions, plan.TypeDrifted)
 	require.NotNil(t, drift)
@@ -94,6 +119,8 @@ func TestDecideObserveDrift(t *testing.T) {
 }
 
 func TestDecideObserveInSync(t *testing.T) {
+	// Arrange
+	// Act
 	d := reconcile.Decide(reconcile.Input{
 		Owner:    "n",
 		Spec:     spec(1),
@@ -102,28 +129,38 @@ func TestDecideObserveInSync(t *testing.T) {
 		BrakeCap: 20,
 	})
 	drift := condition(d.Conditions, plan.TypeDrifted)
+
+	// Assert
 	require.NotNil(t, drift)
 	require.Equal(t, plan.StatusFalse, drift.Status)
 }
 
 func TestDecideAdoptOrphaned(t *testing.T) {
+	// Arrange
+	// Act
 	d := reconcile.Decide(reconcile.Input{
 		Owner:    "n",
 		Spec:     spec(1),
 		Ledger:   reconcile.LedgerState{Exists: true, Phase: ledger.PhaseOrphaned},
 		BrakeCap: 20,
 	})
+
+	// Assert
 	require.Equal(t, reconcile.LedgerPreAdopt, d.LedgerPre)
 }
 
 func TestDecideConflict(t *testing.T) {
+	// Arrange
+	// Act
 	d := reconcile.Decide(reconcile.Input{
 		Owner:    "n",
 		Spec:     spec(1),
 		Foreign:  []string{"n-copy-0"},
 		BrakeCap: 20,
 	})
-	require.Empty(t, d.Upserts) // never overwrite the foreign object
+
+	// Assert
+	require.Empty(t, d.Upserts)
 	require.NotNil(t, condition(d.Conditions, plan.TypeConflict))
 	ready := condition(d.Conditions, plan.TypeReady)
 	require.NotNil(t, ready)
@@ -132,11 +169,18 @@ func TestDecideConflict(t *testing.T) {
 }
 
 func TestDesiredNames(t *testing.T) {
+	// Arrange
+	// Act
+	// Assert
 	require.Equal(t, []string{"n-copy-0", "n-copy-1"}, reconcile.DesiredNames("n", spec(2)))
 }
 
 func TestWaitingForEndpointCondition(t *testing.T) {
+	// Arrange
+	// Act
 	c := reconcile.WaitingForEndpoint("dial tcp: connection refused")
+
+	// Assert
 	require.Equal(t, plan.TypeWaitingForEndpoint, c.Type)
 	require.Equal(t, plan.StatusTrue, c.Status)
 	require.Contains(t, c.Message, "connection refused")

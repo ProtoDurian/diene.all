@@ -20,6 +20,7 @@ import (
 )
 
 func TestManagerRuntimeHealthEndpoints(t *testing.T) {
+	// Arrange
 	binary := os.Getenv("MANAGER_BINARY")
 	if binary == "" {
 		t.Skip("MANAGER_BINARY is set by the manager-runtime smoke")
@@ -30,7 +31,7 @@ func TestManagerRuntimeHealthEndpoints(t *testing.T) {
 
 	healthAddress := availableAddress(t)
 	kubeconfig := writeEnvtestKubeconfig(t)
-	//nolint:gosec // The test resolves and validates the configured manager binary before execution.
+	//nolint:gosec // Validated test binary.
 	command := exec.CommandContext(
 		t.Context(),
 		binary,
@@ -44,6 +45,8 @@ func TestManagerRuntimeHealthEndpoints(t *testing.T) {
 	var output bytes.Buffer
 	command.Stdout = &output
 	command.Stderr = &output
+
+	// Act
 	require.NoError(t, command.Start())
 
 	done := make(chan error, 1)
@@ -57,8 +60,13 @@ func TestManagerRuntimeHealthEndpoints(t *testing.T) {
 		}
 	}()
 
+	// Assert
 	for _, endpoint := range []string{"healthz", "readyz"} {
+		// Arrange
 		url := "http://" + healthAddress + "/" + endpoint
+
+		// Act
+		// Assert
 		if !waitForOK(t.Context(), url, 10*time.Second) {
 			_ = stopRuntime(command, done)
 			t.Fatalf("manager endpoint %s did not answer ok\n%s", url, output.String())

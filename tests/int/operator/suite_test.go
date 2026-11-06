@@ -15,10 +15,6 @@ import (
 	apiv1alpha1 "github.com/AtomiCloud/diene.go-base/api/v1alpha1"
 )
 
-// Shared envtest fixtures for the whole int suite. envtest runs a real
-// kube-apiserver + etcd from KUBEBUILDER_ASSETS (nix-provided, offline); it needs
-// no Docker. The MinIO ledger test (ledger_minio_test.go) uses testcontainers and
-// therefore Docker.
 var (
 	k8sClient  client.Client
 	testScheme *runtime.Scheme
@@ -26,7 +22,10 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	// Arrange
+	// Act
 	code, err := runSuite(m)
+	// Assert
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -35,6 +34,7 @@ func TestMain(m *testing.M) {
 }
 
 func runSuite(m *testing.M) (int, error) {
+	// Arrange
 	crdDir := filepath.Join("..", "..", "..", "infra", "root_chart", "templates", "crds")
 	if override := os.Getenv("CRD_DIR"); override != "" {
 		crdDir = override
@@ -65,5 +65,8 @@ func runSuite(m *testing.M) (int, error) {
 	k8sClient = c
 	testScheme = scheme
 	restConfig = cfg
+
+	// Act
+	// Assert
 	return m.Run(), nil
 }

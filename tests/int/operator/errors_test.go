@@ -18,10 +18,6 @@ import (
 	"github.com/AtomiCloud/diene.go-base/lib/operator/ledger"
 )
 
-// These tests inject failing ports to exercise controller error-handling branches
-// a real apiserver cannot deterministically produce. The kube/ledgerstore adapters
-// themselves run against real dependencies (envtest + testcontainers) elsewhere.
-
 type failingLedgerStore struct{}
 
 func (failingLedgerStore) Get(context.Context, string) (ledger.Entry, bool, error) {
@@ -85,44 +81,67 @@ func request(name string) ctrl.Request {
 }
 
 func TestConvergeListError(t *testing.T) {
+	// Arrange
 	finalizedNote(t, "err-list")
 	r := reconcilerWith(stubConfigMaps{listErr: errors.New("list boom")}, newFakeLedgerStore())
+
+	// Act
 	_, err := r.Reconcile(context.Background(), request("err-list"))
+
+	// Assert
 	require.Error(t, err)
 }
 
 func TestConvergeUpsertError(t *testing.T) {
+	// Arrange
 	finalizedNote(t, "err-upsert")
 	r := reconcilerWith(stubConfigMaps{upsertErr: errors.New("upsert boom")}, newFakeLedgerStore())
+
+	// Act
 	_, err := r.Reconcile(context.Background(), request("err-upsert"))
+
+	// Assert
 	require.Error(t, err)
 }
 
 func TestConvergeIntentError(t *testing.T) {
+	// Arrange
 	finalizedNote(t, "err-intent")
 	r := reconcilerWith(stubConfigMaps{}, putFailLedgerStore{present: false})
+
+	// Act
 	_, err := r.Reconcile(context.Background(), request("err-intent"))
+
+	// Assert
 	require.Error(t, err)
 }
 
 func TestConvergeAdoptError(t *testing.T) {
+	// Arrange
 	finalizedNote(t, "err-adopt")
 	r := reconcilerWith(stubConfigMaps{}, putFailLedgerStore{present: true, phase: ledger.PhaseOrphaned})
+
+	// Act
 	_, err := r.Reconcile(context.Background(), request("err-adopt"))
+
+	// Assert
 	require.Error(t, err)
 }
 
 func TestConvergeConfirmError(t *testing.T) {
+	// Arrange
 	finalizedNote(t, "err-confirm")
 	r := reconcilerWith(stubConfigMaps{}, putFailLedgerStore{present: true, phase: ledger.PhaseCreated})
+
+	// Act
 	_, err := r.Reconcile(context.Background(), request("err-confirm"))
+
+	// Assert
 	require.Error(t, err)
 }
 
 func TestConvergeConfirmErrorPublishesAppliedCount(t *testing.T) {
-	// The Note converges once (owned=1), then its replicas grow to 3 and the
-	// confirm-after-write ledger transition fails. The published count must be the
-	// freshly applied 3 (dec.OwnedCount), not the stale pre-write status value of 1.
+	// Arrange
 	finalizedNote(t, "err-confirm-count")
 	require.Equal(t, int32(1), getNote(t, "err-confirm-count").Status.OwnedConfigMaps)
 
@@ -130,25 +149,37 @@ func TestConvergeConfirmErrorPublishesAppliedCount(t *testing.T) {
 	current.Spec.Replicas = 3
 	require.NoError(t, k8sClient.Update(context.Background(), current))
 
-	// Ledger present + created so the reconcile writes then fails only at confirm.
 	r := reconcilerWith(stubConfigMaps{}, putFailLedgerStore{present: true, phase: ledger.PhaseCreated})
+
+	// Act
 	_, err := r.Reconcile(context.Background(), request("err-confirm-count"))
+
+	// Assert
 	require.Error(t, err)
 	require.Equal(t, int32(3), getNote(t, "err-confirm-count").Status.OwnedConfigMaps)
 }
 
 func TestConvergeCreatedError(t *testing.T) {
+	// Arrange
 	finalizedNote(t, "err-created")
-	// Phase intent + a failing Put makes the intent->created transition error.
 	r := reconcilerWith(stubConfigMaps{}, putFailLedgerStore{present: true, phase: ledger.PhaseIntent})
+
+	// Act
 	_, err := r.Reconcile(context.Background(), request("err-created"))
+
+	// Assert
 	require.Error(t, err)
 }
 
 func TestConvergeGetLedgerError(t *testing.T) {
+	// Arrange
 	finalizedNote(t, "err-get")
 	r := reconcilerWith(stubConfigMaps{}, failingLedgerStore{})
+
+	// Act
 	_, err := r.Reconcile(context.Background(), request("err-get"))
+
+	// Assert
 	require.Error(t, err)
 	waiting := metav1.Condition{}
 	for _, c := range getNote(t, "err-get").Status.Conditions {
@@ -160,33 +191,52 @@ func TestConvergeGetLedgerError(t *testing.T) {
 }
 
 func TestConvergeDeleteError(t *testing.T) {
+	// Arrange
 	finalizedNote(t, "err-delete")
-	// One owned copy outside the desired set forces a delete that the stub fails.
 	r := reconcilerWith(stubConfigMaps{owned: []kube.OwnedConfigMap{{Name: "err-delete-copy-9"}}, deleteErr: errors.New("del boom")}, newFakeLedgerStore())
+
+	// Act
 	_, err := r.Reconcile(context.Background(), request("err-delete"))
+
+	// Assert
 	require.Error(t, err)
 }
 
 func TestFinalizeListError(t *testing.T) {
+	// Arrange
 	finalizedNote(t, "err-fin-list")
 	require.NoError(t, k8sClient.Delete(context.Background(), getNote(t, "err-fin-list")))
 	r := reconcilerWith(stubConfigMaps{listErr: errors.New("list boom")}, newFakeLedgerStore())
+
+	// Act
 	_, err := r.Reconcile(context.Background(), request("err-fin-list"))
+
+	// Assert
 	require.Error(t, err)
 }
 
 func TestFinalizeDeleteError(t *testing.T) {
+	// Arrange
 	finalizedNote(t, "err-fin-del")
 	require.NoError(t, k8sClient.Delete(context.Background(), getNote(t, "err-fin-del")))
 	r := reconcilerWith(stubConfigMaps{owned: []kube.OwnedConfigMap{{Name: "err-fin-del-copy-0"}}, deleteErr: errors.New("del boom")}, newFakeLedgerStore())
+
+	// Act
 	_, err := r.Reconcile(context.Background(), request("err-fin-del"))
+
+	// Assert
 	require.Error(t, err)
 }
 
 func TestFinalizeOrphanError(t *testing.T) {
+	// Arrange
 	finalizedNote(t, "err-fin-orphan")
 	require.NoError(t, k8sClient.Delete(context.Background(), getNote(t, "err-fin-orphan")))
 	r := reconcilerWith(stubConfigMaps{}, failingLedgerStore{})
+
+	// Act
 	_, err := r.Reconcile(context.Background(), request("err-fin-orphan"))
+
+	// Assert
 	require.Error(t, err)
 }

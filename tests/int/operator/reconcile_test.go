@@ -21,8 +21,6 @@ import (
 	"github.com/AtomiCloud/diene.go-base/lib/operator/plan"
 )
 
-// fakeLedgerStore is an in-memory ledger.Store so the envtest reconcile tests run
-// without Docker; the MinIO adapter is covered by ledger_minio_test.go.
 type fakeLedgerStore struct{ entries map[string]ledger.Entry }
 
 func newFakeLedgerStore() *fakeLedgerStore {
@@ -107,11 +105,15 @@ func getNoteOrNil(name string) *apiv1alpha1.Note {
 }
 
 func TestNoteConvergesToReadyAndConfirmed(t *testing.T) {
+	// Arrange
 	store := newFakeLedgerStore()
 	r := newNoteReconciler(store, false, 20)
 	makeNote(t, "converge", "work", 2)
+
+	// Act
 	reconcileNote(t, r, "converge", 2)
 
+	// Assert
 	got := getNote(t, "converge")
 	require.Equal(t, int32(2), got.Status.OwnedConfigMaps)
 	require.Equal(t, "diene/lapras/note/converge", got.Status.LedgerRef)
@@ -122,10 +124,11 @@ func TestNoteConvergesToReadyAndConfirmed(t *testing.T) {
 
 	entry, ok, _ := store.Get(context.Background(), "diene/lapras/note/converge")
 	require.True(t, ok)
-	require.Equal(t, ledger.PhaseConfirmed, entry.Phase) // Ready only after confirm
+	require.Equal(t, ledger.PhaseConfirmed, entry.Phase)
 }
 
 func TestNoteContentUpdate(t *testing.T) {
+	// Arrange
 	r := newNoteReconciler(newFakeLedgerStore(), false, 20)
 	makeNote(t, "update", "work", 1)
 	reconcileNote(t, r, "update", 2)
@@ -133,23 +136,33 @@ func TestNoteContentUpdate(t *testing.T) {
 	current := getNote(t, "update")
 	current.Spec.Body = "changed body"
 	require.NoError(t, k8sClient.Update(context.Background(), current))
+
+	// Act
 	reconcileNote(t, r, "update", 1)
 
+	// Assert
 	cms := ownedConfigMaps(t, "update")
 	require.Len(t, cms, 1)
 	require.Contains(t, cms[0].Data["payload"], "changed body")
 }
 
 func TestNoteFinalizerLifecycle(t *testing.T) {
+	// Arrange
 	store := newFakeLedgerStore()
 	r := newNoteReconciler(store, false, 20)
 	makeNote(t, "finalized", "personal", 1)
+
+	// Act
 	reconcileNote(t, r, "finalized", 2)
+
+	// Assert
 	require.Contains(t, getNote(t, "finalized").Finalizers, apiv1alpha1.NoteFinalizer)
 
+	// Act
 	require.NoError(t, k8sClient.Delete(context.Background(), getNote(t, "finalized")))
 	reconcileNote(t, r, "finalized", 1)
 
+	// Assert
 	require.Nil(t, getNoteOrNil("finalized"))
 	entry, ok, _ := store.Get(context.Background(), "diene/lapras/note/finalized")
 	require.True(t, ok)
@@ -157,19 +170,25 @@ func TestNoteFinalizerLifecycle(t *testing.T) {
 }
 
 func TestNoteOrphanReapplyConfirmed(t *testing.T) {
+	// Arrange
 	store := newFakeLedgerStore()
 	r := newNoteReconciler(store, false, 20)
 	makeNote(t, "readopt", "work", 1)
+
+	// Act
 	reconcileNote(t, r, "readopt", 2)
 	require.NoError(t, k8sClient.Delete(context.Background(), getNote(t, "readopt")))
 	reconcileNote(t, r, "readopt", 1)
 	orphaned, _, _ := store.Get(context.Background(), "diene/lapras/note/readopt")
+
+	// Assert
 	require.Equal(t, ledger.PhaseOrphaned, orphaned.Phase)
 
-	// Re-create the same coordinate: the orphaned entry must be adopted back and
-	// end confirmed, preserving the external ID, never remaining orphaned.
+	// Act
 	makeNote(t, "readopt", "work", 1)
 	reconcileNote(t, r, "readopt", 2)
+
+	// Assert
 	readopted, ok, _ := store.Get(context.Background(), "diene/lapras/note/readopt")
 	require.True(t, ok)
 	require.Equal(t, ledger.PhaseConfirmed, readopted.Phase)
@@ -179,9 +198,14 @@ func TestNoteOrphanReapplyConfirmed(t *testing.T) {
 }
 
 func TestNoteObserveDrift(t *testing.T) {
+	// Arrange
 	r := newNoteReconciler(newFakeLedgerStore(), true, 20)
 	makeNote(t, "observe-drift", "work", 2)
+
+	// Act
 	reconcileNote(t, r, "observe-drift", 2)
+
+	// Assert
 	drifted := apimeta.FindStatusCondition(getNote(t, "observe-drift").Status.Conditions, plan.TypeDrifted)
 	require.NotNil(t, drifted)
 	require.Equal(t, metav1.ConditionTrue, drifted.Status)
@@ -189,34 +213,46 @@ func TestNoteObserveDrift(t *testing.T) {
 }
 
 func TestNoteObserveInSync(t *testing.T) {
+	// Arrange
 	store := newFakeLedgerStore()
 	makeNote(t, "observe-sync", "archive", 1)
 	reconcileNote(t, newNoteReconciler(store, false, 20), "observe-sync", 2)
+
+	// Act
 	reconcileNote(t, newNoteReconciler(store, true, 20), "observe-sync", 1)
+
+	// Assert
 	drifted := apimeta.FindStatusCondition(getNote(t, "observe-sync").Status.Conditions, plan.TypeDrifted)
 	require.Equal(t, metav1.ConditionFalse, drifted.Status)
 }
 
 func TestNoteBlastBrakeTrips(t *testing.T) {
+	// Arrange
 	r := newNoteReconciler(newFakeLedgerStore(), false, 20)
 	makeNote(t, "brake", "work", 4)
+
+	// Act
 	reconcileNote(t, r, "brake", 2)
+
+	// Assert
 	require.Len(t, ownedConfigMaps(t, "brake"), 4)
 
 	current := getNote(t, "brake")
 	current.Spec.Replicas = 1
 	require.NoError(t, k8sClient.Update(context.Background(), current))
+
+	// Act
 	reconcileNote(t, r, "brake", 1)
 
+	// Assert
 	tripped := apimeta.FindStatusCondition(getNote(t, "brake").Status.Conditions, plan.TypeBlastBrakeTripped)
 	require.NotNil(t, tripped)
 	require.Equal(t, metav1.ConditionTrue, tripped.Status)
-	require.Len(t, ownedConfigMaps(t, "brake"), 4) // wrote nothing
+	require.Len(t, ownedConfigMaps(t, "brake"), 4)
 }
 
 func TestNoteConflictForeignConfigMap(t *testing.T) {
-	// A foreign ConfigMap occupies the desired copy-0 name; ownership is by UID, so
-	// it must not be overwritten and the Note must surface Conflict.
+	// Arrange
 	foreign := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "conflict-copy-0", Namespace: "default"},
 		Data:       map[string]string{"payload": "foreign-owned"},
@@ -225,20 +261,22 @@ func TestNoteConflictForeignConfigMap(t *testing.T) {
 
 	r := newNoteReconciler(newFakeLedgerStore(), false, 20)
 	makeNote(t, "conflict", "work", 1)
+
+	// Act
 	reconcileNote(t, r, "conflict", 2)
 
+	// Assert
 	cond := apimeta.FindStatusCondition(getNote(t, "conflict").Status.Conditions, plan.TypeConflict)
 	require.NotNil(t, cond)
 	require.Equal(t, metav1.ConditionTrue, cond.Status)
 
 	var after corev1.ConfigMap
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "conflict-copy-0"}, &after))
-	require.Equal(t, "foreign-owned", after.Data["payload"]) // never overwritten
+	require.Equal(t, "foreign-owned", after.Data["payload"])
 }
 
 func TestSpoofLabelledConfigMapSurvives(t *testing.T) {
-	// A ConfigMap carrying the owner label but no controller OwnerReference must
-	// never be counted or deleted during scale-down or finalization.
+	// Arrange
 	spoof := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "spoof-not-owned",
@@ -250,24 +288,38 @@ func TestSpoofLabelledConfigMapSurvives(t *testing.T) {
 
 	r := newNoteReconciler(newFakeLedgerStore(), false, 20)
 	makeNote(t, "spoofed", "work", 1)
-	reconcileNote(t, r, "spoofed", 2)
-	require.Equal(t, int32(1), getNote(t, "spoofed").Status.OwnedConfigMaps) // spoof not counted
 
+	// Act
+	reconcileNote(t, r, "spoofed", 2)
+
+	// Assert
+	require.Equal(t, int32(1), getNote(t, "spoofed").Status.OwnedConfigMaps)
+
+	// Act
 	require.NoError(t, k8sClient.Delete(context.Background(), getNote(t, "spoofed")))
 	reconcileNote(t, r, "spoofed", 1)
 
+	// Assert
 	var survivor corev1.ConfigMap
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "spoof-not-owned"}, &survivor))
 }
 
 func TestNoteWaitingForEndpointOnLedgerFailure(t *testing.T) {
+	// Arrange
 	r := newNoteReconciler(failingLedgerStore{}, false, 20)
 	makeNote(t, "waiting", "work", 1)
-	// First reconcile adds the finalizer; the second hits the failing ledger.
 	key := client.ObjectKey{Namespace: "default", Name: "waiting"}
+
+	// Act
 	_, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+
+	// Assert
 	require.NoError(t, err)
+
+	// Act
 	_, err = r.Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+
+	// Assert
 	require.Error(t, err)
 	waiting := apimeta.FindStatusCondition(getNote(t, "waiting").Status.Conditions, plan.TypeWaitingForEndpoint)
 	require.NotNil(t, waiting)
@@ -275,12 +327,18 @@ func TestNoteWaitingForEndpointOnLedgerFailure(t *testing.T) {
 }
 
 func TestNoteReconcileMissingIsNoOp(t *testing.T) {
+	// Arrange
 	r := newNoteReconciler(newFakeLedgerStore(), false, 20)
+
+	// Act
 	_, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "ghost"}})
+
+	// Assert
 	require.NoError(t, err)
 }
 
 func TestJournalReconcile(t *testing.T) {
+	// Arrange
 	journal := &apiv1alpha1.Journal{
 		ObjectMeta: metav1.ObjectMeta{Name: "jrnl", Namespace: "default"},
 		Spec:       apiv1alpha1.JournalSpec{Message: "first entry"},
@@ -292,7 +350,11 @@ func TestJournalReconcile(t *testing.T) {
 		Recorder: kube.NewEventRecorder(record.NewFakeRecorder(8)),
 		Metrics:  metrics.NewPrometheus(),
 	}
+
+	// Act
 	_, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(journal)})
+
+	// Assert
 	require.NoError(t, err)
 	var got apiv1alpha1.Journal
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKeyFromObject(journal), &got))
@@ -300,13 +362,20 @@ func TestJournalReconcile(t *testing.T) {
 }
 
 func TestInvalidNoteRejectedBySchema(t *testing.T) {
+	// Arrange
 	invalid := &apiv1alpha1.Note{
 		ObjectMeta: metav1.ObjectMeta{Name: "invalid", Namespace: "default"},
 		Spec:       apiv1alpha1.NoteSpec{Title: "t", Body: "b", Category: "nonsense", Replicas: 1},
 	}
+
+	// Act
+	// Assert
 	require.Error(t, k8sClient.Create(context.Background(), invalid))
 }
 
 func TestRealClockNow(t *testing.T) {
+	// Arrange
+	// Act
+	// Assert
 	require.WithinDuration(t, time.Now(), kube.RealClock{}.Now(), 5*time.Second)
 }

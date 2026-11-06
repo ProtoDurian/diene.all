@@ -26,21 +26,35 @@ func createForeign(t *testing.T, name string) {
 }
 
 func TestAdapterUpsertRejectsForeign(t *testing.T) {
+	// Arrange
 	createForeign(t, "adapter-foreign-1")
 	makeNote(t, "adapter-owner-1", "work", 1)
+
+	// Act
 	err := newAdapter().Upsert(context.Background(), getNote(t, "adapter-owner-1"), "adapter-foreign-1", "x")
+
+	// Assert
 	require.True(t, apierrors.IsAlreadyExists(err))
 }
 
 func TestAdapterDeleteSkipsForeign(t *testing.T) {
+	// Arrange
 	createForeign(t, "adapter-foreign-2")
 	makeNote(t, "adapter-owner-2", "work", 1)
+
+	// Act
 	require.NoError(t, newAdapter().Delete(context.Background(), getNote(t, "adapter-owner-2"), "adapter-foreign-2"))
+
+	// Assert
 	var after corev1.ConfigMap
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "adapter-foreign-2"}, &after))
 }
 
 func TestAdapterDeleteAbsentIsNoOp(t *testing.T) {
+	// Arrange
 	makeNote(t, "adapter-owner-3", "work", 1)
+
+	// Act
+	// Assert
 	require.NoError(t, newAdapter().Delete(context.Background(), getNote(t, "adapter-owner-3"), "adapter-absent"))
 }

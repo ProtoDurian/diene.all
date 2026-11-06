@@ -15,8 +15,6 @@ import (
 	"github.com/AtomiCloud/diene.go-base/lib/operator/ledger"
 )
 
-// startMinio brings up a throwaway MinIO (Docker via testcontainers); these tests
-// run in CI's int job and the local quiet window only.
 func startMinio(t *testing.T) *minio.Client {
 	t.Helper()
 	ctx := context.Background()
@@ -48,51 +46,79 @@ func coordinate(module string) ledger.Coordinate {
 }
 
 func TestMinioLedgerLifecycle(t *testing.T) {
+	// Arrange
 	ctx := context.Background()
 	store := ledgerstore.NewMinioStore(startMinio(t), "operator-template-ledger", "notes/")
 	require.NoError(t, store.EnsureBucket(ctx))
-	require.NoError(t, store.EnsureBucket(ctx)) // idempotent
+
+	// Act
+	// Assert
+	require.NoError(t, store.EnsureBucket(ctx))
 
 	svc := ledger.NewService(store)
 	coord := coordinate("alpha")
 
+	// Act
 	_, ok, err := store.Get(ctx, coord.Key())
+
+	// Assert
 	require.NoError(t, err)
 	require.False(t, ok)
 
-	// intent -> created -> confirmed.
+	// Act
 	entry, err := svc.Intent(ctx, coord, "ext-alpha", "secret/notes/alpha")
+
+	// Assert
 	require.NoError(t, err)
 	require.Equal(t, ledger.PhaseIntent, entry.Phase)
+
+	// Act
 	entry, err = svc.Created(ctx, coord)
+
+	// Assert
 	require.NoError(t, err)
 	require.Equal(t, ledger.PhaseCreated, entry.Phase)
+
+	// Act
 	entry, err = svc.Confirm(ctx, coord)
+
+	// Assert
 	require.NoError(t, err)
 	require.Equal(t, ledger.PhaseConfirmed, entry.Phase)
 
-	// delete -> orphan (external record preserved).
+	// Act
 	require.NoError(t, svc.Orphan(ctx, coord))
+
+	// Assert
 	orphaned, _, _ := store.Get(ctx, coord.Key())
 	require.Equal(t, ledger.PhaseOrphaned, orphaned.Phase)
 	require.Equal(t, "ext-alpha", orphaned.ExternalID)
 
-	// same-coordinate reapply -> adopt back (preserve external ID) -> confirmed.
+	// Act
 	adopted, err := svc.Adopt(ctx, coord)
+
+	// Assert
 	require.NoError(t, err)
 	require.Equal(t, ledger.PhaseCreated, adopted.Phase)
 	require.Equal(t, "ext-alpha", adopted.ExternalID)
+
+	// Act
 	confirmed, err := svc.Confirm(ctx, coord)
+
+	// Assert
 	require.NoError(t, err)
 	require.Equal(t, ledger.PhaseConfirmed, confirmed.Phase)
 
-	// lookup-first: a second intent never duplicate-creates.
+	// Act
 	again, err := svc.Intent(ctx, coord, "ext-other", "other")
+
+	// Assert
 	require.NoError(t, err)
 	require.Equal(t, "ext-alpha", again.ExternalID)
 }
 
 func TestMinioLedgerCorruptObject(t *testing.T) {
+	// Arrange
 	ctx := context.Background()
 	client := startMinio(t)
 	store := ledgerstore.NewMinioStore(client, "corrupt-bucket", "notes/")
@@ -102,6 +128,9 @@ func TestMinioLedgerCorruptObject(t *testing.T) {
 	_, err := client.PutObject(ctx, "corrupt-bucket", "notes/diene/lapras/note/beta", bytes.NewReader(garbage), int64(len(garbage)), minio.PutObjectOptions{})
 	require.NoError(t, err)
 
+	// Act
 	_, _, err = store.Get(ctx, coordinate("beta").Key())
+
+	// Assert
 	require.Error(t, err)
 }

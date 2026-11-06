@@ -12,7 +12,7 @@ func TestCompiledArtifactReportsItsInterface(t *testing.T) {
 	ctx := context.Background()
 
 	// Act
-	// #nosec G204 -- the executable is fixed and nothing in the invocation is dynamic.
+	// #nosec G204 -- fixed executable and arguments.
 	output, err := exec.CommandContext(ctx, "../../../dist/manager", "--help").CombinedOutput()
 	// Assert
 	if err != nil {

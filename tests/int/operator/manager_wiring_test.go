@@ -22,10 +22,13 @@ import (
 )
 
 func TestMultiControllerWiring(t *testing.T) {
+	// Arrange
 	config := operatorruntime.Config{}
 	flags := flag.NewFlagSet("manager-acceptance", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	operatorruntime.BindFlags(flags, &config)
+
+	// Act
 	require.NoError(t, flags.Parse([]string{
 		"--enable-note=true",
 		"--enable-journal=true",
@@ -36,11 +39,16 @@ func TestMultiControllerWiring(t *testing.T) {
 		"--platform=diene",
 		"--landscape=lapras",
 	}))
+
+	// Assert
 	require.True(t, config.EnableNote)
 	require.True(t, config.EnableJournal)
 	require.False(t, config.LeaderElection)
 
+	// Act
 	manager, err := operatorruntime.NewManager(restConfig, testScheme, config)
+
+	// Assert
 	require.NoError(t, err)
 	noteLedger := ledger.NewService(newFakeLedgerStore())
 	require.NoError(t, operatorruntime.RegisterControllers(manager, config, operatorruntime.ControllerDependencies{
@@ -51,6 +59,8 @@ func TestMultiControllerWiring(t *testing.T) {
 
 	managerContext, stopManager := context.WithCancel(context.Background())
 	managerDone := make(chan error, 1)
+
+	// Act
 	go func() {
 		managerDone <- manager.Start(managerContext)
 	}()
@@ -61,6 +71,8 @@ func TestMultiControllerWiring(t *testing.T) {
 
 	cacheContext, stopCacheWait := context.WithTimeout(managerContext, 10*time.Second)
 	defer stopCacheWait()
+
+	// Assert
 	require.True(t, manager.GetCache().WaitForCacheSync(cacheContext))
 
 	note := &apiv1alpha1.Note{
@@ -76,9 +88,12 @@ func TestMultiControllerWiring(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "manager-journal", Namespace: "default"},
 		Spec:       apiv1alpha1.JournalSpec{Message: "converged independently"},
 	}
+
+	// Act
 	require.NoError(t, k8sClient.Create(context.Background(), note))
 	require.NoError(t, k8sClient.Create(context.Background(), journal))
 
+	// Assert
 	require.Eventually(t, func() bool {
 		var current apiv1alpha1.Note
 		if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(note), &current); err != nil {

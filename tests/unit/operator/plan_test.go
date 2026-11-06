@@ -8,12 +8,18 @@ import (
 )
 
 func TestPlanEmpty(t *testing.T) {
+	// Arrange
+	// Act
+	// Assert
 	require.True(t, plan.Plan{}.Empty())
 	require.False(t, plan.Plan{Creates: []string{"a"}}.Empty())
 	require.False(t, plan.Plan{Deletes: []string{"b"}}.Empty())
 }
 
 func TestConditionVocabulary(t *testing.T) {
+	// Arrange
+	// Act
+	// Assert
 	require.Equal(t, "Ready", plan.TypeReady)
 	require.Equal(t, "Drifted", plan.TypeDrifted)
 	require.Equal(t, "Conflict", plan.TypeConflict)
