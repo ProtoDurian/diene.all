@@ -1,7 +1,10 @@
 import { expectBunGreen } from './lib/bun-command.ts';
 
 type ProbeRepo = {
-  exec(command: string, options?: { timeoutMs?: number }): Promise<{ exitCode: number; stdout: string; stderr: string }>;
+  exec(
+    command: string,
+    options?: { timeoutMs?: number },
+  ): Promise<{ exitCode: number; stdout: string; stderr: string }>;
   read(path: string): Promise<string>;
   write(path: string, content: string): Promise<void>;
   glob(pattern: string): Promise<string[]>;
@@ -74,7 +77,8 @@ export default {
     },
     {
       name: 'mutation-aseity-web-pwa-caught',
-      description: 'Dropping the PWA plugin from the web build leaves no manifest or service worker, which the check catches.',
+      description:
+        'Dropping the PWA plugin from the web build leaves no manifest or service worker, which the check catches.',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: ProbeRepo) {

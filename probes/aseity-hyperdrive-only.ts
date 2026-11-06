@@ -6,7 +6,8 @@ interface ProbeRepo {
   write(path: string, content: string): Promise<void>;
 }
 
-const command = "nix develop .#ci -c bash -lc 'bun install --frozen-lockfile && bun test --config=bunfig.unit.toml tests/unit/architecture/hyperdrive-only.test.ts'";
+const command =
+  "nix develop .#ci -c bash -lc 'bun install --frozen-lockfile && bun test --config=bunfig.unit.toml tests/unit/architecture/hyperdrive-only.test.ts'";
 
 export default {
   contractVersion: 1,
@@ -14,7 +15,8 @@ export default {
   probes: [
     {
       name: 'baseline-aseity-hyperdrive-only-green',
-      description: 'The Worker reaches Postgres only through the HYPERDRIVE binding: no env read, no URL, pg only in the factory.',
+      description:
+        'The Worker reaches Postgres only through the HYPERDRIVE binding: no env read, no URL, pg only in the factory.',
       kind: 'baseline',
       async run(repo: ProbeRepo) {
         await expectBunGreen(repo, command, 'aseity-hyperdrive-only');
@@ -28,9 +30,22 @@ export default {
       async run(repo: ProbeRepo) {
         const path = 'src/adapters/data/notes/repo.ts';
         const source = await repo.read(path);
-        if (!source.includes('export class PgNotesReader')) throw new Error(`${path} no longer contains the sabotage target`);
-        await repo.write(path, source.replace('export class PgNotesReader', 'export const probeDatabaseUrl = process.env.DATABASE_URL;\n\nexport class PgNotesReader'));
-        await expectRedBecause(repo, command, 'aseity-hyperdrive-only', ['should never read the environment for a connection'], { timeoutMs: 600_000 });
+        if (!source.includes('export class PgNotesReader'))
+          throw new Error(`${path} no longer contains the sabotage target`);
+        await repo.write(
+          path,
+          source.replace(
+            'export class PgNotesReader',
+            'export const probeDatabaseUrl = process.env.DATABASE_URL;\n\nexport class PgNotesReader',
+          ),
+        );
+        await expectRedBecause(
+          repo,
+          command,
+          'aseity-hyperdrive-only',
+          ['should never read the environment for a connection'],
+          { timeoutMs: 600_000 },
+        );
       },
     },
   ],

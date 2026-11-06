@@ -79,7 +79,9 @@ describe('PgForkSanitizer (Testcontainers Postgres)', () => {
     url.pathname = '/blank';
 
     // Act
-    const actual = await expectErr(subject.sanitize({ name: 'blank', connectionString: url.toString() }, { source: 'x' }));
+    const actual = await expectErr(
+      subject.sanitize({ name: 'blank', connectionString: url.toString() }, { source: 'x' }),
+    );
 
     // Assert
     actual.kind.should.equal('provider_failed');

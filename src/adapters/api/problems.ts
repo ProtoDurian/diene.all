@@ -54,7 +54,12 @@ export type ProblemIdentity = Pick<ErrorPortalConfig, 'landscape' | 'platform' |
 
 export class ProblemPortal {
   constructor(
-    private readonly identity: ProblemIdentity = { landscape: 'app', platform: 'aseity', service: 'api', module: 'core' },
+    private readonly identity: ProblemIdentity = {
+      landscape: 'app',
+      platform: 'aseity',
+      service: 'api',
+      module: 'core',
+    },
   ) {}
 
   /** Problem type URIs live under the app's own origin. */

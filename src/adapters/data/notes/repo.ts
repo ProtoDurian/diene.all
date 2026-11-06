@@ -25,10 +25,10 @@ export class PgNoteRepository implements INoteRepository {
   }
 
   async create(record: NoteRecord): Promise<Note> {
-    const rows = await this.sql.query<NoteRow>(
-      `INSERT INTO notes (title, body) VALUES ($1, $2) RETURNING ${COLUMNS}`,
-      [record.title, record.body],
-    );
+    const rows = await this.sql.query<NoteRow>(`INSERT INTO notes (title, body) VALUES ($1, $2) RETURNING ${COLUMNS}`, [
+      record.title,
+      record.body,
+    ]);
     return this.toNote(rows[0] as NoteRow);
   }
 

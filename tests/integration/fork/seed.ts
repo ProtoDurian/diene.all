@@ -40,7 +40,10 @@ export class ForkSeeder {
           ('k1', 'default', 'u1', $1, true, now(), now()), ('k2', 'default', 'u1', $2, NULL, now(), now())`,
         [value(), value()],
       ],
-      [`INSERT INTO "jwks" (id, "publicKey", "privateKey", "createdAt") VALUES ('j1', $1, $2, now())`, [value(), value()]],
+      [
+        `INSERT INTO "jwks" (id, "publicKey", "privateKey", "createdAt") VALUES ('j1', $1, $2, now())`,
+        [value(), value()],
+      ],
       [
         `INSERT INTO "oauthClient" (id, "clientId", "clientSecret", "redirectUris") VALUES
           ('c1', 'confidential', $1, '[]'::jsonb), ('c2', 'public-cli', NULL, '[]'::jsonb)`,

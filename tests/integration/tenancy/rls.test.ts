@@ -21,7 +21,9 @@ describe('Tenant row-level security (Testcontainers Postgres)', () => {
     noteA = (row as { id: string }).id;
     await db.withTenant(tenantA, async sql => {
       await sql.query("INSERT INTO jobs (kind, payload) VALUES ('work', '{}')");
-      await sql.query("INSERT INTO cache_entries (key, value, expires_at) VALUES ('k', '1', now() + interval '1 hour')");
+      await sql.query(
+        "INSERT INTO cache_entries (key, value, expires_at) VALUES ('k', '1', now() + interval '1 hour')",
+      );
     });
   }, 120_000);
 
@@ -59,7 +61,9 @@ describe('Tenant row-level security (Testcontainers Postgres)', () => {
     const updated = await db.withTenant(tenantB, sql =>
       sql.query("UPDATE notes SET title = 'stolen' WHERE id = $1 RETURNING id", [noteA]),
     );
-    const deleted = await db.withTenant(tenantB, sql => sql.query('DELETE FROM notes WHERE id = $1 RETURNING id', [noteA]));
+    const deleted = await db.withTenant(tenantB, sql =>
+      sql.query('DELETE FROM notes WHERE id = $1 RETURNING id', [noteA]),
+    );
     const [kept] = await db.withTenant(tenantA, sql =>
       sql.query<{ title: string }>('SELECT title FROM notes WHERE id = $1', [noteA]),
     );
@@ -121,7 +125,11 @@ describe('Tenant row-level security (Testcontainers Postgres)', () => {
 
     // Assert
     actual.should.deepEqual(
-      ['cache_entries', 'jobs', 'notes', 'tenants'].map(relname => ({ relname, relrowsecurity: true, relforcerowsecurity: true })),
+      ['cache_entries', 'jobs', 'notes', 'tenants'].map(relname => ({
+        relname,
+        relrowsecurity: true,
+        relforcerowsecurity: true,
+      })),
     );
   });
 });

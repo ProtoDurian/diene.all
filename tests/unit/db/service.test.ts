@@ -65,7 +65,11 @@ describe('MigrationPlanner', () => {
     { kind: 'duplicate', available: [migration(1), migration(1, 'other')], done: [] },
     { kind: 'missing', available: [migration(1)], done: [applied(migration(2))] },
     { kind: 'changed', available: [migration(1, 'edited')], done: [applied(migration(1))] },
-    { kind: 'out_of_order', available: [migration(1), migration(2), migration(3)], done: [applied(migration(1)), applied(migration(3))] },
+    {
+      kind: 'out_of_order',
+      available: [migration(1), migration(2), migration(3)],
+      done: [applied(migration(1)), applied(migration(3))],
+    },
   ])('should refuse $kind drift', async ({ kind, available, done }) => {
     // Act
     const actual = await expectErr(subject.plan(available, done));
@@ -81,7 +85,9 @@ describe('MigrationPlanner allowing out-of-order files', () => {
     const subject = new MigrationPlanner(true);
 
     // Act
-    const actual = await expectOk(subject.plan([migration(1), migration(2), migration(3)], [applied(migration(1)), applied(migration(3))]));
+    const actual = await expectOk(
+      subject.plan([migration(1), migration(2), migration(3)], [applied(migration(1)), applied(migration(3))]),
+    );
 
     // Assert
     actual.map(entry => entry.version).should.deepEqual([2]);
@@ -110,7 +116,11 @@ describe('MigrationService', () => {
   it('should apply nothing when the plan finds drift', async () => {
     // Arrange
     const ledger = new MemoryLedger([applied(migration(1, 'old'))]);
-    const subject = new MigrationService(new MemorySource([migration(1), migration(2)]), ledger, new MigrationPlanner());
+    const subject = new MigrationService(
+      new MemorySource([migration(1), migration(2)]),
+      ledger,
+      new MigrationPlanner(),
+    );
 
     // Act
     const actual = await expectErr(subject.migrate());

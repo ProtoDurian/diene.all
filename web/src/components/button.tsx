@@ -15,7 +15,14 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   pending?: boolean;
 };
 
-export function Button({ variant = 'secondary', pending = false, className = '', children, disabled, ...rest }: ButtonProps) {
+export function Button({
+  variant = 'secondary',
+  pending = false,
+  className = '',
+  children,
+  disabled,
+  ...rest
+}: ButtonProps) {
   return (
     <button
       type="button"

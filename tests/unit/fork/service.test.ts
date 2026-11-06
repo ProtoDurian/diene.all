@@ -74,7 +74,13 @@ function setup() {
   const databases = new MemoryDatabases();
   const buckets = new MemoryBuckets();
   const sanitizer = new RecordingSanitizer();
-  const subject = new ForkService(databases, buckets, sanitizer, new FixedSecret(), new ForkNaming({ database: 'aseity', bucket: 'files' }));
+  const subject = new ForkService(
+    databases,
+    buckets,
+    sanitizer,
+    new FixedSecret(),
+    new ForkNaming({ database: 'aseity', bucket: 'files' }),
+  );
   return { databases, buckets, sanitizer, subject };
 }
 

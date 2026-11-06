@@ -45,7 +45,9 @@ export class S3Client {
       if (token) query.set('continuation-token', token);
       const body = await this.send('GET', `/${bucket}?${query}`);
       keys.push(...this.values(body, 'Key'));
-      token = body.includes('<IsTruncated>true</IsTruncated>') ? this.values(body, 'NextContinuationToken')[0] : undefined;
+      token = body.includes('<IsTruncated>true</IsTruncated>')
+        ? this.values(body, 'NextContinuationToken')[0]
+        : undefined;
     } while (token);
     return keys;
   }

@@ -36,7 +36,8 @@ export default {
       kind: 'baseline',
       async run(repo: ProbeRepo) {
         const result = await release(repo);
-        if (result.exitCode !== 0) throw new Error(`CLI snapshot release failed on the healthy repo:\n${result.output}`);
+        if (result.exitCode !== 0)
+          throw new Error(`CLI snapshot release failed on the healthy repo:\n${result.output}`);
       },
     },
     {

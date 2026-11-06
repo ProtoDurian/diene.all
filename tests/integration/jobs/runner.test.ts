@@ -59,7 +59,9 @@ describe('JobRunner against Postgres (Testcontainers)', () => {
     // Arrange
     const jobs = await enqueue(JOBS, false);
     const handler = new CountingHandler('count');
-    const runners = [left, right].map(db => new JobRunner(new PgJobStore(db), [handler], new RetryPolicy(), false, options));
+    const runners = [left, right].map(
+      db => new JobRunner(new PgJobStore(db), [handler], new RetryPolicy(), false, options),
+    );
 
     // Act
     const summaries = await Promise.all(runners.map(runner => runner.drain()));

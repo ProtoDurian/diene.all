@@ -62,7 +62,13 @@ describe('WorkerRuntime over HTTP (Testcontainers Postgres + MinIO)', () => {
   const call = async (
     method: string,
     path: string,
-    options: { tenant?: string; json?: unknown; body?: RequestInit['body']; headers?: Record<string, string>; target?: WorkerEnv } = {},
+    options: {
+      tenant?: string;
+      json?: unknown;
+      body?: RequestInit['body'];
+      headers?: Record<string, string>;
+      target?: WorkerEnv;
+    } = {},
   ) => {
     const headers = new Headers(options.headers);
     if (options.tenant !== undefined) headers.set(TEST_TENANT_HEADER, options.tenant);
@@ -72,7 +78,11 @@ describe('WorkerRuntime over HTTP (Testcontainers Postgres + MinIO)', () => {
       body = JSON.stringify(options.json);
     }
     const background = new BackgroundWork();
-    const response = await runtime.fetch(new Request(`${APP_URL}${path}`, { method, headers, body }), options.target ?? env, background);
+    const response = await runtime.fetch(
+      new Request(`${APP_URL}${path}`, { method, headers, body }),
+      options.target ?? env,
+      background,
+    );
     await background.settle();
     return response;
   };
@@ -201,14 +211,19 @@ describe('WorkerRuntime over HTTP (Testcontainers Postgres + MinIO)', () => {
     delivered.length = 0;
 
     // Act
-    const response = await call('POST', `/api/notes/${note.id}/share`, { tenant: tenantA, json: { to: 'b@example.com' } });
+    const response = await call('POST', `/api/notes/${note.id}/share`, {
+      tenant: tenantA,
+      json: { to: 'b@example.com' },
+    });
 
     // Assert
     response.status.should.equal(202);
     const actual = (await response.json()) as { jobId: string; status: string };
     actual.status.should.equal('queued');
     delivered.should.deepEqual([{ from: 'app@example.com', to: 'b@example.com', subject: 'Shared', text: 'Ship it' }]);
-    const [job] = await postgres.admin(async client => (await client.query('SELECT status FROM jobs WHERE id = $1', [actual.jobId])).rows);
+    const [job] = await postgres.admin(
+      async client => (await client.query('SELECT status FROM jobs WHERE id = $1', [actual.jobId])).rows,
+    );
     job.status.should.equal('done');
   });
 
@@ -219,7 +234,10 @@ describe('WorkerRuntime over HTTP (Testcontainers Postgres + MinIO)', () => {
     await postgres.markFork();
 
     // Act
-    const response = await call('POST', `/api/notes/${note.id}/share`, { tenant: tenantA, json: { to: 'b@example.com' } });
+    const response = await call('POST', `/api/notes/${note.id}/share`, {
+      tenant: tenantA,
+      json: { to: 'b@example.com' },
+    });
     const health = (await (await call('GET', '/api/health')).json()) as { fork: boolean };
     await postgres.admin(client => client.query('UPDATE fork_meta SET is_fork = false'));
 
@@ -297,7 +315,9 @@ describe('WorkerRuntime over HTTP (Testcontainers Postgres + MinIO)', () => {
 
     // Act
     const response = await call('POST', '/api/notes', { tenant: unknownTenant, json: { title: 'Orphan', body: 'x' } });
-    const rows = await postgres.admin(async client => (await client.query("SELECT id FROM notes WHERE title = 'Orphan'")).rows);
+    const rows = await postgres.admin(
+      async client => (await client.query("SELECT id FROM notes WHERE title = 'Orphan'")).rows,
+    );
 
     // Assert
     await problem(response, 500, 'internal_error');
@@ -328,14 +348,19 @@ describe('WorkerRuntime over HTTP (Testcontainers Postgres + MinIO)', () => {
         "INSERT INTO jobs (tenant_id, kind, payload, outside_effect) VALUES ($1, 'mail.send', $2, true)",
         [tenantB, JSON.stringify({ to: 'c@example.com', subject: 'Cron', text: 'tick' })],
       );
-      await client.query("INSERT INTO cache_entries (tenant_id, key, value, expires_at) VALUES ($1, 'old', '1', now() - interval '1 minute')", [tenantB]);
+      await client.query(
+        "INSERT INTO cache_entries (tenant_id, key, value, expires_at) VALUES ($1, 'old', '1', now() - interval '1 minute')",
+        [tenantB],
+      );
     });
     const background = new BackgroundWork();
 
     // Act
     await runtime.scheduled(env, background);
     await background.settle();
-    const cache = await postgres.admin(async client => (await client.query("SELECT key FROM cache_entries WHERE key = 'old'")).rows);
+    const cache = await postgres.admin(
+      async client => (await client.query("SELECT key FROM cache_entries WHERE key = 'old'")).rows,
+    );
 
     // Assert
     delivered.should.deepEqual([{ from: 'app@example.com', to: 'c@example.com', subject: 'Cron', text: 'tick' }]);

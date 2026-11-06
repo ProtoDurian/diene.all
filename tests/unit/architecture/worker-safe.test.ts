@@ -26,7 +26,9 @@ describe('Worker code runs on workerd, not Bun', () => {
 
   it('should not import a Bun module', () => {
     // Act
-    const actual = modules.filter(module => module.packages.some(name => BUN_MODULE.test(name))).map(module => module.path);
+    const actual = modules
+      .filter(module => module.packages.some(name => BUN_MODULE.test(name)))
+      .map(module => module.path);
 
     // Assert
     actual.should.deepEqual([]);

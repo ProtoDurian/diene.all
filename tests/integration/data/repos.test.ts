@@ -123,7 +123,9 @@ describe('Postgres repositories (Testcontainers Postgres)', () => {
 
       // Act
       const actual = await new PgForkMarkerReader(db).read();
-      await postgres.admin(client => client.query('UPDATE fork_meta SET is_fork = false, source = NULL, forked_at = NULL'));
+      await postgres.admin(client =>
+        client.query('UPDATE fork_meta SET is_fork = false, source = NULL, forked_at = NULL'),
+      );
 
       // Assert
       actual.isFork.should.be.true();
@@ -189,7 +191,13 @@ describe('Postgres repositories (Testcontainers Postgres)', () => {
       const done = await status(enqueued.id);
 
       // Assert
-      enqueued.should.containEql({ kind: 'work', status: 'queued', outsideEffect: true, tenantId: tenant, attempts: 0 });
+      enqueued.should.containEql({
+        kind: 'work',
+        status: 'queued',
+        outsideEffect: true,
+        tenantId: tenant,
+        attempts: 0,
+      });
       should(enqueued.lockedUntil).be.undefined();
       (claimed as { attempts: number; status: string }).should.containEql({ attempts: 1, status: 'running' });
       (claimed as { lockedUntil: Date }).lockedUntil.should.be.instanceOf(Date);

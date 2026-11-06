@@ -26,7 +26,8 @@ describe('CopyBucketForker (Testcontainers MinIO)', () => {
     }
     const buckets = new S3ForkBuckets(
       new S3Client(minio.connection),
-      new ForkNaming({ database: 'app', bucket: 'files' }));
+      new ForkNaming({ database: 'app', bucket: 'files' }),
+    );
     subject = new CopyBucketForker(buckets);
   }, 120_000);
 
@@ -73,9 +74,7 @@ describe('CopyBucketForker (Testcontainers MinIO)', () => {
   it('should report a storage failure', async () => {
     // Arrange
     const broken = new CopyBucketForker(
-      new S3ForkBuckets(
-        new S3Client(minio.connection),
-        new ForkNaming({ database: 'app', bucket: 'no-such-source' })),
+      new S3ForkBuckets(new S3Client(minio.connection), new ForkNaming({ database: 'app', bucket: 'no-such-source' })),
     );
 
     // Act
@@ -89,9 +88,7 @@ describe('CopyBucketForker (Testcontainers MinIO)', () => {
   it('should refuse a bucket name past 63 characters', async () => {
     // Arrange
     const long = new CopyBucketForker(
-      new S3ForkBuckets(
-        new S3Client(minio.connection),
-        new ForkNaming({ database: 'app', bucket: 'b'.repeat(40) })),
+      new S3ForkBuckets(new S3Client(minio.connection), new ForkNaming({ database: 'app', bucket: 'b'.repeat(40) })),
     );
 
     // Act
@@ -118,7 +115,9 @@ describe('TigrisBucketForker', () => {
           source: request.headers.get('x-tigris-fork-source-bucket'),
         });
         if (request.method === 'GET' && url.pathname === '/') {
-          return new Response('<ListAllMyBucketsResult><Buckets><Bucket><Name>files-fork-demo</Name></Bucket></Buckets></ListAllMyBucketsResult>');
+          return new Response(
+            '<ListAllMyBucketsResult><Buckets><Bucket><Name>files-fork-demo</Name></Bucket></Buckets></ListAllMyBucketsResult>',
+          );
         }
         if (request.method === 'GET') {
           return new Response('<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>');
@@ -132,9 +131,7 @@ describe('TigrisBucketForker', () => {
       accessKeyId: randomUUID(),
       secretAccessKey: randomUUID(),
     });
-    subject = new TigrisBucketForker(
-      new S3ForkBuckets(s3, new ForkNaming({ database: 'app', bucket: 'files' })),
-    );
+    subject = new TigrisBucketForker(new S3ForkBuckets(s3, new ForkNaming({ database: 'app', bucket: 'files' })));
   });
 
   afterAll(() => {
@@ -160,11 +157,8 @@ describe('TigrisBucketForker', () => {
 
     // Assert
     listed.should.deepEqual(['demo']);
-    requests.map(request => `${request.method} ${request.path}`).should.deepEqual([
-      'GET /',
-      'GET /',
-      'GET /files-fork-demo',
-      'DELETE /files-fork-demo',
-    ]);
+    requests
+      .map(request => `${request.method} ${request.path}`)
+      .should.deepEqual(['GET /', 'GET /', 'GET /files-fork-demo', 'DELETE /files-fork-demo']);
   });
 });

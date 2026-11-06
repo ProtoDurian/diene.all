@@ -50,7 +50,8 @@ function NoteForm({ onCreated }: { onCreated: (note: Note) => void }) {
   const [serverMessage, setServerMessage] = useState<string | undefined>();
   const [summary, setSummary] = useState<ReturnType<typeof summaryOf>>([]);
   const live = validate(draft);
-  const shown = (field: keyof NoteErrors) => serverErrors[field] ?? (submitted || draft[field] ? live[field] : undefined);
+  const shown = (field: keyof NoteErrors) =>
+    serverErrors[field] ?? (submitted || draft[field] ? live[field] : undefined);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -153,16 +154,15 @@ export function NotesScreen({ tenantName, onSwitch }: { tenantName: string; onSw
 
   if (load.state === 'error') {
     const { problem } = load;
-    if (isTenantPending(problem)) return <PendingScreen tenantName={tenantName} onRetry={refresh} onSwitch={onSwitch} />;
+    if (isTenantPending(problem))
+      return <PendingScreen tenantName={tenantName} onRetry={refresh} onSwitch={onSwitch} />;
     if (signedOut) return null;
     if (problemTier(problem) === 'failure') return <FailureScreen problem={problem} />;
   }
 
   const notes = load.state === 'ready' ? load.notes : [];
   const needle = query.trim().toLowerCase();
-  const visible = needle
-    ? notes.filter(note => `${note.title}\n${note.body}`.toLowerCase().includes(needle))
-    : notes;
+  const visible = needle ? notes.filter(note => `${note.title}\n${note.body}`.toLowerCase().includes(needle)) : notes;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
@@ -184,10 +184,13 @@ export function NotesScreen({ tenantName, onSwitch }: { tenantName: string; onSw
           </div>
         </div>
 
-        {load.state === 'loading' ? (showSkeleton ? <NotesSkeleton /> : <div className="min-h-64" />) : null}
+        {load.state === 'loading' ? showSkeleton ? <NotesSkeleton /> : <div className="min-h-64" /> : null}
 
         {load.state === 'error' ? (
-          <div role="alert" className="flex flex-col items-start gap-3 rounded-control border border-err-border bg-err-bg p-4 text-err">
+          <div
+            role="alert"
+            className="flex flex-col items-start gap-3 rounded-control border border-err-border bg-err-bg p-4 text-err"
+          >
             <p>
               {load.problem.title}. {load.problem.detail ?? 'Try again.'}
             </p>
@@ -228,12 +231,20 @@ export function NotesScreen({ tenantName, onSwitch }: { tenantName: string; onSw
         ) : null}
       </section>
 
-      <section aria-labelledby="new-note-title" className="flex flex-col gap-4 sm:rounded-panel sm:border sm:border-border sm:bg-surface sm:p-6 sm:shadow-panel lg:self-start">
+      <section
+        aria-labelledby="new-note-title"
+        className="flex flex-col gap-4 sm:rounded-panel sm:border sm:border-border sm:bg-surface sm:p-6 sm:shadow-panel lg:self-start"
+      >
         <h2 id="new-note-title" className="font-semibold text-lg">
           New note
         </h2>
         <NoteForm
-          onCreated={note => setLoad(previous => ({ state: 'ready', notes: [note, ...(previous.state === 'ready' ? previous.notes : [])] }))}
+          onCreated={note =>
+            setLoad(previous => ({
+              state: 'ready',
+              notes: [note, ...(previous.state === 'ready' ? previous.notes : [])],
+            }))
+          }
         />
       </section>
     </div>

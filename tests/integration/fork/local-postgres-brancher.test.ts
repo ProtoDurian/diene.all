@@ -16,9 +16,7 @@ describe('LocalPostgresBrancher (Testcontainers Postgres)', () => {
     await db.admin(client =>
       client.query("INSERT INTO notes (tenant_id, title, body) VALUES ($1, 'hello', 'world')", [tenantId]),
     );
-    subject = new LocalPostgresBrancher(
-      db.connectionString,
-      new ForkNaming({ database: 'app', bucket: 'files' }));
+    subject = new LocalPostgresBrancher(db.connectionString, new ForkNaming({ database: 'app', bucket: 'files' }));
   }, 120_000);
 
   afterAll(async () => {
@@ -97,7 +95,8 @@ describe('LocalPostgresBrancher (Testcontainers Postgres)', () => {
     // Arrange
     const missing = new LocalPostgresBrancher(
       db.connectionString,
-      new ForkNaming({ database: 'missing', bucket: 'files' }));
+      new ForkNaming({ database: 'missing', bucket: 'files' }),
+    );
 
     // Act
     const actual = await expectErr(missing.create('demo'));
@@ -114,7 +113,8 @@ describe('LocalPostgresBrancher (Testcontainers Postgres)', () => {
     // Arrange
     const long = new LocalPostgresBrancher(
       db.connectionString,
-      new ForkNaming({ database: 'a'.repeat(40), bucket: 'files' }));
+      new ForkNaming({ database: 'a'.repeat(40), bucket: 'files' }),
+    );
 
     // Act
     const actual = await expectErr(long.create('abcdefghijklmnopqrstuvwx'));

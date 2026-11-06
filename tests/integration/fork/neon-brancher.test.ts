@@ -47,7 +47,9 @@ class FakeNeon {
     }
     if (path === '/connection_uri') {
       const q = url.searchParams;
-      return Response.json({ uri: `postgres://${q.get('role_name')}@${q.get('branch_id')}.neon.test/${q.get('database_name')}` });
+      return Response.json({
+        uri: `postgres://${q.get('role_name')}@${q.get('branch_id')}.neon.test/${q.get('database_name')}`,
+      });
     }
     const id = path.replace('/branches/', '');
     const branch = this.branches.find(candidate => candidate.id === id);
@@ -102,13 +104,15 @@ describe('NeonBrancher (fake Neon API)', () => {
 
     // Assert
     actual.should.deepEqual({ name: 'fork-demo', connectionString: 'postgres://app_owner@br-1.neon.test/app' });
-    neon.calls.map(call => `${call.method} ${call.path}`).should.deepEqual([
-      'GET /branches',
-      'POST /branches',
-      'GET /branches/br-1',
-      'GET /branches/br-1',
-      'GET /connection_uri',
-    ]);
+    neon.calls
+      .map(call => `${call.method} ${call.path}`)
+      .should.deepEqual([
+        'GET /branches',
+        'POST /branches',
+        'GET /branches/br-1',
+        'GET /branches/br-1',
+        'GET /connection_uri',
+      ]);
     neon.calls[1]?.body?.should.deepEqual({
       branch: { name: 'fork-demo', parent_id: 'br-main' },
       endpoints: [{ type: 'read_write' }],

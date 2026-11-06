@@ -51,7 +51,13 @@ export function TextField({ id, label, error, hint, ...rest }: FieldShell & Inpu
   );
 }
 
-export function TextAreaField({ id, label, error, hint, ...rest }: FieldShell & TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function TextAreaField({
+  id,
+  label,
+  error,
+  hint,
+  ...rest
+}: FieldShell & TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="font-medium text-fg-soft text-sm">

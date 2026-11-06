@@ -12,7 +12,13 @@ import type { Job, NewJob } from '../../../src/lib/jobs/structures';
 import { MailPolicy } from '../../../src/lib/mail/service';
 import type { INoteRepository } from '../../../src/lib/notes/interfaces';
 import { NoteAttachmentService, NoteService, NoteShareService } from '../../../src/lib/notes/service';
-import { AttachmentNotFound, type Note, NoteNotFound, type NotePatch, type NoteRecord } from '../../../src/lib/notes/structures';
+import {
+  AttachmentNotFound,
+  type Note,
+  NoteNotFound,
+  type NotePatch,
+  type NoteRecord,
+} from '../../../src/lib/notes/structures';
 
 class MemoryNoteRepository implements INoteRepository {
   readonly notes = new Map<string, Note>();

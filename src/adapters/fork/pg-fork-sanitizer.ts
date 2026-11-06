@@ -59,7 +59,9 @@ export class PgForkSanitizer implements ForkSanitizer {
        WHERE "accessToken" IS NOT NULL OR "refreshToken" IS NOT NULL OR "idToken" IS NOT NULL`,
     );
     rotated += await this.count(client, `UPDATE "invitation" SET "status" = 'canceled' WHERE "status" = 'pending'`);
-    const clients = await client.query<{ id: string }>('SELECT "id" FROM "oauthClient" WHERE "clientSecret" IS NOT NULL');
+    const clients = await client.query<{ id: string }>(
+      'SELECT "id" FROM "oauthClient" WHERE "clientSecret" IS NOT NULL',
+    );
     for (const row of clients.rows) {
       await client.query('UPDATE "oauthClient" SET "clientSecret" = $1, "updatedAt" = now() WHERE "id" = $2', [
         this.secrets.generate(),

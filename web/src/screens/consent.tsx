@@ -60,10 +60,20 @@ export function ConsentScreen() {
           </p>
         ) : null}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button variant="ghost" pending={pending === 'deny'} disabled={pending === 'accept'} onClick={() => decide(false)}>
+          <Button
+            variant="ghost"
+            pending={pending === 'deny'}
+            disabled={pending === 'accept'}
+            onClick={() => decide(false)}
+          >
             Deny
           </Button>
-          <Button variant="primary" pending={pending === 'accept'} disabled={pending === 'deny'} onClick={() => decide(true)}>
+          <Button
+            variant="primary"
+            pending={pending === 'accept'}
+            disabled={pending === 'deny'}
+            onClick={() => decide(true)}
+          >
             Allow
           </Button>
         </div>

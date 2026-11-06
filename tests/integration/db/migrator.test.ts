@@ -3,7 +3,12 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import 'should';
-import { FileMigrationSource, MigrationDriftError, MigrationFileError, PgMigrator } from '../../../src/adapters/db/migrator';
+import {
+  FileMigrationSource,
+  MigrationDriftError,
+  MigrationFileError,
+  PgMigrator,
+} from '../../../src/adapters/db/migrator';
 import { MIGRATIONS_DIR, PostgresFixture } from '../../support/postgres';
 
 describe('PgMigrator (Testcontainers Postgres)', () => {

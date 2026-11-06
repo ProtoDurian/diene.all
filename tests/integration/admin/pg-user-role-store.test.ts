@@ -45,7 +45,9 @@ describe('PgUserRoleStore (Testcontainers Postgres)', () => {
     await expectOk(subject.setRole('u2', 'user,admin'));
 
     // Assert
-    const rows = await db.admin(async client => (await client.query('SELECT role FROM "user" WHERE id = $1', ['u2'])).rows);
+    const rows = await db.admin(
+      async client => (await client.query('SELECT role FROM "user" WHERE id = $1', ['u2'])).rows,
+    );
     rows.should.deepEqual([{ role: 'user,admin' }]);
   });
 

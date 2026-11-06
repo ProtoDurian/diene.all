@@ -6,7 +6,10 @@ export class MigrationPlanner {
   /** Out-of-order files are refused by default: a lower version landing late means a merge went wrong. */
   constructor(private readonly allowOutOfOrder = false) {}
 
-  plan(available: readonly Migration[], applied: readonly AppliedMigration[]): Result<readonly Migration[], MigrationDrift> {
+  plan(
+    available: readonly Migration[],
+    applied: readonly AppliedMigration[],
+  ): Result<readonly Migration[], MigrationDrift> {
     const byVersion = new Map<number, Migration>();
     for (const migration of available) {
       if (byVersion.has(migration.version)) return Err(this.drift('duplicate', migration));

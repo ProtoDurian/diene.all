@@ -48,7 +48,10 @@ export class ForkCommand {
       ok: forks => {
         const human = forks.length
           ? forks
-              .map(fork => `${fork.name}\tdatabase=${fork.hasDatabase ? 'yes' : 'no'}\tbucket=${fork.hasBucket ? 'yes' : 'no'}`)
+              .map(
+                fork =>
+                  `${fork.name}\tdatabase=${fork.hasDatabase ? 'yes' : 'no'}\tbucket=${fork.hasBucket ? 'yes' : 'no'}`,
+              )
               .join('\n')
           : 'no forks';
         this.output.result(human, forks);

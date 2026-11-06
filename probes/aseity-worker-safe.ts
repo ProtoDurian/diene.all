@@ -6,7 +6,8 @@ interface ProbeRepo {
   write(path: string, content: string): Promise<void>;
 }
 
-const command = "nix develop .#ci -c bash -lc 'bun install --frozen-lockfile && bun test --config=bunfig.unit.toml tests/unit/architecture/worker-safe.test.ts'";
+const command =
+  "nix develop .#ci -c bash -lc 'bun install --frozen-lockfile && bun test --config=bunfig.unit.toml tests/unit/architecture/worker-safe.test.ts'";
 
 export default {
   contractVersion: 1,
@@ -30,7 +31,13 @@ export default {
         const source = await repo.read(path);
         if (!source.includes('const LIST_KEY')) throw new Error(`${path} no longer contains the sabotage target`);
         await repo.write(path, source.replace('const LIST_KEY', 'console.log(Bun.version);\n\nconst LIST_KEY'));
-        await expectRedBecause(repo, command, 'aseity-worker-safe', ['should not use the Bun global in any module the Worker reaches'], { timeoutMs: 600_000 });
+        await expectRedBecause(
+          repo,
+          command,
+          'aseity-worker-safe',
+          ['should not use the Bun global in any module the Worker reaches'],
+          { timeoutMs: 600_000 },
+        );
       },
     },
   ],

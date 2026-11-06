@@ -149,7 +149,13 @@ export class WorkerRuntime {
   private async scope(env: WorkerEnv, db: PgDatabase): Promise<RuntimeScope> {
     const fork = new CachedForkMarkerReader(new PgForkMarkerReader(db));
     const mailSettings = await this.settings('mail', new MailSettingsParser().parse(env));
-    const mailer = new PolicyMailer(new MailPolicy(), mailSettings, fork, new SinkMailer(this.log), this.options.mailEndpoint);
+    const mailer = new PolicyMailer(
+      new MailPolicy(),
+      mailSettings,
+      fork,
+      new SinkMailer(this.log),
+      this.options.mailEndpoint,
+    );
     return {
       env,
       db,
@@ -164,7 +170,10 @@ export class WorkerRuntime {
     return parsed.match({
       ok: value => value,
       err: error => {
-        throw new SettingsError(block, error.issues.map(issue => `${issue.path.join('.')} ${issue.message}`));
+        throw new SettingsError(
+          block,
+          error.issues.map(issue => `${issue.path.join('.')} ${issue.message}`),
+        );
       },
     });
   }

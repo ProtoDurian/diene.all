@@ -73,18 +73,21 @@ describe('JobScheduler', () => {
     { forkMode: false, outsideEffect: false, expected: 'queued' },
     { forkMode: true, outsideEffect: false, expected: 'queued' },
     { forkMode: true, outsideEffect: true, expected: 'held' },
-  ])('should store fork=$forkMode outsideEffect=$outsideEffect as $expected', async ({ forkMode, outsideEffect, expected }) => {
-    // Arrange
-    const queue = new RecordingQueue();
-    const subject = new JobScheduler(queue, forkMode);
+  ])(
+    'should store fork=$forkMode outsideEffect=$outsideEffect as $expected',
+    async ({ forkMode, outsideEffect, expected }) => {
+      // Arrange
+      const queue = new RecordingQueue();
+      const subject = new JobScheduler(queue, forkMode);
 
-    // Act
-    const actual = await subject.schedule({ kind: 'mail.send', payload: {}, outsideEffect });
+      // Act
+      const actual = await subject.schedule({ kind: 'mail.send', payload: {}, outsideEffect });
 
-    // Assert
-    actual.status.should.equal(expected);
-    queue.statuses.should.deepEqual([expected]);
-  });
+      // Assert
+      actual.status.should.equal(expected);
+      queue.statuses.should.deepEqual([expected]);
+    },
+  );
 });
 
 describe('RetryPolicy', () => {
@@ -147,7 +150,12 @@ describe('JobRunner', () => {
 
   it('should stop after the batch limit even when more work is waiting', async () => {
     // Arrange
-    const store = new ScriptedStore([[job(), job()], [job(), job()], [job(), job()], [job(), job()]]);
+    const store = new ScriptedStore([
+      [job(), job()],
+      [job(), job()],
+      [job(), job()],
+      [job(), job()],
+    ]);
     const subject = new JobRunner(store, [new Handler('work')], new RetryPolicy(), false, options);
 
     // Act

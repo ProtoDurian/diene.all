@@ -11,7 +11,12 @@ export function ErrorSummary({ errors }: ErrorSummaryProps) {
   }, [errors]);
   if (errors.length === 0) return null;
   return (
-    <div ref={ref} tabIndex={-1} role="alert" className="rounded-control border border-err-border bg-err-bg p-3 text-err">
+    <div
+      ref={ref}
+      tabIndex={-1}
+      role="alert"
+      className="rounded-control border border-err-border bg-err-bg p-3 text-err"
+    >
       <p className="font-medium">Fix {errors.length === 1 ? 'this' : 'these'} to continue:</p>
       <ul className="mt-1 list-disc ps-5">
         {errors.map(error => (

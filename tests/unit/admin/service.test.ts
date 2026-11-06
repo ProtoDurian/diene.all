@@ -24,7 +24,10 @@ class MemoryUsers implements UserRoleStore {
 
 function setup(role?: string) {
   const users = new MemoryUsers();
-  users.users.set('u1', role === undefined ? { id: 'u1', email: 'ada@example.com' } : { id: 'u1', email: 'ada@example.com', role });
+  users.users.set(
+    'u1',
+    role === undefined ? { id: 'u1', email: 'ada@example.com' } : { id: 'u1', email: 'ada@example.com', role },
+  );
   return { users, subject: new AdminGrantService(users) };
 }
 

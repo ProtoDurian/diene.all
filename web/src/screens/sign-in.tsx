@@ -90,7 +90,9 @@ export function SignInScreen() {
           <Logo className="size-10" />
           <h1 className="font-semibold text-2xl tracking-tight">Sign in</h1>
           <p className="text-fg-soft">
-            {step === 'email' ? 'We will email you a sign-in code.' : `Enter the code we sent to ${draft.email.trim()}.`}
+            {step === 'email'
+              ? 'We will email you a sign-in code.'
+              : `Enter the code we sent to ${draft.email.trim()}.`}
           </p>
         </header>
 

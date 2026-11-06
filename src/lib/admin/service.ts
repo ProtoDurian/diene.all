@@ -14,7 +14,9 @@ export class AdminGrantService {
     if (!EMAIL.test(email)) return Err({ kind: 'invalid_email', email: raw });
     return this.users
       .find(email)
-      .andThen(user => (user ? Ok<UserRole, AdminError>(user) : Err<UserRole, AdminError>({ kind: 'user_not_found', email })))
+      .andThen(user =>
+        user ? Ok<UserRole, AdminError>(user) : Err<UserRole, AdminError>({ kind: 'user_not_found', email }),
+      )
       .andThen(user => this.promote(user));
   }
 

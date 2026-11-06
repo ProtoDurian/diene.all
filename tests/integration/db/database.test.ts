@@ -45,7 +45,9 @@ describe('PgDatabase (Testcontainers Postgres)', () => {
     await single.withTenant(tenant, sql => sql.query('SELECT 1'));
 
     // Act
-    const actual = await single.withSystem(sql => sql.query<{ tenant: string | null }>('SELECT app_current_tenant() AS tenant'));
+    const actual = await single.withSystem(sql =>
+      sql.query<{ tenant: string | null }>('SELECT app_current_tenant() AS tenant'),
+    );
     await single.close();
 
     // Assert

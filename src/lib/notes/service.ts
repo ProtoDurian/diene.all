@@ -115,7 +115,9 @@ export class NoteAttachmentService {
     return this.lookup
       .note(id)
       .mapErr<NoteNotFound | AttachmentNotFound>(error => error)
-      .andThen(note => this.lookup.require(note.id, this.files.get(this.key(note.id))).mapErr(() => new AttachmentNotFound(note.id)));
+      .andThen(note =>
+        this.lookup.require(note.id, this.files.get(this.key(note.id))).mapErr(() => new AttachmentNotFound(note.id)),
+      );
   }
 
   /** Call after the note is deleted; a missing object is not an error. */

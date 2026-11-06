@@ -42,11 +42,13 @@ export class ForkService {
 
   private populate(name: string, database: DatabaseBranch): Result<ForkCreated, ForkError> {
     const authSecret = this.secrets.generate();
-    return this.buckets.fork(name).andThen(bucket =>
-      this.sanitizer
-        .sanitize(database, { source: this.naming.sources.database })
-        .map(report => ({ name, database, bucket, authSecret, report })),
-    );
+    return this.buckets
+      .fork(name)
+      .andThen(bucket =>
+        this.sanitizer
+          .sanitize(database, { source: this.naming.sources.database })
+          .map(report => ({ name, database, bucket, authSecret, report })),
+      );
   }
 
   // A half-made fork is worse than none: it may still hold live sessions and keys.
