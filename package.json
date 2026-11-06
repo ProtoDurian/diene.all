@@ -67,8 +67,8 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@atomicloud/diene.core-utils": "1.0.0",
-    "@atomicloud/diene.result": "1.0.2",
+    "@atomicloud/diene.core-utils": "^1.0.0",
+    "@atomicloud/diene.result": "^1.0.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

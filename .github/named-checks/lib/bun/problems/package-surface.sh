@@ -23,7 +23,7 @@ q() { jq -r "$1" <<<"${manifest}"; }
 deps_want="@atomicloud/diene.core-utils,@atomicloud/diene.result,zod"
 [[ "$(q '(.dependencies // {}) | keys | join(",")')" == "${deps_want}" ]] || fail "runtime dependencies must be exactly ${deps_want}, got: $(q '(.dependencies // {}) | keys | join(",")')"
 for dep in @atomicloud/diene.core-utils @atomicloud/diene.result; do
-  [[ "$(q ".dependencies[\"${dep}\"]")" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "${dep} must pin an exact published version, got $(q ".dependencies[\"${dep}\"]")"
+  [[ "$(q ".dependencies[\"${dep}\"]")" =~ ^\^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "${dep} must use a caret range on a published version, got $(q ".dependencies[\"${dep}\"]")"
 done
 # helper-only deps may exist, but only as optional peers
 # shellcheck disable=SC2016
@@ -50,4 +50,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ package-surface: deps = result + core-utils (exact) + zod, root + ./test-helper exports, typesVersions, usage skill shipped, src/ = index.ts + lib/ + test-helper/, empty int tier kept"
+echo "✅ package-surface: deps = result + core-utils (caret) + zod, root + ./test-helper exports, typesVersions, usage skill shipped, src/ = index.ts + lib/ + test-helper/, empty int tier kept"
