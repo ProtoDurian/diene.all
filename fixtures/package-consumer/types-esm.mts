@@ -1,13 +1,4 @@
-import {
-  type DU,
-  Err,
-  Ok,
-  Res,
-  Some,
-  type Option,
-  type Result,
-  type ResultSerial,
-} from '@atomicloud/diene.result';
+import { type DU, Err, Ok, Res, Some, type Option, type Result, type ResultSerial } from '@atomicloud/diene.result';
 import { expectErr, expectOk, expectSome } from '@atomicloud/diene.result/test-helper';
 
 const result: Result<number, string> = Ok<number, string>(42);
