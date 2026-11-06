@@ -68,7 +68,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@atomicloud/diene.result": "1.0.2"
+    "@atomicloud/diene.result": "^1.0.2"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
