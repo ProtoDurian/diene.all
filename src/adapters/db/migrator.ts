@@ -68,7 +68,7 @@ class ClientMigrationSession implements IMigrationSession {
   }
 }
 
-export class PgMigrationLedger implements IMigrationLedger {
+class PgMigrationLedger implements IMigrationLedger {
   constructor(private readonly source: ConnectionSource) {}
 
   async exclusive<T>(work: (session: IMigrationSession) => Promise<T>): Promise<T> {

@@ -1,7 +1,7 @@
 import type { Mailer } from '../../lib/mail/interfaces';
 import type { MailMessage } from '../../lib/mail/structures';
 
-export const DEFAULT_MAIL_ENDPOINT = 'https://api.resend.com/emails';
+const DEFAULT_MAIL_ENDPOINT = 'https://api.resend.com/emails';
 
 export class MailDeliveryError extends Error {
   constructor(readonly status: number) {

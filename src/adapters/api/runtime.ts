@@ -59,7 +59,7 @@ export interface RuntimeOptions {
   readonly log?: RuntimeLog;
 }
 
-export class SettingsError extends Error {
+class SettingsError extends Error {
   constructor(
     readonly block: string,
     readonly issues: readonly string[],

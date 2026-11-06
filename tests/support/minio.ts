@@ -2,7 +2,7 @@ import { AwsClient } from 'aws4fetch';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import type { StorageSettings } from '../../src/lib/files/structures';
 
-export const MINIO_IMAGE = 'pgsty/minio:RELEASE.2026-08-04T00-00-00Z';
+const MINIO_IMAGE = 'pgsty/minio:RELEASE.2026-08-04T00-00-00Z';
 
 export class MinioFixture {
   private constructor(

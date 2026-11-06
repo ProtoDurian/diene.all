@@ -1,0 +1,9 @@
+[test]
+root = "tests/e2e"
+coverageReporter = ["text", "lcov"]
+coverageDir = "reports/e2e"
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = ["tests/**"]
+
+# The Worker under test runs inside workerd, out of reach of Bun's coverage, so this tier has no threshold.
+timeout = 240000

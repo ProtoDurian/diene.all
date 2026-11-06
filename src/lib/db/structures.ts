@@ -13,10 +13,8 @@ export interface AppliedMigration {
   readonly checksum: string;
 }
 
-export type MigrationDriftKind = 'duplicate' | 'missing' | 'changed' | 'out_of_order';
-
 export interface MigrationDrift {
-  readonly kind: MigrationDriftKind;
+  readonly kind: 'duplicate' | 'missing' | 'changed' | 'out_of_order';
   readonly version: number;
   readonly name: string;
 }

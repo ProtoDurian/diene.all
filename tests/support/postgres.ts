@@ -3,7 +3,7 @@ import { Client } from 'pg';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { PgMigrator } from '../../src/adapters/db/migrator';
 
-export const POSTGRES_IMAGE = 'postgres:17.11-alpine';
+const POSTGRES_IMAGE = 'postgres:17.11-alpine';
 export const MIGRATIONS_DIR = resolve(import.meta.dir, '../../db/migrations');
 
 export class PostgresFixture {
