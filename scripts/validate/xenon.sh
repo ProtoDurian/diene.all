@@ -16,7 +16,7 @@ stacks=("")
 for l in $(jq -r '.[]' <<<"${landscapes}"); do stacks+=("--values chart/values.${l}.yaml"); done
 full=(--values chart/values.serving.yaml --values chart/values.canary.yaml)
 stacks+=("${full[*]}")
-objects='["APIService/v1beta1.metrics.k8s.io","ClusterRole/system:upstream-aggregated-reader","ClusterRole/system:xenon-metrics","ClusterRoleBinding/system:xenon-metrics","ClusterRoleBinding/xenon-metrics:system:auth-delegator","Deployment/xenon-metrics","RoleBinding/xenon-metrics-auth-reader","Service/xenon-metrics","ServiceAccount/xenon-metrics"]'
+objects='["APIService/v1beta1.metrics.k8s.io","ClusterRole/system:xenon-metrics","ClusterRole/system:xenon-metrics-aggregated-reader","ClusterRoleBinding/system:xenon-metrics","ClusterRoleBinding/xenon-metrics:system:auth-delegator","Deployment/xenon-metrics","RoleBinding/xenon-metrics-auth-reader","Service/xenon-metrics","ServiceAccount/xenon-metrics"]'
 
 render() {
   local chart="$1"
@@ -192,11 +192,11 @@ toggle-map)
   expect_red 'README serving substrate row missing' 'README serving substrate rows' toggle_check "${tmp}/readme-sub/chart"
   ;;
 kube-floor)
-  render chart "${full[@]}" --kube-version 1.31.0 >/dev/null
-  expect_refusal 'needs Kubernetes 1.31\+' "${full[@]}" --kube-version 1.30.0
+  render chart "${full[@]}" --kube-version 1.34.0 >/dev/null
+  expect_refusal 'needs Kubernetes 1.34\+' "${full[@]}" --kube-version 1.31.5
   for l in lapras ditto rotom absol; do
-    [ "$(render chart --values "chart/values.${l}.yaml" --kube-version 1.30.0 | yq eval-all -o=json '.' | jq -s 'map(select(.kind != null)) | length')" = 0 ] ||
-      { echo "❌ OFF landscape ${l} does not install cleanly on Kubernetes 1.30" >&2 && exit 1; }
+    [ "$(render chart --values "chart/values.${l}.yaml" --kube-version 1.31.5 | yq eval-all -o=json '.' | jq -s 'map(select(.kind != null)) | length')" = 0 ] ||
+      { echo "❌ OFF landscape ${l} does not install cleanly on Kubernetes 1.31" >&2 && exit 1; }
   done
   ;;
 lpsm-labels)

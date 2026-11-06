@@ -18,7 +18,7 @@ serviceTree:
 # metrics-server). Then `upstream.enabled` must be false; otherwise it must be true.
 builtInMetricsProvider: false
 
-# -- metrics-server 3.13.1 (app 0.8.1, Kubernetes 1.31+) values: upstream defaults plus the toggle, LPSM labels, Reloader,
+# -- metrics-server 3.14.0 (app 0.9.0, Kubernetes 1.34+) values: upstream defaults plus the toggle, LPSM labels, Reloader,
 # pod non-root and limits. No ServiceMonitor, no metrics endpoint (upstream defaults stay off).
 upstream:
   # -- The xenon toggle (Helm dependency condition). ON exactly when `builtInMetricsProvider` is false.

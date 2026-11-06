@@ -24,8 +24,8 @@
 {{- if not (or $builtIn $enabled) -}}
 {{- fail "missing provider: no built-in Resource Metrics API provider is declared (builtInMetricsProvider=false), so xenon must be ON (upstream.enabled=true)" -}}
 {{- end -}}
-{{- if and $enabled (not (semverCompare ">=1.31.0-0" .Capabilities.KubeVersion.Version)) -}}
-{{- fail (printf "metrics-server 0.8 needs Kubernetes 1.31+, the cluster is %s" .Capabilities.KubeVersion.Version) -}}
+{{- if and $enabled (not (semverCompare ">=1.34.0-0" .Capabilities.KubeVersion.Version)) -}}
+{{- fail (printf "metrics-server 0.9 needs Kubernetes 1.34+, the cluster is %s" .Capabilities.KubeVersion.Version) -}}
 {{- end -}}
 {{- end -}}
 
