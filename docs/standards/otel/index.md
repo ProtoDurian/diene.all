@@ -133,10 +133,22 @@ never decides from `process.env` on its own and the library never writes to it.
 - `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` (`cumulative` default, `delta`,
   `lowmemory`) and `OTEL_BSP_SCHEDULE_DELAY`, `OTEL_BSP_MAX_QUEUE_SIZE`,
   `OTEL_BSP_MAX_EXPORT_BATCH_SIZE`, `OTEL_BSP_EXPORT_TIMEOUT` (SDK defaults otherwise).
+- `OTEL_ATTRIBUTE_COUNT_LIMIT`, `OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT` and the span limits
+  `OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT`, `OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT`,
+  `OTEL_SPAN_EVENT_COUNT_LIMIT`, `OTEL_SPAN_LINK_COUNT_LIMIT`,
+  `OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT`, `OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT`
+  (non-negative integers) set the tracer limits. A span limit falls back to its general
+  limit, then to the SDK default (128, and no value length limit).
+- `OTEL_EXPORTER_OTLP_[<SIGNAL>_]CERTIFICATE`, `..._CLIENT_CERTIFICATE` and
+  `..._CLIENT_KEY` (signal names win) name PEM files. Init reads them into the exporter
+  agent; a file that cannot be read fails init with an `OtlpTlsFileError` naming the
+  variable. With none named, the agent only keeps connections alive.
 
-One SDK limit remains: the OTLP exporters always merge header keys from `process.env` under
-the explicit headers. An injected key wins, but a key that only `process.env` sets is still
-sent.
+The header merge is the one remaining process read: the OTLP exporters always merge header
+keys from `process.env` under the explicit headers. An injected key wins, but a key that
+only `process.env` sets is still sent. The SDK also computes its other `process.env`
+fallbacks, opening any certificate files they name, but discards them all because every one
+is passed explicitly.
 
 ---
 
@@ -153,7 +165,8 @@ The package follows three layers:
 - **Adapters** (`src/adapters`, effects): `OtelBootstrap` reads the variables
   (`process.env` unless you pass `environment`), asks the planner for a plan and builds
   only what the plan selects through `LoggerSignalFactory`, `MetricSignalFactory` and
-  `TraceSignalFactory`.
+  `TraceSignalFactory`. `OtlpAgentOptionsFactory` reads the certificate files the plan
+  names.
 - **Test helper** (`src/test-helper`): the trace double, assertions, fixtures and the
   init harness.
 

@@ -85,8 +85,9 @@ All five values (including `module`) are also set as `atomi.<name>`.
 ## Init, flush and shutdown
 
 1. `const runtime = new OtelBootstrap().init(config.otel, config.app);` once at startup.
-   Pass `{ environment }` to choose the variables; the default is `process.env`, and only
-   that record is read.
+   Pass `{ environment }` to choose the variables; the default is `process.env`. Only that
+   record decides the setup; the header merge is the one remaining process read (the OTLP
+   exporters still add header keys that only `process.env` sets).
 2. Use `runtime.tracer`, `runtime.meter`, `runtime.logger` (pino), or the seams
    `runtime.traceEmitter`, `runtime.metricsCollector`, `runtime.loggerSink`.
 3. The runtime registers the global tracer provider (plus context manager and propagator)
@@ -99,8 +100,10 @@ All five values (including `module`) are also set as `atomi.<name>`.
 Standard variables win over the block: `OTEL_SDK_DISABLED`, `OTEL_*_EXPORTER`,
 `OTEL_EXPORTER_OTLP_[SIGNAL_]ENDPOINT|HEADERS|TIMEOUT|COMPRESSION`, `OTEL_TRACES_SAMPLER`
 (+ `_ARG`), `OTEL_METRIC_EXPORT_INTERVAL|TIMEOUT`, `OTEL_BSP_*`,
-`OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`. The metric reader timeout never
-exceeds its interval. Logs are pino JSON on stdout with trace ids; there is no OTLP logs
+`OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`, `OTEL_ATTRIBUTE_*_LIMIT`,
+`OTEL_SPAN_*_LIMIT` and `OTEL_EXPORTER_OTLP_[SIGNAL_]CERTIFICATE|CLIENT_CERTIFICATE|CLIENT_KEY`
+(PEM files; an unreadable one fails init with `OtlpTlsFileError` naming the variable). The
+metric reader timeout never exceeds its interval. Logs are pino JSON on stdout with trace ids; there is no OTLP logs
 export.
 
 Copyable examples: `assets/consumer.ts` (ESM), `assets/consumer.cjs` (CJS).
