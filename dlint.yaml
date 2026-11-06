@@ -30,6 +30,8 @@ checks:
       - hadolint
       - infisical
       - jq
+      - k3d
+      - kubectl version --client
       - nix
       - pre-commit
       - releaser
