@@ -19,6 +19,12 @@ See [docs/standards/ci-cd/index.md](docs/standards/ci-cd/index.md).
 
 See [docs/standards/conventional-commits/index.md](docs/standards/conventional-commits/index.md).
 
+# Core utilities
+
+See [docs/standards/core-utils/index.md](docs/standards/core-utils/index.md) before
+changing the slug, timing, fuzzy, concurrency, record, hash, unique, path or
+wire-date surface.
+
 # CyanPrint-managed files
 
 `.cyan_state.yaml` records what CyanPrint manages here:

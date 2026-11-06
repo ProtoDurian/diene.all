@@ -1,22 +1,25 @@
 ---
 name: diene-core-utils-usage
-description: Use when consuming @atomicloud/diene.core-utils for deterministic utilities, explicit-root filesystem paths, or C0 Temporal wire codecs.
+description: Use when consuming @atomicloud/diene.core-utils for slugs and keys, timing, fuzzy matching, bounded concurrency, stable records, hashing, dedupe, explicit-root path joins, or C0 Temporal wire codecs.
 ---
 
-Import from `@atomicloud/diene.core-utils`. Use `slugify` for identifiers and
-handle both branches of Result-returning `namespacedKey`; validation is not an
-exceptional throw path. Use `sleep`/`noop` intentionally, `fuzzyIncludes` only
-for case-insensitive substring search, and `mapWithConcurrency` with a bounded
-limit chosen for the downstream resource.
+Import classes from `@atomicloud/diene.core-utils`. Each is stateless: create
+one (`new Slugger()`) or inject it, then call its methods.
 
-Use `isRecord` before record access, `stableConfig` before deterministic
-comparison/hash input, `sha256` for digests, and `unique` for deduplication.
-Filesystem helpers require an explicit root: use `safeJoin(root, ...)`, never an
-implicit current working directory.
+- `Slugger`: `slugify` for identifiers; `namespacedKey` returns a `Result`, so
+  handle the `err` branch instead of calling `unwrap`.
+- `Timing.sleep`/`noop`, `FuzzyMatcher.fuzzyIncludes` (case-insensitive
+  substring only), `ConcurrencyMapper.mapWithConcurrency` with a limit chosen
+  for the downstream resource.
+- `RecordTools.isRecord` before record access, `stableConfig` before comparison
+  or hashing, `Hasher.sha256`, and `array.filter(new Deduper().unique)`.
+- `SafePath.safeJoin(root, ...)`: pure, explicit absolute root, never the cwd;
+  returns `Result<string, VfsError>`. Do file I/O through the interfaces
+  package's `VirtualFileSystem`.
+- `WireDateCodec` at a transport boundary only: `parse*`/`format*` for date
+  `YYYY-MM-DD`, time `HH:mm:ss`, UTC RFC 3339 instant, ISO 8601 duration and
+  IANA timezone, returning `Result<…, WireDateError>`.
 
-At a transport boundary use the `parseWire*`/`formatWire*` Temporal codecs only:
-date `YYYY-MM-DD`, time `HH:mm:ss`, UTC RFC3339 instant, ISO8601 duration, and
-IANA timezone identifier. Keep locale display formatting outside the wire.
-
-Read [patterns.md](patterns.md) for examples and the future-TestHelper rule. This
-pure-value package has TestHelper=NO: do not add a helper merely for convenience.
+This package has TestHelper=NO; `pls test:meta` is a no-op. Read
+[patterns.md](patterns.md) for examples and for how to create this lib's
+TestHelper if a real need appears.
