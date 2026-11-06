@@ -6,8 +6,9 @@ description: Use when consuming @atomicloud/diene.config — registering config 
 # Diene Config usage
 
 Import only the package root, `/build-time` or `/test-helper`; never copy the
-implementation or reach into `src/` or `dist/`. The full contract is the
-[config standard](https://github.com/AtomiCloud/diene.bun-config/blob/main/docs/standards/config/index.md).
+implementation or reach into `src/` or `dist/`. Everything a consumer needs is in
+this skill and its [assets](assets/test-helper.md); the full contract lives in
+`docs/standards/config/index.md` of the library's source repository.
 
 ## Load configuration (runtime)
 
@@ -35,6 +36,7 @@ build-time/runtime.
 | Fully-static frontend                            | build-time values only; zero runtime env, so no runtime secrets                                  |
 
 Runtime env still wins over a build-time value wherever both exist.
+`BuildTimeValueMapper` keeps only `<prefix>CLIENT__*` keys and drops any key with a `BUILD` segment.
 
 ## Env-override rules
 
@@ -45,13 +47,17 @@ Runtime env still wins over a build-time value wherever both exist.
 - Don't put JSON or comma lists in env.
 - Don't hand-roll `Number(process.env.X)`; the loader coerces through zod.
 - Don't rely on an empty env value: blank means unset and keeps the file value.
-- Keep secrets blank in YAML; they arrive as runtime env.
+- Keep secrets blank in YAML; they arrive as runtime env. Declare secrets `z.string().min(1)`.
+- Don't set `app.landscape` from env; pass `landscape` to the loader.
+- String fields keep env text as-is (`0123` stays `0123`); number and boolean
+  fields are parsed by their schema type.
 
 ## Testing (`/test-helper`)
 
 - `InMemoryConfigSource` — plain-object tiers, no files and no `process.env`.
 - `LandscapeConfigSource` — an in-memory source whose base names a landscape.
-- `ConfigStubBuilder` — a validated `Config` built by the real loader.
+- `ConfigStubBuilder(registry, { prefix })` — a validated `Config` built by the
+  real loader; `prefix` is required.
 - `ConfigAssertions` — `expectValid` / `expectInvalid` over a stub builder.
 
 Run one behavioural suite against both `YamlConfigSource` and

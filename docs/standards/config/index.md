@@ -34,23 +34,37 @@ incomplete as long as the merged result satisfies the root schema.
 - **`__` is the nesting separator.** `ATOMI_SERVER__PORT` targets
   `server.port`.
 - **Case- and separator-insensitive key matching.** A snake segment matches
-  snake / Pascal / camel / kebab object keys: `SERVER__MAX_RETRIES` matches
-  `maxRetries`.
+  snake / Pascal / camel / kebab keys: `SERVER__MAX_RETRIES` matches
+  `maxRetries`. The registry's schema keys are tried first, then the YAML keys,
+  so a key absent from YAML is still reached. A segment that matches two keys
+  throws `ConfigLoaderError`.
 - **Lists use indexed keys** — `FOO__0`, `FOO__1`, … There is NO JSON-in-env and
-  NO comma encoding; this is specced family-wide (in YAML too).
-- **Number/boolean coercion goes through zod, never a hand-rolled `Number()`**
-  (M31). Declare env-overridable numeric fields with `z.coerce.number()`.
+  NO comma encoding; this is specced family-wide (in YAML too). A non-numeric or
+  out-of-range (> 4096) index into a list throws `ConfigLoaderError`.
+- **Shorter paths apply first**, so `ATOMI_A` and `ATOMI_A__B` give the same
+  result whatever order the environment lists them in.
+- **Coercion follows the schema's leaf type**, never a hand-rolled `Number()`
+  (M31). A string field keeps the raw text (`0123`, `true`, `123456` stay
+  strings), a number field is parsed by zod, a boolean field takes only
+  `true`/`false`. A field the schema does not type (union, `unknown`, an
+  unregistered key) gets the plain scalar coercion. A value the type cannot take
+  stays a string, so validation reports it.
 - **A blank env value means UNSET** (M33): it is dropped, leaving the file value,
   never written as an empty string.
 - **Secrets are blank in YAML** and injected at runtime (Infisical). Since
   secrets only materialize as runtime env, a fully-static frontend carries none.
+  Declare secrets `z.string().min(1)`, so a secret nobody injected fails
+  validation instead of shipping as `''`.
 
 ## Landscape resolution
 
 The host supplies the landscape; this lib never detects it (it does not import
 frontend-utils). `LandscapeResolver.resolve` prefers an explicit landscape, then
 the service-tree `app.landscape` field in the base config, then `base` (defaults
-only). Landscape names must be a lowercase token (`[a-z0-9][a-z0-9-]*`).
+only). A blank explicit landscape counts as unset. Landscape names must be a
+lowercase token (`[a-z0-9][a-z0-9-]*`). Env must not set `app.landscape`: the
+overlay is chosen before env applies, so the loader throws `ConfigLoaderError`
+naming the variable.
 
 ## The dimension matrix and `/build-time`
 
@@ -64,9 +78,9 @@ with build-time / runtime.
 | build-time secret               | CI env read by the build step only                | never                 |
 
 - The **runtime loader** keeps SSR/server-side runtime secrets.
-- **`BuildTimeValueMapper.map(env, prefix)`** (`/build-time`) returns the
-  prefixed, non-blank variables to inline with a DefinePlugin-style static
-  injection. nextjs owns the DefinePlugin wiring; this lib owns the value map.
+- **`BuildTimeValueMapper.map(env, prefix)`** (`/build-time`) returns only the
+  non-blank `<prefix>CLIENT__*` variables, minus any key with a `BUILD` segment
+  after `CLIENT__`, to inline with a DefinePlugin-style static injection. nextjs owns the DefinePlugin wiring; this lib owns the value map.
   Runtime env still wins over a frozen build-time value.
 - **Build-time secrets** (e.g. the Faro source-map upload key
   `ATOMI_CLIENT__FARO__BUILD__KEY`) are CI-injected during the build, consumed by
@@ -86,25 +100,28 @@ working defaults.
 | `FrozenConfig` (implements `Config`)                      | `get(key)`, `all()`                                                                       |
 | `YamlConfigSource(options)`                               | the real `ConfigSource`: `base()`, `overlay(landscape)`, `buildTimeEnv()`, `runtimeEnv()` |
 | `DeepMerger`                                              | `merge(base, override)`                                                                   |
-| `EnvOverrides(coercer?, matcher?)`                        | `apply(target, env, prefix)`                                                              |
-| `EnvKeyMatcher`                                           | `normalize(key)`, `match(keys, segment)`                                                  |
-| `ScalarCoercer`                                           | `coerce(raw)`                                                                             |
+| `EnvOverrides(coercer?, matcher?, walker?)`               | `apply(target, env, prefix, schema?)`, `keysFor(env, prefix, path)`                       |
+| `EnvKeyMatcher`                                           | `normalize(key)`, `matches(keys, segment)`                                                |
+| `ScalarCoercer`                                           | `coerce(raw)`, `coerceAs(raw, kind)`                                                      |
+| `SchemaWalker`                                            | `keys(schema)`, `child(schema, key)`, `kind(schema)`                                      |
 | `LandscapeResolver`                                       | `resolve(explicit, base)`                                                                 |
 | `ConfigValidator`                                         | `validate(schema, value)`                                                                 |
 | `JsonSchemaGenerator`                                     | `generate(registry, { id? })`                                                             |
-| `BuildTimeValueMapper` (`/build-time`)                    | `map(env, prefix)`                                                                        |
+| `BuildTimeValueMapper(matcher?)` (`/build-time`)          | `map(env, prefix)`                                                                        |
 
 - `load()` throws `ConfigValidationError` (aggregated, per-path issues) on an
   invalid final layer; `loadResult()` returns it as an `Err` instead, using
   `@atomicloud/diene.result`. IO failures throw from both.
-- An empty `prefix` throws `ConfigLoaderError`.
+- An empty `prefix`, an env override of `app.landscape`, an ambiguous key match
+  and a bad list index throw `ConfigLoaderError`.
+- The loaded config is deep-frozen: every block, nested object and array.
 - `JsonSchemaGenerator` emits the JSON Schema a config YAML's first line points
-  at: `# yaml-language-server: $schema=./schema.json`. A unit test runs a sample
-  YAML through ajv's draft 2020-12 validator (the draft zod emits): the good file
-  passes and a wrong-typed field fails at its path. That proves the schema works
-  in a standard JSON-Schema validator; it does not launch an editor.
-- Only blocks you register are allowed at the root (`additionalProperties: false`),
-  so register every top-level key a config YAML carries, including `app:`.
+  at: `# yaml-language-server: $schema=./schema.json`. It describes the schema's
+  input side, so a field with a default is optional in the editor. A unit test
+  runs sample YAMLs through ajv's draft 2020-12 validator (the draft zod emits):
+  the good and the default-relying files pass, and a wrong-typed field fails at
+  its path. That proves the schema works in a standard JSON-Schema validator; it
+  does not launch an editor.
 - `DeepMerger`, `EnvOverrides` and the coercion classes live here; this lib is
   their only consumer-facing home (moved out of core-utils).
 
@@ -124,8 +141,9 @@ rebuild:
   as plain objects; no files, no `process.env` mutation.
 - `LandscapeConfigSource(landscape, tiers)` — the landscape fake: an in-memory
   source whose base carries `app.landscape`.
-- `ConfigStubBuilder(registry, { prefix?, landscape? })` — `build(tiers)` runs
-  the real loader, so a stub always passes the registry.
+- `ConfigStubBuilder(registry, { prefix, landscape? })` — `build(tiers)` runs
+  the real loader, so a stub always passes the registry. `prefix` is required,
+  like the loader's.
 - `ConfigAssertions(builder)` — `expectValid(tiers)` / `expectInvalid(tiers)`;
   each throws `TestHelperError` when the expectation fails.
 
