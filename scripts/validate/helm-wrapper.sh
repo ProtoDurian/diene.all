@@ -214,6 +214,32 @@ publish-oci)
   [ ! -s "${tmp}/oci/diene-helm-wrapper-0.1.0.tgz" ] && echo "❌ OCI chart package missing" >&2 && exit 1
   rg -q '^oci://registry.example.invalid/charts$' "${tmp}/oci/oci-ref.txt"
   ;;
+publish-https-dep)
+  root="$(pwd)"
+  mkdir -p "${tmp}/repo" "${tmp}/fixture/chart"
+  helm create "${tmp}/upstream" >/dev/null
+  helm package "${tmp}/upstream" --destination "${tmp}/repo" >/dev/null
+  for _ in 1 2 3 4 5; do
+    port=$((20000 + RANDOM % 20000))
+    nc -s 127.0.0.1 -p "${port}" -L httpd "${tmp}/repo" &
+    server=$!
+    sleep 0.5
+    kill -0 "${server}" 2>/dev/null && break
+    server=""
+  done
+  [ -z "${server}" ] && echo "❌ could not start the fixture chart repository" >&2 && exit 1
+  trap 'kill "${server}" 2>/dev/null; rm -rf "${tmp}"' EXIT
+  helm repo index "${tmp}/repo" --url "http://127.0.0.1:${port}"
+  curl -fsS "http://127.0.0.1:${port}/index.yaml" | cmp -s - "${tmp}/repo/index.yaml" ||
+    { echo "❌ fixture chart repository is not serving its index" >&2 && exit 1; }
+  printf 'apiVersion: v2\nname: diene-helm-wrapper\nversion: 0.1.0\ndependencies:\n  - name: upstream\n    version: 0.1.0\n    repository: http://127.0.0.1:%s\n' "${port}" >"${tmp}/fixture/chart/Chart.yaml"
+  HELM_REPOSITORY_CONFIG="${tmp}/lock/repositories.yaml" HELM_REPOSITORY_CACHE="${tmp}/lock/cache" helm dependency update "${tmp}/fixture/chart" >/dev/null
+  (cd "${tmp}/fixture" && HELM_REPOSITORY_CONFIG="${tmp}/empty/repositories.yaml" HELM_REPOSITORY_CACHE="${tmp}/empty/cache" \
+    PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/out" bash "${root}/scripts/ci/publish.sh") >/dev/null
+  tar -tzf "${tmp}/out/diene-helm-wrapper-0.1.0.tgz" | rg -q '^diene-helm-wrapper/charts/upstream/Chart.yaml$' ||
+    { echo "❌ chart with a repository-URL dependency did not package it" >&2 && exit 1; }
+  [ -e "${tmp}/empty/repositories.yaml" ] && echo "❌ publish wrote to the caller's Helm repository config" >&2 && exit 1
+  ;;
 version)
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh >/dev/null
   ;;

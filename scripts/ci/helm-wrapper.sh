@@ -17,6 +17,7 @@ bash ./scripts/validate/helm-wrapper.sh task-surface
 bash ./scripts/validate/helm-wrapper.sh rendered-manifests
 bash ./scripts/validate/helm-wrapper.sh publish-git
 bash ./scripts/validate/helm-wrapper.sh publish-oci
+bash ./scripts/validate/helm-wrapper.sh publish-https-dep
 bash ./scripts/validate/helm-wrapper.sh version
 bash ./scripts/validate/helm-wrapper.sh presence
 bash ./scripts/validate/helm-wrapper.sh gateway-webhook-presence

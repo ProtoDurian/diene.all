@@ -231,6 +231,11 @@
   },
   {
     "template": "diene/helm-wrapper",
+    "name": "wrapper-publish-https-dep",
+    "class": "gate"
+  },
+  {
+    "template": "diene/helm-wrapper",
     "name": "wrapper-version-guard",
     "class": "gate"
   },

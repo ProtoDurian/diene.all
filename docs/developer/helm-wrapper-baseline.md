@@ -94,7 +94,7 @@ Every gateway exposes `/healthz` and must return a 2xx response. Webhook receive
 
 OCI is the default publish/consume mode. Git chart repositories remain secondary. The only exception classes are the moving-tag fleet compiler and boot-time Primordial/seed charts; the exact bootstrap roster remains intentionally held for its owner.
 
-`scripts/release/bump.sh` stamps `chart/Chart.yaml` at the release commit. `scripts/ci/publish.sh` refuses a manifest/tag mismatch, regenerates Helm docs, and supports git packaging plus OCI dry-run or push. No external publish is needed for local proof.
+`scripts/release/bump.sh` stamps `chart/Chart.yaml` at the release commit. `scripts/ci/publish.sh` refuses a manifest/tag mismatch, regenerates Helm docs, and supports git packaging plus OCI dry-run or push. It registers every `https://` dependency repository from `chart/Chart.yaml` in a throwaway Helm repository config before `helm dependency build`, so a fresh CD runner needs no `helm repo add`. No external publish is needed for local proof.
 
 ## Tokenization surface
 
