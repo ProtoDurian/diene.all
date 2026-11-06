@@ -48,12 +48,12 @@ checks that it names every surface.
 
 This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, Docker, Helm, secrets, release configuration, validators, and standards.
 
-# Helm wrapper
+# Cobalt
 
-This branch adds the wrapper chart, stacked values, generated schema, rendered-manifest validation, k3d proof, and dual publish modes.
+This branch materializes the Helm wrapper as `cobalt`: External Secrets Operator 2.7.0 plus the `infisical` ClusterSecretStore (SoS project, scoped to the cluster landscape).
 
-- `task build` — vendor external config and build pinned chart dependencies.
-- `task test:unit` — run schema, lint, render, contracts, VAP, and publish dry-runs.
-- `task test:int` — install on ephemeral k3d and round-trip the chart through a local OCI registry.
+- `task build` — build the pinned chart dependency.
+- `task test:unit` — run schema, lint, render, store/CRD/v1 contracts, VAP, and publish dry-runs.
+- `task test:int` — install on ephemeral k3d, check ESO health and the applied store, and round-trip the chart through a local OCI registry.
 - `task example:lapras:template` — render the independent landscape + cluster stack.
-- [Helm wrapper baseline](docs/developer/helm-wrapper-baseline.md)
+- [Cobalt baseline](docs/developer/cobalt-baseline.md)

@@ -90,6 +90,6 @@ See [docs/standards/shell-scripts/index.md](docs/standards/shell-scripts/index.m
 
 See [docs/standards/taskfile/index.md](docs/standards/taskfile/index.md).
 
-# Helm wrapper
+# Cobalt
 
-Read [docs/developer/helm-wrapper-baseline.md](docs/developer/helm-wrapper-baseline.md) before changing `chart/`, the stacked values, CR/LPSM helpers, provider LoadBalancer annotations, config vendoring, or chart publishing.
+Read [docs/developer/cobalt-baseline.md](docs/developer/cobalt-baseline.md) before changing `chart/`, the stacked values, the ClusterSecretStore, LPSM labels, or chart publishing.
