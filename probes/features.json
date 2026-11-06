@@ -278,5 +278,10 @@
     "template": "diene/aseity",
     "name": "aseity-wrangler-config",
     "class": "gate"
+  },
+  {
+    "template": "diene/bun-base",
+    "name": "bun-biome-format",
+    "class": "gate"
   }
 ]
