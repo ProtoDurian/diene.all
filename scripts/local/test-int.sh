@@ -11,8 +11,10 @@ cd "${root_dir}"
 
 [[ ${coverage_mode} == "coverage" ]] && rm -rf reports/integration
 
-adapter_source="$(find src/adapters -type f -name '*.ts' -print -quit 2>/dev/null || true)"
-int_test="$(find tests/integration -type f -name '*.test.ts' -print -quit 2>/dev/null || true)"
+# Any file counts: bun also runs x.spec.ts, x_test.ts and other spellings.
+adapter_source="$(find src/adapters -type f -print -quit 2>/dev/null || true)"
+int_test="$(find tests/integration -type f -print -quit 2>/dev/null || true)"
+[[ -z ${adapter_source} && -z ${int_test} && -n ${TEST_INT_NOOP_MARKER:-} ]] && touch "${TEST_INT_NOOP_MARKER}"
 [[ -z ${adapter_source} && -z ${int_test} ]] && echo "⏭️ No adapters or integration tests exist; integration tier is a successful no-op" && exit 0
 [[ -z ${adapter_source} || -z ${int_test} ]] && echo "❌ adapter source and integration tests must be added together" >&2 && exit 1
 

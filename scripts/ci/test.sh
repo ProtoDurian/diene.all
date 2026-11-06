@@ -26,9 +26,11 @@ elif [[ ${mode} == "meta" ]]; then
   # Without a TestHelper the meta tier is a successful no-op: there is no ledger to check.
   [[ -z "$(find src/test-helper -type f -name "*.ts" -print -quit 2>/dev/null || true)" ]] && exit 0
 else
-  ./scripts/local/test-int.sh "${config}" coverage
-  # Without adapters or integration tests the int tier is a successful no-op (A121).
-  [[ -z "$(find src/adapters -type f -name "*.ts" -print -quit 2>/dev/null || true)" && -z "$(find tests/integration -type f -name "*.test.ts" -print -quit 2>/dev/null || true)" ]] && exit 0
+  # Without adapters or integration tests the int tier is a successful no-op (A121); test-int.sh owns that guard.
+  noop_dir="$(mktemp -d)"
+  trap 'rm -rf "${noop_dir}"' EXIT
+  TEST_INT_NOOP_MARKER="${noop_dir}/noop" ./scripts/local/test-int.sh "${config}" coverage
+  [[ -f "${noop_dir}/noop" ]] && exit 0
 fi
 
 # rg exits 2 on a missing file, so absence needs its own refusal.
