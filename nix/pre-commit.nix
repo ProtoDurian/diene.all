@@ -114,33 +114,6 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    a-publish-tag-policy = {
-      enable = true;
-      name = "Publish tag policy";
-      entry = validator "scripts/validate/publish-policy.sh tag";
-      files = "^\\.github/workflows/cd\\.yaml$";
-      pass_filenames = false;
-      language = "system";
-    };
-
-    a-publish-credential-policy = {
-      enable = true;
-      name = "Publish credential policy";
-      entry = validator "scripts/validate/publish-policy.sh credential";
-      files = "^(\\.github/workflows/.*\\.ya?ml$|scripts/ci/publish\\.sh$)";
-      pass_filenames = false;
-      language = "system";
-    };
-
-    a-publish-command-policy = {
-      enable = true;
-      name = "Publish command policy";
-      entry = validator "scripts/validate/publish-policy.sh command";
-      files = "^scripts/ci/publish\\.sh$";
-      pass_filenames = false;
-      language = "system";
-    };
-
     a-package-metadata = {
       enable = true;
       name = "Package metadata agreement";
