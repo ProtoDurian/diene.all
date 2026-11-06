@@ -56,9 +56,7 @@ exports[`ProblemManifestEmitter should snapshot the enumerable list and a schema
     {
       "data": {
         "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": false,
-        "properties": {},
-        "type": "object",
+        "not": {},
       },
       "id": "invalid_json",
       "recoverable": true,
@@ -94,9 +92,7 @@ exports[`ProblemManifestEmitter should snapshot the enumerable list and a schema
     {
       "data": {
         "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": false,
-        "properties": {},
-        "type": "object",
+        "not": {},
       },
       "id": "unauthenticated",
       "recoverable": true,
@@ -108,9 +104,7 @@ exports[`ProblemManifestEmitter should snapshot the enumerable list and a schema
     {
       "data": {
         "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": false,
-        "properties": {},
-        "type": "object",
+        "not": {},
       },
       "id": "unauthorized",
       "recoverable": false,
@@ -200,9 +194,7 @@ exports[`ProblemManifestEmitter should snapshot the enumerable list and a schema
     },
     "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/invalid_json": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object",
+      "not": {},
     },
     "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/note_locked": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -222,15 +214,11 @@ exports[`ProblemManifestEmitter should snapshot the enumerable list and a schema
     },
     "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/unauthenticated": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object",
+      "not": {},
     },
     "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/unauthorized": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object",
+      "not": {},
     },
     "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/validation_error": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -276,7 +264,7 @@ exports[`ProblemResourceEmitter should snapshot one Problem CR for the fixture r
   "apiVersion": "atomi.cloud/v1alpha1",
   "kind": "Problem",
   "metadata": {
-    "name": "zinc-api-raichu-v1",
+    "name": "zinc.api.raichu.v1",
     "namespace": "nitroso",
   },
   "spec": {
@@ -355,9 +343,7 @@ exports[`ProblemResourceEmitter should snapshot one Problem CR for the fixture r
         "recoverable": true,
         "schema": {
           "$schema": "http://json-schema.org/draft-07/schema#",
-          "additionalProperties": false,
-          "properties": {},
-          "type": "object",
+          "not": {},
         },
         "status": 400,
         "title": "Invalid JSON",
@@ -403,9 +389,7 @@ exports[`ProblemResourceEmitter should snapshot one Problem CR for the fixture r
         "recoverable": true,
         "schema": {
           "$schema": "http://json-schema.org/draft-07/schema#",
-          "additionalProperties": false,
-          "properties": {},
-          "type": "object",
+          "not": {},
         },
         "status": 401,
         "title": "Unauthenticated",
@@ -422,9 +406,7 @@ exports[`ProblemResourceEmitter should snapshot one Problem CR for the fixture r
         "recoverable": false,
         "schema": {
           "$schema": "http://json-schema.org/draft-07/schema#",
-          "additionalProperties": false,
-          "properties": {},
-          "type": "object",
+          "not": {},
         },
         "status": 403,
         "title": "Unauthorized",

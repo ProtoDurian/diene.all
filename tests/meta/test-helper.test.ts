@@ -53,7 +53,7 @@ describe('ProblemTestHelper builders', () => {
     const helper = new ProblemTestHelper();
 
     // Act
-    const actual = helper.buildProblemFromRegistry(registry, 'unauthorized', { data: {} }, 'v1');
+    const actual = helper.buildProblemFromRegistry(registry, 'unauthorized', {}, 'v1');
 
     // Assert
     actual.status.should.equal(403);
@@ -65,7 +65,7 @@ describe('ProblemTestHelper builders', () => {
     const helper = new ProblemTestHelper();
 
     // Act
-    const error = failureOf(() => helper.buildProblemFromRegistry(registry, 'missing', { data: {} }));
+    const error = failureOf(() => helper.buildProblemFromRegistry(registry, 'missing', {}));
 
     // Assert
     error.should.be.instanceOf(ProblemRegistryError);
@@ -158,6 +158,9 @@ describe('ProblemExpectation.toBe', () => {
     error.differences[3]!.should.equal('detail expected "expected detail", received "wrong detail"');
     error.differences[4]!.should.equal('instance expected "/expected", received "/wrong"');
     error.differences[5]!.should.startWith('data did not match registry schema:');
+    error.differences[6]!.should.equal(
+      'data expected {\n  "entityType": "Note",\n  "id": "42"\n}, received {\n  "unknown": true\n}',
+    );
     error.message.should.startWith('Problem assertion failed:\n- type expected');
   });
 
@@ -210,13 +213,50 @@ describe('ProblemExpectation.toBe', () => {
     const unauthorized = registry.require('unauthorized');
     const circular: { self?: unknown } = {};
     circular.self = circular;
-    const actual = { ...helper.buildProblem(unauthorized, { data: {} }), data: circular };
+    const actual = { ...helper.buildProblem(unauthorized, {}), data: circular };
 
     // Act
     const error = failureOf(() => helper.expectProblem(actual).toBe(unauthorized, { data: {} }));
 
     // Assert
-    error.differences.length.should.equal(2);
-    error.differences[1]!.should.equal('data expected {}, received [object Object]');
+    error.differences.should.eql([
+      'data expected absent, received [object Object]',
+      'data expected {}, received [object Object]',
+    ]);
+  });
+
+  it('should pass a data-less Problem against a data-less entry', () => {
+    // Arrange
+    const helper = new ProblemTestHelper();
+    const unauthorized = registry.require('unauthorized');
+    const expected = helper.buildProblem(unauthorized, { detail: 'no access' });
+
+    // Act
+    const actual = helper.expectProblem(expected).toBe(unauthorized, { detail: 'no access' });
+
+    // Assert
+    actual.should.equal(expected);
+    actual.should.not.have.property('data');
+  });
+
+  it('should fail with a ProblemAssertionError when given something that is not a Problem', () => {
+    // Arrange
+    const helper = new ProblemTestHelper();
+    const values: readonly unknown[] = [undefined, { ok: true, value: 1 }, { type: 'x', title: 'y', status: 200 }];
+
+    // Act
+    const errors = values.map(value => failureOf(() => helper.expectProblem(value as Problem).toBe(notFound)));
+
+    // Assert
+    for (const error of errors) {
+      error.should.be.instanceOf(ProblemAssertionError);
+    }
+    errors
+      .map(error => error.differences)
+      .should.eql([
+        ['expected a Problem, received undefined'],
+        ['expected a Problem, received {\n  "ok": true,\n  "value": 1\n}'],
+        ['expected a Problem, received {\n  "status": 200,\n  "title": "y",\n  "type": "x"\n}'],
+      ]);
   });
 });

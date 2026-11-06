@@ -1,7 +1,6 @@
 import { isRecord } from '@atomicloud/diene.core-utils';
-import type { z } from 'zod';
 import { ProblemFactory, ProblemStatusPolicy } from './registry.js';
-import type { Problem, RegisteredProblem } from './types.js';
+import type { Problem, ProblemDataInputOf, ProblemDataSchema, ProblemInit, RegisteredProblem } from './types.js';
 
 export class ProblemGuard {
   constructor(private readonly statuses: ProblemStatusPolicy = new ProblemStatusPolicy()) {}
@@ -11,23 +10,23 @@ export class ProblemGuard {
       isRecord(value) &&
       typeof value.type === 'string' &&
       typeof value.title === 'string' &&
-      this.statuses.isStatus(value.status) &&
-      'data' in value
+      this.statuses.isStatus(value.status)
     );
   }
 }
 
-export interface ProblemTransformerOptions<TSchema extends z.ZodType> {
+export interface ProblemTransformerOptions<TSchema extends ProblemDataSchema> {
   readonly fallback: RegisteredProblem<TSchema>;
-  readonly fallbackData: (error: unknown) => z.input<TSchema>;
+  readonly fallbackData?: (error: unknown) => ProblemDataInputOf<TSchema>;
   readonly instance?: (error: unknown) => string | undefined;
 }
 
-export class ProblemTransformer<TSchema extends z.ZodType> {
+export class ProblemTransformer<TSchema extends ProblemDataSchema> {
   constructor(
     readonly options: ProblemTransformerOptions<TSchema>,
     private readonly guard: ProblemGuard = new ProblemGuard(),
     private readonly factory: ProblemFactory = new ProblemFactory(),
+    private readonly statuses: ProblemStatusPolicy = new ProblemStatusPolicy(),
   ) {}
 
   fromError(error: unknown): Problem {
@@ -36,9 +35,8 @@ export class ProblemTransformer<TSchema extends z.ZodType> {
 
     while (true) {
       if (this.guard.isProblem(current)) {
-        return current;
+        return this.normalize(current, current.status);
       }
-
       if (isRecord(current)) {
         visited.add(current);
       }
@@ -49,32 +47,44 @@ export class ProblemTransformer<TSchema extends z.ZodType> {
       current = nested;
     }
 
-    return this.factory.createProblem(this.options.fallback, {
-      detail: this.errorDetail(current),
-      instance: this.options.instance?.(current),
-      data: this.options.fallbackData(current),
-    });
+    return this.fallback(error, this.errorDetail(error));
   }
 
   async fromHttpError(response: Response): Promise<Problem> {
     const text = await response.text();
     const body = this.parseBody(text);
-
-    if (this.guard.isProblem(body)) {
-      return { ...body, status: response.status };
-    }
+    const status = this.statuses.isStatus(response.status) ? response.status : undefined;
 
     const nested = this.nestedError(body);
-    if (this.guard.isProblem(nested)) {
-      return { ...nested, status: response.status };
+    const found = this.guard.isProblem(body) ? body : this.guard.isProblem(nested) ? nested : undefined;
+    if (found !== undefined) {
+      return this.normalize(found, status ?? found.status);
     }
 
-    return this.factory.createProblem(this.options.fallback, {
-      detail: text === '' ? response.statusText || 'HTTP request failed' : this.errorDetail(body),
-      status: response.status,
-      instance: response.url || this.options.instance?.(body),
-      data: this.options.fallbackData(body),
-    });
+    const detail = text === '' ? response.statusText || 'HTTP request failed' : this.errorDetail(body);
+    return this.fallback(body, detail, status);
+  }
+
+  private fallback(source: unknown, detail: string, status?: number): Problem {
+    const init = {
+      detail,
+      status,
+      instance: this.options.instance?.(source),
+      data: this.options.fallbackData?.(source),
+    } as ProblemInit<ProblemDataInputOf<TSchema>>;
+    return this.factory.createProblem(this.options.fallback, init);
+  }
+
+  private normalize(problem: Problem, status: number): Problem {
+    const { type, title, detail, instance, data } = problem;
+    return {
+      type,
+      title,
+      status,
+      ...(typeof detail === 'string' ? { detail } : {}),
+      ...(typeof instance === 'string' ? { instance } : {}),
+      ...(data === undefined || data === null ? {} : { data }),
+    };
   }
 
   private parseBody(text: string): unknown {

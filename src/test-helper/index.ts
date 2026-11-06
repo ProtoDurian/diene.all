@@ -1,12 +1,15 @@
 import { stableConfig } from '@atomicloud/diene.core-utils';
 import {
   type Problem,
+  type ProblemDataInputOf,
+  type ProblemDataOf,
+  type ProblemDataSchema,
   ProblemFactory,
+  ProblemGuard,
   type ProblemInit,
   type ProblemRegistry,
   type RegisteredProblem,
 } from '@atomicloud/diene.problems';
-import type { z } from 'zod';
 
 export class ProblemAssertionError extends Error {
   constructor(readonly differences: readonly string[]) {
@@ -23,45 +26,58 @@ export interface ProblemExpectationOptions {
 }
 
 export class ProblemExpectation {
-  constructor(readonly actual: Problem) {}
+  constructor(
+    readonly actual: Problem,
+    private readonly guard: ProblemGuard = new ProblemGuard(),
+  ) {}
 
-  toBe<TSchema extends z.ZodType>(
+  toBe<TSchema extends ProblemDataSchema>(
     expected: RegisteredProblem<TSchema>,
     options: ProblemExpectationOptions = {},
-  ): Problem<z.output<TSchema>> {
+  ): Problem<ProblemDataOf<TSchema>> {
+    const actual: unknown = this.actual;
+    if (!this.guard.isProblem(actual)) {
+      throw new ProblemAssertionError([`expected a Problem, received ${this.display(actual)}`]);
+    }
+
     const differences: string[] = [];
     const expectedStatus = options.status ?? expected.status;
-
-    if (this.actual.type !== expected.type) {
-      differences.push(`type expected ${expected.type}, received ${this.actual.type}`);
+    if (actual.type !== expected.type) {
+      differences.push(`type expected ${expected.type}, received ${actual.type}`);
     }
-    if (this.actual.title !== expected.title) {
-      differences.push(`title expected ${expected.title}, received ${this.actual.title}`);
+    if (actual.title !== expected.title) {
+      differences.push(`title expected ${expected.title}, received ${actual.title}`);
     }
-    if (this.actual.status !== expectedStatus) {
-      differences.push(`status expected ${expectedStatus}, received ${this.actual.status}`);
+    if (actual.status !== expectedStatus) {
+      differences.push(`status expected ${expectedStatus}, received ${actual.status}`);
     }
-    if (options.detail !== undefined && this.actual.detail !== options.detail) {
-      differences.push(`detail expected ${this.display(options.detail)}, received ${this.display(this.actual.detail)}`);
+    if (options.detail !== undefined && actual.detail !== options.detail) {
+      differences.push(`detail expected ${this.display(options.detail)}, received ${this.display(actual.detail)}`);
     }
-    if (options.instance !== undefined && this.actual.instance !== options.instance) {
+    if (options.instance !== undefined && actual.instance !== options.instance) {
       differences.push(
-        `instance expected ${this.display(options.instance)}, received ${this.display(this.actual.instance)}`,
+        `instance expected ${this.display(options.instance)}, received ${this.display(actual.instance)}`,
       );
     }
 
-    const parsed = expected.dataSchema.safeParse(this.actual.data);
-    if (!parsed.success) {
-      differences.push(`data did not match registry schema: ${parsed.error.message}`);
+    if (expected.dataSchema === undefined) {
+      if (actual.data !== undefined) {
+        differences.push(`data expected absent, received ${this.display(actual.data)}`);
+      }
+    } else {
+      const parsed = expected.dataSchema.safeParse(actual.data);
+      if (!parsed.success) {
+        differences.push(`data did not match registry schema: ${parsed.error.message}`);
+      }
     }
-    if (options.data !== undefined && this.display(this.actual.data) !== this.display(options.data)) {
-      differences.push(`data expected ${this.display(options.data)}, received ${this.display(this.actual.data)}`);
+    if (options.data !== undefined && this.display(actual.data) !== this.display(options.data)) {
+      differences.push(`data expected ${this.display(options.data)}, received ${this.display(actual.data)}`);
     }
 
     if (differences.length > 0) {
       throw new ProblemAssertionError(differences);
     }
-    return this.actual as Problem<z.output<TSchema>>;
+    return actual as Problem<ProblemDataOf<TSchema>>;
   }
 
   private display(value: unknown): string {
@@ -74,25 +90,23 @@ export class ProblemExpectation {
 }
 
 export class ProblemTestHelper {
-  constructor(private readonly factory: ProblemFactory = new ProblemFactory()) {}
+  constructor(
+    private readonly factory: ProblemFactory = new ProblemFactory(),
+    private readonly guard: ProblemGuard = new ProblemGuard(),
+  ) {}
 
   expectProblem(actual: Problem): ProblemExpectation {
-    return new ProblemExpectation(actual);
+    return new ProblemExpectation(actual, this.guard);
   }
 
-  buildProblem<TSchema extends z.ZodType>(
+  buildProblem<TSchema extends ProblemDataSchema>(
     problem: RegisteredProblem<TSchema>,
-    init: ProblemInit<z.input<TSchema>>,
-  ): Problem<z.output<TSchema>> {
+    init: ProblemInit<ProblemDataInputOf<TSchema>>,
+  ): Problem<ProblemDataOf<TSchema>> {
     return this.factory.createProblem(problem, init);
   }
 
-  buildProblemFromRegistry(
-    registry: ProblemRegistry,
-    id: string,
-    init: ProblemInit<unknown>,
-    version?: string,
-  ): Problem {
+  buildProblemFromRegistry(registry: ProblemRegistry, id: string, init: ProblemInit, version?: string): Problem {
     return this.factory.createProblem(registry.require(id, version), init);
   }
 }

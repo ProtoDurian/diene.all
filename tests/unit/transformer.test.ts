@@ -5,7 +5,9 @@ import { z } from 'zod';
 import { portal } from './support/fixtures';
 
 class TransformerFixture {
-  readonly fallback = new ProblemRegistry(portal).register({
+  readonly registry = new ProblemRegistry(portal);
+
+  readonly fallback = this.registry.register({
     id: 'unexpected_error',
     title: 'Unexpected Error',
     status: 500,
@@ -24,16 +26,17 @@ class TransformerFixture {
 }
 
 describe('ProblemGuard', () => {
-  it('should recognise only records with the RFC 9457 members and data', () => {
+  it('should recognise records with type, title, and an error status, with or without data', () => {
     // Arrange
     const guard = new ProblemGuard();
     const { mapped } = new TransformerFixture();
     const values: readonly unknown[] = [
       mapped,
+      { type: 'x', title: 'y', status: 403 },
       null,
       'problem',
       { ...mapped, status: 99 },
-      { type: 'x', title: 'y', status: 400 },
+      { ...mapped, status: 200 },
       { ...mapped, title: 1 },
       { ...mapped, type: 1 },
     ];
@@ -42,36 +45,76 @@ describe('ProblemGuard', () => {
     const actual = values.map(value => guard.isProblem(value));
 
     // Assert
-    actual.should.eql([true, false, false, false, false, false, false]);
+    actual.should.eql([true, true, false, false, false, false, false, false]);
   });
 });
 
 describe('ProblemTransformer.fromError', () => {
-  it('should return an existing Problem unchanged', () => {
+  it('should return an equal Problem for an existing Problem', () => {
     // Arrange
     const { mapped, transformer } = new TransformerFixture();
-    const expected = mapped;
 
     // Act
     const actual = transformer.fromError(mapped);
 
     // Assert
-    actual.should.equal(expected);
+    actual.should.eql(mapped);
   });
 
-  it('should unwrap problem, error, and cause members to the innermost value', () => {
+  it('should rebuild a found Problem without null or unknown members', () => {
+    // Arrange
+    const { transformer } = new TransformerFixture();
+    const found = {
+      type: 'https://errors.example/docs/a/b/c/d/v1/unauthorized',
+      title: 'Unauthorized',
+      status: 403,
+      detail: null,
+      instance: 7,
+      data: null,
+      stack: 'secret',
+    };
+
+    // Act
+    const actual = transformer.fromError({ cause: found });
+
+    // Assert
+    actual.should.eql({ type: found.type, title: 'Unauthorized', status: 403 });
+  });
+
+  it('should find a Problem through problem, error, and cause members', () => {
     // Arrange
     const { mapped, transformer } = new TransformerFixture();
 
     // Act
     const viaProblem = transformer.fromError({ problem: mapped });
-    const viaCause = transformer.fromError({ cause: { error: new Error('nested failure') } });
+    const viaError = transformer.fromError({ error: { cause: mapped } });
 
     // Assert
-    viaProblem.should.equal(mapped);
-    viaCause.detail!.should.equal('nested failure');
-    viaCause.instance!.should.equal('/operation/42');
-    (viaCause.data as object).should.eql({ source: 'object' });
+    viaProblem.should.eql(mapped);
+    viaError.should.eql(mapped);
+  });
+
+  it('should build the fallback from the original thrown value when no Problem is found', () => {
+    // Arrange
+    const { fallback } = new TransformerFixture();
+    const seen: unknown[] = [];
+    const transformer = new ProblemTransformer({
+      fallback,
+      fallbackData: value => {
+        seen.push(value);
+        return { source: typeof value };
+      },
+      instance: value => (value instanceof Error ? `/errors/${value.message}` : undefined),
+    });
+    const thrownError = new Error('outer', { cause: 42 });
+
+    // Act
+    const actual = transformer.fromError(thrownError);
+
+    // Assert
+    actual.detail!.should.equal('outer');
+    actual.instance!.should.equal('/errors/outer');
+    seen.should.eql([thrownError]);
   });
 
   it('should take the detail from an Error, string, detail, message, or a default', () => {
@@ -82,6 +125,7 @@ describe('ProblemTransformer.fromError', () => {
       'plain failure',
       { detail: 'detail failure' },
       { message: 'message failure' },
+      { error: new Error('nested only') },
       42,
     ];
 
@@ -91,7 +135,14 @@ describe('ProblemTransformer.fromError', () => {
     // Assert
     actual
       .map(problem => problem.detail)
-      .should.eql(['boom', 'plain failure', 'detail failure', 'message failure', 'An unexpected error occurred']);
+      .should.eql([
+        'boom',
+        'plain failure',
+        'detail failure',
+        'message failure',
+        'An unexpected error occurred',
+        'An unexpected error occurred',
+      ]);
     actual.every(problem => problem.type === fallback.type).should.be.true();
   });
 
@@ -110,24 +161,31 @@ describe('ProblemTransformer.fromError', () => {
 
     // Assert
     selfCycle.type.should.equal(fallback.type);
-    pairCycle.detail!.should.equal('second');
+    pairCycle.detail!.should.equal('first');
   });
 
-  it('should omit the instance when no instance mapper is configured', () => {
+  it('should mint a data-less fallback without data or instance mappers', () => {
     // Arrange
-    const { fallback } = new TransformerFixture();
-    const transformer = new ProblemTransformer({ fallback, fallbackData: () => ({ source: 'none' }) });
+    const { registry } = new TransformerFixture();
+    const fallback = registry.register({
+      id: 'upstream_failed',
+      title: 'Upstream Failed',
+      status: 502,
+      recoverable: true,
+      version: 'v1',
+    });
+    const transformer = new ProblemTransformer({ fallback });
 
     // Act
     const actual = transformer.fromError('failure');
 
     // Assert
-    actual.should.not.have.property('instance');
+    actual.should.eql({ type: fallback.type, title: 'Upstream Failed', status: 502, detail: 'failure' });
   });
 });
 
 describe('ProblemTransformer.fromHttpError', () => {
-  it('should keep direct and nested Problem bodies with the transport status', async () => {
+  it('should keep direct and nested Problem bodies with the transport error status', async () => {
     // Arrange
     const { mapped, transformer } = new TransformerFixture();
 
@@ -140,11 +198,38 @@ describe('ProblemTransformer.fromHttpError', () => {
     nested.should.eql({ ...mapped, status: 502 });
   });
 
-  it('should map JSON, text, and empty bodies through the fallback', async () => {
+  it('should keep a data-less RFC 9457 body instead of replacing it with the fallback', async () => {
+    // Arrange
+    const { transformer } = new TransformerFixture();
+    const body = { type: 'https://errors.example/docs/a/b/c/d/v1/unauthorized', title: 'Unauthorized', status: 403 };
+
+    // Act
+    const actual = await transformer.fromHttpError(
+      new Response(JSON.stringify({ ...body, detail: 'no access', extra: 'leak' }), { status: 403 }),
+    );
+
+    // Assert
+    actual.should.eql({ ...body, detail: 'no access' });
+  });
+
+  it('should keep the body or entry status when the transport status is not an error status', async () => {
+    // Arrange
+    const { fallback, mapped, transformer } = new TransformerFixture();
+
+    // Act
+    const found = await transformer.fromHttpError(new Response(JSON.stringify(mapped), { status: 200 }));
+    const minted = await transformer.fromHttpError(new Response('redirected', { status: 302 }));
+
+    // Assert
+    found.status.should.equal(500);
+    minted.status.should.equal(fallback.status);
+  });
+
+  it('should map JSON, text, and empty bodies through the fallback with the configured instance only', async () => {
     // Arrange
     const { transformer } = new TransformerFixture();
     const located = new Response(JSON.stringify({ message: 'remote message' }), { status: 409 });
-    Object.defineProperty(located, 'url', { value: 'https://api.example/notes/42' });
+    Object.defineProperty(located, 'url', { value: 'https://api.internal/notes/42?token=secret' });
 
     // Act
     const json = await transformer.fromHttpError(located);
@@ -154,10 +239,9 @@ describe('ProblemTransformer.fromHttpError', () => {
 
     // Assert
     json.detail!.should.equal('remote message');
-    json.instance!.should.equal('https://api.example/notes/42');
+    json.instance!.should.equal('/operation/42');
     json.status.should.equal(409);
     text.detail!.should.equal('plain response');
-    text.instance!.should.equal('/operation/42');
     empty.detail!.should.equal('Gateway Timeout');
     blank.detail!.should.equal('HTTP request failed');
   });

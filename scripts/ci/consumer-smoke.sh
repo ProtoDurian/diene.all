@@ -45,7 +45,7 @@ import { ProblemTestHelper } from '${name}/test-helper';
 const registry = new GenericProblemCatalog().createGenericProblemRegistry(${portal});
 if (registry.require('entity_not_found').type !== '${uri}') throw new Error('ESM import built the wrong type URI');
 const helper = new ProblemTestHelper();
-helper.expectProblem(helper.buildProblemFromRegistry(registry, 'unauthorized', { data: {} })).toBe(registry.require('unauthorized'));
+helper.expectProblem(helper.buildProblemFromRegistry(registry, 'unauthorized', {})).toBe(registry.require('unauthorized'));
 JS
 cat >"${work}/cjs.cjs" <<JS
 const { GenericProblemCatalog } = require('${name}');
@@ -53,7 +53,7 @@ const { ProblemTestHelper } = require('${name}/test-helper');
 const registry = new GenericProblemCatalog().createGenericProblemRegistry(${portal});
 if (registry.require('entity_not_found').type !== '${uri}') throw new Error('CJS require built the wrong type URI');
 const helper = new ProblemTestHelper();
-helper.expectProblem(helper.buildProblemFromRegistry(registry, 'unauthorized', { data: {} })).toBe(registry.require('unauthorized'));
+helper.expectProblem(helper.buildProblemFromRegistry(registry, 'unauthorized', {})).toBe(registry.require('unauthorized'));
 JS
 for ext in mts cts; do
   cat >"${work}/types.${ext}" <<TS

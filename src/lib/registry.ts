@@ -1,6 +1,15 @@
 import { Err, Ok, type Result } from '@atomicloud/diene.result';
-import type { z } from 'zod';
-import type { ErrorPortalConfig, Problem, ProblemDefinition, ProblemInit, RegisteredProblem } from './types.js';
+import { ProblemSchemaRenderer } from './publish.js';
+import type {
+  ErrorPortalConfig,
+  Problem,
+  ProblemDataInputOf,
+  ProblemDataOf,
+  ProblemDataSchema,
+  ProblemDefinition,
+  ProblemInit,
+  RegisteredProblem,
+} from './types.js';
 import { ProblemTypeUriBuilder } from './uri.js';
 
 export class ProblemRegistryError extends Error {
@@ -19,14 +28,14 @@ export class ProblemStatusPolicy {
   constructor() {}
 
   isStatus(value: unknown): value is number {
-    return Number.isInteger(value) && (value as number) >= 100 && (value as number) <= 599;
+    return Number.isInteger(value) && (value as number) >= 400 && (value as number) <= 599;
   }
 
   assertStatus(value: number, subject: string): void {
     if (!this.isStatus(value)) {
       throw new ProblemRegistryError(
         'invalid',
-        `${subject} must be an integer from 100 through 599; received ${value}`,
+        `${subject} must be an integer from 400 through 599; received ${value}`,
       );
     }
   }
@@ -35,21 +44,23 @@ export class ProblemStatusPolicy {
 export class ProblemFactory {
   constructor(private readonly statuses: ProblemStatusPolicy = new ProblemStatusPolicy()) {}
 
-  createProblem<TSchema extends z.ZodType>(
+  createProblem<TSchema extends ProblemDataSchema>(
     definition: RegisteredProblem<TSchema>,
-    init: ProblemInit<z.input<TSchema>>,
-  ): Problem<z.output<TSchema>> {
-    const data = definition.dataSchema.parse(init.data);
+    init: ProblemInit<ProblemDataInputOf<TSchema>>,
+  ): Problem<ProblemDataOf<TSchema>> {
     const status = init.status ?? definition.status;
     this.statuses.assertStatus(status, 'Problem status override');
+    if (definition.dataSchema === undefined && init.data !== undefined) {
+      throw new ProblemRegistryError('invalid', `Problem ${definition.id} carries no data`);
+    }
     return {
       type: definition.type,
       title: definition.title,
       status,
       ...(init.detail === undefined ? {} : { detail: init.detail }),
       ...(init.instance === undefined ? {} : { instance: init.instance }),
-      data,
-    };
+      ...(definition.dataSchema === undefined ? {} : { data: definition.dataSchema.parse(init.data) }),
+    } as Problem<ProblemDataOf<TSchema>>;
   }
 }
 
@@ -61,11 +72,14 @@ export class ProblemRegistry {
     portal: ErrorPortalConfig,
     private readonly uris: ProblemTypeUriBuilder = new ProblemTypeUriBuilder(),
     private readonly statuses: ProblemStatusPolicy = new ProblemStatusPolicy(),
+    private readonly schemas: ProblemSchemaRenderer = new ProblemSchemaRenderer(),
   ) {
     this.portal = Object.freeze({ ...portal });
   }
 
-  register<TSchema extends z.ZodType>(definition: ProblemDefinition<TSchema>): RegisteredProblem<TSchema> {
+  register<TSchema extends ProblemDataSchema = undefined>(
+    definition: ProblemDefinition<TSchema>,
+  ): RegisteredProblem<TSchema> {
     const key = this.key(definition.id, definition.version);
     if (this.#entries.has(key)) {
       throw new ProblemRegistryError(
@@ -78,7 +92,7 @@ export class ProblemRegistry {
     return registered;
   }
 
-  tryRegister<TSchema extends z.ZodType>(
+  tryRegister<TSchema extends ProblemDataSchema = undefined>(
     definition: ProblemDefinition<TSchema>,
   ): Result<RegisteredProblem<TSchema>, ProblemRegistryError> {
     try {
@@ -110,12 +124,13 @@ export class ProblemRegistry {
   }
 
   list(): readonly RegisteredProblem[] {
-    return [...this.#entries.values()].sort((left, right) =>
-      left.version === right.version ? left.id.localeCompare(right.id) : left.version.localeCompare(right.version),
+    return [...this.#entries.values()].sort(
+      (left, right) =>
+        left.version.localeCompare(right.version, 'en', { numeric: true }) || left.id.localeCompare(right.id),
     );
   }
 
-  private bind<TSchema extends z.ZodType>(definition: ProblemDefinition<TSchema>): RegisteredProblem<TSchema> {
+  private bind<TSchema extends ProblemDataSchema>(definition: ProblemDefinition<TSchema>): RegisteredProblem<TSchema> {
     this.statuses.assertStatus(definition.status, 'Problem status');
     if (definition.title.trim() === '') {
       throw new ProblemRegistryError('invalid', 'Problem title must not be empty');
@@ -125,6 +140,7 @@ export class ProblemRegistry {
       return Object.freeze({
         ...definition,
         type: this.uris.buildProblemTypeUri(this.portal, definition.version, definition.id),
+        schema: this.schemas.problemDataJsonSchema(definition),
       });
     } catch (error: unknown) {
       throw new ProblemRegistryError('invalid', `Invalid problem definition ${definition.id}`, { cause: error });

@@ -1,19 +1,22 @@
 import { stableConfig } from '@atomicloud/diene.core-utils';
 import { z } from 'zod';
 import type { ProblemRegistry } from './registry.js';
-import type { JsonSchema, ProblemManifest, ProblemManifestEntry, RegisteredProblem } from './types.js';
+import type { JsonSchema, ProblemDefinition, ProblemManifest, ProblemManifestEntry } from './types.js';
 
 export class ProblemSchemaRenderer {
   // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
   constructor() {}
 
-  problemDataJsonSchema(problem: RegisteredProblem): JsonSchema {
-    return stableConfig(z.toJSONSchema(problem.dataSchema, { target: 'draft-7' })) as JsonSchema;
+  problemDataJsonSchema(problem: ProblemDefinition): JsonSchema {
+    // A problem without data renders as `not: {}`: any present `data` member is invalid.
+    const schema = problem.dataSchema ?? z.never();
+    return stableConfig(z.toJSONSchema(schema, { target: 'draft-7' })) as JsonSchema;
   }
 }
 
 export class ProblemManifestEmitter {
-  constructor(private readonly schemas: ProblemSchemaRenderer = new ProblemSchemaRenderer()) {}
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor() {}
 
   emitProblemManifest(registry: ProblemRegistry): ProblemManifest {
     const problems: ProblemManifestEntry[] = registry.list().map(problem => ({
@@ -23,7 +26,7 @@ export class ProblemManifestEmitter {
       status: problem.status,
       recoverable: problem.recoverable,
       version: problem.version,
-      data: this.schemas.problemDataJsonSchema(problem),
+      data: problem.schema,
     }));
     const schemas = Object.fromEntries(problems.map(problem => [problem.type, problem.data]));
     return {

@@ -30,7 +30,7 @@ const resource: ProblemResource = new ProblemResourceEmitter().emitProblemResour
   version: 'v1',
 });
 const helper = new ProblemTestHelper();
-const problem: Problem = helper.buildProblemFromRegistry(registry, 'unauthorized', { data: {} });
+const problem: Problem = helper.buildProblemFromRegistry(registry, 'unauthorized', {});
 const expectation: ProblemExpectation = helper.expectProblem(problem);
 expectation.toBe(registry.require('unauthorized'));
 

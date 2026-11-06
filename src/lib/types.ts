@@ -11,38 +11,58 @@ export interface ErrorPortalConfig {
   readonly module: string;
 }
 
-export interface ProblemDefinition<TSchema extends z.ZodType = z.ZodType> {
+export type ProblemDataSchema = z.ZodType | undefined;
+
+export type ProblemDataOf<TSchema extends ProblemDataSchema> = TSchema extends z.ZodType
+  ? z.output<TSchema>
+  : undefined;
+
+export type ProblemDataInputOf<TSchema extends ProblemDataSchema> = TSchema extends z.ZodType
+  ? z.input<TSchema>
+  : undefined;
+
+export interface ProblemDefinition<TSchema extends ProblemDataSchema = ProblemDataSchema> {
   readonly id: string;
   readonly title: string;
   readonly status: number;
   readonly recoverable: boolean;
   readonly version: string;
-  readonly dataSchema: TSchema;
+  readonly dataSchema?: TSchema;
 }
 
-export interface RegisteredProblem<TSchema extends z.ZodType = z.ZodType> extends ProblemDefinition<TSchema> {
+export interface RegisteredProblem<
+  TSchema extends ProblemDataSchema = ProblemDataSchema,
+> extends ProblemDefinition<TSchema> {
   readonly type: string;
+  readonly schema: JsonSchema;
 }
 
-export type ProblemData<TDefinition extends ProblemDefinition> = z.output<TDefinition['dataSchema']>;
+export type ProblemData<TDefinition extends ProblemDefinition> =
+  TDefinition extends ProblemDefinition<infer TSchema> ? ProblemDataOf<TSchema> : never;
 
-export interface Problem<TData = unknown> {
+export type ProblemDataMember<TData> = unknown extends TData
+  ? { readonly data?: unknown }
+  : [TData] extends [undefined]
+    ? { readonly data?: undefined }
+    : { readonly data: TData };
+
+interface ProblemEnvelope {
   readonly type: string;
   readonly title: string;
   readonly status: number;
   readonly detail?: string;
   readonly instance?: string;
-  readonly data: TData;
 }
+
+export type Problem<TData = unknown> = ProblemEnvelope & ProblemDataMember<TData>;
 
 export type ProblemDetail<TData = unknown> = Problem<TData>;
 
-export interface ProblemInit<TData> {
+export type ProblemInit<TData = unknown> = {
   readonly detail?: string;
   readonly instance?: string;
   readonly status?: number;
-  readonly data: TData;
-}
+} & ProblemDataMember<TData>;
 
 export interface ProblemEndpoint {
   readonly method: string;

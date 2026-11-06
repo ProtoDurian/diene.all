@@ -1,7 +1,6 @@
-import { slugify } from '@atomicloud/diene.core-utils';
 import { z } from 'zod';
 import { ProblemSchemaRenderer } from './publish.js';
-import { ProblemRegistry, ProblemRegistryError } from './registry.js';
+import { ProblemRegistry, ProblemRegistryError, ProblemStatusPolicy } from './registry.js';
 import type {
   ErrorPortalConfig,
   ProblemCatalogDeclaration,
@@ -13,17 +12,28 @@ import type {
 } from './types.js';
 import { ProblemTypeUriBuilder } from './uri.js';
 
-const GENERIC_VERSION = 'v1';
-const ENDPOINT_METHOD_PATTERN = /^[A-Z]+$/;
+const HTTP_METHODS: readonly string[] = Object.freeze([
+  'GET',
+  'HEAD',
+  'POST',
+  'PUT',
+  'PATCH',
+  'DELETE',
+  'OPTIONS',
+  'TRACE',
+  'CONNECT',
+]);
+const DNS_LABEL_PATTERN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+const DNS_LABEL_MAX = 63;
+const RESOURCE_NAME_MAX = 253;
+const RESOURCE_VERSION_PATTERN = /^v[1-9][0-9]*$/;
 const ENTITY_REFERENCE_SCHEMA = z.object({ entityType: z.string(), id: z.string() }).strict();
-const NO_DATA_SCHEMA = z.object({}).strict();
 
 export const ValidationError = Object.freeze({
   id: 'validation_error',
   title: 'Validation Error',
   status: 400,
   recoverable: true,
-  version: GENERIC_VERSION,
   dataSchema: z
     .object({
       issues: z.array(
@@ -44,7 +54,6 @@ export const EntityNotFound = Object.freeze({
   title: 'Entity Not Found',
   status: 404,
   recoverable: false,
-  version: GENERIC_VERSION,
   dataSchema: ENTITY_REFERENCE_SCHEMA,
 });
 
@@ -53,7 +62,6 @@ export const Conflict = Object.freeze({
   title: 'Conflict',
   status: 409,
   recoverable: true,
-  version: GENERIC_VERSION,
   dataSchema: ENTITY_REFERENCE_SCHEMA,
 });
 
@@ -62,8 +70,6 @@ export const Unauthenticated = Object.freeze({
   title: 'Unauthenticated',
   status: 401,
   recoverable: true,
-  version: GENERIC_VERSION,
-  dataSchema: NO_DATA_SCHEMA,
 });
 
 export const Unauthorized = Object.freeze({
@@ -71,8 +77,6 @@ export const Unauthorized = Object.freeze({
   title: 'Unauthorized',
   status: 403,
   recoverable: false,
-  version: GENERIC_VERSION,
-  dataSchema: NO_DATA_SCHEMA,
 });
 
 export const InvalidJson = Object.freeze({
@@ -80,28 +84,29 @@ export const InvalidJson = Object.freeze({
   title: 'Invalid JSON',
   status: 400,
   recoverable: true,
-  version: GENERIC_VERSION,
-  dataSchema: NO_DATA_SCHEMA,
 });
 
 export class GenericProblemCatalog {
-  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
-  constructor() {}
+  constructor(
+    private readonly uris: ProblemTypeUriBuilder = new ProblemTypeUriBuilder(),
+    private readonly statuses: ProblemStatusPolicy = new ProblemStatusPolicy(),
+    private readonly schemas: ProblemSchemaRenderer = new ProblemSchemaRenderer(),
+  ) {}
 
-  registerGenericProblems(registry: ProblemRegistry) {
+  registerGenericProblems(registry: ProblemRegistry, version = 'v1') {
     return Object.freeze({
-      ValidationError: registry.register(ValidationError),
-      EntityNotFound: registry.register(EntityNotFound),
-      Conflict: registry.register(Conflict),
-      Unauthenticated: registry.register(Unauthenticated),
-      Unauthorized: registry.register(Unauthorized),
-      InvalidJson: registry.register(InvalidJson),
+      ValidationError: registry.register({ ...ValidationError, version }),
+      EntityNotFound: registry.register({ ...EntityNotFound, version }),
+      Conflict: registry.register({ ...Conflict, version }),
+      Unauthenticated: registry.register({ ...Unauthenticated, version }),
+      Unauthorized: registry.register({ ...Unauthorized, version }),
+      InvalidJson: registry.register({ ...InvalidJson, version }),
     });
   }
 
-  createGenericProblemRegistry(portal: ErrorPortalConfig): ProblemRegistry {
-    const registry = new ProblemRegistry(portal);
-    this.registerGenericProblems(registry);
+  createGenericProblemRegistry(portal: ErrorPortalConfig, version = 'v1'): ProblemRegistry {
+    const registry = new ProblemRegistry(portal, this.uris, this.statuses, this.schemas);
+    this.registerGenericProblems(registry, version);
     return registry;
   }
 }
@@ -109,10 +114,7 @@ export class GenericProblemCatalog {
 export class ProblemCatalog {
   readonly #entries = new Map<string, ProblemCatalogEntry>();
 
-  constructor(
-    readonly registry: ProblemRegistry,
-    private readonly schemas: ProblemSchemaRenderer = new ProblemSchemaRenderer(),
-  ) {}
+  constructor(readonly registry: ProblemRegistry) {}
 
   declare(problem: RegisteredProblem, declaration: ProblemCatalogDeclaration): ProblemCatalogEntry {
     const registered = this.registry.get(problem.id, problem.version);
@@ -130,8 +132,8 @@ export class ProblemCatalog {
       status: registered.status,
       recoverable: registered.recoverable,
       version: registered.version,
-      data: this.schemas.problemDataJsonSchema(registered),
-      endpoints: declaration.endpoints.map(endpoint => this.validateEndpoint(endpoint)),
+      data: registered.schema,
+      endpoints: this.validateEndpoints(declaration.endpoints),
     });
     this.#entries.set(entry.id, entry);
     return entry;
@@ -141,14 +143,22 @@ export class ProblemCatalog {
     return [...this.#entries.values()].sort((left, right) => left.id.localeCompare(right.id));
   }
 
-  private validateEndpoint(endpoint: ProblemEndpoint): ProblemEndpoint {
-    if (!ENDPOINT_METHOD_PATTERN.test(endpoint.method)) {
-      throw new RangeError(`Problem endpoint method must be uppercase; received ${endpoint.method}`);
-    }
-    if (!endpoint.path.startsWith('/')) {
-      throw new RangeError(`Problem endpoint path must start with '/'; received ${endpoint.path}`);
-    }
-    return Object.freeze({ method: endpoint.method, path: endpoint.path });
+  private validateEndpoints(endpoints: readonly ProblemEndpoint[]): readonly ProblemEndpoint[] {
+    const seen = new Set<string>();
+    return endpoints.map(({ method, path }) => {
+      if (!HTTP_METHODS.includes(method)) {
+        throw new RangeError(`Problem endpoint method must be an uppercase HTTP method; received ${method}`);
+      }
+      if (!path.startsWith('/')) {
+        throw new RangeError(`Problem endpoint path must start with '/'; received ${path}`);
+      }
+      const key = `${method} ${path}`;
+      if (seen.has(key)) {
+        throw new RangeError(`Problem endpoint ${key} is declared twice`);
+      }
+      seen.add(key);
+      return Object.freeze({ method, path });
+    });
   }
 }
 
@@ -156,32 +166,36 @@ export class ProblemResourceEmitter {
   constructor(private readonly uris: ProblemTypeUriBuilder = new ProblemTypeUriBuilder()) {}
 
   emitProblemResource(catalog: ProblemCatalog, identity: ProblemResourceIdentity): ProblemResource {
+    const { platform, service, module, landscape, version } = identity;
+    for (const [field, value] of Object.entries({ platform, service, module, landscape })) {
+      if (value.length > DNS_LABEL_MAX || !DNS_LABEL_PATTERN.test(value)) {
+        throw new RangeError(`Problem resource ${field} must be a DNS-1123 label; received ${JSON.stringify(value)}`);
+      }
+    }
+    if (!RESOURCE_VERSION_PATTERN.test(version)) {
+      throw new RangeError(`Problem resource version must match ${RESOURCE_VERSION_PATTERN}; received ${version}`);
+    }
+    const name = [service, module, landscape, version].join('.');
+    if (name.length > RESOURCE_NAME_MAX) {
+      throw new RangeError(`Problem resource name must be at most ${RESOURCE_NAME_MAX} characters; received ${name}`);
+    }
+
     const entries = catalog.list();
     if (entries.length === 0) {
       throw new RangeError('Problem resource needs at least one declared catalog entry');
     }
-    const portal: ErrorPortalConfig = {
-      ...catalog.registry.portal,
-      platform: identity.platform,
-      service: identity.service,
-      module: identity.module,
-      landscape: identity.landscape,
-    };
+    const portal: ErrorPortalConfig = { ...catalog.registry.portal, platform, service, module, landscape };
     for (const entry of entries) {
-      const expected = this.uris.buildProblemTypeUri(portal, identity.version, entry.id);
+      const expected = this.uris.buildProblemTypeUri(portal, version, entry.id);
       if (entry.type !== expected) {
         throw new RangeError(`Problem ${entry.type} does not belong to the resource row ${expected}`);
       }
     }
 
-    const { platform, service, module, landscape, version } = identity;
     return {
       apiVersion: 'atomi.cloud/v1alpha1',
       kind: 'Problem',
-      metadata: {
-        name: [service, module, landscape, version].map(slugify).join('-'),
-        namespace: platform,
-      },
+      metadata: { name, namespace: platform },
       spec: {
         platform,
         service,
