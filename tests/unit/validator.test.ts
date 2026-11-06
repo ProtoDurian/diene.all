@@ -55,3 +55,40 @@ describe('ConfigValidator.validate', () => {
     error.message.should.containEql('; host: ');
   });
 });
+
+describe('ConfigValidationError instanceof', () => {
+  class NarrowerError extends ConfigValidationError {}
+  const brand = Symbol.for('AtomiCloud.Diene.Config.ConfigValidationError');
+  const lookalike = Object.defineProperty(new Error('copy'), brand, { value: true });
+
+  it.each([
+    { label: 'its own instance', value: new ConfigValidationError(['x']), expected: true },
+    { label: 'a branded copy from another build', value: lookalike, expected: true },
+    { label: 'a plain Error', value: new Error('x'), expected: false },
+    { label: 'null', value: null, expected: false },
+  ])('should report $expected for $label', ({ value, expected }) => {
+    // Arrange
+    const subject: unknown = value;
+
+    // Act
+    const actual = subject instanceof ConfigValidationError;
+
+    // Assert
+    actual.should.equal(expected);
+  });
+
+  it.each([
+    { label: 'a subclass instance', value: new NarrowerError(['x']), expected: true },
+    { label: 'a base instance', value: new ConfigValidationError(['x']), expected: false },
+    { label: 'a branded copy', value: lookalike, expected: false },
+  ])('should judge $label against a subclass', ({ value, expected }) => {
+    // Arrange
+    const subclass = NarrowerError;
+
+    // Act
+    const actual = value instanceof subclass;
+
+    // Assert
+    actual.should.equal(expected);
+  });
+});
