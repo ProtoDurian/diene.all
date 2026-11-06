@@ -1,0 +1,9 @@
+# Values in secrets/<env>.yaml are encrypted to these age recipients; key names stay readable.
+# The shipped recipient's private key exists nowhere. Run the sealed-secrets init script to
+# switch to your own key and re-seal the files.
+creation_rules:
+  - path_regex: (^|/)secrets/[^/]+\.yaml$
+    age: age190fu4m9lwd9lg7c5ajzh238q0q4kgj47wx6wp27xg0hxk5ftwguqave6uc
+stores:
+  yaml:
+    indent: 2
