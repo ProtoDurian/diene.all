@@ -112,17 +112,31 @@ All five raw values are also set as `atomi.landscape`, `atomi.platform`,
 
 ## Standard `OTEL_*` variables win
 
-The library sets an SDK option only when the matching standard variable is unset,
-so operators can override the block without a release.
+Init reads one variable record: the `environment` option, or `process.env` when it is
+omitted. The planner resolves every variable below into **explicit** SDK options, so the SDK
+never decides from `process.env` on its own and the library never writes to it.
 
 - `OTEL_SDK_DISABLED=true` makes init a no-op: no pipeline is built and seams are ignored.
 - `OTEL_LOGS_EXPORTER`, `OTEL_METRICS_EXPORTER`, `OTEL_TRACES_EXPORTER` (`console`, `otlp`,
   `none`) replace the block's exporter flags for that signal.
-- `OTEL_TRACES_SAMPLER` set: no programmatic sampler; the SDK reads it.
-- `OTEL_EXPORTER_OTLP_[SIGNAL_]ENDPOINT`, `_HEADERS`, `_TIMEOUT` set: the matching option
-  is left to the SDK.
-- `OTEL_METRIC_EXPORT_INTERVAL` / `OTEL_METRIC_EXPORT_TIMEOUT` (positive milliseconds)
-  replace `metrics.interval` and the OTLP timeout for the metric reader.
+- `OTEL_EXPORTER_OTLP_<SIGNAL>_ENDPOINT` is used as-is; `OTEL_EXPORTER_OTLP_ENDPOINT` gets
+  `/v1/<signal>` appended; otherwise the block endpoint, else `http://localhost:4318`.
+- `OTEL_EXPORTER_OTLP_[<SIGNAL>_]HEADERS` (percent-decoded, signal keys win) replace the block
+  headers; `..._TIMEOUT` (milliseconds) replaces the block timeout; `..._COMPRESSION` is
+  `gzip` or `none` (default).
+- `OTEL_TRACES_SAMPLER` (`always_on`, `always_off`, `traceidratio`, `parentbased_always_on`,
+  `parentbased_always_off`, `parentbased_traceidratio`) with `OTEL_TRACES_SAMPLER_ARG` (a ratio
+  in `[0, 1]`, default 1) replaces the block sampler; an unknown name keeps the block sampler.
+- `OTEL_METRIC_EXPORT_INTERVAL` / `OTEL_METRIC_EXPORT_TIMEOUT` (positive milliseconds) replace
+  `metrics.interval` and the reader timeout. The reader timeout is capped at the interval, so a
+  short interval such as `PT1S` is valid.
+- `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` (`cumulative` default, `delta`,
+  `lowmemory`) and `OTEL_BSP_SCHEDULE_DELAY`, `OTEL_BSP_MAX_QUEUE_SIZE`,
+  `OTEL_BSP_MAX_EXPORT_BATCH_SIZE`, `OTEL_BSP_EXPORT_TIMEOUT` (SDK defaults otherwise).
+
+One SDK limit remains: the OTLP exporters always merge header keys from `process.env` under
+the explicit headers. An injected key wins, but a key that only `process.env` sets is still
+sent.
 
 ---
 
@@ -154,13 +168,28 @@ your own `MetricExporterFactories`.
 `new OtelBootstrap().init(block, identity, options?)` returns one `OtelRuntime`:
 
 - `tracer`, `meter`, `logger` scoped to the service name and version;
+- `globalRegistered` (whether this runtime owns the global tracer provider);
 - `traceEmitter`, `metricsCollector`, `loggerSink` (the seam implementations);
 - `resource`, `resourceAttributes`, `active` (which signals built a pipeline);
 - `flush()` and `shutdown()`.
 
 Call init once and keep the runtime. The library registers **no** process signal
-handlers: your framework owns `SIGTERM` and calls `shutdown()`, which flushes every
-signal, shuts the providers down and throws one `AggregateError` naming every failure.
+handlers: your framework owns `SIGTERM` and calls `shutdown()`. Shutdown waits for every
+signal's flush, then shuts the providers down, then releases the globals this runtime
+registered. Every failure is kept: one `AggregateError` of `TelemetryLifecycleError`, each
+naming its `signal` (`logs`, `metrics`, `traces`), its `phase` (`flush`, `shutdown`) and the
+`cause`. `flush()` reports the same way. The log flush resolves only after pino's
+destination has drained.
+
+### Global registration
+
+When the trace pipeline is built, init registers its tracer provider as the global one,
+together with an async-local context manager and the W3C trace-context and baggage
+propagators, **only if** no tracer provider is registered yet (each slot is claimed only if it
+is free). `runtime.globalRegistered` says whether this runtime owns the global tracer. A host
+that registered its own provider first keeps it; the runtime still works through
+`runtime.tracer`. Shutdown removes only what this runtime registered. No meter provider is
+registered globally.
 
 When a signal has no selected exporter, its accessors are no-ops and no provider,
 exporter, reader, processor, timer or network client is created.
@@ -209,9 +238,9 @@ pino output even when its OTLP exporter is on.
 - **SIT** (`tests/sit`): real OTLP http/protobuf export of a span and a metric to a
   loopback receiver started by the test on `127.0.0.1`. The receiver decodes the
   protobuf body and checks `service.name`, `deployment.environment.name`, the `atomi.*`
-  attributes and the emitted span and metric. The block keeps port 4318; the test
-  points the exporters at the receiver through `OTEL_EXPORTER_OTLP_ENDPOINT`. The receiver
-  is test-only and never ships.
+  attributes and the emitted span and metric. The block keeps port 4318; the test passes
+  `OTEL_EXPORTER_OTLP_ENDPOINT` in the injected environment to reach the receiver. The
+  receiver is test-only and never ships.
 
 ### Test helper
 
@@ -219,7 +248,11 @@ pino output even when its OTLP exporter is on.
 
 - `InMemoryTraceEmitter`: records validated trace records and calls, with `failNext`.
 - `OtelAssertions`: `traceRecords`, `traceCalls`, `resourceAttributes`,
-  `identityResource` and `payload`, each throwing `OtelAssertionError` with both sides.
+  `identityResource` and `payload`, each throwing `OtelAssertionError` with both sides. A
+  value JSON cannot carry (`NaN`, `Infinity`, `undefined`, a function, symbol, bigint or
+  non-plain object) on either side fails with its path instead of comparing equal.
+- `TraceError` and `OtelAssertionError` match `instanceof` across the ESM and CJS builds;
+  subclasses keep the normal prototype check.
 - `OtelBlockFixtures`: `canonical()`, `disabled()`, `console()`, `otlp()` blocks.
 - `AppIdentityBuilder`: a valid identity, `with(...)` overrides and the mapped `attributes()`.
 - `OtelTestHarness`: `start(block?, identity?, environment?)` inits the runtime with the
