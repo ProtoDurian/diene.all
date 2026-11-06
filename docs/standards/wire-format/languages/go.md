@@ -101,7 +101,8 @@ type JobRes struct {
 }
 
 res := JobRes{Timeout: *duration.FromTimeDuration(2*time.Hour + 30*time.Minute)}
-// {"timeout":"PT2H30M"}; 26 hours writes "P1DT2H"
+// {"timeout":"PT2H30M"}; 26 hours writes "P1DT2H"; for 7 days or more see
+// the duration notes in the datetime doc
 ```
 
 ## Money / Decimal
@@ -155,7 +156,8 @@ type TaskReq struct {
 ## Missing Value
 
 Omit the field; never send `null`. A nil pointer, nil slice or nil map encodes
-as `null` unless the tag says otherwise.
+as `null` unless the tag says otherwise. `omitempty` also drops an empty list:
+when `[]` means something, drop the tag and initialize the slice.
 
 ```go
 type NoteRes struct {

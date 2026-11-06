@@ -40,7 +40,7 @@ A point on the global timeline. Normalize with `UTC()` whenever one crosses a
 boundary (storage, transport, logs).
 
 ```go
-occurredAt, err := time.Parse(time.RFC3339, "2024-03-15T14:30:00Z")
+occurredAt, err := time.Parse(time.RFC3339, "2024-03-15T14:30:00.000Z")
 if err != nil {
 	return fmt.Errorf("occurred at: %w", err)
 }
@@ -194,8 +194,10 @@ parsed.String()         // "P1DT2H"
 parsed.ToTimeDuration() // 26h0m0s
 ```
 
-`duration.Format` counts a day as 24 hours, and folds 7 days or more into weeks
-and months (`P1W1D`). For calendar spans longer than a few days, keep the
+`duration.Format` and `duration.FromTimeDuration` count a day as 24 hours, fold
+7 days into a week and 730 hours into a month: 31 days writes `"P1MT14H"`, which
+a reader takes as a calendar month. For spans of 7 days or more, build the value
+field by field (`duration.Duration{Days: 31}` writes `"P31D"`), and keep a
 parsed `*duration.Duration` instead of round-tripping it through
 `time.Duration`.
 

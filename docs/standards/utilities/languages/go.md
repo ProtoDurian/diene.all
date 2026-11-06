@@ -225,7 +225,7 @@ lo.CamelCase("order_id")                    // "orderId"
 lo.SnakeCase("InProgress")                  // "in_progress"
 lo.KebabCase("helloWorld")                  // "hello-world"
 lo.PascalCase("hello world")                // "HelloWorld"
-lo.Capitalize("hello world")                // "Hello world"
+lo.Capitalize("hello world")                // "Hello World"
 lo.Ellipsis("hello world this is long", 15) // "hello world..."
 ```
 
