@@ -1,6 +1,6 @@
 import { expectGreen, expectRed } from './lib/helpers.ts';
 
-const WIRING = 'nix develop .#ci -c ./scripts/validate/workflows.sh wiring';
+const WIRING = 'nix develop .#ci -c dlint ci-wiring';
 
 export default {
   contractVersion: 1,

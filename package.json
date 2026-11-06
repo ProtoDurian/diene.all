@@ -42,7 +42,6 @@
     "core-utils",
     "temporal",
     "result",
-    "filesystem",
     "concurrency",
     "esm",
     "cjs"

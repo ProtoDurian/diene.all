@@ -2,8 +2,16 @@ name: CI
 
 on:
   push:
+    branches-ignore:
+      - 'dependabot/**'
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   precommit:
@@ -13,8 +21,12 @@ jobs:
     uses: ./.github/workflows/⚡reusable-precommit.yaml
     secrets: inherit
 
-  # ### bun-base-ci
-  # #### source: bun-base
+  named-checks:
+    name: named-checks
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-named-checks.yaml
+    secrets: inherit
   unit:
     name: Unit Tests
     permissions:
@@ -33,8 +45,6 @@ jobs:
     with:
       mode: int
 
-  # ### bun-lib-meta-ci
-  # #### source: bun-lib
   meta:
     name: Meta Tests
     permissions:
@@ -51,8 +61,6 @@ jobs:
     uses: ./.github/workflows/⚡reusable-build.yaml
     secrets: inherit
 
-  # ### bun-lib-ci
-  # #### source: bun-lib
   package-validate:
     name: Package Validation
     permissions:
