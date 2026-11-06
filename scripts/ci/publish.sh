@@ -21,6 +21,14 @@ manifest_version="$(yq -r '.version' chart/Chart.yaml)"
 
 helm-docs --chart-search-root chart
 mkdir -p "${output_dir}"
+helm_repos="$(mktemp -d)"
+trap 'rm -rf "${helm_repos}"' EXIT
+export HELM_REPOSITORY_CONFIG="${helm_repos}/repositories.yaml" HELM_REPOSITORY_CACHE="${helm_repos}/cache"
+index=0
+while IFS= read -r url; do
+  index=$((index + 1))
+  helm repo add "chart-dep-${index}" "${url}" >/dev/null
+done < <(yq -r '[(.dependencies // [])[].repository // "" | select(test("^https?://"))] | unique | .[]' chart/Chart.yaml)
 helm dependency build chart
 helm package chart --destination "${output_dir}" --version "${version}"
 package="${output_dir}/xenon-${version}.tgz"

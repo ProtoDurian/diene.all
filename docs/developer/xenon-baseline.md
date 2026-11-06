@@ -61,4 +61,5 @@ have no floor.
 
 OCI is the default mode and git is secondary (inherited `scripts/ci/publish.sh`). The package is `xenon-<version>.tgz`.
 `task build` runs `helm dependency build` through `scripts/local/with-chart-repos.sh`, which registers
-the https repositories named in `chart/Chart.yaml` in a throwaway Helm repo config (metrics-server has no OCI chart).
+the https repositories named in `chart/Chart.yaml` in a throwaway Helm repo config (metrics-server has no OCI chart);
+`scripts/ci/publish.sh` does the same itself, so the publish checks call it bare, as CD does.
