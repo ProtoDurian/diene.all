@@ -20,7 +20,7 @@ jobs:
       - uses: AtomiCloud/actions.setup-nix@v3
       - uses: AtomiCloud/actions.cache-bun@v2
       - name: Validate the Nix CLI package
-        run: nix build .#bun-cli
+        run: nix build .#releaser
       - name: Compile, package, and publish all channels
         env:
           FURY_ENDPOINT: push.fury.io/atomicloud

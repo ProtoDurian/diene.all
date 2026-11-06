@@ -13,6 +13,7 @@ let
           ".claude/skills/vendor/**"
           "Changelog.md"
           "docs/developer/CommitConventions.md"
+          "tests/fixtures/golden/*.md"
           "*.ts"
           "*.tsx"
           "*.mts"

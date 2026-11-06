@@ -67,6 +67,32 @@ pre-commit-lib.run {
       language = "system";
     };
 
+    a-changelog-format = {
+      enable = true;
+      name = "Changelog formatter stability";
+      entry = "${pkgs.writeShellScript "changelog-format" ''
+        PATH=${
+          pkgs.lib.makeBinPath [
+            pkgs.prettier
+            pkgs.diffutils
+            pkgs.coreutils
+          ]
+        }:$PATH exec ./scripts/validate/cli-contracts.sh changelog-format
+      ''}";
+      files = "^(tests/fixtures/golden/.*-notes\\.md|scripts/validate/cli-contracts\\.sh)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-releaser-config = {
+      enable = true;
+      name = "Release config and conventions";
+      entry = "${packages.releaser}/bin/releaser conventions --check -c release.yaml";
+      files = "^(release\\.yaml|docs/developer/CommitConventions\\.md)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
     a-skills-sync = {
       enable = true;
       name = "Vendored skills";
