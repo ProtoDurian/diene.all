@@ -1,14 +1,14 @@
 # Sulfur baseline
 
 `sulfur` is the certificate engine: a pure passthrough of the vendored `jetstack/cert-manager` chart (v1.20.3) with its
-controller, cainjector and webhook. It is a materialized helm-wrapper instance (S30): an ordinary unit + integration
+controller, cainjector and webhook. It is a materialized helm-wrapper instance: an ordinary unit + integration
 testing pyramid, no `probes/`.
 
 ## What the chart renders
 
 - cert-manager with upstream defaults. The chart's own templates render nothing. They only run the service-tree and
   label guards.
-- The only overrides (R16 minimal):
+- The only overrides, kept minimal:
   - `nameOverride: cert-manager`, so objects are `sulfur-cert-manager*`;
   - `crds.enabled: true` and `crds.keep: true`;
   - `config.enableGatewayAPI: true`, for Gateway/HTTPRoute TLS (kgateway);
