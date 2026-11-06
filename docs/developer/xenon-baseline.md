@@ -1,7 +1,7 @@
 # Xenon baseline
 
 `xenon` is the Resource Metrics API (`v1beta1.metrics.k8s.io`) for HPA and `kubectl top`: a passthrough of the vendored
-`kubernetes-sigs/metrics-server` chart (3.14.0, app 0.9.0). It is a materialized helm-wrapper instance (S30) and an edge
+`kubernetes-sigs/metrics-server` chart (3.14.0, app 0.9.0). It is a materialized helm-wrapper instance and an edge
 chart: an ordinary unit + integration testing pyramid, no `probes/`.
 
 ## The toggle is the surface
@@ -27,7 +27,7 @@ an OFF stack renders nothing, so the chart installs on every landscape.
    `--kubelet-insecure-tls`, because the in-vcluster kubelet endpoint serves a self-signed certificate.
 3. `chart/values.canary.yaml`: the cluster overlay of the `canary-xenon` fixture cluster.
 
-The only upstream overrides (R16 minimal): `fullnameOverride: xenon-metrics`, LPSM `commonLabels` + `podLabels`, the
+The only upstream overrides (minimal delta): `fullnameOverride: xenon-metrics`, LPSM `commonLabels` + `podLabels`, the
 Reloader annotation on the Deployment, pod `runAsNonRoot`, and CPU/memory limits. Upstream keeps `serviceMonitor` and
 `metrics` off: xenon ships no observability objects. `commonLabels`/`podLabels` are literal values, and the chart refuses
 any drift from `labelPrefix` + `serviceTree`. Release namespace = `serviceTree.platform` = `metrics`.
