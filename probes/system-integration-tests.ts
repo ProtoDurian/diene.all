@@ -9,7 +9,8 @@ export default {
   probes: [
     {
       name: 'baseline-system-integration-tests-green',
-      description: 'The CI system-integration entrypoint builds the artifact and completes the tier on its own.',
+      description:
+        'The CI system-integration entrypoint builds the artifact and runs the sample Note/KV journey against Redis.',
       kind: 'baseline',
       async run(repo: any) {
         await expectGreen(repo, gate, 'system-integration-tests', gateTimeoutMs);
