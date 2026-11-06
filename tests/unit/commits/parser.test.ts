@@ -38,19 +38,22 @@ describe('commit parser', () => {
     }
   });
 
-  it.each(['Merge branch main', 'Revert "feat: x"', 'fixup! feat: x', 'amend! feat: x', 'squash! feat: x'])(
-    'should ignore %s',
-    message => {
-      // Arrange
-      const keywords: string[] = [];
+  it.each([
+    'Merge branch main',
+    'Revert "feat: x"',
+    'fixup! feat: x',
+    'amend! feat: x',
+    'squash! feat: x',
+  ])('should ignore %s', message => {
+    // Arrange
+    const keywords: string[] = [];
 
-      // Act
-      const actual = parseCommitMessage(message, keywords);
+    // Act
+    const actual = parseCommitMessage(message, keywords);
 
-      // Assert
-      expect(actual.kind).toBe('ignored');
-    },
-  );
+    // Assert
+    expect(actual.kind).toBe('ignored');
+  });
 
   it('should mark malformed headers', () => {
     // Arrange
