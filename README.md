@@ -52,7 +52,7 @@ This tree is the all-features workspace baseline inherited by every downstream s
 
 This branch materializes the Helm wrapper as `vanadium`: the fleet's controller-free ValidatingAdmissionPolicy set (one policy + binding per rule, `[Warn, Audit]` by default, `[Deny]` per landscape, namespace-label exemptions).
 
-- `task test:unit` — run schema, lint, render, LPSM, parity, rendered-manifest structure checks, per-policy conformance (the Q-G20 stage), audit/enforce, exemption, and publish dry-runs.
+- `task test:unit` — run schema, lint, render, LPSM, parity, rendered-manifest structure checks, per-policy conformance, audit/enforce, exemption, and publish dry-runs.
 - `task test:int` — install on ephemeral k3d, prove warn + metrics, deny and exemption, and round-trip the chart through a local OCI registry.
 - `task example:lapras:template` — render the independent landscape + cluster stack.
 - [Vanadium baseline](docs/developer/vanadium-baseline.md)

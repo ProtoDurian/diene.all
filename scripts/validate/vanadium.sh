@@ -177,7 +177,7 @@ parity)
   rg -q '^## Workload escape hatch$' "${doc}" || { echo "❌ workload-level escape hatch is not documented" >&2 && exit 1; }
   ;;
 rendered-manifests)
-  # Structural checks on the render, which holds only VAPs and bindings; the Q-G20 stage is `conformance`.
+  # Structural checks on the render, which holds only VAPs and bindings; per-policy checks live in `conformance`.
   index=0
   for stack in "${stacks[@]}"; do
     index=$((index + 1))
@@ -194,7 +194,7 @@ rendered-manifests)
   done
   ;;
 conformance)
-  # The Q-G20 stage: helm template -> kubeconform -> kyverno apply of the VAP definitions on the fixtures.
+  # Per-policy conformance: helm template -> kubeconform -> kyverno apply of the VAP definitions on the fixtures.
   render "${stacks[0]}" >"${tmp}/rendered.yaml"
   definitions "${tmp}/rendered.yaml" "${tmp}/defs.yaml"
   mapfile -t all < <(find "${fixtures}" -name '*.yaml' | LC_ALL=C sort)

@@ -138,7 +138,7 @@ dashboards are not this chart's to prove. trivy-operator stays dropped and is no
 
 - `task test:unit` (`scripts/ci/vanadium.sh`): schema, lint, render, LPSM labels, names, parity,
   structural checks on the render, per-policy conformance over `tests/vap/`, audit/enforce, the
-  exemption pair, and the publish dry-runs. `conformance` is the Q-G20 stage for this chart:
+  exemption pair, and the publish dry-runs. `conformance` is the per-policy stage:
   helm template → kubeconform → `kyverno apply` of the rendered VAP definitions on the fixtures.
 - `task test:int` (`scripts/ci/vanadium-k3d.sh`): k3d install, Warn + metric (good fixtures draw
   no warning), Deny (good fixtures and a Job created from the good CronJob admitted), exempt
