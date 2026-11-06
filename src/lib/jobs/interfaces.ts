@@ -1,11 +1,9 @@
 import type { Job, NewJob } from './structures';
 
-/** Tenant-scoped: inserts into the current tenant's queue. */
 export interface IJobQueue {
   enqueue(job: NewJob, status: 'queued' | 'held'): Promise<Job>;
 }
 
-/** Cross-tenant: claims and settles jobs for the runner. */
 export interface IJobStore {
   claim(limit: number, leaseSeconds: number): Promise<readonly Job[]>;
   complete(id: string): Promise<void>;

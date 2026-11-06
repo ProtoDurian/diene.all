@@ -13,7 +13,6 @@
     {
       "binding": "HYPERDRIVE",
       "id": "00000000000000000000000000000000",
-      // Local dev only: the compose.dev.yaml Postgres; wrangler dev never reads the remote id.
       "localConnectionString": "postgres://aseity:aseity@127.0.0.1:5432/aseity"
     }
   ],

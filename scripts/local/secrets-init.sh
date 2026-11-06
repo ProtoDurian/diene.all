@@ -17,10 +17,7 @@ recipient="$(age-keygen -y "${key_file}")"
 echo "📝 Sealing secrets/ to ${recipient}..."
 RECIPIENT="${recipient}" yq -i '.creation_rules[0].age = strenv(RECIPIENT)' .sops.yaml
 
-# A file this key can already open is re-encrypted with its values kept. A file sealed to someone
-# else's key (the shipped template) cannot be opened, so it is re-sealed with fresh random values
-# under the same key names; replace them with `sops edit <file>`. Plain values only ever go
-# through a pipe, never to disk.
+# Plain values only ever go through a pipe, never to disk.
 for file in secrets/*.yaml; do
   if SOPS_AGE_KEY_FILE="${key_file}" sops decrypt "${file}" >/dev/null 2>&1; then
     SOPS_AGE_KEY_FILE="${key_file}" sops updatekeys --yes "${file}"

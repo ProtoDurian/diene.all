@@ -16,9 +16,6 @@ terraform {
     }
   }
 
-  # State lives in a private Tigris bucket created once by hand. The bucket name comes from
-  # `-backend-config=bucket=<name>` and credentials from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
-  # at init time, so nothing about the backend's access is stored here.
   backend "s3" {
     key                         = "aseity/terraform.tfstate"
     region                      = "auto"

@@ -25,7 +25,6 @@ export interface MailMessage {
   readonly html?: string;
 }
 
-// Same shape as the app Mailer, so the app mailer (and a fork's sink) plugs in directly.
 export interface IMailSender {
   send(message: MailMessage): Promise<void>;
 }

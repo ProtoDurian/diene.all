@@ -27,7 +27,6 @@ const LIST_NOTES_TOOL = {
   inputSchema: { type: 'object', properties: {}, additionalProperties: false },
 };
 
-// A minimal stateless MCP server (JSON-RPC over streamable HTTP, JSON responses only).
 export class McpServer {
   constructor(private readonly notes: IMcpNotesReader) {}
 

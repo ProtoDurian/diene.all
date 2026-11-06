@@ -3,7 +3,6 @@ import type { BucketForker } from '../../lib/fork/interfaces';
 import type { ForkError } from '../../lib/fork/structures';
 import type { S3ForkBuckets } from './s3-fork-buckets';
 
-// Tigris forks copy-on-write when CreateBucket names a source; the source bucket needs snapshots enabled.
 const FORK_SOURCE_HEADER = 'X-Tigris-Fork-Source-Bucket';
 
 export class TigrisBucketForker implements BucketForker {

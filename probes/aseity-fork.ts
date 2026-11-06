@@ -9,7 +9,6 @@ type ProbeRepo = {
 
 const command =
   "nix develop .#ci -c bash -lc 'bun install --frozen-lockfile && bun test --timeout 120000 ./tests/e2e/fork/fork-cli.test.ts 2>&1'";
-// The sanitize step that signs everyone out of the fork.
 const SIGN_OUT = `const sessionsDeleted = await this.count(client, 'DELETE FROM "session"');`;
 const SANITIZE_SCENARIO = '(fail) aseity fork (CLI, Postgres + MinIO) > should fork a copy that is signed out';
 

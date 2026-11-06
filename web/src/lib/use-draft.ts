@@ -20,9 +20,7 @@ export function useDraft<T extends object>(key: string, initial: T) {
         const next = { ...previous, ...patch };
         try {
           localStorage.setItem(PREFIX + key, JSON.stringify(next));
-        } catch {
-          // Storage can be full or blocked; the draft then lives in memory only.
-        }
+        } catch {}
         return next;
       });
     },
@@ -32,9 +30,7 @@ export function useDraft<T extends object>(key: string, initial: T) {
   const clear = useCallback(() => {
     try {
       localStorage.removeItem(PREFIX + key);
-    } catch {
-      // Nothing stored to clear.
-    }
+    } catch {}
     setValue(initial);
   }, [key, initial]);
 

@@ -12,7 +12,6 @@ export class FileStoreError extends Error {
   }
 }
 
-/** S3-compatible store over path-style URLs (Tigris in production, MinIO locally). */
 export class S3FileStore implements IFileStore {
   private readonly client: AwsClient;
 

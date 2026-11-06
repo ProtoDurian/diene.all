@@ -5,7 +5,6 @@ import type { StorageSettings } from './structures';
 export class FileKeyPolicy {
   constructor(private readonly root = 'tenants') {}
 
-  /** Every object key starts with its tenant, so a bucket copy or purge can work per tenant. */
   noteAttachment(tenantId: string, noteId: string): string {
     return `${this.root}/${tenantId}/notes/${noteId}/attachment`;
   }

@@ -10,7 +10,6 @@ echo "📦 Installing dependencies..."
 bun install --frozen-lockfile
 echo "✅ Dependencies installed"
 
-# skills-sync reads node_modules, so it runs after the install.
 skills-sync sync
 
 echo "✅ setup completed"

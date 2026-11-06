@@ -13,7 +13,6 @@ type TenantRow = {
 const COLUMNS = 'id, slug, status, created_at, approved_at';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// tenants forces row-level security; approval reads and writes run as the system role.
 export class PgTenantRepository implements ITenantRepository {
   constructor(private readonly db: IDatabase) {}
 

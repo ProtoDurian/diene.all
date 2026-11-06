@@ -5,7 +5,6 @@ import type { MailMessage, MailSettings } from '../../lib/mail/structures';
 import { HttpMailer } from './http-mailer';
 import type { SinkMailer } from './sink-mailer';
 
-/** Picks the transport per message from the fork marker, so a fork can never send real mail. */
 export class PolicyMailer implements Mailer {
   constructor(
     private readonly policy: MailPolicy,

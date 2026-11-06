@@ -13,7 +13,6 @@ tigris_endpoint="$(awk -F '"' '/^tigris_endpoint[[:space:]]*=/ { print $2 }' "${
   echo "❌ ${tfvars} must set worker_name, app_hostname, bucket_name and tigris_endpoint" >&2 && exit 1
 sealed_keys="$(yq -o=json '[del(.sops) | keys | .[]]' secrets/production.yaml)"
 
-# The dry run bundles the Worker and needs the assets directory to exist, built or not.
 assets_dir="$(bun -e 'process.stdout.write(Bun.JSONC.parse(await Bun.file("wrangler.jsonc").text()).assets?.directory ?? "")')"
 [ -n "${assets_dir}" ] && mkdir -p "${assets_dir}"
 out_dir="$(mktemp -d)"

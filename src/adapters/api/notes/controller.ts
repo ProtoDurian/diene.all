@@ -37,7 +37,6 @@ export class NotesController implements RouteModule {
 
   register(app: Hono<AppEnv>): void {
     const { transaction, problems } = this.deps;
-    // Hono context variables are invariant; the gate only sets `identity`, which AppEnv declares.
     const gate = this.deps.gate as unknown as MiddlewareHandler<AppEnv>;
     app.use('/api/notes', gate, transaction.handler);
     app.use('/api/notes/*', gate, transaction.handler);

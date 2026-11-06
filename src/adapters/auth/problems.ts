@@ -114,7 +114,6 @@ export class AuthProblems {
     return response;
   }
 
-  // The app registry is shared, so an id another module registered first is reused, not duplicated.
   private ensure<TSchema extends z.ZodType>(
     registry: ProblemRegistry,
     definition: ProblemDefinition<TSchema>,

@@ -17,7 +17,6 @@ const MailMessageSchema = z.object({
 export class MailPolicy {
   constructor(private readonly jobKind = MAIL_JOB_KIND) {}
 
-  /** A fork always sinks mail, whatever key it copied. */
   transport(settings: MailSettings, isFork: boolean): MailTransport {
     return isFork || settings.apiKey === undefined ? 'sink' : 'http';
   }

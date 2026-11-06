@@ -9,7 +9,6 @@ type ProbeRepo = {
 
 const command =
   "nix develop .#ci -c bash -lc 'bun install --frozen-lockfile && bun test --timeout 120000 ./tests/e2e/admin/admin-cli.test.ts 2>&1'";
-// The role name the tenant-approval check looks for.
 const ADMIN_ROLE = "const ADMIN = 'admin';";
 const GRANT_SCENARIO = '(fail) aseity admin grant (CLI, Postgres) > should make the first signed-up user an admin';
 

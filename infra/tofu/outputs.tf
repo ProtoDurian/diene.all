@@ -18,7 +18,6 @@ output "bucket_name" {
   value       = tigris_bucket.files.bucket
 }
 
-# The Worker's runtime secrets, in the shape `wrangler secret bulk` reads.
 output "worker_secrets" {
   sensitive = true
   value = {

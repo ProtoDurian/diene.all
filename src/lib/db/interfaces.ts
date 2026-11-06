@@ -5,9 +5,7 @@ export interface ISqlExecutor {
 }
 
 export interface IDatabase {
-  /** Runs `work` in one transaction as the RLS-bound runtime role, scoped to `tenantId`. */
   withTenant<T>(tenantId: string, work: (sql: ISqlExecutor) => Promise<T>): Promise<T>;
-  /** Runs `work` in one transaction as the cross-tenant system role (job runner, fork marker). */
   withSystem<T>(work: (sql: ISqlExecutor) => Promise<T>): Promise<T>;
   close(): Promise<void>;
 }

@@ -25,7 +25,6 @@ aarch64 | arm64) arch="arm64" ;;
   ;;
 esac
 
-# Only darwin arm64 ships (no Intel mac) — fail clearly instead of 404ing on a missing archive.
 [[ ${os} == "darwin" && ${arch} == "amd64" ]] && echo "❌ Intel macOS is not supported (arm64 only)" >&2 && exit 1
 
 archive="${BINARY}_${os}_${arch}.tar.gz"

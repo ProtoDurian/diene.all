@@ -3,7 +3,6 @@ import { Client } from 'pg';
 import type { UserRoleStore } from '../../lib/admin/interfaces';
 import type { AdminError, UserRole } from '../../lib/admin/structures';
 
-// Runs as the database owner, like migrate: the auth tables have no row-level security.
 export class PgUserRoleStore implements UserRoleStore {
   constructor(private readonly connectionString: string) {}
 

@@ -1,7 +1,5 @@
 @import 'tailwindcss';
 
-/* Theme tokens: ferretry's Studio family (light + dark). Literal colours live here only;
-   components use the token utilities below. */
 :root {
   color-scheme: light;
   --font-body: 'Inter var', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;

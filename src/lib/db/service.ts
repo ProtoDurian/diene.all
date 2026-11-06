@@ -3,7 +3,6 @@ import type { IMigrationLedger, IMigrationSource } from './interfaces';
 import type { AppliedMigration, Migration, MigrationDrift } from './structures';
 
 export class MigrationPlanner {
-  /** Out-of-order files are refused by default: a lower version landing late means a merge went wrong. */
   constructor(private readonly allowOutOfOrder = false) {}
 
   plan(

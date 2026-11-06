@@ -9,7 +9,6 @@ type TenantSwitcherProps = {
   onClose: () => void;
 };
 
-// Selectors open as a modal sheet (bottom on phones), never a dropdown.
 export function TenantSwitcher({ open, onClose }: TenantSwitcherProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const tenants = authClient.useListOrganizations();

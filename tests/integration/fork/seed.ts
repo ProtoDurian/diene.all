@@ -5,8 +5,6 @@ export interface ForkSeed {
   readonly clientSecret: string;
 }
 
-// One row in every table the fork sanitizer must clean, plus rows it must keep.
-// Credential values are generated per run so no secret-shaped literal sits in the tree.
 export class ForkSeeder {
   async seed(client: Client, tenantId: string): Promise<ForkSeed> {
     const value = () => randomUUID();

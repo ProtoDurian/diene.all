@@ -2,7 +2,6 @@ import { Err, Ok, type Result } from '@atomicloud/diene.result';
 import { z } from 'zod';
 import type { AuthSettings, SocialProviderSettings } from './structures';
 
-// A blank env value means unset.
 const blank = (value: unknown) => (value === '' ? undefined : value);
 const blankIsUnset = z.preprocess(blank, z.string().min(1).optional());
 

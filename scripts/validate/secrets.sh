@@ -63,7 +63,6 @@ tfvars_hits="$(git ls-files --cached --others --exclude-standard -- '*.tfvars' '
   xargs -r grep -lE "(^|[[:space:]\"])(${tofu_names})\"?[[:space:]]*[=:]" || true)"
 [ -n "${tfvars_hits}" ] && echo "❌ sensitive variables must come from secrets/, not tfvars: ${tfvars_hits}" >&2 && exit 1
 
-# With an age key that opens the files, also prove no decrypted value is written anywhere else.
 for file in "${files[@]}"; do
   plain="$(sops decrypt --output-type json "${file}" 2>/dev/null || true)"
   [ -z "${plain}" ] && echo "📝 ${file}: no local age key opens it; skipped the decrypted-value scan" && continue

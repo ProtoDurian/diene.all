@@ -4,8 +4,6 @@ import { Logo } from '../components/logo.tsx';
 import { authClient, followRedirect } from '../lib/auth-client.ts';
 import { CreateTenantForm } from './create-tenant.tsx';
 
-// OAuth (MCP/CLI) step after sign-in: the token is scoped to the tenant chosen here.
-// oauthProviderClient attaches the signed oauth_query from this page's URL to the continue call.
 export function SelectTenantScreen() {
   const tenants = authClient.useListOrganizations();
   const [creating, setCreating] = useState(false);

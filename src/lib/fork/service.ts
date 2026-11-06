@@ -51,7 +51,6 @@ export class ForkService {
       );
   }
 
-  // A half-made fork is worse than none: it may still hold live sessions and keys.
   private undoOnErr(result: Result<ForkCreated, ForkError>, name: string): Result<ForkCreated, ForkError> {
     return Res.async(() =>
       result.match<Result<ForkCreated, ForkError>>({

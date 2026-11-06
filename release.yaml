@@ -167,7 +167,6 @@ release:
       - Changelog.old.md
       - docs/developer/CommitConventions.md
       - package.json
-  # GoReleaser publishes this tag's GitHub release; a second publisher would collide.
   github: false
   hooks:
     # A file a hook writes joins commit.assets in the same edit.

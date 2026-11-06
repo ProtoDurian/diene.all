@@ -12,7 +12,6 @@ import { PostgresFixture } from '../../support/postgres';
 export const APP_URL = 'https://aseity.test';
 const MCP_URL = `${APP_URL}/mcp`;
 const REDIRECT_URI = 'http://127.0.0.1:9999/callback';
-// One secret per database: the JWT signing keys stored there are encrypted with it.
 const AUTH_SECRET = createHash('sha256').update('aseity-integration-auth').digest('hex');
 
 export class CapturingMailer implements IMailSender {
@@ -114,7 +113,6 @@ export class AuthHarness {
     );
   }
 
-  // Dynamic registration, authorize, consent and token exchange, the way an MCP client signs in.
   async authorize(cookie: string): Promise<Response> {
     const registered = await this.post('/api/auth/oauth2/register', {
       redirect_uris: [REDIRECT_URI],

@@ -7,13 +7,13 @@ builds:
     builder: bun
     binary: aseity
     main: ./cli/index.ts
-    # x64 uses the -baseline runtime (no AVX2) so it also runs under QEMU and on older CPUs.
+    # -baseline (no AVX2) so x64 also runs under QEMU and on older CPUs.
     targets:
       - linux-x64-baseline
       - linux-arm64
       - darwin-arm64
       - windows-x64-baseline
-    # Setting flags replaces the builder default, so --compile must stay listed.
+    # Setting flags drops the builder's default --compile.
     flags:
       - --compile
       - --minify
@@ -44,7 +44,6 @@ nfpms:
     license: MIT
     bindir: /usr/bin
 
-# GoReleaser uses casks (not the deprecated `brews`) for pre-compiled binaries.
 homebrew_casks:
   - name: aseity
     ids: [archive]
@@ -55,7 +54,6 @@ homebrew_casks:
       token: '{{ .Env.HOMEBREW_TAP_TOKEN }}'
     homepage: https://github.com/AtomiCloud/diene.aseity
     description: Command-line tool for an aseity app (migrate, fork create, list and delete)
-    # The Bun binary ships unsigned; strip the macOS quarantine attribute on install.
     hooks:
       post:
         install: |

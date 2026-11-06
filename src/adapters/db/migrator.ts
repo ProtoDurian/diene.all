@@ -91,7 +91,6 @@ class PgMigrationLedger implements IMigrationLedger {
   }
 }
 
-/** Applies `db/migrations` in order; one advisory lock keeps concurrent runs from racing. */
 export class PgMigrator {
   constructor(private readonly source: ConnectionSource) {}
 

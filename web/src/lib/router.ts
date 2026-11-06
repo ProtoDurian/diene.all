@@ -16,7 +16,6 @@ export function usePath(): string {
   return path;
 }
 
-// Shareable view state lives in the query string and updates as the user types.
 export function useQueryParam(name: string): [string, (value: string) => void] {
   const [value, setValue] = useState(() => new URLSearchParams(window.location.search).get(name) ?? '');
   const update = (next: string) => {

@@ -10,7 +10,6 @@ export class MailDeliveryError extends Error {
   }
 }
 
-/** Sends through an HTTP mail API that takes `{ from, to, subject, text, html }` with a bearer key. */
 export class HttpMailer implements Mailer {
   constructor(
     private readonly from: string,

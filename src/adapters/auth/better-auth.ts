@@ -67,7 +67,6 @@ export class BetterAuthFactory {
           allowUnauthenticatedClientRegistration: true,
           resources: [mcpResource],
           clientRegistrationDefaultResources: [mcpResource],
-          // Native MCP clients (CLI, desktop) register loopback callbacks without naming their type.
           clientRegistrationDefaultApplicationType: 'infer',
           postLogin: {
             page: '/select-tenant',

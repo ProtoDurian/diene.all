@@ -1,5 +1,3 @@
-# Local development only: never deployed, never built into an image.
-# Set ASEITY_DEV_STACK and the *_PORT variables to run several stacks side by side.
 name: ${ASEITY_DEV_STACK:-aseity-dev}
 
 services:

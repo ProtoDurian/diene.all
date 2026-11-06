@@ -6,7 +6,6 @@ type KeypadProps = {
   onChange: (value: string) => void;
 };
 
-// Digits come from this inline keypad on touch screens so the OS keyboard never covers the form.
 export function Keypad({ value, maxLength, onChange }: KeypadProps) {
   return (
     <div className="grid grid-cols-3 gap-2 sm:hidden">

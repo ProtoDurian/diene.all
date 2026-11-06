@@ -7,7 +7,6 @@ export class SecretFile {
     return existsSync(path);
   }
 
-  // The names match what wrangler reads, so the file works as-is for a local run against the fork.
   async write(path: string, created: ForkCreated): Promise<void> {
     const lines = [
       `# Secrets for the aseity fork '${created.name}'. Never commit this file.`,

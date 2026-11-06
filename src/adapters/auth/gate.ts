@@ -8,7 +8,6 @@ export interface TenantEnv {
   Variables: { identity: TenantIdentity };
 }
 
-// Mount in front of every tenant-scoped route: only members of an approved tenant get through.
 export class TenantGate {
   constructor(
     private readonly credentials: CredentialResolver,

@@ -83,7 +83,6 @@ let
         };
       in
       {
-        # Keep the pinned bun; the compiled runtime and depsHash depend on it.
         aseity = atomiLib.buildBunCli {
           name = cliName;
           version = manifest.version;

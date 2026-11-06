@@ -10,7 +10,6 @@ interface ForkRow extends Record<string, unknown> {
 export class PgForkMarkerReader implements IForkMarkerReader {
   constructor(private readonly db: IDatabase) {}
 
-  /** A missing row reads as not a fork. */
   async read(): Promise<ForkMarker> {
     const rows = await this.db.withSystem(sql =>
       sql.query<ForkRow>('SELECT is_fork, source, forked_at FROM fork_meta WHERE singleton'),
@@ -25,7 +24,6 @@ export class PgForkMarkerReader implements IForkMarkerReader {
   }
 }
 
-/** Reads the marker at most once per request. */
 export class CachedForkMarkerReader implements IForkMarkerReader {
   private marker: Promise<ForkMarker> | undefined;
 

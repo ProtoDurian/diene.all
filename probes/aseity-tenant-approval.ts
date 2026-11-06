@@ -10,7 +10,6 @@ type ProbeRepo = {
 
 const SCENARIO = 'should keep a new tenant pending until an admin approves it';
 const command = `nix develop .#ci -c bash -lc 'bun install --frozen-lockfile && bun test --config=bunfig.int.toml tests/integration/auth/flow.test.ts -t "${SCENARIO}" 2>&1'`;
-// The approval check in the domain service: anything not approved is refused.
 const APPROVAL_CHECK = /^\s*if \(status !== 'approved'\) return Err\(new TenantNotApproved\(tenantId, status\)\);\n/m;
 
 async function scenario(repo: ProbeRepo) {

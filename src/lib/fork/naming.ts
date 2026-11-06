@@ -3,7 +3,6 @@ import type { ForkError, ForkSources } from './structures';
 
 const FORK_NAME = /^[a-z](?:[a-z0-9-]*[a-z0-9])?$/;
 const MAX_FORK_NAME = 24;
-// Postgres truncates identifiers past 63 bytes, and S3 caps bucket names at 63.
 const MAX_RESOURCE_NAME = 63;
 
 export class ForkNaming {

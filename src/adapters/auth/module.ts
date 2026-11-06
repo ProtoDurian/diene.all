@@ -24,7 +24,6 @@ export interface AuthModuleDependencies {
   readonly notes: IMcpNotesReader;
 }
 
-// Wires auth, tenant approval and MCP for one database pool.
 export class AuthModule {
   readonly auth: AseityAuth;
   readonly approval: TenantApprovalService;

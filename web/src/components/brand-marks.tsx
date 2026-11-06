@@ -1,4 +1,3 @@
-// Official marks: GitHub's is single-colour (black on light, white on dark); Google's "G" keeps its four colours.
 export function GitHubMark() {
   return (
     <svg viewBox="0 0 24 24" className="size-5 fill-fg" aria-hidden="true">

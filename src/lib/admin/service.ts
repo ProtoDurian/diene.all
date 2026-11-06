@@ -5,7 +5,6 @@ import type { AdminError, AdminGranted, UserRole } from './structures';
 const ADMIN = 'admin';
 const EMAIL = /^[^\s@]+@[^\s@]+$/;
 
-// Better Auth's admin plugin keeps a user's roles as one comma-separated string.
 export class AdminGrantService {
   constructor(private readonly users: UserRoleStore) {}
 

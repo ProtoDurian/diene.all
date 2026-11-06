@@ -1,4 +1,3 @@
--- Better Auth schema (user, session, organization, apiKey, admin, JWT and OAuth provider plugins).
 -- Generated from the app's Better Auth options; an integration test fails if they drift apart.
 
 create table "user" ("id" text not null primary key, "name" text not null, "email" text not null unique, "emailVerified" boolean not null, "image" text, "createdAt" timestamptz default CURRENT_TIMESTAMP not null, "updatedAt" timestamptz default CURRENT_TIMESTAMP not null, "role" text, "banned" boolean, "banReason" text, "banExpires" timestamptz);
@@ -43,5 +42,4 @@ create index "oauthConsent_clientId_idx" on "oauthConsent" ("clientId");
 create index "oauthConsent_userId_idx" on "oauthConsent" ("userId");
 create unique index "oauthClientResource_clientId_resourceId_uidx" on "oauthClientResource" ("clientId", "resourceId");
 
--- Auth tables are system data: app_system may use them, the tenant-scoped app_runtime role gets nothing.
 GRANT SELECT, INSERT, UPDATE, DELETE ON "user", "session", "account", "verification", "organization", "member", "invitation", "apikey", "jwks", "oauthClient", "oauthResource", "oauthClientResource", "oauthRefreshToken", "oauthAccessToken", "oauthConsent", "oauthClientAssertion" TO app_system;

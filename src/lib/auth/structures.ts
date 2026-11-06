@@ -26,14 +26,12 @@ export interface Actor {
   readonly role?: string;
 }
 
-// What a credential claims before the tenant is checked.
 export interface CredentialClaim {
   readonly via: CredentialKind;
   readonly userId?: string;
   readonly tenantId?: string;
 }
 
-// A caller allowed to act inside an approved tenant.
 export interface TenantIdentity {
   readonly via: CredentialKind;
   readonly tenantId: string;

@@ -10,10 +10,8 @@ export interface AppEnv {
   };
 }
 
-/** Sets `identity` for an admitted caller of an approved tenant, or answers with a Problem. */
 export type IdentityGate = MiddlewareHandler<{ Variables: { identity: TenantIdentity } }>;
 
-/** A set of routes another module mounts on the app (auth, MCP). */
 export interface RouteModule {
   register(app: Hono<AppEnv>): void;
 }

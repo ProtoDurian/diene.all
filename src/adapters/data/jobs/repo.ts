@@ -52,7 +52,6 @@ export class PgJobQueue implements IJobQueue {
 
 export class PgJobStore implements IJobStore {
   private readonly mapper = new JobRowMapper();
-  // SKIP LOCKED is what lets two runners drain at once without claiming the same row.
   private readonly claimSql = `
 WITH next AS (
   SELECT id AS next_id FROM jobs

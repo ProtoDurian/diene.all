@@ -52,7 +52,6 @@ export default {
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: ProbeRepo) {
-        // Reuse a real sealed value so the file stays well formed and no secret-shaped literal ships.
         const { text, value } = await firstSealedLine(repo);
         await repo.write(sealedFile, `PROBE_ONE_SIDED: ${value}\n${text}`);
         await expectRedBecause(

@@ -26,7 +26,6 @@ bun test --config="${config}" --coverage
   echo "❌ no coverage artifact at ${coverage_file}" >&2
   exit 1
 }
-# The e2e Worker runs in workerd, so its ledger only records the test process.
 [[ -z ${scope} ]] && echo "✅ e2e tests passed; ledger at ${coverage_file}" && exit 0
 
 sources="$(rg -N --replace '' '^SF:' "${coverage_file}" || true)"

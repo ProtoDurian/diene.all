@@ -7,7 +7,6 @@ export class JobScheduler {
     private readonly forkMode: boolean,
   ) {}
 
-  /** A fork never runs a job with outside effects, so it is stored held. */
   schedule(job: NewJob): Promise<Job> {
     return this.queue.enqueue(job, this.forkMode && job.outsideEffect ? 'held' : 'queued');
   }
@@ -20,7 +19,6 @@ export class RetryPolicy {
     private readonly maxSeconds = 3600,
   ) {}
 
-  /** Seconds until the next attempt, or undefined once attempts are used up. */
   delay(attempts: number): number | undefined {
     if (attempts >= this.maxAttempts) return undefined;
     return Math.min(this.baseSeconds * 2 ** (attempts - 1), this.maxSeconds);

@@ -62,7 +62,6 @@ export class ProblemPortal {
     },
   ) {}
 
-  /** Problem type URIs live under the app's own origin. */
   config(appUrl: string): ErrorPortalConfig {
     const url = new URL(appUrl);
     return { scheme: url.protocol === 'http:' ? 'http' : 'https', host: url.host, ...this.identity };
@@ -136,7 +135,6 @@ export class ApiProblems {
     });
   }
 
-  // The registry is shared with the auth module, so an id it registered first is reused.
   private ensure<TSchema extends z.ZodType>(
     registry: ProblemRegistry,
     definition: ProblemDefinition<TSchema>,

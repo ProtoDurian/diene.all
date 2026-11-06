@@ -84,7 +84,6 @@ export class NoteShareService {
     this.lookup = new NoteLookup(repo);
   }
 
-  /** Mail goes out through a job with outside effects, so a fork holds it instead of sending. */
   share(id: string, to: string): Result<Job, NoteNotFound> {
     return this.lookup
       .note(id)
@@ -120,7 +119,6 @@ export class NoteAttachmentService {
       );
   }
 
-  /** Call after the note is deleted; a missing object is not an error. */
   remove(id: string): Promise<void> {
     return this.files.delete(this.key(id));
   }

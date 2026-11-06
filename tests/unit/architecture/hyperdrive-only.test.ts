@@ -2,7 +2,6 @@ import { beforeAll, describe, it } from 'bun:test';
 import 'should';
 import { WorkerGraph, type WorkerModule } from '../../support/worker-graph';
 
-// The Worker may reach Postgres only through the HYPERDRIVE binding, never a URL from anywhere else.
 const ENV_READS = /\bprocess\.env\b|\bBun\.env\b|\bimport\.meta\.env\b/;
 const URL_SOURCES = /\b(?:DATABASE_URL|POSTGRES_URL|PGHOST|PGUSER|PGPASSWORD|PGDATABASE)\b|postgres(?:ql)?:\/\//;
 const DB_FACTORY_DIR = 'src/adapters/db/';

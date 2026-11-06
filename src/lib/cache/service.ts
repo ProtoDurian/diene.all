@@ -4,7 +4,6 @@ import type { ICacheStore } from './interfaces';
 export class CacheService {
   constructor(private readonly store: ICacheStore) {}
 
-  /** A missing, expired or unreadable entry is recomputed and stored again. */
   async remember<S extends z.ZodType>(
     key: string,
     ttlSeconds: number,

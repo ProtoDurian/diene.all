@@ -2,7 +2,6 @@ import { Pool, type PoolClient } from 'pg';
 import type { IDatabase, ISqlExecutor } from '../../lib/db/interfaces';
 import type { SqlRow } from '../../lib/db/structures';
 
-/** The Hyperdrive binding's shape; Worker code passes `env.HYPERDRIVE` and nothing else. */
 export interface ConnectionSource {
   readonly connectionString: string;
 }

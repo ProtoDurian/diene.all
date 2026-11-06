@@ -2,7 +2,6 @@ import type { MiddlewareHandler } from 'hono';
 import type { IDatabase } from '../../lib/db/interfaces';
 import type { AppEnv } from './env';
 
-/** Runs the rest of the request in one tenant transaction; a thrown handler error rolls it back. */
 export class TenantTransaction {
   constructor(private readonly db: IDatabase) {}
 

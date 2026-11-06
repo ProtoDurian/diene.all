@@ -9,7 +9,6 @@ const DUPLICATE_DATABASE = '42P04';
 const UNDEFINED_DATABASE = '3D000';
 const OBJECT_IN_USE = '55006';
 
-// Copies the source database on the same server with CREATE DATABASE ... TEMPLATE.
 export class LocalPostgresBrancher implements DatabaseBrancher {
   constructor(
     private readonly sourceConnectionString: string,

@@ -4,7 +4,6 @@ import type { ForkSanitizer, SecretGenerator } from '../../lib/fork/interfaces';
 import type { DatabaseBranch, ForkError, SanitizePlan, SanitizeReport } from '../../lib/fork/structures';
 import { ProviderAttempt } from './attempt';
 
-// Live credentials copied from the source: delete them so nothing issued there works in the fork.
 const DELETE_SECRET_ROWS = [
   'DELETE FROM "verification"',
   'DELETE FROM "oauthAccessToken"',

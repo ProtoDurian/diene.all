@@ -21,7 +21,6 @@ interface NeonBranch {
   readonly current_state?: string;
 }
 
-// Branches the Neon project through its REST API (copy-on-write, instant).
 export class NeonBrancher implements DatabaseBrancher {
   constructor(
     private readonly connection: NeonConnection,

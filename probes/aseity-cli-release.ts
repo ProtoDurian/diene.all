@@ -7,7 +7,6 @@ type ProbeRepo = {
   write(path: string, content: string): Promise<void>;
 };
 
-// The snapshot compiles every target, smoke-runs the linux binary and renders every channel.
 const command =
   "nix develop .#releaser -c bash -lc 'bun install --frozen-lockfile && goreleaser check && ./scripts/release/publish.sh --snapshot && " +
   'test -x dist/aseity_bun-linux-x64-baseline/aseity && test -x dist/aseity_bun-linux-arm64/aseity && ' +

@@ -12,7 +12,6 @@ interface FakeBranch {
   checks: number;
 }
 
-// An in-memory stand-in for the Neon v2 API: branches become ready on their second status check.
 class FakeNeon {
   readonly branches: FakeBranch[] = [];
   readonly calls: { method: string; path: string; auth: string | null; body: unknown }[] = [];

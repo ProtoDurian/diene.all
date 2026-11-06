@@ -24,8 +24,6 @@ resource "cloudflare_hyperdrive_config" "app" {
   }
 }
 
-# Creates the proxied DNS record and certificate for app_hostname. The Worker itself is
-# uploaded by `wrangler deploy`, which must have run once before this applies.
 resource "cloudflare_workers_custom_domain" "app" {
   account_id = var.cloudflare_account_id
   zone_id    = data.cloudflare_zone.app.zone_id
