@@ -1,124 +1,81 @@
-# Grafana Dashboard Sandbox & Verification Reference
+# Dashboard Sandbox
 
-Everything needed to run the self-verification loop locally. Copy these files into a
-scratch directory (not the repo) unless the project already has a `sandbox/` setup.
+A local Grafana, image renderer and Prometheus, so you can render a dashboard with synthetic data and look at it before merge. Rules for what to check: [Grafana Dashboards](docs/standards/grafana-dashboards/index.md#visual-checklist).
 
-All CLI tools used here (`jq`, `dashboard-linter`, `promtool`, `docker`) come from the
-repo's **nix dev shell** — add missing ones to `flake.nix` (see the `nix` skill).
-Never instruct or perform ad-hoc installs.
+## What it checks, and what it does not
 
-## 1. Sandbox: docker compose
+- **Metrics only.** The sandbox has Prometheus, but no log store (Loki) or trace store (Tempo). Log and trace panels show "No data" here. Mark them `UNVERIFIED` in their description and check them in Grafana Explore against the real landscape after deploy.
+- **No folders.** Dashboards land in Grafana's General folder. The service folder (`<platform>-<service>-folder`, see [Shipping](docs/standards/observability/shipping.md)) is checked after deploy.
 
-`compose.yaml`:
+## Tools
 
-```yaml
-services:
-  grafana:
-    image: grafana/grafana:12.1.0
-    ports: ['3000:3000']
-    environment:
-      GF_AUTH_ANONYMOUS_ENABLED: 'true'
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
-      GF_RENDERING_SERVER_URL: http://renderer:8081/render
-      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
-    volumes:
-      - ./provisioning:/etc/grafana/provisioning
-      - ./dashboards:/var/lib/grafana/dashboards
-  renderer:
-    image: grafana/grafana-image-renderer:latest
-    environment:
-      AUTH_TOKEN: '-'
-  prometheus:
-    image: prom/prometheus:latest
-    ports: ['9090:9090']
-    volumes:
-      - ./prom-data:/prometheus
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-```
+`jq`, `dashboard-linter`, `promtool`, `bun`, `curl`, `file` and the `docker` CLI with `docker compose` all come from this repo's nix shell. You need Docker itself (the daemon) installed and running on the host.
 
-`provisioning/datasources/datasources.yaml`:
+## Files
 
-```yaml
-apiVersion: 1
-datasources:
-  - name: Prometheus
-    uid: prometheus # match the datasource uid your dashboard queries
-    type: prometheus
-    access: proxy
-    url: http://prometheus:9090
-    isDefault: true
-  - name: TestData
-    uid: testdata # layout prototyping only — cannot run PromQL
-    type: grafana-testdata-datasource
-    access: proxy
-```
+Everything lives in `.claude/skills/grafana-dashboards/sandbox/`:
 
-`provisioning/dashboards/default.yaml`:
+| File                     | What it is                                                                       |
+| ------------------------ | -------------------------------------------------------------------------------- |
+| `compose.yaml`           | The three containers, pinned by digest, bound to `127.0.0.1` only                |
+| `provisioning/`          | Adds the Prometheus datasource (uid `prometheus`) and loads `dashboards/`        |
+| `generate-metrics.ts`    | Writes 6 hours of a counter and a histogram, two landscapes, with an error burst |
+| `dashboards/sample.json` | A small dashboard that passes strict lint and renders with that data             |
+| `dashboards/.lint`       | Example `dashboard-linter` exclusions, each with a reason                        |
 
-```yaml
-apiVersion: 1
-providers:
-  - name: local
-    type: file
-    options:
-      path: /var/lib/grafana/dashboards
-      foldersFromFilesStructure: true
-```
+Rename the metric and label names at the top of `generate-metrics.ts` to the ones your dashboard queries. Cover every metric and label value the dashboard uses, including error series, so threshold colors show.
 
-Copy the JSONs from `observability/dashboards/` into `./dashboards/` — file provisioning
-reloads every ~10s, so edit → save → re-render is the whole iteration loop.
+## Run it
 
-## 2. Synthetic data (so panels render with real lines, not "No data")
-
-TestData cannot execute PromQL, so backfill Prometheus with OpenMetrics series that
-match the dashboard's metric names:
+From the repo root:
 
 ```bash
-# generate synthetic series (bun script or shell loop) → openmetrics.txt, e.g.:
-# http_requests_total{service="checkout",status="200"} 1027 1719999000
-# http_requests_total{service="checkout",status="500"} 3 1719999000
-# ... one sample per series per 15-60s step, covering now-6h → now, ending with # EOF
+dashboard=observability/dashboards/overview.json
+jq empty "$dashboard"
+dashboard-linter lint "$dashboard" --strict
 
-promtool tsdb create-blocks-from openmetrics openmetrics.txt ./prom-data
-docker compose restart prometheus
+sb="$(mktemp -d)"
+cp -r .claude/skills/grafana-dashboards/sandbox/. "$sb"
+cp "$dashboard" "$sb/dashboards/"
+mkdir "$sb/prom-data"
+bun "$sb/generate-metrics.ts" > "$sb/metrics.om"
+promtool tsdb create-blocks-from openmetrics "$sb/metrics.om" "$sb/prom-data"
+
+export SANDBOX_UID="$(id -u)" SANDBOX_GID="$(id -g)"
+project="dash-sandbox-$(date +%s)"
+docker compose -p "$project" -f "$sb/compose.yaml" up -d
+for _ in $(seq 60); do
+  curl -fsS http://127.0.0.1:9090/-/ready >/dev/null 2>&1 &&
+    curl -fsS http://127.0.0.1:3000/api/health >/dev/null 2>&1 && break
+  sleep 2
+done
 ```
 
-Rules for the generator:
+- `dashboard-linter` reads `.lint` from the dashboard's own folder, so justified exclusions go in `observability/dashboards/.lint`.
+- `SANDBOX_UID`/`SANDBOX_GID` make Prometheus run as you, so it can write `prom-data`.
+- The project name is unique, so the stack never touches another one.
+- Grafana is anonymous admin, which is why every port is bound to `127.0.0.1`.
+- Grafana re-reads `$sb/dashboards/` about every 10 seconds: copy an edited JSON there and render again.
 
-- Cover **every metric name and label combination** the dashboard queries.
-- Include error-path series (5xx, failures) so error panels and thresholds show color.
-- Counters must increase monotonically; gauges should vary (test y-axis scaling).
-
-## 3. Render endpoints
+## Render and look
 
 ```bash
-# full dashboard (kiosk hides chrome)
-curl -s -o board.png "http://localhost:3000/render/d/<uid>/x?kiosk&width=1600&height=1200&from=now-6h&to=now&tz=UTC"
+uid="$(jq -r .uid "$dashboard")"
+curl -fsS -o "$sb/board.png" \
+  "http://127.0.0.1:3000/render/d/$uid/x?kiosk&width=1600&height=1200&from=now-6h&to=now&tz=UTC&var-landscape=pichu"
+file "$sb/board.png" | grep -q 'PNG image data' && test -s "$sb/board.png"
 
-# single panel
-curl -s -o panel.png "http://localhost:3000/render/d-solo/<uid>/x?panelId=<id>&width=1000&height=500&from=now-6h&to=now"
+curl -fsS -o "$sb/panel-2.png" \
+  "http://127.0.0.1:3000/render/d-solo/$uid/x?panelId=2&width=1000&height=500&from=now-6h&to=now&var-landscape=pichu"
 ```
 
-- Tall dashboards: raise `height` until the bottom row is visible in the PNG.
-- Against a real (non-anonymous) Grafana, add `-H "Authorization: Bearer <sa-token>"`.
-- Then **Read the PNG files** and inspect against the [visual checklist](./index.md#visual-checklist-looks-good-defined).
+- Render once per landscape (`var-landscape=pichu`, `raichu`) to prove the variable changes the data.
+- Raise `height` until the bottom row is in the picture.
+- Open every PNG and go through the [visual checklist](docs/standards/grafana-dashboards/index.md#visual-checklist).
 
-## 4. Lint configuration
-
-`dashboard-linter` checks Prometheus dashboards: datasource/job/instance template
-variables, `$__rate_interval` usage, counter aggregation (`rate` before `sum`), panel
-titles/descriptions/units, PromQL validity.
+## Clean up
 
 ```bash
-dashboard-linter lint dashboard.json --strict [--fix]
-```
-
-Justified exclusions go in a `.lint` file next to the dashboard:
-
-```yaml
-exclusions:
-  template-job-rule:
-    reason: single-tenant dashboard, job selector not applicable
+docker compose -p "$project" -f "$sb/compose.yaml" down -v
+rm -rf "$sb"
 ```

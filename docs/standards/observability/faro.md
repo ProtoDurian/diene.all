@@ -1,88 +1,55 @@
-# Faro Frontend Variant
+# Faro for Frontends
 
-Faro is the O1 frontend path for Next.js and Flutter. It is not a fourth OTel
-library: each frontend owns a thin initialization adapter around the supported
-Grafana Faro SDK, an error-reporter adapter, and its consumer tests.
+Next.js and Flutter frontends send telemetry with Grafana Faro, Grafana's frontend observability SDK, instead of an OTel library. Each frontend keeps a thin module of its own around the official Faro SDK: one part starts Faro, one part reports errors, plus its tests.
 
-## Shared initialization contract
+## Start-up rules
 
-Both variants must:
+Both frontends must:
 
-1. Read a validated, config-driven enabled flag, collector target, sampling
-   policy, and service-tree `app:` block.
-2. Initialize exactly once after client-safe configuration is available.
-3. No-op without network activity when disabled.
-4. Fail visibly on invalid enabled configuration; never swallow initialization
-   failures and silently pretend telemetry is active.
-5. Attach the complete LPSM/version identity to every event, error, session,
-   and span.
-6. Route unexpected exceptions and `LocalError` Problems through the same
-   reporter after the UI error boundary has classified/rendered them.
-7. Redact secrets and use an explicit allowlist for user/context attributes.
-8. Flush or drain through the platform lifecycle hook where the SDK supports
-   it.
+1. Read a validated config: an enabled flag, the collector address, the sampling policy and the service-tree `app:` block.
+2. Start Faro exactly once, after the client-safe config is available.
+3. Do nothing, and make no network calls, when disabled.
+4. Fail visibly when enabled with invalid config. Never swallow a start-up failure and pretend telemetry works.
+5. Attach the full LPSM and version identity (terms: [Observability Standards](docs/standards/observability/index.md#terms)) to every event, error, session and span.
+6. Send unexpected exceptions and expected app errors through the same reporter, after the UI error boundary has shown them. Expected errors are RFC 9457 Problems, as in [Wire format](docs/standards/wire-format/index.md).
+7. Redact secrets; send only user and context attributes from an explicit allowlist.
+8. Flush on the platform's lifecycle hook where the SDK supports it.
 
-## Identity mapping
+## Identity
 
-Use the Faro app metadata fields for the semantic-convention-compatible core:
-
-| Service-tree value | Faro application field / attribute              |
+| Service-tree value | Faro field / attribute                          |
 | ------------------ | ----------------------------------------------- |
 | service            | app name / `service.name`                       |
 | platform           | app namespace / `service.namespace`             |
 | version            | app version / `service.version`                 |
 | landscape          | app environment + `deployment.environment.name` |
-| module             | `atomi.module` custom/session attribute         |
+| module             | `atomi.module` session attribute                |
 
-Also attach `atomi.landscape`, `atomi.platform`, `atomi.service`,
-`atomi.module`, and `atomi.version`. Do not derive identity from the browser
-hostname, Flutter bundle id, or a user-entered value.
+Also attach `atomi.landscape`, `atomi.platform`, `atomi.service`, `atomi.module` and `atomi.version`. Never take identity from the browser hostname, the Flutter bundle id or user input.
 
-## Next.js scaffold
-
-The consumer-owned module follows this responsibility split:
+## Next.js
 
 ```text
 src/lib/observability/
-├── config.ts
-├── faro.ts
-├── faro-error-reporter.ts
-├── FrontendObservability.tsx
-└── index.ts
+├── config.ts                  # adapts the composed client-safe config; loads no files
+├── faro.ts                    # builds metadata and instrumentations; start-once init
+├── faro-error-reporter.ts     # the app's error reporter
+├── FrontendObservability.tsx  # client-only component that calls init once config is injected
+└── index.ts                   # exports the public surface only
 ```
 
-- `config.ts` adapts the composed client-safe config; it does not load files.
-- `faro.ts` builds metadata/instrumentations and exposes idempotent init.
-- `faro-error-reporter.ts` implements the application's Problem/error reporter.
-- `FrontendObservability.tsx` is a client-only composition adapter that invokes
-  init after the SSR-injected config is available.
-- The barrel exports the supported surface only.
+Use the official `@grafana/faro-web-sdk` and `@grafana/faro-web-tracing` packages. The component must not catch and discard SDK failures.
 
-Use the official `@grafana/faro-web-sdk` and
-`@grafana/faro-web-tracing` packages. The component must not catch-and-discard
-SDK failures. The argon module is a shape seed, not a verbatim port: its
-service-tree naming, one-time init, and error-reporter split survive; silent
-failure handling and app-specific config do not.
+### Source maps
 
-### Web source maps
+Upload source maps with `@grafana/faro-webpack-plugin` from the webpack hook in `next.config.ts`, during the production build.
 
-Source-map upload is Next.js-only O1 scaffolding and runs inline from the
-`next.config.ts` webpack hook during the OpenNext build with
-`@grafana/faro-webpack-plugin`.
+- Add the plugin only when Faro and `client.faro.build.enabled` are both true.
+- Require the endpoint, app id, stack id and the build secret `ATOMI_CLIENT__FARO__BUILD__KEY` before uploading.
+- Read the key from the build environment just before the build. It must never reach YAML, the generated client config, `DefinePlugin` values, the bundle, the image or any build output.
+- Test the upload guard in CI with a dry run.
 
-- Instantiate the plugin only when runtime Faro and `client.faro.build.enabled`
-  are both true.
-- Require endpoint, app id, stack id, and the single build secret
-  `ATOMI_CLIENT__FARO__BUILD__KEY` before the upload path can run.
-- Read the key from the build environment immediately before the build. It must
-  never enter YAML, generated client config, DefinePlugin payloads, the bundle,
-  image, or build artifacts.
-- The PR-side guard/dry-run is a consumer gate. One real resolved stack trace is
-  proven once while building diene; it is not a shipped probe row.
-
-## Flutter scaffold
-
-The consumer-owned module follows the Flutter equivalent:
+## Flutter
 
 ```text
 lib/src/observability/
@@ -92,20 +59,14 @@ lib/src/observability/
 └── observability.dart
 ```
 
-Use Grafana's verified-publisher `faro` Flutter package. Map `service` to
-`appName`, `platform` to `namespace`, `version` to `appVersion`, and landscape
-to `appEnv`; put the raw `atomi.*` taxonomy and
-`deployment.environment.name` into session/resource attributes. Wrap the app
-once through the SDK bootstrap and add only the approved interaction/asset
-instrumentation widgets.
+Use Grafana's verified-publisher `faro` package. Map `service` to `appName`, `platform` to `namespace`, `version` to `appVersion` and landscape to `appEnv`; put the `atomi.*` values and `deployment.environment.name` in session or resource attributes. Wrap the app once with the SDK bootstrap, and add only the interaction and asset instrumentation widgets you need.
 
-Flutter does not reuse the web webpack source-map uploader. Native symbol and
-source mapping remains a Flutter release-pipeline concern unless its owning
-goal explicitly adds a contract.
+Flutter does not use the webpack source-map plugin. Native symbol upload belongs to the Flutter release pipeline.
 
-## Consumer-owned proof
+## Tests each frontend needs
 
-Next.js and Flutter each own gates for disabled no-op, exactly-once init,
-complete LPSM metadata, and error propagation. Next.js separately owns the
-source-map upload guard. Live collector/export paths and environment-specific
-targets remain outside this payload node.
+- Disabled config makes no network calls.
+- Init runs exactly once.
+- Every event carries the full LPSM metadata.
+- Errors reach the reporter.
+- Next.js only: the source-map upload guard.
