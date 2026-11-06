@@ -16,7 +16,7 @@ export default {
         if (name !== 'diene-otel-usage') {
           throw new Error(`usage skill name mismatch: ${name ?? 'missing'}`);
         }
-        if ((await repo.glob('skills/diene-otel-usage/patterns.md')).length !== 1) {
+        if ((await repo.glob('skills/diene-otel-usage/assets/*')).length !== 3) {
           throw new Error('usage skill assets are missing');
         }
       },
