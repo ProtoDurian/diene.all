@@ -33,6 +33,16 @@ tasks:
     cmds:
       - ./scripts/local/build.sh
 
+  compile:
+    desc: Compile the aseity CLI for this host into dist/bin/
+    cmds:
+      - ./scripts/release/compile.sh
+
+  release:snapshot:
+    desc: Package every CLI channel locally without publishing
+    cmds:
+      - ./scripts/release/publish.sh --snapshot
+
   deadcode:
     desc: Review dead code with the LLM Knip views
     cmds:

@@ -37,6 +37,7 @@
         pkgs-2605 = nixpkgs-2605.legacyPackages.${system};
         pkgs-unstable = nixpkgs-unstable.legacyPackages.${system};
         atomi = atomipkgs.packages.${system};
+        atomiLib = atomipkgs.lib.${system};
         pre-commit-lib = pre-commit-hooks.lib.${system};
       in
       let
@@ -60,6 +61,7 @@
             pkgs-2605
             pkgs-unstable
             atomi
+            atomiLib
             ;
         };
         env = import ./nix/env.nix {

@@ -6,6 +6,7 @@ with packages;
     docker-compose
     git
     go-task
+    goreleaser
     infisical
     releaser
   ];
@@ -36,6 +37,7 @@ with packages;
   ];
 
   releaser = [
+    goreleaser
     releaser
   ];
 

@@ -1,5 +1,6 @@
 {
   atomi,
+  atomiLib,
   pkgs-2605,
   pkgs-unstable,
 }:
@@ -47,9 +48,52 @@ let
     nix-unstable = (
       with pkgs-unstable;
       {
+        inherit
+          goreleaser
+          ;
       }
     );
+
+    cli =
+      let
+        manifest = builtins.fromJSON (builtins.readFile ../package.json);
+        cliNames = builtins.attrNames manifest.bin;
+        cliName =
+          if builtins.length cliNames == 1 then
+            builtins.head cliNames
+          else
+            builtins.throw "aseity requires exactly one package.json bin entry";
+        entry = manifest.bin.${cliName};
+        src = pkgs-2605.lib.cleanSourceWith {
+          src = ../.;
+          filter =
+            path: _type:
+            let
+              base = baseNameOf path;
+            in
+            !(builtins.elem base [
+              "node_modules"
+              "dist"
+              "prebuilt"
+              "coverage"
+              ".direnv"
+              ".wrangler"
+              "result"
+            ]);
+        };
+      in
+      {
+        # Keep the pinned bun; the compiled runtime and depsHash depend on it.
+        aseity = atomiLib.buildBunCli {
+          name = cliName;
+          version = manifest.version;
+          inherit src;
+          entrypoint = entry;
+          depsHash = pkgs-2605.lib.fakeHash;
+          bun = pkgs-2605.bun;
+        };
+      };
   };
 in
 with all;
-atomipkgs // nix-2605 // nix-unstable
+atomipkgs // nix-2605 // nix-unstable // cli
