@@ -30,6 +30,7 @@ describe('Timing.sleep', () => {
     { seconds: -1, label: 'negative' },
     { seconds: Number.NaN, label: 'NaN' },
     { seconds: Number.POSITIVE_INFINITY, label: 'infinite' },
+    { seconds: 2_147_483.648, label: 'setTimeout-overflowing' },
   ])('should reject a $label delay with a RangeError', async ({ seconds }) => {
     // Arrange
     const timing = new Timing();
