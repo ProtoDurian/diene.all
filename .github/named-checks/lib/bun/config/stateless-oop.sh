@@ -24,9 +24,21 @@ for path in "${files[@]}"; do
       const c = src[i], n = src[i + 1], start = i;
       if (c === "/" && n === "/") { while (i < src.length && src[i] !== "\n") i++; blank(start, i); continue; }
       if (c === "/" && n === "*") { i = src.indexOf("*/", i + 2); i = i < 0 ? src.length : i + 2; blank(start, i); continue; }
-      if (c === "\x27" || c === "\"" || c === "`") {
+      if (c === "\x27" || c === "\"") {
         for (i++; i < src.length && src[i] !== c; i++) if (src[i] === "\\") i++;
         i++; blank(start + 1, i - 1); continue;
+      }
+      if (c === "`") {
+        let from = i + 1;
+        for (i++; i < src.length && src[i] !== "`"; i++) {
+          if (src[i] === "\\") { i++; continue; }
+          if (src[i] === "$" && src[i + 1] === "{") {
+            blank(from, i);
+            for (let depth = 0; i < src.length; i++) { if (src[i] === "{") depth++; else if (src[i] === "}" && --depth === 0) break; }
+            from = i + 1;
+          }
+        }
+        blank(from, i); i++; continue;
       }
       if (c === "/" && regexBefore.test(code.slice(Math.max(0, i - 200), i).join("").trimEnd())) {
         for (i++; i < src.length && src[i] !== "/" && src[i] !== "\n"; i++) {
@@ -50,7 +62,7 @@ for path in "${files[@]}"; do
     };
     const wipe = (from, to) => { for (let k = from; k <= to; k++) if (out[k] !== "\n") out[k] = " "; };
     // Class bodies hold the methods; interfaces and type aliases hold only types.
-    for (const m of text.matchAll(/\b(class|interface)\b[^{;]*\{/g)) {
+    for (const m of text.matchAll(/(?<![.\w$])(?:class|interface)(?![\w$])(?!\s*[(<])[^{;(]*\{/g)) {
       const open = m.index + m[0].length - 1;
       if (out[open] === "{") wipe(open, matchBrace(open));
     }
