@@ -1,6 +1,6 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/helpers.ts';
-import { packPackages } from './lib/dotnet-package.ts';
+import { expectGreen } from './lib/dotnet.ts';
+import { PACKAGE_VALIDATE, expectRedBecause, manifestVersion, packPackages } from './lib/dotnet-package.ts';
 
 export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
@@ -9,11 +9,7 @@ export default defineGate({
     description: 'The package and its symbol package exist at the committed version.',
     async run(repo: any) {
       await packPackages(repo, 'dotnet-lib-artifact-inventory-pack');
-      await expectGreen(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/dotnet-package.sh inventory',
-        'dotnet-lib-artifact-inventory',
-      );
+      await expectGreen(repo, `${PACKAGE_VALIDATE} inventory`, 'dotnet-lib-artifact-inventory');
     },
   },
   mutation: {
@@ -25,11 +21,9 @@ export default defineGate({
       await repo.exec(
         'rm "$(find artifacts/package -maxdepth 1 -name \'AtomiCloud.Diene.CoreUtils.*.snupkg\' -print -quit)"',
       );
-      await expectRed(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/dotnet-package.sh inventory',
-        'dotnet-lib-artifact-inventory',
-      );
+      await expectRedBecause(repo, `${PACKAGE_VALIDATE} inventory`, 'dotnet-lib-artifact-inventory', [
+        `❌ Missing AtomiCloud.Diene.CoreUtils.${await manifestVersion(repo)}.snupkg`,
+      ]);
     },
   },
 });

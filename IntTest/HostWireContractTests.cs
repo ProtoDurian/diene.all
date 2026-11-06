@@ -2,7 +2,7 @@ using System.Text.Json;
 using AtomiCloud.Diene.Interfaces;
 using AtomiCloud.Diene.Interfaces.TestHelper;
 
-namespace AtomiCloud.Diene.CoreUtils.IntTest;
+namespace AtomiCloud.DotnetBase.IntTest;
 
 /// <summary>
 /// INT tier — the parts of the contract that are only real against the host.

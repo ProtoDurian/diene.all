@@ -17,6 +17,12 @@ current surface. To read it from source instead, start at `Taskfile.yaml`: its
 Every task carries a `desc:` explaining what it does, and its `cmds:` are the
 literal commands it runs.
 
+The root `setup` task owns generated workspace assets. It runs
+`releaser conventions -c release.yaml` and then the only permitted vendor-tree
+writer, `skills-sync sync`. Setup is repair-capable; the pre-commit hook
+(`skills-sync sync --frozen`, which CI runs) refuses rather than silently staging or
+repairing a commit.
+
 ## Rules
 
 1. Keep one- or two-line commands inline in Taskfiles.

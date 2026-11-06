@@ -2,27 +2,15 @@ using System.Text.Json;
 using AtomiCloud.Diene.CoreUtils.Json;
 using AtomiCloud.Diene.Interfaces;
 
-namespace AtomiCloud.Diene.CoreUtils.App;
+namespace AtomiCloud.DotnetBase.App;
 
-/// <summary>
-/// The demo consumer: what a service actually does with this library. Every
-/// method here is a shape a real caller reproduces — compose an identifier,
-/// put a payload on the wire, read one back, and attach wire-formatted values
-/// to telemetry.
-/// </summary>
 public static class Samples
 {
-    /// <summary>Composes a catalog identifier from untrusted namespace and title text.</summary>
     public static Result<string, KeyError> CatalogKey(string ns, string title) => Slug.NamespacedKey(ns, title);
 
-    /// <summary>Serializes a receipt using the wire contract, with no per-property attributes.</summary>
     public static string ToWire(ShipmentReceipt receipt) =>
         JsonSerializer.Serialize(receipt, AtomiJson.DefaultOptions);
 
-    /// <summary>
-    /// Reads a receipt back. A malformed payload becomes a value, not an
-    /// exception escaping into the caller's request pipeline.
-    /// </summary>
     public static Result<ShipmentReceipt, WireFormatError> FromWire(string json)
     {
         try
@@ -39,10 +27,6 @@ public static class Samples
         }
     }
 
-    /// <summary>
-    /// Builds the attribute map a logger sink or metrics collector receives, with
-    /// keys canonicalized so services that spell them differently still aggregate.
-    /// </summary>
     public static Result<IReadOnlyDictionary<string, AttributeValue>, KeyError> Telemetry(ShipmentReceipt receipt)
     {
         ArgumentNullException.ThrowIfNull(receipt);
@@ -58,11 +42,6 @@ public static class Samples
         });
     }
 
-    /// <summary>
-    /// Reads an attribute by any casing or separator spelling of its key — the
-    /// shape a config binder or a telemetry query needs, and the reason
-    /// <see cref="KeyNormalizer.KeysMatch" /> exists.
-    /// </summary>
     public static Result<AttributeValue, KeyError> Lookup(
         IReadOnlyDictionary<string, AttributeValue> attributes,
         string key)
@@ -76,7 +55,6 @@ public static class Samples
         return Result.Err<AttributeValue, KeyError>(new KeyError("no attribute matches the key", key));
     }
 
-    /// <summary>The receipt the demo run puts through the whole round trip.</summary>
     public static Result<ShipmentReceipt, WireFormatError> Sample() =>
         Wire.ParseTimeZone("Asia/Singapore").Map(zone => new ShipmentReceipt
         {

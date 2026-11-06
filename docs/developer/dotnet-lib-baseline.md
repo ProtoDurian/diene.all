@@ -14,9 +14,9 @@ publishes ONE package from the solution:
 
 There is no TestHelper companion here — the usefulness lens says NO for a pure
 value library. The dual-package machinery stays inherited and dormant: the meta
-tier deactivates itself when no `TestHelper*.csproj` exists, so `pls test:meta`
-is a green no-op and no empty `meta` flag reaches codecov. The shipped usage
-skill carries the steps to add one later.
+tier deactivates itself when no `TestHelper*.csproj` exists, so `task test:meta`
+is a green no-op that writes no coverage report. The shipped usage skill carries
+the steps to add one later.
 
 The package id and assembly name are consumer-visible, real identities.
 `dotnet-base.slnx`, `.config/dotnet-base.test.yaml`, workflows, and non-shipped
@@ -59,20 +59,20 @@ stays at `1.0.0` in-branch, `probes/dotnet-lib-api-compatibility.ts` packs with
 
 ## Testing tiers
 
-- `pls test:unit` measures the real `AtomiCloud.Diene.CoreUtils` assembly plus
+- `task test:unit` measures the real `AtomiCloud.Diene.CoreUtils` assembly plus
   the inherited `[Lib*]*` scaling wildcard at 100%, and explicitly excludes
   `*.TestHelper` assemblies. The scope guard in
   `scripts/local/dotnet-test.sh` reads the allowed assembly names from the
   `AssemblyName` each `Lib*` project declares, so it scales with a renamed
   library instead of naming one.
-- `pls test:int` measures only `[App*]*` and covers what is real only against
+- `task test:int` measures only `[App*]*` and covers what is real only against
   the host: IANA timezone resolution through the machine tz database and the
-  pinned C0 fixture read off a real filesystem.
-- `pls test:meta` is inactive because no TestHelper project exists. It exits
-  green and uploads nothing.
+  pinned wire fixture read off a real filesystem.
+- `task test:meta` is inactive because no TestHelper project exists. It exits
+  green and writes no coverage report.
 
-Codecov uploads the `unit` and `int` ledgers as informational flags (`meta` has
-no results to upload here); the local merged thresholds remain authoritative.
+CI uploads each tier's Cobertura report as a build artifact; the local merged
+thresholds are authoritative.
 
 ## Release and publish
 

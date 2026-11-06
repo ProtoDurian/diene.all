@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-./scripts/ci/setup.sh
-
 version="$(xmlstarlet sel -t -v '/Project/PropertyGroup/Version' Version.props)"
 artifacts="artifacts/package"
 
@@ -32,7 +30,24 @@ printf '%s\n' \
   'if (Wire.Format(Wire.ParseDuration("PT1M30S").Get()) != "PT1M30S") return 1;' \
   'if (JsonSerializer.Serialize(new DateOnly(2026, 7, 25), AtomiJson.DefaultOptions) != "\"2026-07-25\"") return 1;' \
   'return 0;' >"${scratch}/Program.cs"
-dotnet restore "${scratch}" --source "$(pwd)/${artifacts}" --source https://api.nuget.org/v3/index.json >/dev/null
+cat >"${scratch}/nuget.config" <<EOF
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="local" value="$(pwd)/${artifacts}" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="local">
+      <package pattern="AtomiCloud.Diene.CoreUtils" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+EOF
+dotnet restore "${scratch}" --packages "${scratch}/packages" >/dev/null
 dotnet build "${scratch}" -c Release --no-restore >/dev/null
 
 echo "✅ Package validation and scratch consumption passed"

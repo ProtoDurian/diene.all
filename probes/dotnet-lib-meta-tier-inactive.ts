@@ -1,5 +1,5 @@
 import { defineSmoke } from './lib/definition.ts';
-import { expectGreen } from './lib/helpers.ts';
+import { expectGreen } from './lib/dotnet.ts';
 
 // This library ships no TestHelper companion (dotnet-family usefulness lens: a
 // pure value surface has no port to fake). The inherited meta machinery must

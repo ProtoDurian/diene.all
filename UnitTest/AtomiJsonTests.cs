@@ -1,7 +1,7 @@
 using System.Text.Json;
 using AtomiCloud.Diene.CoreUtils.Json;
 
-namespace AtomiCloud.Diene.CoreUtils.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 public class AtomiJsonTests
 {

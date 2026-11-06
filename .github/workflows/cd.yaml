@@ -1,5 +1,3 @@
-# ### dotnet-lib-cd
-# #### source: dotnet-lib
 name: CD
 
 on:

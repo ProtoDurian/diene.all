@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace AtomiCloud.Diene.CoreUtils.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 /// <summary>
 /// The pinned C0 §1 payloads. A change to a canonical spelling has to change this

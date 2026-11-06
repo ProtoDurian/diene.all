@@ -1,6 +1,6 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/helpers.ts';
-import { packPackages } from './lib/dotnet-package.ts';
+import { expectGreen } from './lib/dotnet.ts';
+import { PACKAGE_VALIDATE, expectRedBecause, packPackages } from './lib/dotnet-package.ts';
 
 export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
@@ -9,11 +9,7 @@ export default defineGate({
     description: 'Both nupkgs carry the required identity, README, icon, license, repository, and skill metadata.',
     async run(repo: any) {
       await packPackages(repo, 'dotnet-lib-package-metadata-pack');
-      await expectGreen(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/dotnet-package.sh metadata',
-        'dotnet-lib-package-metadata',
-      );
+      await expectGreen(repo, `${PACKAGE_VALIDATE} metadata`, 'dotnet-lib-package-metadata');
     },
   },
   mutation: {
@@ -26,11 +22,9 @@ export default defineGate({
         replace: '',
       });
       await packPackages(repo, 'dotnet-lib-package-metadata-mutation-pack');
-      await expectRed(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/dotnet-package.sh metadata',
-        'dotnet-lib-package-metadata',
-      );
+      await expectRedBecause(repo, `${PACKAGE_VALIDATE} metadata`, 'dotnet-lib-package-metadata', [
+        'package README metadata missing',
+      ]);
     },
   },
 });

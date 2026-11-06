@@ -1,144 +1,105 @@
-# Diene workspace agent guide
+# .NET base template
 
-<!-- ### workspace -->
-<!-- #### source: workspace -->
+Read [the .NET baseline](docs/developer/dotnet-baseline.md) before changing the
+.NET toolchain, task surface, test tiers, coverage ledgers, dead-code passes, or
+illustrative sample. Follow the C# variants linked from that baseline alongside
+the shared engineering standards. Keep `dotnet-base.slnx`,
+`.config/dotnet-base.test.yaml`, and the `AtomiCloud.DotnetBase.*` root
+namespaces base-named.
 
-## Agent skills
+# Agent skills
 
 `.claude/skills/vendor/` is tool-owned and is never hand-edited. Nothing in this
 tree writes it: the tool that does is consumed per-template from the Nix registry,
 and this tree declares no packages for it to vendor.
 
-## CI/CD workflows
+# Authorization
+
+See [docs/standards/authorization/index.md](docs/standards/authorization/index.md).
+
+# CI/CD workflows
 
 See [docs/standards/ci-cd/index.md](docs/standards/ci-cd/index.md).
 
-## Conventional commits
+# Conventional commits
 
 See [docs/standards/conventional-commits/index.md](docs/standards/conventional-commits/index.md).
 
-## Data validation
+# CyanPrint-managed files
 
-See [docs/standards/validation/index.md](docs/standards/validation/index.md).
+`.cyan_state.yaml` records what CyanPrint manages here:
 
-## Date and time
+- `files`: every path the last generation wrote.
+- `provenance`: per path, how it was merged: `source` (the winning template),
+  `decision` (`added`, `resolver-merged` or `lww-override`), `resolver` and
+  `contributors` (every template that supplied a version).
 
-See [docs/standards/datetime/index.md](docs/standards/datetime/index.md).
+Check a file there before you edit it:
 
-## Domain-driven design
+- **Not listed:** yours. Edit freely.
+- **Listed:** make the smallest line-level edit. No reformatting, reordering,
+  rewriting or renaming, so the next `cyanprint update` 3-way merge stays clean.
+- **More than one contributor:** merged from several templates. Change only your
+  own part.
+- Never hand-edit or delete `.cyan_state.yaml`.
 
-See [docs/standards/domain-driven-design/index.md](docs/standards/domain-driven-design/index.md).
+To pull template changes, use the `cyanprint-update` skill.
 
-## Functional practices
+# Development Environment
 
-See [docs/standards/functional-practices/index.md](docs/standards/functional-practices/index.md).
+All binaries, tools, and PATH are managed by **Nix**. Do not install tools manually or modify PATH outside of the nix configuration.
 
-## Infisical and secrets
+## Prerequisites
+
+1. **Nix** — package manager ([install](https://nixos.org/download))
+2. **Docker** — container runtime ([install](https://docs.docker.com/get-docker))
+3. **direnv** — auto-loads the nix shell on `cd` ([install](https://direnv.net/docs/installation.html))
+
+## Getting Started
+
+```bash
+direnv allow    # first time only — loads the nix dev shell
+```
+
+## Nix Configuration
+
+See **[docs/standards/nix/index.md](docs/standards/nix/index.md)** for the full guide on:
+
+- File structure (`flake.nix`, `nix/`, `.envrc`)
+- Adding/removing packages
+- Environment groups and shells
+- Formatters and pre-commit hooks
+- Adding registries
+
+# Infisical and secrets
 
 See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).
 
-## Linting and pre-commit
+# Linting and pre-commit
 
 See [docs/standards/linting/index.md](docs/standards/linting/index.md).
 
-<!-- ### nix-root -->
-<!-- #### source: main -->
-
-## Nix flakes and development shells
-
-Use the repository's Nix shell for every command. Read
-[docs/standards/nix/index.md](docs/standards/nix/index.md) before changing the
-flake or `nix/` modules.
-
-## Release automation
+# Release automation
 
 See [docs/standards/semantic-release/index.md](docs/standards/semantic-release/index.md).
 
-## Repository standards
+# Repository standards
 
-Follow the linked standard before changing its surface. Domain-specific
-architecture and behavior belongs under [docs/domain/](docs/domain/README.md),
-not under `docs/standards/`.
+Follow the linked standard before changing its surface.
 
-## Service-tree identity
+# Service-tree identity
 
 See [docs/standards/service-tree/index.md](docs/standards/service-tree/index.md).
 
-## Shell scripts
+# Shell scripts
 
 See [docs/standards/shell-scripts/index.md](docs/standards/shell-scripts/index.md).
 
-## Software design philosophy
-
-See [docs/standards/software-design-philosophy/index.md](docs/standards/software-design-philosophy/index.md).
-
-## SOLID principles
-
-See [docs/standards/solid-principles/index.md](docs/standards/solid-principles/index.md).
-
-## Stateless OOP and dependency injection
-
-See [docs/standards/stateless-oop-di/index.md](docs/standards/stateless-oop-di/index.md).
-
-## Taskfile conventions
+# Taskfile conventions
 
 See [docs/standards/taskfile/index.md](docs/standards/taskfile/index.md).
 
-## Testing
-
-See [docs/standards/testing/index.md](docs/standards/testing/index.md).
-
-## Three-layer architecture
-
-See [docs/standards/three-layer-architecture/index.md](docs/standards/three-layer-architecture/index.md).
-
-## Utility libraries
-
-See [docs/standards/utilities/index.md](docs/standards/utilities/index.md).
-
-<!-- ### shared -->
-<!-- #### source: shared -->
-
-## Authorization
-
-See [docs/standards/authorization/index.md](docs/standards/authorization/index.md).
-The standard left the parent template with the .NET layer that is its only user,
-so this node owns it.
-
-<!-- ### dotnet-base -->
-<!-- #### source: dotnet-base -->
-
-## .NET base template
-
-Read [the .NET baseline](docs/developer/dotnet-baseline.md) and use `task` for
-setup, build, run, test, coverage, and dead-code review.
-
-Language variants:
-
-- [C# date and time](docs/standards/datetime/languages/csharp.md)
-- [C# domain-driven design](docs/standards/domain-driven-design/languages/csharp.md)
-- [C# functional practices](docs/standards/functional-practices/languages/csharp.md)
-- [C# SOLID principles](docs/standards/solid-principles/languages/csharp.md)
-- [C# stateless OOP and DI](docs/standards/stateless-oop-di/languages/csharp.md)
-- [C# testing](docs/standards/testing/languages/csharp.md)
-- [C# utilities](docs/standards/utilities/languages/csharp.md)
-- [C# validation](docs/standards/validation/languages/csharp.md)
-
-Keep `dotnet-base.slnx`, `.config/dotnet-base.test.yaml`, and the project
-filenames base-named. Observability is absent on this branch.
-
-This branch materializes `AtomiCloud.Diene.CoreUtils`. Read
-[docs/domain/core-utils.md](docs/domain/core-utils.md) before touching the
-surface: parsing is total and returns `Result`, the C0 wire forms are pinned in
-`fixtures/c0/wire-v1.json` and are a cross-language contract, `Slug.Slugify` is
-byte-parity with the bun sibling, and deep-merge and env-var coercion are
-deliberately absent because `IConfiguration` already owns both. Do not wrap what
-the BCL already does.
-
-<!-- ### dotnet-lib -->
-<!-- #### source: dotnet-lib -->
-
-## .NET library template
+# .NET library template
 
 Read [the .NET library baseline](docs/developer/dotnet-lib-baseline.md) before
 changing package identity, release/versioning, package validation, TestHelper,

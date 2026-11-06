@@ -1,7 +1,7 @@
 using AtomiCloud.Diene.Interfaces;
 using AtomiCloud.Diene.Interfaces.TestHelper;
 
-namespace AtomiCloud.Diene.CoreUtils.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 public class WireAttributesTests
 {

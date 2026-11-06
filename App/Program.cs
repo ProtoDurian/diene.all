@@ -1,11 +1,9 @@
-namespace AtomiCloud.Diene.CoreUtils.App;
+namespace AtomiCloud.DotnetBase.App;
 
-/// <summary>Composition root: the demo round trip a consuming service reproduces.</summary>
 public static class Program
 {
     public static int Main()
     {
-        // ── Demo wiring (illustrative sample) — replace this block with your domain ──
         var built = Samples.Sample();
         if (built.IsFailure(out var buildError)) return Reject(buildError);
 
@@ -18,7 +16,6 @@ public static class Program
         var telemetry = Samples.Telemetry(receipt);
         if (telemetry.IsFailure(out var attributeError)) return Reject(attributeError);
 
-        // The emitting service spelled it "tracking_number"; ask for it in Pascal.
         var tracking = Samples.Lookup(telemetry.Get(), "TrackingNumber");
         if (tracking.IsFailure(out var lookupError)) return Reject(lookupError);
 
@@ -27,7 +24,6 @@ public static class Program
         Console.WriteLine($"tracking attribute resolved across spellings: {tracking.Get().Wire}");
         Console.WriteLine($"Success: core-utils round trip {(matched ? "matched" : "drifted")}");
         return matched ? 0 : 1;
-        // ── End demo wiring ──
     }
 
     private static int Reject(WireFormatError error)

@@ -1,4 +1,4 @@
-namespace AtomiCloud.Diene.CoreUtils.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 public class KeyNormalizerTests
 {
