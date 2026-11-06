@@ -7,7 +7,7 @@ import {
   InMemoryMetricsCollector,
 } from '@atomicloud/diene.interfaces/test-helper';
 import { Ok, Res } from '@atomicloud/diene.result';
-import { trace } from '@opentelemetry/api';
+import { context, propagation, trace } from '@opentelemetry/api';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import 'should';
@@ -432,6 +432,59 @@ describe('OtelBootstrap global registration ownership', () => {
     ownerStillServes.should.be.true();
     exported.should.eql(['auto']);
     globalTracerRecords().should.be.false();
+  });
+
+  it('should keep a later owner registered when a stale runtime shuts down again', async () => {
+    // Arrange
+    const first = start();
+    await first.runtime.shutdown();
+    const second = start();
+
+    // Act
+    await first.runtime.shutdown();
+    const stillServes = globalTracerRecords();
+    const parent = trace.setSpanContext(context.active(), {
+      traceId: 'ab'.repeat(16),
+      spanId: 'cd'.repeat(8),
+      traceFlags: 1,
+    });
+    const carried = context.with(parent, () => trace.getSpanContext(context.active())?.traceId);
+    const headers: Record<string, string> = {};
+    propagation.inject(parent, headers);
+    const exported = second.spans.getFinishedSpans().map(span => span.name);
+    await second.runtime.shutdown();
+
+    // Assert
+    second.runtime.globalRegistered.should.be.true();
+    stillServes.should.be.true();
+    exported.should.eql(['auto']);
+    (carried ?? '').should.eql('ab'.repeat(16));
+    (headers.traceparent ?? '').should.startWith('00-abab');
+    globalTracerRecords().should.be.false();
+  });
+
+  it('should leave a host provider registered after a stale runtime shuts down again', async () => {
+    // Arrange
+    const stale = start();
+    await stale.runtime.shutdown();
+    const host = new InMemorySpanExporter();
+    const hostProvider = new BasicTracerProvider({
+      resource: resourceFromAttributes({}),
+      spanProcessors: [new SimpleSpanProcessor(host)],
+    });
+    trace.setGlobalTracerProvider(hostProvider);
+
+    // Act
+    await stale.runtime.shutdown();
+    globalTracerRecords();
+
+    // Assert
+    host
+      .getFinishedSpans()
+      .map(span => span.name)
+      .should.eql(['auto']);
+    await hostProvider.shutdown();
+    trace.disable();
   });
 
   it('should leave a host provider untouched and still work through its own tracer', async () => {

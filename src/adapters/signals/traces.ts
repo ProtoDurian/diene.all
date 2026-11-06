@@ -81,12 +81,15 @@ class TraceRegistration {
     readonly tracer: boolean,
     readonly contextManager: boolean,
     readonly propagator: boolean,
+    private readonly provider?: TracerProvider,
   ) {}
 
   release(): void {
+    const current = trace.getTracerProvider();
+    if (!this.tracer || !(current instanceof ProxyTracerProvider) || current.getDelegate() !== this.provider) return;
     if (this.propagator) propagation.disable();
     if (this.contextManager) context.disable();
-    if (this.tracer) trace.disable();
+    trace.disable();
   }
 }
 
@@ -106,7 +109,7 @@ class GlobalTraceRegistrar {
     const manager = this.contextManager().enable();
     const ownsContext = context.setGlobalContextManager(manager);
     if (!ownsContext) manager.disable();
-    return new TraceRegistration(true, ownsContext, propagation.setGlobalPropagator(this.propagator()));
+    return new TraceRegistration(true, ownsContext, propagation.setGlobalPropagator(this.propagator()), provider);
   }
 }
 
