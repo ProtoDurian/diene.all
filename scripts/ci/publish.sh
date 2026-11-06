@@ -7,6 +7,7 @@ release_version="${RELEASE_VERSION:-}"
 output_dir="${PUBLISH_OUTPUT_DIR:-dist/${mode}}"
 oci_registry="${OCI_REGISTRY:-}"
 oci_repository="${OCI_REPOSITORY:-charts}"
+oci_repository="${oci_repository,,}"
 plain_http="${OCI_PLAIN_HTTP:-false}"
 oci_username="${OCI_USERNAME:-}"
 oci_password="${OCI_PASSWORD:-}"
@@ -20,8 +21,9 @@ manifest_version="$(yq -r '.version' chart/Chart.yaml)"
 
 helm-docs --chart-search-root chart
 mkdir -p "${output_dir}"
+helm dependency build chart
 helm package chart --destination "${output_dir}" --version "${version}"
-package="${output_dir}/diene-zinc-${version}.tgz"
+package="${output_dir}/zinc-${version}.tgz"
 [ ! -s "${package}" ] && echo "❌ chart package was not created" >&2 && exit 1
 
 if [ "${mode}" = "git" ]; then

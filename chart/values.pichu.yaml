@@ -1,7 +1,8 @@
-# pichu landscape overlay. LE STAGING directory (Q-I33) for rate-limit protection.
+# Registered-fleet serving row (Q-I33): LE staging, for rate-limit protection.
 serviceTree:
   landscape: pichu
+
 issuer:
   refs:
-    - name: zinc-letsencrypt
+    - token: letsencrypt
       directory: staging

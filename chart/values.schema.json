@@ -1,88 +1,62 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Diene Zinc Values",
-    "description": "Generated schema for the diene zinc cert-manager issuer chart.",
+    "description": "Generated schema for the diene zinc issuer chart.",
     "type": "object",
     "properties": {
-        "instance": {
-            "description": "Optional physical-instance metadata. The instance remains outside LPSM.",
-            "type": "object",
-            "properties": {
-                "physicalId": {
-                    "description": "Repository-qualified physical instance id.",
-                    "type": "string",
-                    "pattern": "^[a-z0-9._:/-]+$",
-                    "minLength": 1
-                }
-            }
-        },
         "issuer": {
-            "description": "The reusable Let's Encrypt ACME DNS-01 (Cloudflare) ClusterIssuer definition. Zinc owns NO Certificate: certificate owners reference a stable ClusterIssuer name. ONE definition is rendered once per `refs` entry (cluster-scoped, so it is instantiated per cluster); there are no per-landscape/zone issuer variants beyond the LE-directory selection carried by the overlays.",
+            "description": "The one reusable Let's Encrypt DNS-01 (Cloudflare) ClusterIssuer definition. Overlays only pick refs and zones.",
             "type": "object",
             "properties": {
-                "acme": {
+                "cloudflareTokenKey": {
+                    "description": "Token key under `secret.serviceFolder`; the ExternalSecret adds the folder prefix.",
+                    "type": "string",
+                    "pattern": "^[A-Z0-9_]+$"
+                },
+                "directories": {
                     "type": "object",
                     "properties": {
-                        "directories": {
-                            "description": "Named Let's Encrypt ACME directory endpoints. A `refs` entry selects one by name; the five-landscape LE-directory map (Q-I33) is expressed by the landscape overlays choosing production or staging.",
-                            "type": "object",
-                            "properties": {
-                                "production": {
-                                    "type": "string"
-                                },
-                                "staging": {
-                                    "type": "string"
-                                }
-                            }
+                        "production": {
+                            "type": "string"
+                        },
+                        "staging": {
+                            "type": "string"
                         }
+                    }
+                },
+                "dnsZones": {
+                    "description": "DNS-01 solver zone restriction. Empty means any zone the token can edit.",
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                        "type": "string"
                     }
                 },
                 "email": {
-                    "description": "ACME registration contact address.",
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^[^@\\s]+@[^@\\s]+$"
                 },
                 "refs": {
-                    "description": "ClusterIssuer instances to materialize from the one definition. Registered clusters instantiate a single stable ref; the ENTEI host-role overlay instantiates the staging+production pair concurrently on the shared host.",
+                    "description": "ClusterIssuers to materialize, each named `zinc-\u003ctoken\u003e`. Registered rows keep `zinc-letsencrypt`.",
                     "type": "array",
+                    "minItems": 1,
                     "items": {
                         "type": "object",
+                        "required": [
+                            "token",
+                            "directory"
+                        ],
                         "properties": {
                             "directory": {
-                                "type": "string"
+                                "type": "string",
+                                "enum": [
+                                    "production",
+                                    "staging"
+                                ]
                             },
-                            "name": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                },
-                "solver": {
-                    "type": "object",
-                    "properties": {
-                        "cloudflare": {
-                            "type": "object",
-                            "properties": {
-                                "apiTokenSecretRef": {
-                                    "type": "object",
-                                    "properties": {
-                                        "key": {
-                                            "description": "Key inside that Secret (folder-prefixed by the ExternalSecret rewrite).",
-                                            "type": "string"
-                                        },
-                                        "name": {
-                                            "description": "The ExternalSecret-materialized Secret carrying the Cloudflare token.",
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "dnsZones": {
-                            "description": "DNS-01 solver zone restriction. Empty = unrestricted (registered fleet); the ENTEI overlay pins the hosted-development authority zones.",
-                            "type": "array",
-                            "uniqueItems": true,
-                            "items": {
-                                "type": "string"
+                            "token": {
+                                "type": "string",
+                                "pattern": "^[a-z0-9]+$"
                             }
                         }
                     }
@@ -96,30 +70,25 @@
             "minLength": 1
         },
         "secret": {
-            "description": "One service-scoped ExternalSecret that materializes the Cloudflare API token from the platform SecretStore created by carbon via the SoS chain. The DNS-01 solver references this Secret only; a token is never inlined.",
+            "description": "The one ExternalSecret: the Cloudflare API token from the platform SecretStore (carbon), folder-prefixed.",
             "type": "object",
             "properties": {
-                "enabled": {
-                    "description": "Render the ExternalSecret.",
-                    "type": "boolean"
-                },
                 "refreshInterval": {
-                    "description": "ESO refresh cadence.",
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^[0-9]+(s|m|h)$"
                 },
                 "serviceFolder": {
-                    "description": "Service-folder path fanned in with a ZINC_ prefix (holds the CF token).",
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^/.+"
                 },
                 "sharedFolder": {
-                    "description": "Shared-folder path fanned in with a SHARED_ prefix.",
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^/.+"
                 },
                 "store": {
                     "type": "object",
                     "properties": {
                         "kind": {
-                            "description": "The platform SecretStore is namespace-scoped (created by carbon).",
                             "type": "string",
                             "enum": [
                                 "SecretStore",
@@ -127,34 +96,40 @@
                             ]
                         },
                         "name": {
-                            "description": "Platform SecretStore name.",
-                            "type": "string"
+                            "description": "Platform SecretStore name; carbon has not pinned it yet.",
+                            "type": "string",
+                            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
                         }
                     }
                 }
             }
         },
         "serviceTree": {
-            "description": "Stable service-tree projection. Platform is always the release namespace (never a value); landscape is added by independent overlays.",
+            "description": "Stable four-slot service-tree projection. Landscape is added by the landscape overlays.",
             "type": "object",
             "required": [
+                "platform",
                 "service",
                 "module",
                 "layer"
             ],
             "properties": {
                 "layer": {
-                    "description": "Architecture layer.",
                     "type": "string",
                     "pattern": "^[0-9]+$"
                 },
                 "module": {
-                    "description": "Module name.",
                     "type": "string",
                     "pattern": "^[a-z0-9]+$"
                 },
+                "platform": {
+                    "description": "cert-manager reads DNS-01 secrets from its cluster resource namespace: sulfur's `certs`.",
+                    "type": "string",
+                    "enum": [
+                        "certs"
+                    ]
+                },
                 "service": {
-                    "description": "Service name.",
                     "type": "string",
                     "pattern": "^[a-z0-9]+$"
                 }

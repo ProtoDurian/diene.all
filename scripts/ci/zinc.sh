@@ -1,25 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-bash ./scripts/ci/setup.sh
-bash ./scripts/validate/zinc.sh schema
-bash ./scripts/validate/zinc.sh schema-negative
-bash ./scripts/validate/zinc.sh schema-drift
-bash ./scripts/validate/zinc.sh lint
-bash ./scripts/validate/zinc.sh render
-bash ./scripts/validate/zinc.sh labels
-bash ./scripts/validate/zinc.sh le-directory-map
-bash ./scripts/validate/zinc.sh issuer-cardinality
-bash ./scripts/validate/zinc.sh entei-overlay
-bash ./scripts/validate/zinc.sh no-certificate
-bash ./scripts/validate/zinc.sh credential-literal
-bash ./scripts/validate/zinc.sh rendered-manifests
-bash ./scripts/validate/zinc.sh vap-sabotage
-bash ./scripts/validate/zinc.sh publish-git
-bash ./scripts/validate/zinc.sh publish-oci
-bash ./scripts/validate/zinc.sh version
-bash ./scripts/validate/zinc.sh presence
-bash ./scripts/validate/release-config.sh all
-bash ./scripts/validate/gitlint-types.sh
+for mode in schema schema-drift lint render lpsm-labels secret task-surface directory-map entei-overlay issuer-cardinality no-certificate credential-literal rendered-manifests stale-row publish-git publish-oci version presence; do
+  bash ./scripts/validate/zinc.sh "${mode}"
+done
+bash ./scripts/validate/release-lint.sh parse
+bash ./scripts/validate/release-lint.sh vocabulary
+bash ./scripts/validate/release-lint.sh types
 
-echo "✅ Zinc CI validation complete"
+echo "✅ zinc unit tier complete"

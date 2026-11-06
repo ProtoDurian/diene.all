@@ -1,7 +1,8 @@
-# raichu landscape overlay. Registered fleet — LE PRODUCTION directory (Q-I33).
+# Registered-fleet serving row (Q-I33): LE production.
 serviceTree:
   landscape: raichu
+
 issuer:
   refs:
-    - name: zinc-letsencrypt
+    - token: letsencrypt
       directory: production

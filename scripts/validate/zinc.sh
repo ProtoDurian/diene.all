@@ -1,57 +1,210 @@
 #!/usr/bin/env bash
-# Zinc unit-tier validation (materialized cert-manager issuer chart — S30, no probe
-# matrix). One mode per independently invoked mechanism; the CI orchestrator calls
-# them in order. Positive assertion and its negative fixture live together in each
-# mode.
+# shellcheck disable=SC2016 # jq programs are single-quoted on purpose
 set -euo pipefail
 
 mode="${1:-}"
 release="${RELEASE:-zinc}"
-namespace="${NAMESPACE:-cert-manager}"
-base_overlay="chart/values.example.yaml"
-prod_url="https://acme-v02.api.letsencrypt.org/directory"
-staging_url="https://acme-staging-v02.api.letsencrypt.org/directory"
-# The explicit five-landscape LE-directory map (Q-I33, amended): production on
-# pikachu/raichu/amphoros; staging on pichu/lapras.
-map_landscapes=(pikachu raichu amphoros pichu lapras)
-map_directory() {
-  case "$1" in
-  pikachu | raichu | amphoros) echo production ;;
-  pichu | lapras) echo staging ;;
-  *)
-    echo "❌ landscape $1 is not in the LE-directory map" >&2
-    exit 1
-    ;;
-  esac
-}
-all_overlays=(example pikachu raichu amphoros pichu lapras entei)
+namespace="${NAMESPACE:-certs}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 
 [ -z "${mode}" ] && echo "❌ validation mode not set" >&2 && exit 1
 
+prod=https://acme-v02.api.letsencrypt.org/directory
+staging=https://acme-staging-v02.api.letsencrypt.org/directory
+landscapes=(example pikachu raichu ampharos pichu entei)
+prod_rows=(pikachu raichu ampharos)
+entei_zones='["castform.dev.atomi.cloud","eevee.dev.atomi.cloud"]'
+schemas='tests/schemas/{{ .Group }}/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json'
+
 render() {
-  # render <output> [overlay-file ...]
-  local out="$1"
+  local root="$1"
   shift
-  local args=()
-  local o
-  for o in "$@"; do args+=(--values "${o}"); done
-  helm template "${release}" chart --namespace "${namespace}" "${args[@]}" >"${out}"
+  helm template "${release}" "${root}/chart" --namespace "${namespace}" "$@"
+}
+
+render_l() { render "$1" --values "$1/chart/values.$2.yaml" "${@:3}"; }
+
+json() { yq eval-all -o=json '.' "$1" | jq -s 'map(select(.kind != null))'; }
+
+need_jq() {
+  local reason="$1"
+  shift
+  jq -e "$@" >/dev/null || { echo "❌ ${reason}" >&2 && return 1; }
+}
+
+expect_red() {
+  local label="$1" pattern="$2"
+  shift 2
+  if "$@" >"${tmp}/red.txt" 2>&1; then
+    echo "❌ negative fixture '${label}' was not caught" >&2 && exit 1
+  fi
+  rg -q -- "${pattern}" "${tmp}/red.txt" || { echo "❌ negative fixture '${label}' failed for the wrong reason" >&2 && cat "${tmp}/red.txt" >&2 && exit 1; }
+}
+
+expect_refusal() {
+  local pattern="$1"
+  shift
+  expect_red "refusal: $*" "${pattern}" render . "$@"
+}
+
+copy_root() {
+  mkdir -p "$1"
+  cp -a chart tests Taskfile.yaml tasks "$1/"
+}
+
+issuers() { render_l "$1" "$2" >"${tmp}/issuers.yaml" && json "${tmp}/issuers.yaml" | jq -c '[.[] | select(.kind == "ClusterIssuer") | {name: .metadata.name, server: .spec.acme.server, zones: (.spec.acme.solvers[0].selector.dnsZones // [] | sort)}] | sort_by(.name)'; }
+
+check_map() {
+  local root="$1" l got
+  local lapras
+  lapras="$( (
+    find "${root}/chart" -maxdepth 1 -name 'values.lapras*' -print
+    rg -l '^\s*landscape:\s*lapras\b' "${root}/chart" || true
+  ) | sort -u)"
+  [ -z "${lapras}" ] || { echo "❌ a lapras issuer overlay exists (Lapras is Boron-direct; the Q-I33 map has no lapras row): ${lapras}" >&2 && return 1; }
+  got="$(find "${root}/chart" -maxdepth 1 -name 'values.*.yaml' ! -name values.schema.json -printf '%f\n' | sed 's/^values\.//; s/\.yaml$//' | sort | paste -sd' ')"
+  [ "${got}" = "$(printf '%s\n' "${landscapes[@]}" | sort | paste -sd' ')" ] || { echo "❌ the landscape overlay set differs from the Q-I33 map: ${got}" >&2 && return 1; }
+  for l in "${prod_rows[@]}"; do
+    issuers "${root}" "${l}" | need_jq "${l} is not on the LE production directory (Q-I33)" --arg s "${prod}" '. == [{name: "zinc-letsencrypt", server: $s, zones: []}]' || return 1
+  done
+  issuers "${root}" pichu | need_jq "pichu is not on the LE staging directory (Q-I33)" --arg s "${staging}" '. == [{name: "zinc-letsencrypt", server: $s, zones: []}]'
+}
+
+check_entei() {
+  local root="$1"
+  issuers "${root}" entei >"${tmp}/entei.json"
+  need_jq 'ENTEI does not expose exactly the zinc-production and zinc-staging refs' '[.[].name] == ["zinc-production", "zinc-staging"]' "${tmp}/entei.json" || return 1
+  need_jq 'the ENTEI staging ref zinc-staging does not resolve to the LE staging directory' --arg s "${staging}" '.[1].server == $s' "${tmp}/entei.json" || return 1
+  need_jq 'the ENTEI production ref zinc-production does not resolve to the LE production directory' --arg s "${prod}" '.[0].server == $s' "${tmp}/entei.json" || return 1
+  need_jq 'the ENTEI DNS-01 solver is not restricted to the hosted-development zones' --argjson z "${entei_zones}" 'all(.[]; .zones == $z)' "${tmp}/entei.json"
+}
+
+check_cardinality() {
+  local root="$1" defs l paths allowed bad
+  defs="$(rg -c '^\s*kind:\s*(Cluster)?Issuer\b' "${root}/chart/templates" || true)"
+  [ "${defs}" = "${root}/chart/templates/clusterissuer.yaml:1" ] || { echo "❌ the issuer definition is not exactly one template: ${defs//$'\n'/ }" >&2 && return 1; }
+  render "${root}" >"${tmp}/base.yaml"
+  json "${tmp}/base.yaml" | jq -c '[.[] | select(.kind == "ClusterIssuer") | .spec | del(.acme.server, .acme.privateKeySecretRef, .acme.solvers[].selector)] | unique' >"${tmp}/base-spec.json"
+  for l in "${landscapes[@]}"; do
+    render_l "${root}" "${l}" >"${tmp}/card.yaml"
+    json "${tmp}/card.yaml" | jq -c '[.[] | select(.kind == "ClusterIssuer") | .spec | del(.acme.server, .acme.privateKeySecretRef, .acme.solvers[].selector)] | unique' |
+      need_jq "${l} renders a per-landscape issuer variant (spec differs beyond directory, ref and zones)" --slurpfile b "${tmp}/base-spec.json" '. == $b[0] and length == 1' || return 1
+    allowed='^(serviceTree\.landscape|issuer\.refs\.0\.(token|directory))$'
+    [ "${l}" = entei ] && allowed='^(serviceTree\.landscape|issuer\.refs\.[01]\.(token|directory)|issuer\.dnsZones\.[0-9]+)$'
+    paths="$(yq '[.. | select(tag != "!!map" and tag != "!!seq") | path | join(".")] | .[]' "${root}/chart/values.${l}.yaml")"
+    bad="$(rg -v "${allowed}" <<<"${paths}" || true)"
+    [ -z "${bad}" ] || { echo "❌ ${l} overlay is a per-landscape issuer variant: it sets ${bad//$'\n'/ } (only landscape, refs and the ENTEI zones vary)" >&2 && return 1; }
+  done
+  for l in example pikachu raichu ampharos pichu; do
+    issuers "${root}" "${l}" | need_jq "${l} renders a per-landscape issuer variant (not the one zinc-letsencrypt ref)" 'length == 1 and .[0].name == "zinc-letsencrypt" and .[0].zones == []' || return 1
+  done
+}
+
+check_no_certs() {
+  local root="$1" hits l
+  hits="$(rg -n '^\s*kind:\s*(Certificate|CertificateRequest)\b' "${root}/chart" || true)"
+  [ -z "${hits}" ] || { echo "❌ zinc authors a Certificate (certificate owners live outside zinc): ${hits}" >&2 && return 1; }
+  for l in "" "${landscapes[@]}"; do
+    if [ -z "${l}" ]; then render "${root}" >"${tmp}/certs.yaml"; else render_l "${root}" "${l}" >"${tmp}/certs.yaml"; fi
+    json "${tmp}/certs.yaml" | need_jq "zinc renders a Certificate (${l:-values.yaml})" 'all(.[]; .kind != "Certificate" and .kind != "CertificateRequest")' || return 1
+  done
+}
+
+check_intents() {
+  local root="$1" file="$2"
+  issuers "${root}" entei | jq -c '[.[].name]' >"${tmp}/refs.json"
+  yq eval-all -o=json '.' "${file}" | jq -s 'map(select(.kind == "Certificate"))' >"${tmp}/intents.json"
+  need_jq 'the fixture holds no Certificate intent' 'length > 0' "${tmp}/intents.json" || return 1
+  need_jq 'a Certificate intent references no zinc ENTEI ref' --slurpfile r "${tmp}/refs.json" 'all(.[]; .spec.issuerRef.kind == "ClusterIssuer" and (.spec.issuerRef.name | IN($r[0][])))' "${tmp}/intents.json" || return 1
+  need_jq 'a Certificate intent names an exact host instead of a service.platform wildcard (exact-name-per-host)' 'all(.[].spec.dnsNames[]; startswith("*."))' "${tmp}/intents.json" || return 1
+  need_jq 'a Certificate intent carries a broad landscape wildcard (not one single-label wildcard per service.platform pair)' --argjson z "${entei_zones}" '
+    def dnslabel: test("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$");
+    all(.[].spec.dnsNames[]; . as $n | any($z[]; . as $zone | ($n | endswith("." + $zone)) and
+      ($n | ltrimstr("*.") | rtrimstr("." + $zone) | split(".") | length == 3 and all(.[]; dnslabel))))' "${tmp}/intents.json"
+}
+
+check_credentials() {
+  local root="$1" hits l
+  hits="$(rg -n -i --glob '*.yaml' --glob '*.tpl' -e '(api[_-]?(token|key)|password|secret[_-]?key)\s*:\s*\S' -e '\b[A-Za-z0-9_-]{40}\b' "${root}/chart" | rg -v 'apiTokenSecretRef:|cloudflareTokenKey:' || true)"
+  [ -z "${hits}" ] || { echo "❌ a credential literal is inlined in the chart (the Cloudflare token comes only from the ExternalSecret): ${hits}" >&2 && return 1; }
+  for l in "${landscapes[@]}"; do
+    render_l "${root}" "${l}" >"${tmp}/cred.yaml"
+    json "${tmp}/cred.yaml" | need_jq "${l} renders an inline credential (a Secret, inline data or a non-ref Cloudflare field)" '
+      all(.[]; .kind != "Secret" and (has("data") or has("stringData") | not)) and
+      all(.[] | select(.kind == "ClusterIssuer"); .spec.acme.solvers | all(.[]; (.dns01.cloudflare | keys) == ["apiTokenSecretRef"])) and
+      all(.[] | select(.kind == "ExternalSecret"); .spec.data == null and .spec.target.template.data == null)' || return 1
+  done
+}
+
+check_lpsm() {
+  local root="$1" prefix="$2" l
+  shift 2
+  for l in "${landscapes[@]}"; do
+    render_l "${root}" "${l}" "$@" >"${tmp}/lpsm.yaml"
+    json "${tmp}/lpsm.yaml" | need_jq "LPSM labels/annotations differ on the ClusterIssuer, ExternalSecret or its Secret (${l})" --arg p "${prefix}" --arg l "${l}" '
+      ({($p + "/platform"): "certs", ($p + "/service"): "zinc", ($p + "/module"): "issuer", ($p + "/layer"): "1", ($p + "/landscape"): $l}) as $want |
+      def lpsm: . as $m | all($want | to_entries[]; $m[.key] == .value);
+      (map(.kind) | sort | unique) == ["ClusterIssuer", "ExternalSecret"] and
+      all(.[]; (.metadata.labels | lpsm) and (.metadata.annotations | lpsm)) and
+      all(.[] | select(.kind == "ExternalSecret"); (.spec.target.template.metadata.labels | lpsm) and (.spec.target.template.metadata.annotations | lpsm)) and
+      ($p == "atomi.cloud" or all(.[]; [.metadata.labels, .metadata.annotations | keys[] | select(startswith("atomi.cloud/"))] | length == 0))' || return 1
+  done
+}
+
+check_secret() {
+  local root="$1"
+  render_l "${root}" pikachu >"${tmp}/secret.yaml"
+  json "${tmp}/secret.yaml" >"${tmp}/secret.json"
+  need_jq 'zinc does not render exactly one ExternalSecret without hand-written key mappings' 'map(select(.kind == "ExternalSecret")) | length == 1 and .[0].spec.data == null' "${tmp}/secret.json" || return 1
+  need_jq 'the ExternalSecret name, store or folder-derived prefixes are wrong' '
+    map(select(.kind == "ExternalSecret"))[0] as $s | $s.metadata.name == "zinc-secrets" and $s.spec.target.name == "zinc-secrets" and
+    $s.spec.secretStoreRef == {kind: "SecretStore", name: "certs"} and
+    ($s.spec.dataFrom | map(.find.path)) == ["/shared", "/zinc"] and ($s.spec.dataFrom | map(.rewrite[0].regexp.target)) == ["SHARED_$1", "ZINC_$1"]' "${tmp}/secret.json" || return 1
+  need_jq 'the ClusterIssuer token ref is not the folder-prefixed ExternalSecret key' '
+    all(.[] | select(.kind == "ClusterIssuer"); .spec.acme.solvers[0].dns01.cloudflare.apiTokenSecretRef == {name: "zinc-secrets", key: "ZINC_CLOUDFLARE_API_TOKEN"})' "${tmp}/secret.json"
+}
+
+check_tasks() {
+  local root="$1" got want
+  got="$(yq -r '.includes | to_entries[] | select(.key != "helm") | [.key, .value.taskfile, .value.vars.LANDSCAPE, .value.vars.NAMESPACE, .value.vars.RELEASE_NAME, (.value.vars.CLUSTER // "")] | join(" ")' "${root}/Taskfile.yaml" | sort)"
+  want="$(for l in "${landscapes[@]}"; do echo "${l} tasks/Taskfile.cluster.yaml ${l} certs zinc "; done | sort)"
+  [ "${got}" = "${want}" ] || { echo "❌ the Taskfile includes differ from the landscape overlays (one tasks/Taskfile.cluster.yaml include per overlay)" >&2 && diff <(echo "${want}") <(echo "${got}") >&2 || true && return 1; }
+  (cd "${root}" && task --silent pikachu:template) >"${tmp}/task.yaml"
+  json "${tmp}/task.yaml" | need_jq 'pikachu:template does not render the pikachu overlay' --arg s "${prod}" '
+    map(select(.kind == "ClusterIssuer")) | length == 1 and .[0].spec.acme.server == $s and .[0].metadata.labels["atomi.cloud/landscape"] == "pikachu"'
+}
+
+vap_stage() {
+  local root="$1" file="$2"
+  kubeconform -strict -summary -schema-location default -schema-location "${root}/${schemas}" "${file}" >"${file}.kc.txt" 2>&1 ||
+    { cat "${file}.kc.txt" >&2 && echo "❌ kubeconform rejected the rendered manifests" >&2 && return 1; }
+  rg -q 'Valid: [1-9][0-9]*, Invalid: 0, Errors: 0, Skipped: 0' "${file}.kc.txt" || { cat "${file}.kc.txt" >&2 && echo "❌ kubeconform validated nothing or skipped a kind" >&2 && return 1; }
+  yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "${file}" >"${file}.vap.yaml"
+  if [ -s "${file}.vap.yaml" ]; then
+    kyverno apply "${root}/policies/vap" --resource "${file}.vap.yaml" --detailed-results --remove-color
+  else
+    echo "VAP evaluation vacuous: no workload or Service targets"
+  fi
+}
+
+stale="amph"
+stale+="oros"
+
+check_stale() {
+  local tree="$1" dir="${2:-.}" hits
+  hits="$(git -C "${dir}" -c core.quotePath=false ls-tree -r --name-only "${tree}" | rg -i "${stale}" || true)"
+  hits+="$(git -C "${dir}" grep -n -I -i "${stale}" "${tree}" || true)"
+  [ -z "${hits}" ] || { echo "❌ a shipped file names the stale ${stale} row: ${hits}" >&2 && return 1; }
 }
 
 case "${mode}" in
 schema)
-  helm lint chart --namespace "${namespace}" >/dev/null
-  helm lint chart --namespace "${namespace}" --values "${base_overlay}" >/dev/null
-  ;;
-schema-negative)
-  yq '.serviceTree.layer = "notnumeric"' chart/values.yaml >"${tmp}/invalid-values.yaml"
-  if helm lint chart --namespace "${namespace}" --values "${tmp}/invalid-values.yaml" >"${tmp}/schema.stdout" 2>"${tmp}/schema.stderr"; then
-    echo "❌ non-numeric layer passed Helm schema validation" >&2
-    exit 1
-  fi
-  rg -qi 'layer|pattern|does not match' "${tmp}/schema.stdout" "${tmp}/schema.stderr"
+  expect_red 'platform other than certs' "serviceTree/platform|at '/serviceTree/platform'" helm lint chart --namespace other --set serviceTree.platform=other
+  expect_red 'layer is not numeric' "serviceTree/layer|at '/serviceTree/layer'" helm lint chart --namespace "${namespace}" --set-string serviceTree.layer=one
+  expect_red 'unknown ACME directory' "refs/0/directory|at '/issuer/refs/0/directory'" helm lint chart --namespace "${namespace}" --set 'issuer.refs[0].directory=prod'
+  expect_red 'dashed ref token' "refs/0/token|at '/issuer/refs/0/token'" helm lint chart --namespace "${namespace}" --set 'issuer.refs[0].token=lets-encrypt'
+  expect_red 'no refs' "issuer/refs|at '/issuer/refs'" helm lint chart --namespace "${namespace}" --set-json 'issuer.refs=[]'
   ;;
 schema-drift)
   bash ./scripts/local/generate-chart-schema.sh "${tmp}/values.schema.json" >/dev/null
@@ -59,310 +212,131 @@ schema-drift)
   ;;
 lint)
   helm lint chart --namespace "${namespace}"
-  for ls in "${all_overlays[@]}"; do
-    echo "🔎 linting ${ls} overlay"
-    helm lint chart --namespace "${namespace}" --values "chart/values.${ls}.yaml"
-  done
+  for l in "${landscapes[@]}"; do helm lint chart --namespace "${namespace}" --values "chart/values.${l}.yaml"; done
   ;;
 render)
-  # Every rendered object name must be a valid RFC-1123 subdomain.
-  for ls in "${all_overlays[@]}"; do
-    render "${tmp}/render.yaml" "chart/values.${ls}.yaml"
-    yq eval-all -o=json '.' "${tmp}/render.yaml" | jq -se '
-      def dnssubdomain: test("^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$");
-      (map(select(type == "object" and has("kind")))) as $r
-      | ($r | length) >= 1
-        and (all($r[]; ((.metadata.name // "") | dnssubdomain)))
-    ' >/dev/null || {
-      echo "❌ rendered a non-RFC-1123 object name in the ${ls} overlay" >&2
-      exit 1
-    }
-  done
+  render . >/dev/null
+  for l in "${landscapes[@]}"; do render_l . "${l}" >/dev/null; done
+  expect_refusal 'must equal release namespace' --namespace other
+  expect_refusal 'repeats token "b" or directory "staging"' --set-json 'issuer.refs=[{"token":"a","directory":"staging"},{"token":"b","directory":"staging"}]'
+  expect_refusal 'repeats token "a"' --set-json 'issuer.refs=[{"token":"a","directory":"staging"},{"token":"a","directory":"production"}]'
   ;;
-labels)
-  # serviceTree.platform must never be a value; the slots must be consistent.
-  yq -e '.serviceTree | has("platform") | not' chart/values.yaml >/dev/null
-  render "${tmp}/rendered.yaml" chart/values.pikachu.yaml
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" | jq --arg ns "${namespace}" -se '
-    def lpsm($prefix; $namespace):
-      (.[$prefix + "/platform"] == $namespace)
-      and (.[$prefix + "/service"] == "zinc")
-      and (.[$prefix + "/module"] == "issuer")
-      and (.[$prefix + "/layer"] == "1")
-      and (.[$prefix + "/landscape"] == "pikachu");
-    (map(select(type == "object" and has("kind")))) as $resources
-    | ($resources | map(select(.kind == "ClusterIssuer"))) as $issuers
-    | ($resources | map(select(.kind == "ExternalSecret"))) as $secrets
-    | ($issuers | length) == 1
-      and ($secrets | length) == 1
-      and (all($issuers[]; .metadata.labels | lpsm("atomi.cloud"; $ns)))
-      and (all($issuers[]; .metadata.annotations | lpsm("atomi.cloud"; $ns)))
-      and (all($secrets[]; .metadata.labels | lpsm("atomi.cloud"; $ns)))
-      and (all($secrets[]; .metadata.annotations | lpsm("atomi.cloud"; $ns)))
-  ' >/dev/null
-  # Namespace change moves the platform label (platform is namespace-sourced).
-  helm template "${release}" chart --namespace tenant --values chart/values.pikachu.yaml >"${tmp}/ns.yaml"
-  yq eval-all -o=json '.' "${tmp}/ns.yaml" | jq -se '
-    (map(select(type == "object" and .kind == "ClusterIssuer"))[0]) as $ci
-    | $ci.metadata.labels["atomi.cloud/platform"] == "tenant"
-      and $ci.metadata.annotations["atomi.cloud/platform"] == "tenant"
-  ' >/dev/null
-  # labelPrefix override reprefixes every key and leaves no atomi.cloud key.
-  helm template "${release}" chart --namespace tenant --values chart/values.pikachu.yaml --set labelPrefix=example.dev >"${tmp}/override.yaml"
-  yq eval-all -o=json '.' "${tmp}/override.yaml" | jq -se '
-    def lpsm:
-      (.["example.dev/platform"] == "tenant")
-      and (.["example.dev/service"] == "zinc")
-      and (.["example.dev/module"] == "issuer")
-      and (.["example.dev/layer"] == "1")
-      and (.["example.dev/landscape"] == "pikachu");
-    (map(select(type == "object" and .kind == "ClusterIssuer"))[0]) as $ci
-    | ($ci.metadata.labels | lpsm)
-      and ($ci.metadata.annotations | lpsm)
-      and ([$ci.metadata.labels, $ci.metadata.annotations] | map(to_entries[]) | map(select(.key | startswith("atomi.cloud/"))) | length) == 0
-  ' >/dev/null
-  # A forbidden platform value is rejected at render time.
-  if helm template "${release}" chart --namespace tenant --values chart/values.pikachu.yaml --set serviceTree.platform=wrong >/dev/null 2>&1; then
-    echo "❌ a forbidden serviceTree.platform value was accepted" >&2
-    exit 1
-  fi
+lpsm-labels)
+  check_lpsm . atomi.cloud
+  check_lpsm . example.dev --set labelPrefix=example.dev
+  copy_root "${tmp}/nolabels"
+  sed -i '/include "zinc.serviceTreeLabels"/d' "${tmp}/nolabels/chart/templates/_helpers.tpl"
+  expect_red 'LPSM labels dropped' 'LPSM labels/annotations differ' check_lpsm "${tmp}/nolabels" atomi.cloud
   ;;
-le-directory-map)
-  # The explicit five-landscape map: production on pikachu/raichu/amphoros,
-  # staging on pichu/lapras.
-  server_of() {
-    yq eval-all -o=json '.' "$1" | jq -sr '[.[] | select(type == "object" and .kind == "ClusterIssuer")][0].spec.acme.server'
-  }
-  for ls in "${map_landscapes[@]}"; do
-    render "${tmp}/${ls}.yaml" "chart/values.${ls}.yaml"
-    want="$(map_directory "${ls}")"
-    got="$(server_of "${tmp}/${ls}.yaml")"
-    case "${want}" in
-    production) expect="${prod_url}" ;;
-    staging) expect="${staging_url}" ;;
-    esac
-    if [ "${got}" != "${expect}" ]; then
-      echo "❌ ${ls} maps to ${got}, expected the ${want} directory ${expect}" >&2
-      exit 1
-    fi
-  done
-  # Negative: a production-map landscape pointed at the staging directory must be
-  # observably off-map (the assertion has teeth).
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.pikachu.yaml \
-    --set issuer.refs[0].directory=staging >"${tmp}/off-map.yaml"
-  if [ "$(server_of "${tmp}/off-map.yaml")" = "${prod_url}" ]; then
-    echo "❌ pikachu pointed at staging still resolved the production directory; map gate has no teeth" >&2
-    exit 1
-  fi
+secret)
+  check_secret .
+  render_l . pikachu --set secret.sharedFolder=/common --set secret.serviceFolder=/team/zinc-issuer --set secret.store.name=other |
+    yq eval-all -o=json '.' | jq -s -e 'map(select(.kind != null)) | (map(select(.kind == "ExternalSecret"))[0].spec | .secretStoreRef.name == "other" and (.dataFrom | map(.rewrite[0].regexp.target)) == ["COMMON_$1", "TEAM_ZINC_ISSUER_$1"]) and
+      (map(select(.kind == "ClusterIssuer"))[0].spec.acme.solvers[0].dns01.cloudflare.apiTokenSecretRef.key == "TEAM_ZINC_ISSUER_CLOUDFLARE_API_TOKEN")' >/dev/null ||
+    { echo "❌ the ExternalSecret prefixes or the issuer token key do not follow the folders" >&2 && exit 1; }
+  expect_refusal 'secret key prefixes "SHARED_" \(/shared\) and "SHARED_" \(/shared\) collide' --set secret.serviceFolder=/shared
+  expect_refusal 'collide' --set secret.sharedFolder=/zinc/inner
+  copy_root "${tmp}/rawkey"
+  sed -i 's|key: {{ $tokenKey }}|key: CLOUDFLARE_API_TOKEN|' "${tmp}/rawkey/chart/templates/clusterissuer.yaml"
+  expect_red 'issuer reads the un-prefixed key' 'not the folder-prefixed ExternalSecret key' check_secret "${tmp}/rawkey"
   ;;
-issuer-cardinality)
-  # Exactly ONE issuer definition template (no second hand-authored issuer).
-  issuer_template_files="$(rg -l 'kind:\s*(Cluster)?Issuer' chart/templates/ | wc -l)"
-  [ "${issuer_template_files}" -ne 1 ] && echo "❌ expected exactly one issuer template, found ${issuer_template_files}" >&2 && exit 1
-  count_issuers() {
-    yq eval-all -o=json '.' "$1" | jq -s '[.[] | select(type == "object" and (.kind == "Issuer" or .kind == "ClusterIssuer"))] | length'
-  }
-  # Registered clusters instantiate exactly one; ENTEI instantiates the pair.
-  for ls in "${map_landscapes[@]}"; do
-    render "${tmp}/${ls}.yaml" "chart/values.${ls}.yaml"
-    [ "$(count_issuers "${tmp}/${ls}.yaml")" -ne 1 ] && echo "❌ ${ls} did not instantiate exactly one ClusterIssuer" >&2 && exit 1
-    # No namespaced Issuer variant — every issuer is cluster-scoped.
-    if yq eval-all -o=json '.' "${tmp}/${ls}.yaml" | jq -se 'any(.[]; type == "object" and .kind == "Issuer")' >/dev/null 2>&1; then
-      echo "❌ ${ls} rendered a namespaced Issuer variant" >&2
-      exit 1
-    fi
+task-surface)
+  check_tasks .
+  copy_root "${tmp}/tasks"
+  yq -i 'del(.includes.raichu)' "${tmp}/tasks/Taskfile.yaml"
+  expect_red 'an overlay without its Taskfile include' 'Taskfile includes differ from the landscape overlays' check_tasks "${tmp}/tasks"
+  ;;
+directory-map)
+  check_map .
+  for row in "${prod_rows[@]}"; do
+    copy_root "${tmp}/map-${row}"
+    yq -i '.issuer.refs[0].directory = "staging"' "${tmp}/map-${row}/chart/values.${row}.yaml"
+    expect_red "${row} on the staging directory" "${row} is not on the LE production directory" check_map "${tmp}/map-${row}"
   done
-  render "${tmp}/entei.yaml" chart/values.entei.yaml
-  [ "$(count_issuers "${tmp}/entei.yaml")" -ne 2 ] && echo "❌ ENTEI did not instantiate the staging+production pair" >&2 && exit 1
-  # Negative: a second hand-authored issuer template reddens the single-source gate.
-  cat >chart/templates/zz-issuer-variant-fixture.yaml <<'FIXTURE'
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: zinc-handauthored-variant
-spec:
-  selfSigned: {}
-FIXTURE
-  trap 'rm -f chart/templates/zz-issuer-variant-fixture.yaml; rm -rf "${tmp}"' EXIT
-  if [ "$(rg -l 'kind:\s*(Cluster)?Issuer' chart/templates/ | wc -l)" -eq 1 ]; then
-    echo "❌ issuer-cardinality negative fixture did not add a second issuer template" >&2
-    exit 1
-  fi
-  rm -f chart/templates/zz-issuer-variant-fixture.yaml
-  trap 'rm -rf "${tmp}"' EXIT
+  copy_root "${tmp}/map-pichu"
+  yq -i '.issuer.refs[0].directory = "production"' "${tmp}/map-pichu/chart/values.pichu.yaml"
+  expect_red 'pichu on the production directory' 'pichu is not on the LE staging directory' check_map "${tmp}/map-pichu"
+  copy_root "${tmp}/map-lapras"
+  sed 's/pichu/lapras/' chart/values.pichu.yaml >"${tmp}/map-lapras/chart/values.lapras.yaml"
+  expect_red 'a lapras issuer overlay' 'a lapras issuer overlay exists' check_map "${tmp}/map-lapras"
   ;;
 entei-overlay)
-  render "${tmp}/entei.yaml" chart/values.entei.yaml
-  # Both stable refs render with the intended ACME directories and the
-  # hosted-development zone solver restriction.
-  yq eval-all -o=json '.' "${tmp}/entei.yaml" | jq -se --arg prod "${prod_url}" --arg staging "${staging_url}" '
-    (map(select(type == "object" and .kind == "ClusterIssuer"))) as $ci
-    | ($ci | map({key: .metadata.name, value: .spec.acme.server}) | from_entries) as $servers
-    | ($ci | length) == 2
-      and ($servers["zinc-letsencrypt-staging"] == $staging)
-      and ($servers["zinc-letsencrypt-production"] == $prod)
-      and (all($ci[]; (.spec.acme.solvers[0].dns01.cloudflare.apiTokenSecretRef.name != null)))
-      and (all($ci[]; (.spec.acme.solvers[0].selector.dnsZones | index("dev.atomi.cloud")) != null))
-  ' >/dev/null
-  # Negative: dropping the hosted-zone restriction reddens the restriction check.
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.entei.yaml \
-    --set-json 'issuer.solver.dnsZones=[]' >"${tmp}/no-zone.yaml"
-  if yq eval-all -o=json '.' "${tmp}/no-zone.yaml" | jq -se '
-    map(select(type == "object" and .kind == "ClusterIssuer"))
-    | all(.[]; (.spec.acme.solvers[0].selector.dnsZones | index("dev.atomi.cloud")) != null)
-  ' >/dev/null 2>&1; then
-    echo "❌ omitting the hosted-zone restriction did not red the ENTEI solver-restriction gate" >&2
-    exit 1
-  fi
-  # Negative: the staging ref resolving to the production directory reddens the
-  # issuance-class split.
-  helm template "${release}" chart --namespace "${namespace}" --values chart/values.entei.yaml \
-    --set issuer.refs[0].directory=production >"${tmp}/swapped.yaml"
-  if yq eval-all -o=json '.' "${tmp}/swapped.yaml" | jq -se --arg staging "${staging_url}" '
-    (map(select(type == "object" and .kind == "ClusterIssuer")) | map({key: .metadata.name, value: .spec.acme.server}) | from_entries) as $servers
-    | $servers["zinc-letsencrypt-staging"] == $staging
-  ' >/dev/null 2>&1; then
-    echo "❌ the ENTEI staging ref resolving to production was not detected" >&2
-    exit 1
-  fi
+  check_entei .
+  copy_root "${tmp}/swap"
+  yq -i '.issuer.refs[0].directory = "production" | .issuer.refs[1].directory = "staging"' "${tmp}/swap/chart/values.entei.yaml"
+  expect_red 'the two ACME directories swapped' 'zinc-staging does not resolve to the LE staging directory' check_entei "${tmp}/swap"
+  copy_root "${tmp}/nozones"
+  yq -i 'del(.issuer.dnsZones)' "${tmp}/nozones/chart/values.entei.yaml"
+  expect_red 'the hosted-zone restriction omitted' 'not restricted to the hosted-development zones' check_entei "${tmp}/nozones"
+  copy_root "${tmp}/stagingprod"
+  yq -i ".issuer.directories.staging = \"${prod}\"" "${tmp}/stagingprod/chart/values.yaml"
+  expect_red 'the staging ref resolving to production' 'zinc-staging does not resolve to the LE staging directory' check_entei "${tmp}/stagingprod"
+  ;;
+issuer-cardinality)
+  check_cardinality .
+  copy_root "${tmp}/second"
+  cp chart/templates/clusterissuer.yaml "${tmp}/second/chart/templates/clusterissuer-entei.yaml"
+  expect_red 'a second hand-authored issuer template' 'the issuer definition is not exactly one template' check_cardinality "${tmp}/second"
+  copy_root "${tmp}/variant"
+  yq -i '.issuer.email = "raichu@atomi.cloud"' "${tmp}/variant/chart/values.raichu.yaml"
+  expect_red 'a per-landscape issuer variant (raichu email)' 'raichu .*per-landscape issuer variant' check_cardinality "${tmp}/variant"
+  copy_root "${tmp}/variant2"
+  yq -i '.issuer.refs += [{"token": "raichu", "directory": "staging"}]' "${tmp}/variant2/chart/values.raichu.yaml"
+  expect_red 'a per-landscape issuer variant (raichu second ref)' 'raichu overlay is a per-landscape issuer variant' check_cardinality "${tmp}/variant2"
   ;;
 no-certificate)
-  # Zinc renders zero Certificate objects across every overlay.
-  cert_count() {
-    yq eval-all -o=json '.' "$1" | jq -s '[.[] | select(type == "object" and .kind == "Certificate")] | length'
-  }
-  for ls in "${all_overlays[@]}"; do
-    render "${tmp}/${ls}.yaml" "chart/values.${ls}.yaml"
-    [ "$(cert_count "${tmp}/${ls}.yaml")" -ne 0 ] && echo "❌ ${ls} rendered a Certificate; dotted names require materializer-owned exact intents" >&2 && exit 1
-  done
-  # Negative: a chart-authored (wildcard) Certificate reddens the no-Certificate gate.
-  cat >chart/templates/zz-certificate-fixture.yaml <<'FIXTURE'
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: zinc-wildcard-fixture
-spec:
-  secretName: zinc-wildcard-tls
-  dnsNames:
-    - '*.eevee.dev.atomi.cloud'
-  issuerRef:
-    name: zinc-letsencrypt
-    kind: ClusterIssuer
-FIXTURE
-  trap 'rm -f chart/templates/zz-certificate-fixture.yaml; rm -rf "${tmp}"' EXIT
-  render "${tmp}/fixture.yaml" chart/values.entei.yaml
-  if [ "$(cert_count "${tmp}/fixture.yaml")" -eq 0 ]; then
-    echo "❌ no-Certificate negative fixture did not surface a Certificate" >&2
-    exit 1
-  fi
-  rm -f chart/templates/zz-certificate-fixture.yaml
-  trap 'rm -rf "${tmp}"' EXIT
+  check_no_certs .
+  check_intents . tests/fixtures/certificates/instance-intents.yaml
+  copy_root "${tmp}/authored"
+  sed -n '1,/^---$/p' tests/fixtures/certificates/instance-intents.yaml | sed '$d' >"${tmp}/authored/chart/templates/certificate.yaml"
+  expect_red 'a chart-authored Certificate' 'zinc authors a Certificate' check_no_certs "${tmp}/authored"
+  expect_red 'a broad *.eevee.<host-domain> wildcard' 'broad landscape wildcard' check_intents . tests/fixtures/certificates/bad-landscape-wildcard.yaml
+  expect_red 'an exact-name-per-host Certificate' 'exact-name-per-host' check_intents . tests/fixtures/certificates/bad-exact-host.yaml
   ;;
 credential-literal)
-  # The Cloudflare token is referenced via a Secret ref only; nothing inline.
-  for vf in chart/values.yaml chart/values.entei.yaml; do
-    if yq -o=json '.' "${vf}" | rg -q '"apiToken"\s*:|"apiKey"\s*:'; then
-      echo "❌ an inline Cloudflare token/key literal is present in ${vf}" >&2
-      exit 1
-    fi
-  done
-  render "${tmp}/render.yaml" chart/values.pikachu.yaml
-  rg -q 'apiTokenSecretRef' "${tmp}/render.yaml" || {
-    echo "❌ rendered solver does not reference the token via apiTokenSecretRef" >&2
-    exit 1
-  }
-  if rg -q '^\s*apiToken:\s*\S' "${tmp}/render.yaml"; then
-    echo "❌ rendered a bare inline apiToken value" >&2
-    exit 1
-  fi
-  # Negative: an inline token in a wrapper template reddens the bare-token grep.
-  cat >chart/templates/zz-inline-token-fixture.yaml <<'FIXTURE'
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: zinc-inline-token-fixture
-spec:
-  acme:
-    server: https://acme-staging-v02.api.letsencrypt.org/directory
-    solvers:
-      - dns01:
-          cloudflare:
-            apiToken: cf-literal-token-should-be-rejected
-FIXTURE
-  trap 'rm -f chart/templates/zz-inline-token-fixture.yaml; rm -rf "${tmp}"' EXIT
-  render "${tmp}/dirty.yaml" chart/values.pikachu.yaml
-  if ! rg -q '^\s*apiToken:\s*\S' "${tmp}/dirty.yaml"; then
-    echo "❌ credential-literal negative fixture did not inject an inline token; gate is not exercised" >&2
-    exit 1
-  fi
-  rm -f chart/templates/zz-inline-token-fixture.yaml
-  trap 'rm -rf "${tmp}"' EXIT
+  check_credentials .
+  copy_root "${tmp}/inline"
+  fake="$(printf 'x%.0s' {1..40})"
+  yq -i ".issuer.cloudflareApiToken = \"${fake}\"" "${tmp}/inline/chart/values.yaml"
+  expect_red 'an inlined Cloudflare token in values' 'credential literal is inlined' check_credentials "${tmp}/inline"
+  copy_root "${tmp}/secretobj"
+  printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: zinc-cloudflare\nstringData:\n  token: {{ .Values.issuer.email }}\n' >"${tmp}/secretobj/chart/templates/token.yaml"
+  expect_red 'an inline token Secret' 'renders an inline credential' check_credentials "${tmp}/secretobj"
   ;;
 rendered-manifests)
-  # Inherited Q-G20 stage: helm template -> kubeconform -> Kyverno VAP eval. VAP
-  # evaluation is vacuous for this workload-free chart (no workload/Service
-  # targets), but render + kubeconform still run on every stack.
-  for ls in example entei; do
-    render "${tmp}/${ls}.yaml" "chart/values.${ls}.yaml"
-    kubeconform -strict -summary -ignore-missing-schemas "${tmp}/${ls}.yaml"
-    yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "${tmp}/${ls}.yaml" >"${tmp}/${ls}-vap.yaml"
-    if [ -s "${tmp}/${ls}-vap.yaml" ]; then
-      kyverno apply policies/vap --resource "${tmp}/${ls}-vap.yaml" --detailed-results --remove-color
-    else
-      echo "ℹ️  ${ls}: no workload/Service targets; VAP evaluation is vacuous (render + kubeconform ran)"
-    fi
+  for l in "" "${landscapes[@]}"; do
+    if [ -z "${l}" ]; then render . >"${tmp}/rendered.yaml"; else render_l . "${l}" >"${tmp}/rendered.yaml"; fi
+    vap_stage . "${tmp}/rendered.yaml"
   done
+  copy_root "${tmp}/invalid"
+  sed -i 's|^    email: |    emial: |' "${tmp}/invalid/chart/templates/clusterissuer.yaml"
+  render_l "${tmp}/invalid" pikachu >"${tmp}/invalid.yaml"
+  expect_red 'a schema-invalid rendered ClusterIssuer' 'kubeconform rejected the rendered manifests' vap_stage . "${tmp}/invalid.yaml"
   ;;
-vap-sabotage)
-  # The ONE Q-G20 wiring sabotage: a schema-invalid rendered object reddens the
-  # rendered-manifest stage (kubeconform catches the core-object schema break).
-  cat >chart/templates/zz-vap-sabotage.yaml <<'FIXTURE'
-apiVersion: v1
-kind: Service
-metadata:
-  name: zinc-vap-sabotage
-spec:
-  ports:
-    - port: not-an-integer
-      targetPort: 80
-FIXTURE
-  trap 'rm -f chart/templates/zz-vap-sabotage.yaml; rm -rf "${tmp}"' EXIT
-  render "${tmp}/rendered.yaml" chart/values.pikachu.yaml
-  if kubeconform -strict -summary -ignore-missing-schemas "${tmp}/rendered.yaml" >/dev/null 2>&1; then
-    echo "❌ schema-invalid rendered object was not caught by the rendered-manifest stage" >&2
-    exit 1
-  fi
-  rm -f chart/templates/zz-vap-sabotage.yaml
-  trap 'rm -rf "${tmp}"' EXIT
+stale-row)
+  check_stale "$(git write-tree)"
+  copy_root "${tmp}/stale"
+  cp chart/values.ampharos.yaml "${tmp}/stale/chart/values.${stale}.yaml"
+  git -C "${tmp}/stale" init --quiet && git -C "${tmp}/stale" add -A
+  expect_red "a values.${stale}.yaml overlay" 'names the stale' check_stale "$(git -C "${tmp}/stale" write-tree)" "${tmp}/stale"
   ;;
 publish-git)
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/git" bash ./scripts/ci/publish.sh >/dev/null
-  [ ! -s "${tmp}/git/diene-zinc-0.1.0.tgz" ] && echo "❌ git chart package missing" >&2 && exit 1
+  [ ! -s "${tmp}/git/zinc-0.1.0.tgz" ] && echo "❌ git chart package missing" >&2 && exit 1
   [ ! -s "${tmp}/git/index.yaml" ] && echo "❌ git chart index missing" >&2 && exit 1
   ;;
 publish-oci)
   PUBLISH_MODE=oci PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/oci" bash ./scripts/ci/publish.sh >/dev/null
-  [ ! -s "${tmp}/oci/diene-zinc-0.1.0.tgz" ] && echo "❌ OCI chart package missing" >&2 && exit 1
+  [ ! -s "${tmp}/oci/zinc-0.1.0.tgz" ] && echo "❌ OCI chart package missing" >&2 && exit 1
   rg -q '^oci://registry.example.invalid/charts$' "${tmp}/oci/oci-ref.txt"
   ;;
 version)
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh >/dev/null
-  if PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.2.0 PUBLISH_OUTPUT_DIR="${tmp}/version-bad" bash ./scripts/ci/publish.sh >/dev/null 2>&1; then
-    echo "❌ version==tag guard did not red on a mismatched tag" >&2
-    exit 1
-  fi
+  expect_red 'a tag that differs from Chart.yaml' 'does not match tag 9.9.9' env PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v9.9.9 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh
   ;;
 presence)
   test -s docs/developer/zinc-baseline.md
-  test -s chart/templates/clusterissuer.yaml
-  test -s chart/templates/externalsecret.yaml
-  test -s chart/values.schema.json
-  test -s policies/vap/workload-baseline.yaml
-  test -s policies/vap/service-baseline.yaml
-  test -x scripts/validate/zinc-k3d.sh
-  for ls in pikachu raichu amphoros pichu lapras entei; do
-    test -s "chart/values.${ls}.yaml"
-  done
+  test -s .claude/skills/zinc/SKILL.md
   ;;
 *)
   echo "❌ unknown validation mode '${mode}'" >&2
@@ -370,4 +344,4 @@ presence)
   ;;
 esac
 
-echo "✅ Zinc ${mode} validation passed"
+echo "✅ zinc ${mode} validation passed"

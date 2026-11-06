@@ -2,16 +2,46 @@ version: '3'
 
 includes:
   helm: tasks/Taskfile.helm.yaml
-  example:lapras:
+  example:
     taskfile: tasks/Taskfile.cluster.yaml
     vars:
       RELEASE_NAME: zinc
-      NAMESPACE: cert-manager
-      LANDSCAPE: lapras
+      NAMESPACE: certs
+      LANDSCAPE: example
+  pikachu:
+    taskfile: tasks/Taskfile.cluster.yaml
+    vars:
+      RELEASE_NAME: zinc
+      NAMESPACE: certs
+      LANDSCAPE: pikachu
+  raichu:
+    taskfile: tasks/Taskfile.cluster.yaml
+    vars:
+      RELEASE_NAME: zinc
+      NAMESPACE: certs
+      LANDSCAPE: raichu
+  ampharos:
+    taskfile: tasks/Taskfile.cluster.yaml
+    vars:
+      RELEASE_NAME: zinc
+      NAMESPACE: certs
+      LANDSCAPE: ampharos
+  pichu:
+    taskfile: tasks/Taskfile.cluster.yaml
+    vars:
+      RELEASE_NAME: zinc
+      NAMESPACE: certs
+      LANDSCAPE: pichu
+  entei:
+    taskfile: tasks/Taskfile.cluster.yaml
+    vars:
+      RELEASE_NAME: zinc
+      NAMESPACE: certs
+      LANDSCAPE: entei
 
 tasks:
   setup:
-    desc: Set up generated workspace assets
+    desc: Set up the workspace
     cmds:
       - ./scripts/local/setup.sh
 
@@ -20,20 +50,15 @@ tasks:
     cmds:
       - pre-commit run --all-files
 
-  test:
-    desc: Run the zinc unit/static tier
-    cmds:
-      - ./scripts/ci/zinc.sh
-
   test:unit:
-    desc: Run schema, lint, render, labels, LE-directory map, issuer, ENTEI, no-Certificate, VAP, and publish validation
+    desc: Run schema, lint, render, policy, and contract validation
     cmds:
       - ./scripts/ci/zinc.sh
 
   test:int:
-    desc: Run the k3d integration tier (ClusterIssuers apply with CRDs present)
+    desc: Run the local k3d installation proof
     cmds:
-      - ./scripts/validate/zinc-k3d.sh
+      - ./scripts/ci/zinc-k3d.sh
 
   start:cluster:
     desc: Start the local k3d lapras proof cluster

@@ -2,73 +2,40 @@
 # -- Prefix used by every service-tree label and annotation helper.
 labelPrefix: atomi.cloud
 
-# -- Stable service-tree projection. Platform is always the release namespace
-# (never a value); landscape is added by independent overlays.
+# -- Stable four-slot service-tree projection. Landscape is added by the landscape overlays.
 serviceTree:
+  # @schema enum:[certs];required:true
+  # -- cert-manager reads DNS-01 secrets from its cluster resource namespace: sulfur's `certs`.
+  platform: certs
   # @schema pattern:^[a-z0-9]+$;required:true
-  # -- Service name.
   service: zinc
   # @schema pattern:^[a-z0-9]+$;required:true
-  # -- Module name.
   module: issuer
   # @schema pattern:^[0-9]+$;required:true
-  # -- Architecture layer.
   layer: '1'
 
-# -- Optional physical-instance metadata. The instance remains outside LPSM.
-instance:
-  # @schema pattern:^[a-z0-9._:/-]+$;minLength:1
-  # -- Repository-qualified physical instance id.
-  physicalId: example-repository:run-001
-
-# -- One service-scoped ExternalSecret that materializes the Cloudflare API token
-# from the platform SecretStore created by carbon via the SoS chain. The
-# DNS-01 solver references this Secret only; a token is never inlined.
+# -- The one ExternalSecret: the Cloudflare API token from the platform SecretStore (carbon), folder-prefixed.
 secret:
-  # -- Render the ExternalSecret.
-  enabled: true
-  # -- ESO refresh cadence.
-  refreshInterval: 1h
+  refreshInterval: 1h # @schema pattern:^[0-9]+(s|m|h)$
   store:
-    # @schema enum:[SecretStore, ClusterSecretStore]
-    # -- The platform SecretStore is namespace-scoped (created by carbon).
-    kind: SecretStore
-    # -- Platform SecretStore name.
-    name: platform-store
-  # -- Shared-folder path fanned in with a SHARED_ prefix.
-  sharedFolder: /shared
-  # -- Service-folder path fanned in with a ZINC_ prefix (holds the CF token).
-  serviceFolder: /zinc
+    kind: SecretStore # @schema enum:[SecretStore, ClusterSecretStore]
+    # -- Platform SecretStore name; carbon has not pinned it yet.
+    name: certs # @schema pattern:^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+  sharedFolder: /shared # @schema pattern:^/.+
+  serviceFolder: /zinc # @schema pattern:^/.+
 
-# -- The reusable Let's Encrypt ACME DNS-01 (Cloudflare) ClusterIssuer definition.
-# Zinc owns NO Certificate: certificate owners reference a stable ClusterIssuer
-# name. ONE definition is rendered once per `refs` entry (cluster-scoped, so it is
-# instantiated per cluster); there are no per-landscape/zone issuer variants beyond
-# the LE-directory selection carried by the overlays.
+# -- The one reusable Let's Encrypt DNS-01 (Cloudflare) ClusterIssuer definition. Overlays only pick refs and zones.
 issuer:
-  # -- ACME registration contact address.
-  email: platform@atomi.cloud
-  acme:
-    # -- Named Let's Encrypt ACME directory endpoints. A `refs` entry selects one
-    # by name; the five-landscape LE-directory map (Q-I33) is expressed by the
-    # landscape overlays choosing production or staging.
-    directories:
-      production: https://acme-v02.api.letsencrypt.org/directory
-      staging: https://acme-staging-v02.api.letsencrypt.org/directory
-  solver:
-    cloudflare:
-      apiTokenSecretRef:
-        # -- The ExternalSecret-materialized Secret carrying the Cloudflare token.
-        name: zinc
-        # -- Key inside that Secret (folder-prefixed by the ExternalSecret rewrite).
-        key: ZINC_CLOUDFLARE_API_TOKEN
-    # @schema item:string;uniqueItems:true
-    # -- DNS-01 solver zone restriction. Empty = unrestricted (registered fleet);
-    # the ENTEI overlay pins the hosted-development authority zones.
-    dnsZones: []
-  # -- ClusterIssuer instances to materialize from the one definition. Registered
-  # clusters instantiate a single stable ref; the ENTEI host-role overlay
-  # instantiates the staging+production pair concurrently on the shared host.
-  refs:
-    - name: zinc-letsencrypt
-      directory: staging
+  email: platform@atomi.cloud # @schema pattern:^[^@\s]+@[^@\s]+$
+  directories:
+    production: https://acme-v02.api.letsencrypt.org/directory
+    staging: https://acme-staging-v02.api.letsencrypt.org/directory
+  # -- Token key under `secret.serviceFolder`; the ExternalSecret adds the folder prefix.
+  cloudflareTokenKey: CLOUDFLARE_API_TOKEN # @schema pattern:^[A-Z0-9_]+$
+  # @schema item:string;uniqueItems:true
+  # -- DNS-01 solver zone restriction. Empty means any zone the token can edit.
+  dnsZones: []
+  # -- ClusterIssuers to materialize, each named `zinc-<token>`. Registered rows keep `zinc-letsencrypt`.
+  refs: # @schema minItems:1
+    - token: letsencrypt # @schema pattern:^[a-z0-9]+$;required:true
+      directory: staging # @schema enum:[production, staging];required:true

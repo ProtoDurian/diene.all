@@ -1,7 +1,7 @@
 apiVersion: v2
-name: diene-zinc
-description: Pure own-resources cert-manager issuer chart (Let's Encrypt ACME DNS-01 ClusterIssuers over Cloudflare) for AtomiCloud platform landscapes
+name: zinc
+description: AtomiCloud issuer set - Let's Encrypt ACME DNS-01 (Cloudflare) ClusterIssuers on sulfur's cert-manager (no Certificates)
 type: application
 version: 0.1.0
 appVersion: '0.1.0'
-kubeVersion: '>=1.22.0-0'
+kubeVersion: '>=1.27.0-0'
