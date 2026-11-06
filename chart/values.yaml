@@ -1,5 +1,5 @@
 # @schema pattern:^[a-z0-9.-]+$;minLength:1
-# -- Prefix used by every service-tree label.
+# -- Label prefix. No template reads it: the upstream labels below are literals that must match it and serviceTree.
 labelPrefix: atomi.cloud
 
 # -- Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays.

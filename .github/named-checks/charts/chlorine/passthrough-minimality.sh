@@ -20,7 +20,6 @@ git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "‚ù
 git archive "${tree}" | tar -x -C "${work}"
 files="$(git -c core.quotePath=false ls-tree -r --name-only "${tree}")"
 
-# Split a helpers file into one file per define, named by the define with its chart prefix removed.
 split_helpers() {
   local src="$1" out="$2" prefix="$3"
   mkdir -p "${out}"

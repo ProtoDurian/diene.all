@@ -5,7 +5,7 @@
     "type": "object",
     "properties": {
         "labelPrefix": {
-            "description": "Prefix used by every service-tree label.",
+            "description": "Label prefix. No template reads it: the upstream labels below are literals that must match it and serviceTree.",
             "type": "string",
             "pattern": "^[a-z0-9.-]+$",
             "minLength": 1

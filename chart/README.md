@@ -16,7 +16,7 @@ Kubernetes: `>=1.27.0-0`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| labelPrefix | string | `"atomi.cloud"` | Prefix used by every service-tree label. |
+| labelPrefix | string | `"atomi.cloud"` | Label prefix. No template reads it: the upstream labels below are literals that must match it and serviceTree. |
 | serviceTree | object | `{"layer":"1","module":"reloader","platform":"reloader","service":"chlorine"}` | Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays. |
 | upstream | object | `{"fullnameOverride":"chlorine-reloader","nameOverride":"reloader","reloader":{"autoReloadAll":false,"deployment":{"annotations":{"reloader.stakater.com/auto":"true"},"containerSecurityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsNonRoot":true},"labels":{"atomi.cloud/layer":"1","atomi.cloud/module":"reloader","atomi.cloud/platform":"reloader","atomi.cloud/service":"chlorine"},"resources":{"limits":{"cpu":"100m","memory":"128Mi"},"requests":{"cpu":"10m","memory":"32Mi"}}},"rbac":{"labels":{"atomi.cloud/layer":"1","atomi.cloud/module":"reloader","atomi.cloud/platform":"reloader","atomi.cloud/service":"chlorine"}},"readOnlyRootFileSystem":true,"serviceAccount":{"labels":{"atomi.cloud/layer":"1","atomi.cloud/module":"reloader","atomi.cloud/platform":"reloader","atomi.cloud/service":"chlorine"}}}}` | stakater/reloader overrides: annotation opt-in (never auto-reload-all), LPSM labels, self opt-in, hardening, limits. |
 

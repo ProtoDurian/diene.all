@@ -10,8 +10,10 @@ trap 'rm -rf "${tmp}"' EXIT
 
 [ -z "${mode}" ] && echo "❌ validation mode not set" >&2 && exit 1
 
-stacks=("" "--values chart/values.example.yaml" "--values chart/values.example.yaml --values chart/values.lapras.yaml")
+stacks=("")
+for overlay in chart/values.*.yaml; do stacks+=("--values ${overlay}"); done
 full=(--values chart/values.example.yaml --values chart/values.lapras.yaml)
+stacks+=("${full[*]}")
 labelled='["ClusterRole/chlorine-reloader-role","ClusterRoleBinding/chlorine-reloader-role-binding","Deployment/chlorine-reloader","Role/chlorine-reloader-metadata-role","RoleBinding/chlorine-reloader-metadata-role-binding","ServiceAccount/chlorine-reloader"]'
 
 render() {

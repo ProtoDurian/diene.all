@@ -32,7 +32,10 @@ workloads omit it. A values flip to `autoReloadAll: true` fails the unit tier.
 2. `chart/values.<landscape>.yaml`: `serviceTree.landscape` and its LPSM label.
 3. `chart/values.<cluster>.yaml`: `serviceTree.cluster` and its LPSM label.
 
-The upstream labels are literal values. The `lpsm-labels` mode refuses any drift from `labelPrefix` + `serviceTree`.
+No template reads `labelPrefix` or the landscape/cluster slots: the upstream labels are literals. Every overlay must set
+`serviceTree.<slot>` AND the matching label on all three upstream label maps (`deployment`, `serviceAccount`, `rbac`).
+`lpsm-labels` checks this only for committed overlays (base, each `chart/values.*.yaml`, and the full stack); an overlay
+kept outside this repo is not checked.
 Release namespace = `serviceTree.platform` = `reloader`.
 
 ## Version bumps
