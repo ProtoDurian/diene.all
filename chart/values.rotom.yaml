@@ -1,0 +1,13 @@
+# Local loopback landscape rotom (k3d). No cloud LB annotations and no registered-fleet Certificates.
+serviceTree:
+  landscape: rotom
+
+gateway:
+  provider: local
+
+registeredCertificates:
+  enabled: false
+
+upstream:
+  commonLabels:
+    atomi.cloud/landscape: rotom

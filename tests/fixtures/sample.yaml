@@ -1,0 +1,55 @@
+# Integration-tier sample route through the shared Gateway.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platinum-sample
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample
+  namespace: platinum-sample
+spec:
+  selector:
+    matchLabels:
+      app: sample
+  template:
+    metadata:
+      labels:
+        app: sample
+    spec:
+      containers:
+        - name: echo
+          image: registry.k8s.io/e2e-test-images/agnhost:2.53
+          args: [netexec, --http-port=8080]
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample
+  namespace: platinum-sample
+spec:
+  selector:
+    app: sample
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: sample
+  namespace: platinum-sample
+spec:
+  parentRefs:
+    - name: platinum-shared
+      namespace: sulfoxide
+      sectionName: http
+  hostnames: [sample.ditto.localhost]
+  rules:
+    - backendRefs:
+        - name: sample
+          port: 80

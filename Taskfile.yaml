@@ -2,13 +2,13 @@ version: '3'
 
 includes:
   helm: tasks/Taskfile.helm.yaml
-  example:lapras:
+  pichu:opal:
     taskfile: tasks/Taskfile.cluster.yaml
     vars:
-      RELEASE_NAME: helm-wrapper
-      NAMESPACE: sample
-      LANDSCAPE: example
-      CLUSTER: lapras
+      RELEASE_NAME: platinum
+      NAMESPACE: sulfoxide
+      LANDSCAPE: pichu
+      CLUSTER: opal
 
 tasks:
   setup:
@@ -22,9 +22,8 @@ tasks:
       - pre-commit run --all-files
 
   build:
-    desc: Vendor config and build chart dependencies
+    desc: Build the pinned chart dependencies
     cmds:
-      - ./scripts/local/vendor-chart-config.sh
       - helm dependency build chart
 
   update:
@@ -40,19 +39,24 @@ tasks:
   test:unit:
     desc: Run schema, lint, render, policy, and contract validation
     cmds:
-      - ./scripts/ci/helm-wrapper.sh
+      - ./scripts/ci/platinum.sh
 
   test:int:
-    desc: Run the local k3d installation proof
+    desc: Run the k3d integration tier
     cmds:
-      - ./scripts/validate/helm-wrapper-k3d.sh
+      - ./scripts/ci/platinum-k3d.sh
+
+  test:entei:
+    desc: Run the k3d ENTEI dev-host fixture tier
+    cmds:
+      - ./scripts/ci/platinum-entei.sh
 
   start:cluster:
-    desc: Start the local k3d lapras proof cluster
+    desc: Start the local k3d proof cluster
     cmds:
       - ./scripts/local/create-k3d-cluster.sh
 
   stop:cluster:
-    desc: Delete the local k3d lapras proof cluster
+    desc: Delete the local k3d proof cluster
     cmds:
       - ./scripts/local/delete-k3d-cluster.sh

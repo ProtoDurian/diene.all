@@ -1,0 +1,7 @@
+# Serving landscape pikachu.
+serviceTree:
+  landscape: pikachu
+
+upstream:
+  commonLabels:
+    atomi.cloud/landscape: pikachu

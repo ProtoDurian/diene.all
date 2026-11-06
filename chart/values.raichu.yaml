@@ -1,0 +1,7 @@
+# Serving landscape raichu.
+serviceTree:
+  landscape: raichu
+
+upstream:
+  commonLabels:
+    atomi.cloud/landscape: raichu

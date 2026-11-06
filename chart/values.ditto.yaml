@@ -1,0 +1,13 @@
+# Local loopback landscape ditto (k3d). No cloud LB annotations and no registered-fleet Certificates.
+serviceTree:
+  landscape: ditto
+
+gateway:
+  provider: local
+
+registeredCertificates:
+  enabled: false
+
+upstream:
+  commonLabels:
+    atomi.cloud/landscape: ditto

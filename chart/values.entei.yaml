@@ -1,0 +1,13 @@
+# ENTEI dev-host role (registered, infrastructure-only, traffic=false). Stack after its provider cluster overlay.
+serviceTree:
+  cluster: entei
+
+devHost:
+  enabled: true
+
+registeredCertificates:
+  enabled: false
+
+upstream:
+  commonLabels:
+    atomi.cloud/cluster: entei

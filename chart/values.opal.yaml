@@ -1,0 +1,10 @@
+# Representative DigitalOcean cluster (mark opal). DO LB IPs are stable for the LB lifetime only.
+serviceTree:
+  cluster: opal
+
+gateway:
+  provider: digitalocean
+
+upstream:
+  commonLabels:
+    atomi.cloud/cluster: opal

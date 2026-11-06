@@ -1,0 +1,7 @@
+# Serving landscape pichu.
+serviceTree:
+  landscape: pichu
+
+upstream:
+  commonLabels:
+    atomi.cloud/landscape: pichu

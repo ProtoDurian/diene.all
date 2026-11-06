@@ -1,0 +1,7 @@
+# Serving landscape ampharos.
+serviceTree:
+  landscape: ampharos
+
+upstream:
+  commonLabels:
+    atomi.cloud/landscape: ampharos

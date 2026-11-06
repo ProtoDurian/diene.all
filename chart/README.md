@@ -1,33 +1,39 @@
-# diene-helm-wrapper
+# platinum
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 6.9.2](https://img.shields.io/badge/AppVersion-6.9.2-informational?style=flat-square)
+![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v2.5.0](https://img.shields.io/badge/AppVersion-v2.5.0-informational?style=flat-square)
 
-Minimal production-grade Helm wrapper template for AtomiCloud platform charts
+AtomiCloud Gateway API ingress chart wrapping kgateway (element platinum)
 
 ## Requirements
 
-Kubernetes: `>=1.27.0-0`
+Kubernetes: `>=1.33.0-0`
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/stefanprodan/charts | upstream(podinfo) | 6.9.2 |
+| oci://cr.kgateway.dev/kgateway-dev/charts | upstream(kgateway) | v2.5.0 |
+| oci://cr.kgateway.dev/kgateway-dev/charts | crds(kgateway-crds) | v2.5.0 |
 
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| contracts | object | `{"health":{"expectedStatus":"2xx","path":"/healthz"},"lpsm":{"identityLandscape":"example","instance":"run001","instanceZone":"local.example.invalid","landscape":"example","module":"api","ordinaryZone":"cluster.atomi.cloud","parseHostname":"","service":"wrapper"},"webhook":{"pathPrefix":"/internal/webhooks","provider":"example"}}` | Current health and webhook delivery conventions. |
-| fullnameOverride | string | `"wrapper-api"` | Primary workload fullname. It must be `<service>-<dashless-token>`. |
-| gateway | object | `{"aws":{"eipAllocationIds":[],"subnetIds":[]},"enabled":true,"oci":{"reservedPublicIp":""},"port":80,"provider":"digitalocean"}` | Provider-managed LoadBalancer service for the gateway. |
-| instance | object | `{"physicalId":"example-repository:run-001"}` | Optional physical-instance metadata. The instance remains outside LPSM. |
+| crds | object | `{"enabled":false}` | kgateway CRDs (pinned). Installed once per cluster as its own release before platinum. |
+| devHost | object | `{"emergencyListeners":{"enabled":false,"listeners":[]},"enabled":false,"listenerSetNamespaceLabel":"managed-vcluster"}` | ENTEI dev-host shared-Gateway role. Platinum renders the shared edge only; per-host Certificate, ListenerSet, and HTTPRoute belong to the exposure materializer. |
+| devHost.emergencyListeners | object | `{"enabled":false,"listeners":[]}` | Emergency-only direct listeners on the shared Gateway. They count against the Gateway listener ceiling that ListenerSet avoids. |
+| devHost.listenerSetNamespaceLabel | string | `"managed-vcluster"` | Namespace label (under labelPrefix, value "true") that admits a namespace's ListenerSets. |
+| fullnameOverride | string | `"platinum-gateway"` | Primary workload fullname (`<service>-<module>`): the kgateway control plane. |
+| gateway | object | `{"aws":{"eipAllocationIds":[],"subnetIds":[]},"className":"platinum","controllerName":"kgateway.dev/kgateway","enabled":true,"health":{"path":"/healthz","status":200},"oci":{"reservedPublicIp":""},"port":80,"provider":"digitalocean","proxy":{"resources":{"limits":{"cpu":"1","memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}},"tlsPort":443}` | Shared Gateway API edge: GatewayClass, one shared Gateway, the provider LoadBalancer, and the health route. |
+| gateway.className | string | `"platinum"` | GatewayClass name platinum owns. |
+| gateway.controllerName | string | `"kgateway.dev/kgateway"` | kgateway's controller name. |
+| gateway.health.path | string | `"/healthz"` | Fixed path the traffic controller polls once per cluster per tick. |
+| gateway.proxy | object | `{"resources":{"limits":{"cpu":"1","memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}}` | Envoy proxy pods kgateway generates for the shared Gateway (and the default `kgateway` class). The fleet VAP requires CPU and memory requests and limits. |
 | labelPrefix | string | `"atomi.cloud"` | Prefix used by every service-tree label and annotation helper. |
-| migration | object | `{"command":["sh","-c","echo migration-ready"],"enabled":true,"image":{"pullPolicy":"IfNotPresent","repository":"busybox","tag":"1.37.0-glibc"},"reloader":{"enabled":true},"resources":{"limits":{"cpu":"25m","memory":"32Mi"},"requests":{"cpu":"5m","memory":"8Mi"}}}` | Separate pre-sync migration hook. It never owns or recreates the Deployment. |
-| primordial | object | `{"apiVersions":{"edge":"edge.atomi.cloud/v1alpha1","fleet":"fleet.atomi.cloud/v1alpha1","identity":"identity.atomi.cloud/v1alpha1"},"cloudflareDeploy":{"enabled":true,"pin":true,"scriptName":"wrapper-web","tag":"0.1.0"},"enabled":true,"identity":{"concreteLandscapes":["example"]},"logtoApp":{"enabled":true,"extraRedirectUris":[],"landscapes":["example"],"paths":["/auth/callback"],"resourceRefs":["wrapper-api"]},"placement":{"preferredHost":"example-host"},"platformDependency":{"modules":{"cache":{"hot":{"credentialMode":"standard","delivery":"replicated","engine":{"dragonfly":{}},"ram":"128Mi","rotation":"on","type":"dragonfly"}},"database":{"maindb":{"backup":{"crossVendor":true},"cpu":1,"credentialMode":"standard","delivery":"external","engine":{"neon":{"tier":"example"}},"providerAccountRef":"example-neon","ram":"1Gi","rotation":"on","storage":"10Gi","type":"neon","version":"16"}},"kv":{"sessions":{"credentialMode":"standard","delivery":"external","engine":{"upstash":{}},"providerAccountRef":"example-upstash","ram":"128Mi","rotation":"on","type":"upstash"}},"store":{"assets":{"credentialMode":"standard","delivery":"external","engine":{"tigris":{}},"providerAccountRef":"example-tigris","rotation":"on","type":"tigris"}}}},"problem":{"enabled":true,"entries":[{"endpoints":[{"method":"GET","path":"/"}],"id":"example","recoverable":false,"schema":{},"status":500,"title":"Example problem","type":"https://errors.example.invalid/example"}],"version":"0.1.0"},"targetLandscape":"example","virtualLandscapeService":{"enabled":true,"serve":true},"vlandscape":"example-vlandscape"}` | Reusable primordial-chart CR helper inputs against the frozen T3 shapes. |
-| secret | object | `{"enabled":true,"refreshInterval":"1h","serviceFolder":"/wrapper","sharedFolder":"/shared","store":{"kind":"SecretStore","name":"sample-store"}}` | One service-scoped ExternalSecret with folder-prefix rewrites. |
-| serviceTree | object | `{"layer":"2","module":"api","platform":"sample","service":"wrapper"}` | Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays. |
-| upstream | object | `{"enabled":false,"fullnameOverride":"wrapper-upstream","image":{"repository":"ghcr.io/stefanprodan/podinfo","tag":"6.9.2"},"podAnnotations":{"reloader.stakater.com/auto":"true"},"podSecurityContext":{"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000},"resources":{"limits":{"cpu":"100m","memory":"128Mi"},"requests":{"cpu":"10m","memory":"32Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000}}` | Pinned optional upstream chart. Every instantiated dependency must receive a conforming override. |
-| webhookRoute | object | `{"enabled":true,"parentGateway":"sample-gateway","parentNamespace":"gateway-system"}` | Optional Gateway API route scaffold for a webhook receiver. |
-| workload | object | `{"image":{"pullPolicy":"IfNotPresent","repository":"ghcr.io/stefanprodan/podinfo","tag":"6.9.2"},"podSecurityContext":{"fsGroup":10000,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000},"port":9898,"reloader":{"enabled":true},"replicas":1,"resources":{"limits":{"cpu":"100m","memory":"128Mi"},"requests":{"cpu":"10m","memory":"32Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000}}` | Wrapper-owned sample workload. |
+| registeredCertificates | object | `{"backup":{"domain":"*.cluster.atomi-backup.invalid"},"enabled":true,"issuerRef":{"kind":"ClusterIssuer","name":"zinc-letsencrypt"},"primary":{"domain":"*.cluster.atomi.cloud"}}` | Registered-fleet wildcard Certificates against zinc's DNS-01 ClusterIssuer. Platinum renders no issuer. |
+| registeredCertificates.backup.domain | string | `"*.cluster.atomi-backup.invalid"` | Route53 backup base domain wildcard (tokenize before live use). |
+| registeredCertificates.issuerRef.name | string | `"zinc-letsencrypt"` | ClusterIssuer instantiated per cluster by charts/zinc. |
+| serviceTree | object | `{"layer":"1","module":"gateway","platform":"sulfoxide","service":"platinum"}` | Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays. |
+| upstream | object | `{"commonLabels":{"atomi.cloud/layer":"1","atomi.cloud/module":"gateway","atomi.cloud/platform":"sulfoxide","atomi.cloud/service":"platinum"},"controller":{"image":{"repository":"kgateway","tag":"v2.5.0"},"podAnnotations":{"reloader.stakater.com/auto":"true"},"podSecurityContext":{"runAsGroup":10101,"runAsNonRoot":true,"runAsUser":10101},"resources":{"limits":{"cpu":"1","memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsNonRoot":true}},"enabled":true,"fullnameOverride":"platinum-gateway","gatewayClassParametersRefs":{"kgateway":{"name":"platinum-proxy","namespace":"sulfoxide"}},"image":{"registry":"cr.kgateway.dev/kgateway-dev","tag":"v2.5.0"}}` | kgateway control plane (pinned). Its labels must equal the LPSM set. |
+| upstream.gatewayClassParametersRefs | object | `{"kgateway":{"name":"platinum-proxy","namespace":"sulfoxide"}}` | kgateway's default `kgateway` GatewayClass also uses platinum-proxy, so it never gets its own LoadBalancer. |
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)

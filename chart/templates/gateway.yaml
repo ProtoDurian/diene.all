@@ -1,0 +1,24 @@
+{{- if .Values.gateway.enabled -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ include "platinum.gatewayName" . }}
+  {{- include "platinum.metadata" . | nindent 2 }}
+spec:
+  gatewayClassName: {{ .Values.gateway.className }}
+  infrastructure:
+    parametersRef:
+      group: gateway.kgateway.dev
+      kind: GatewayParameters
+      name: {{ include "platinum.resourceName" (dict "root" . "token" "proxy") }}
+  {{- if .Values.devHost.enabled }}
+  allowedListeners:
+    namespaces:
+      from: Selector
+      selector:
+        matchLabels:
+          {{ printf "%s/%s" (include "platinum.labelPrefix" .) .Values.devHost.listenerSetNamespaceLabel }}: 'true'
+  {{- end }}
+  listeners:
+    {{- include "platinum.listeners" . | nindent 4 }}
+{{- end }}

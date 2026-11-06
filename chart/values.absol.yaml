@@ -1,0 +1,13 @@
+# Local loopback landscape absol (k3d). No cloud LB annotations and no registered-fleet Certificates.
+serviceTree:
+  landscape: absol
+
+gateway:
+  provider: local
+
+registeredCertificates:
+  enabled: false
+
+upstream:
+  commonLabels:
+    atomi.cloud/landscape: absol

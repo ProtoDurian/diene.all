@@ -1,0 +1,41 @@
+name: ⚡ Reusable Platinum
+
+on:
+  workflow_call:
+
+jobs:
+  unit:
+    name: Platinum Unit
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Run the unit tier
+        run: nix develop .#ci -c ./scripts/ci/platinum.sh
+
+  integration:
+    name: Platinum Integration
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Install on k3d, program the Gateway, route a sample and /healthz
+        run: nix develop .#ci -c ./scripts/ci/platinum-k3d.sh
+
+  entei:
+    name: Platinum ENTEI Fixtures
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: ENTEI dev-host overlay with fixture ListenerSet, HTTPRoute and Certificate
+        run: nix develop .#ci -c ./scripts/ci/platinum-entei.sh

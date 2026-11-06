@@ -1,0 +1,12 @@
+# Representative OCI OKE cluster (mark emerald). NLB on a reserved public IP.
+serviceTree:
+  cluster: emerald
+
+gateway:
+  provider: oci
+  oci:
+    reservedPublicIp: 203.0.113.10
+
+upstream:
+  commonLabels:
+    atomi.cloud/cluster: emerald

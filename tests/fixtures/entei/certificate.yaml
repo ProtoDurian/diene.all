@@ -1,0 +1,14 @@
+# Issue-once instance Certificate shaped like the exposure materializer's: one single-label wildcard per service/platform pair.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: fixture1-instance
+  namespace: entei-fixture
+spec:
+  secretName: fixture1-instance
+  issuerRef:
+    name: fixture-ca
+    kind: Issuer
+  dnsNames:
+    - '*.zinc.nitroso.fixture1.eevee.dev.example.test'
+    - '*.lithium.nitroso.fixture1.eevee.dev.example.test'

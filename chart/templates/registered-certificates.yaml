@@ -1,0 +1,20 @@
+{{- if and .Values.gateway.enabled .Values.registeredCertificates.enabled -}}
+{{- range $slot := list "primary" "backup" }}
+{{- $cert := index $.Values.registeredCertificates $slot }}
+{{- $name := include "platinum.resourceName" (dict "root" $ "token" (printf "cert%s" $slot)) }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $name }}
+  {{- include "platinum.metadata" $ | nindent 2 }}
+spec:
+  secretName: {{ $name }}
+  issuerRef:
+    group: cert-manager.io
+    kind: {{ $.Values.registeredCertificates.issuerRef.kind }}
+    name: {{ $.Values.registeredCertificates.issuerRef.name }}
+  dnsNames:
+    - {{ $cert.domain | quote }}
+{{- end }}
+{{- end }}
