@@ -2,6 +2,7 @@
 with packages;
 {
   dev = [
+    prometheus.cli
     git
     go-task
     infisical
@@ -9,37 +10,34 @@ with packages;
   ];
 
   lint = [
+    dashboard-linter
     actionlint
     dlint
+    go-tools
+    gofumpt
+    golangci-lint
+    gotools
     infralint
     pre-commit
     shellcheck
     skills-sync
     treefmt
-
-    deadcode
-    gofumpt
-    golangci-lint
-    staticcheck
   ];
 
   main = [
-    cyanprint
-    git
-    go-task
-    infisical
-    shellcheck
-
-    go
-    gotestsum
-    govulncheck
-
-    # ### operator-template-main
-    # #### source: operator-template
     bun
     controller-gen
+    cyanprint
+    git
+    go
+    go-task
+    gotestsum
+    govulncheck
+    infisical
     kubebuilder
+    releaser
     setup-envtest
+    shellcheck
   ];
 
   releaser = [

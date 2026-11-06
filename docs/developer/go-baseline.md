@@ -7,11 +7,10 @@ downstream nodes.
 
 ## Toolchain
 
-The Nix shells provide Go 1.26.5, golangci-lint, govulncheck, deadcode,
-staticcheck, gofumpt, and gotestsum. Go 1.26.5 is an explicit patch-level
-override of the shared 26.05 package because govulncheck rejects Go 1.26.4 for
-GO-2026-5856. The override remains source-pinned and carries no vulnerability
-exclusion.
+The Nix shells provide Go (from the AtomiCloud registry, which pins the patch
+level), golangci-lint, govulncheck, deadcode, staticcheck, gofumpt and
+gotestsum. Dates and times of day use `cloud.google.com/go/civil`, pinned in
+`go.mod` (`pins.go` keeps it there until code imports it).
 
 ## Repository shape
 
@@ -24,12 +23,6 @@ exclusion.
   testcontainers-go.
 - `tests/sit/` exercises compiled artifacts from a client's perspective.
 
-The operator sample (toy `Note`/`Journal` CRDs, pure reconcile services, and the
-S3/MinIO ledger store) is fenced by these structural directories, and the
-compiled-artifact journey in `tests/sit/cli/cli_test.go` is fenced by its own
-`DOMAIN WIRING` comment. Downstream templates may replace the sample while
-retaining the same gates and tier boundaries.
-
 ## Commands
 
 - `task setup` installs modules and synchronizes vendored skills.
@@ -39,15 +32,17 @@ retaining the same gates and tier boundaries.
   tiered suites; `task test:sit` runs the compiled-manager journey.
 - `task test:coverage`, `task test:unit:coverage`, and
   `task test:int:coverage` enforce the scoped ledgers.
-- `task test:watch` watches the unit tier.
-- `task deadcode` runs staticcheck and deadcode independently across the
-  whole-repository and production-only scopes, then writes the nonblocking
-  review feed to `reports/deadcode-llm.txt`.
+- `task test:unit:watch` watches the unit tier.
+- `task vuln` scans dependencies with govulncheck.
+- `task deadcode:strict` runs the four blocking staticcheck/deadcode passes:
+  whole repository and production only, for each tool.
+- `task deadcode` writes the nonblocking LLM review feed to
+  `reports/deadcode-llm.txt`.
 - `task run -- --help` runs the manager from source.
 - `task preview -- --help` runs the compiled manager artifact.
-- `task operator:generate` regenerates the CRDs, RBAC, and deepcopy from the Go
+- `task operator:generate` regenerates the CRDs, RBAC and deepcopy from the Go
   types and markers.
-- `task operator:e2e` runs the k3d end-to-end journey (throwaway cluster).
+- `task operator:e2e` runs the k3d end-to-end journey on a throwaway cluster.
 - `task up` and `task down` manage the local MinIO ledger dependency.
 
 There is deliberately no `task dev`: the manager is exercised through its tiers
@@ -56,14 +51,14 @@ real use case.
 
 ## Test and coverage law
 
-Every `*_test.go` file must declare a package ending in `_test`, and
-`export_test.go` is forbidden. Unit coverage includes only `lib/**` and must be
-100%. Integration coverage includes only `adapters/**`; the operator's real
-adapter surface (controller-runtime reconcilers and the S3/MinIO ledger store)
-adapts the int threshold below 100 because defensive transport-error branches are
-not deterministically reachable with real dependencies — see the threshold
-comment in `.config/go-base.coverage.yaml`. Codecov flags are informational and
-carry forward independently.
+Every `*_test.go` file, `export_test.go` included, must declare a package ending
+in `_test`; golangci-lint's `testpackage` linter enforces it.
+Unit coverage includes only `lib/**` and must be
+100%. Integration coverage includes only `adapters/**`; the operator lowers that
+threshold because defensive transport-error branches of the reconcilers and the
+S3/MinIO ledger store are not reachable with real dependencies. The checked-in ledger is `.config/go-base.coverage.yaml`. Each tier
+writes its own profile: `reports/unit/coverage.out` and
+`reports/integration/coverage.out`.
 
 ## Deadcode and vulnerability law
 
@@ -71,24 +66,21 @@ Four independently invoked strict components cover unused code: staticcheck and
 deadcode each run once with test analysis/reachability enabled and once against
 production packages only. The production deadcode component therefore rejects
 a symbol reachable only from tests. None of the components has an exclusion
-list. Govulncheck is a blocking CI-only job; its negative proof routes a pinned
-vulnerable fixture through a deterministic scanner double, while the healthy
-path uses the real vulnerability database.
+list. Govulncheck is a blocking CI-only job.
 
 ## Docker and Helm
 
 The Dockerfile builds a static binary and runs it from
-`gcr.io/distroless/static-debian12:nonroot` as UID/GID 65532. Separate policy
-checks enforce the runtime base and user. The root chart is the operator manager
-chart: CRDs (plain templates), RBAC, the manager Deployment, a secured metrics
-Service, and the observability pack (ServiceMonitor, GrafanaAlertRuleGroup, and a
-Grafana dashboard).
+`gcr.io/distroless/static-debian12:nonroot` as UID/GID 65532. The root chart is
+the operator manager chart: CRDs (plain templates), RBAC, the manager
+Deployment, a secured metrics Service and the observability pack
+(ServiceMonitor, GrafanaAlertRuleGroup and a Grafana dashboard).
 
 ## Template-maintenance boundary
 
 Downstream authors may adapt package/module identity, sample domain code,
-coverage thresholds after adding real surface, the Docker entrypoint, chart
-metadata, and README badges. They must preserve black-box tests, tier scoping,
+coverage thresholds after adding real surface, the Docker entrypoint and chart
+metadata. They must preserve black-box tests, tier scoping,
 all four staticcheck/deadcode components, the CI-only vulnerability gate, one
 composition root, distroless nonroot runtime policy, and generated hook/probe
 coverage.

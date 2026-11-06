@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Candidates stay nonblocking; a scanner that could not run or load is fatal (staticcheck marks those `compile`), and every pass records completion.
 report="reports/deadcode-llm.txt"
 scan="$(mktemp)"
 trap 'rm -f "${scan}"' EXIT

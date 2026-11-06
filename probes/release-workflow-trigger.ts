@@ -18,7 +18,7 @@ export default {
       description: 'Release runs only after successful CI completion on main.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, 'nix develop .#ci -c dlint workflow-policy', 'release-workflow-trigger');
+        await expectGreen(repo, 'nix develop .#ci -c dlint release-gating', 'release-workflow-trigger');
       },
     },
     {
@@ -34,7 +34,7 @@ export default {
         });
         await expectRedBecause(
           repo,
-          'nix develop .#ci -c dlint workflow-policy',
+          'nix develop .#ci -c dlint release-gating',
           'release-workflow-trigger',
           ['release must trigger from CI'],
           { forbidden: ['does not exist', 'Release trigger conforms', 'Release concurrency conforms', 'DISAGREEMENT'] },

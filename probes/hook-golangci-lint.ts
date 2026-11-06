@@ -1,5 +1,5 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
-import { plantGoFile } from './lib/go.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic, plantGoFile } from './lib/go.ts';
 
 // Per-process golangci cache. This node's baseline and mutation arms run concurrently
 // over one sandbox, and a shared cache lets one arm answer with the other arm's result.
@@ -8,11 +8,10 @@ import { plantGoFile } from './lib/go.ts';
 const gate =
   'GOLANGCI_LINT_CACHE="$PWD/.git/cyanprint-golangci-cache-$$" nix develop .#ci -c pre-commit run a-golangci-lint --all-files';
 
-// Plant beside a structural Go target so sample renames cannot defuse the probe.
 const goSources = 'lib/**/*.go';
 const fixture = 'probe_ineffectual_assignment.go';
 
-// Export the fixture so ineffassign, not unused, owns the red diagnostic.
+// Exported so unused stays quiet and ineffassign owns the red.
 const ineffectualAssignment = [
   'func ProbeIneffectualAssignment() string {',
   '\tvalue := "probe"',

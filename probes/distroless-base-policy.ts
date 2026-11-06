@@ -1,4 +1,4 @@
-import { expectGreen, expectRedWithDiagnostic } from './lib/helpers.ts';
+import { expectImagePolicyGreen, expectImagePolicyRed } from './lib/go.ts';
 
 export default {
   contractVersion: 1,
@@ -9,11 +9,7 @@ export default {
       description: 'The runtime image uses the declared distroless base.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(
-          repo,
-          'nix develop .#ci -c ./scripts/validate/go-image-policy.sh distroless',
-          'distroless-base-policy',
-        );
+        await expectImagePolicyGreen(repo, 'distroless');
       },
     },
     {
@@ -27,12 +23,7 @@ export default {
             find: 'FROM gcr.io/distroless/static-debian12:nonroot AS runtime',
             replace: 'FROM alpine:3.22 AS runtime',
           });
-          await expectRedWithDiagnostic(
-            repo,
-            'nix develop .#ci -c ./scripts/validate/go-image-policy.sh distroless',
-            'distroless-base-policy',
-            /final runtime image must use the distroless nonroot base/,
-          );
+          await expectImagePolicyRed(repo, 'distroless');
         } finally {
           await repo.write('infra/Dockerfile', original);
         }

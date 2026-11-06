@@ -1,121 +1,72 @@
-# Signal Decisions (observability-check)
+# Signal Decisions
 
-The gated decision cascade for deciding which observability signals a feature gets, and the `SIGNALS.md` record that captures the decisions. The defaults differ by signal: **metrics default to NO** (they cost active series forever); **logs and traces are deliberately liberal** (the platform manages their volume with adaptive sampling) — as long as they are event-driven, not spam.
+Use this page whenever a feature is added or changed. Walk the six gates in order, answer every one with a reason and a cost, and record the answers as one block in `observability/SIGNALS.md`. The block format is [the SIGNALS template](/.claude/skills/observability-check/templates/SIGNALS-template.md).
 
----
+Terms such as LPSM, ATS and SLO are defined in [Observability Standards](/docs/standards/observability/index.md#terms).
 
-## Cost model: strict on metrics, liberal on logs and traces
+## Cost: strict on metrics, liberal on logs and traces
 
-| Signal  | Cost unit                                                                                                                        | Stance                                                                                                                                      |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Metrics | **Active time series (ATS)** — the memory/billing unit of the TSDB; product of label-value cardinalities, ×~10–15 for histograms | **Strict.** Estimate ATS before adding (`series = Π(label cardinalities) × buckets`); >100 ATS for one feature needs explicit justification |
-| Logs    | Volume (lines × bytes × retention)                                                                                               | **Liberal.** The platform's adaptive sampling manages volume. Log generously — but event-driven, never unconditional hot loops              |
-| Traces  | Span count (spans × traffic × retention)                                                                                         | **Liberal.** Same: adaptive/tail sampling manages volume. Trace user flows by default                                                       |
+| Signal  | What it costs                                                                    | Stance                                                                              |
+| ------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Metrics | ATS = product of each label's number of values; a histogram is about 10–15× that | **Strict.** Estimate ATS first; over 100 ATS for one feature needs a written reason |
+| Logs    | Lines × bytes × retention                                                        | **Liberal**, as long as logs follow events, not loops                               |
+| Traces  | Spans × traffic × retention                                                      | **Liberal.** The platform team samples traces in the collector                      |
 
-Cardinality bugs are still cost bugs: an unbounded label (user ID, URL, request ID) turns one metric into millions of ATS. Reject them at review — IDs belong in logs and trace attributes, where they are exactly what you want.
+An unbounded label (user ID, URL, request ID) turns one metric into millions of ATS. Put IDs in logs and span attributes instead. If the collector keeps a per-pod label (`pod` or `instance`; check one series in Grafana Explore), multiply the ATS by the replica count. For a new metric, assume it does and use the planned replica count. Count every landscape the service runs in, wherever its data is stored. Until you know the landscapes or replicas, assume 2 landscapes × 2 replicas and say so in the ATS cell. Until you know traffic, assume 1 request/s at peak and say so in the Volume cell.
 
-Attention cost still applies to alerts and dashboards: every panel and alert competes for a responder's focus. Logs and traces don't page anyone — that's why they get to be liberal.
+## The six gates
 
----
+### Gate 1 — Metrics (default NO)
 
-## The Six Gates (walk in order, answer all, justify every answer)
+Say YES only if a person or automation acts on the number, an SLO uses it, or you need an aggregate logs cannot give (such as p99 latency). List only the metrics this feature adds, each with its type, labels and ATS; name an existing metric an SLO uses in the Why line. LPSM labels are stamped, so list only labels the code sets, and multiply the ATS by the number of `module` values that emit the metric. Prefer counters and gauges; use a histogram only when you need percentiles.
 
-### Gate 1 — Metrics? (default NO)
+Example: gauge `webhook_retry_queue_depth`, no labels of its own, emitted by 2 `module` values, in 2 landscapes × 2 replicas → about 8 ATS.
 
-Say YES only if at least one holds:
+### Gate 2 — Logs (default YES for events)
 
-- A human or automation **acts on the number** (threshold, capacity decision, scaling review)
-- It feeds an **SLO**
-- Debugging needs an **aggregate** that logs cannot answer (e.g. p99 latency)
+Log every meaningful user or business event (request handled, job run, state change, decision, failure) as one structured line with its inputs and key values, so someone can rebuild what happened, in order, without a redeploy. Never log inside hot loops or per tick; count those in a metric or log once per batch.
 
-If YES: name each metric, its type (counter/gauge/histogram), its labels, and its **estimated ATS**. Reject any label whose value set is unbounded. Prefer counters/gauges over histograms unless you need percentiles — a histogram is ~10–15× the series.
+Example: one INFO line per delivery attempt with `delivery_id`, `target`, `attempt`, `outcome`.
 
-### Gate 2 — Logs? (default YES for events)
+### Gate 3 — Traces (default YES for user flows)
 
-Log **liberally, driven by user/business events**: every meaningful event (request handled, job executed, state transition, decision taken, failure) gets a structured log carrying the **inputs and key variables** — the goal is that a debugger can reconstruct the **order of events and the values in play** without redeploying. The platform's adaptive sampling manages volume.
+Add a span for each meaningful stage of a user flow, with key IDs as attributes. Skip tracing only for internal work with no per-request flow. The service sets only its head-sampling `ratio` (the share of new traces kept): keep the base `ratio: 1.0` and lower it in a landscape's config when that landscape's trace volume is high (the platform team asks, or its traces cost more than its logs). Keeping every error trace is the platform team's **tail sampling** (the collector decides after a trace ends, so it can keep all errors).
 
-The one prohibition: **constant spam** — unconditional logs in hot loops, per-tick polling, per-item logs inside large batches. Those get aggregated into a metric or logged once per batch with counts. Record the expected volume for anything that could be high-frequency.
+Example: span `webhook.deliver` with `delivery_id`; ratio 1.0, lowered to 0.1 in `raichu` because of its high volume.
 
-### Gate 3 — Traces? (default YES for user flows)
+### Gate 4 — Dashboard (default: the generic dashboard is enough)
 
-Trace **user-event flows by default**: a span per meaningful stage, attributes carrying the key IDs and variables (plus LPSM resource attributes), so latency and causality are reconstructible per request. Adaptive/tail sampling manages volume — note the intended policy (e.g. keep all errors, sample successes). Skip tracing only for internal machinery with no per-event flow worth following.
+Never copy panels of the [generic dashboard](/docs/standards/observability/index.md#terms). Only custom metrics from Gate 1 earn a curated dashboard; their log evidence (the failure classes from Gates 2 and 5) sits beside them. No custom metrics means no curated dashboard. See [Dashboards](/docs/standards/grafana-dashboards/index.md).
 
-### Gate 4 — Dashboard panels? (default: generic tier is enough)
+Example: "Retry queue depth" panel in a detail row.
 
-Standard signals (request rate/errors/duration, resource usage) are already covered by the generic LPSM dashboard — never re-add them. Only **custom/domain** metrics from Gate 1 may earn panels on the curated service dashboard; name the panel and its row (overview vs detail). No custom metrics → no curated dashboard — a valid, good outcome. See [Grafana Dashboards](../grafana-dashboards/index.md).
+### Gate 5 — Alerts (default NO)
 
-### Gate 5 — Alerts? (default NO)
+An alert must pass all three checks:
 
-For each approved signal, apply ALL alerting gates — fail any one → no alert:
+1. **Nothing heals it already.** If an autoscaler, restart policy or retry loop fixes the condition, do not alert on it. Alert when that mechanism is exhausted.
+2. **Someone can act.** The runbook must say what to do. "Watch it" means `info` at most, or no alert.
+3. **Someone owns it.** The owner team in `observability/overview.md` agrees to receive it. The Gate 5 Owner column may be `pending` while drafting, until `overview.md` (written later, with `grafana-runbook`) names the owner team; a `{team}` placeholder still counts as pending. A PR that adds an alert set cannot merge until that column names a team. Delivery is the platform team's routing; if `{platform}` has no route yet, ask them.
 
-1. **No self-healing**: does a mechanism auto-correct this (HPA/autoscaler, restart policy, retries)? If yes → NO alert on the condition; consider alerting on the **mechanism's exhaustion** instead (at max replicas AND still saturated; retries losing).
-2. **Actionable**: a responder must have something concrete to do. "Watch it" → `info` at most.
-3. **Routable**: LPSM labels will route it to the owning team.
+| Condition                             | Already healed by         | Alert?                          |
+| ------------------------------------- | ------------------------- | ------------------------------- |
+| CPU 80%, autoscaler on                | autoscaling               | No                              |
+| CPU 80%, no autoscaler                | nothing                   | `warning`                       |
+| Autoscaler at max and still saturated | the autoscaler has failed | `critical`                      |
+| One pod restart                       | restart policy            | No; a sustained crash loop: yes |
+| Retry queue growing despite retries   | retries are losing        | Yes                             |
 
-If an alert survives: decide **tier count** (1 = binary failure, 2 = capacity/degradation default, 3 = only when the trend itself matters), the **alert type**, and the **noise budget** (expected fire rate, e.g. "≤2 pages/month" — if it will fire more often than someone acts, it fails the actionability gate) — see [Alerts](./alerts.md).
+For each alert that survives, fill every Gate 5 column of the template ([tiers and types](/docs/standards/observability/alerts.md)); the **noise budget** is how often you expect it to fire, e.g. "≤2 pages/month". An alert that fires more often than someone acts fails check 2.
 
-### Gate 6 — Runbook
+### Gate 6 — Alert-set folders
 
-Every alert from Gate 5 becomes an **alert-set folder** (`observability/alerts/<slug>/` with one file per tier — `critical.yaml`/`warning.yaml`/`info.yaml` — plus `runbook.md`) **before merge**. List the required folder slugs — slug = base name lowercased, spaces → hyphens, `[a-z0-9-]` only. See [Runbooks](./runbooks.md) and [Alerts](./alerts.md).
+Each Gate 5 alert becomes one folder, `observability/alerts/<slug>/`, with its tier files and `runbook.md`, in the same PR. Record a short slug next to each alert name, using only `a-z`, `0-9` and `-`: `Retry queue saturated` → `retry-queue`. Its length limit: [Shipping](/docs/standards/observability/shipping.md#structural-checks); if the platform is not known yet, keep the slug ≤ 23 − len(service) characters, which fits any platform name of up to 6 characters (if the service is unknown too, assume its name is ≤ 11 characters), and recheck once both are known.
 
----
+## Review checklist
 
-## The SIGNALS.md record
-
-Lives at `observability/SIGNALS.md`, one block per feature. **The canonical fill-in skeleton is the `observability-check` skill's `templates/SIGNALS-template.md`** — the outline below defines what each gate must record:
-
-```markdown
-## Feature: <name> (<PR link / date>)
-
-### Gate 1 — Metrics
-
-**Decision:** NO | YES
-**Justification:** <who acts on it / which SLO / what aggregate question>
-| Metric | Type | Labels | Est. ATS | Why |
-
-### Gate 2 — Logs
-
-**Decision:** YES | NO (+ event table: Event, Level, Inputs/key variables, Est. volume)
-
-### Gate 3 — Traces
-
-**Decision:** YES | NO (+ span table: Span, Attributes, Sampling)
-
-### Gate 4 — Dashboard
-
-**Decision:** generic tier sufficient | curated panels (+ panel table)
-
-### Gate 5 — Alerts
-
-**Decision:** NO | YES
-**Self-healing check:** <what mechanism exists and why it does not cover this>
-**Noise budget:** <expected fire rate, e.g. ≤2 pages/month>
-| Alert (base name) | Type | Tiers | Threshold(s) |
-
-### Gate 6 — Alert-set folders required
-
-- `alerts/<alert-slug>/`
-```
-
-A worked example:
-
-| Question  | Decision                                                                                                                | Why                                                                                  |
-| --------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Metrics   | ✅ `webhook_retry_queue_depth` (gauge, ~4 ATS), `webhook_delivery_failures_total` (counter, ~8 ATS)                     | Queue depth is capacity-relevant; failures feed error rate                           |
-| Logs      | ✅ one structured event per delivery attempt (payload id, target, attempt #, outcome) + one ERROR per permanent failure | Event order + values reconstructible for debugging; adaptive sampling handles volume |
-| Traces    | ✅ span per delivery attempt (ids as attributes); keep all errors, sample successes                                     | Per-request causality for slow/failed deliveries                                     |
-| Dashboard | ✅ queue depth (detail row), failure rate (overview row)                                                                | Custom metrics — curated tier                                                        |
-| Alerts    | ✅ 2-tier family on queue depth; ❌ none on retry _rate_                                                                | Retrying IS the self-healing — alert on the healer losing, not working               |
-| Runbook   | `alerts/webhook-retry-queue/`                                                                                           |                                                                                      |
-
----
-
-## Verification checklist (mechanical)
-
-- [ ] `SIGNALS.md` has a block for the feature with **all six gates** answered
-- [ ] Every answer has a one-line justification (a bare YES/NO fails review)
-- [ ] Every YES names its artifact (metric / log event / span / panel / alert-set folder) **and its cost** (ATS estimate, log volume, sampling policy)
-- [ ] Every "Gate 5 (Alerts) = YES" names tier count, alert type, AND noise budget
-- [ ] Cross-check: each named artifact exists in the PR (grep the metric name in code; each Gate-6 folder exists under `observability/alerts/`)
-- [ ] No unbounded labels on any metric; no unconditional hot-loop logs; sampling policy stated for traces
-- [ ] No standard-signal panel added to a curated dashboard
+- [ ] The feature has a block in `SIGNALS.md` with all six gates answered.
+- [ ] Every answer has a one-line reason; a bare YES or NO fails review.
+- [ ] Every YES names its metric, log event, span, panel or folder, and its cost (ATS, log volume or sampling).
+- [ ] Every Gate 5 row is fully filled, and its Owner follows [check 3](#gate-5--alerts-default-no).
+- [ ] Everything named exists in the PR: each metric in the service code (unless its Gate 1 row says `planned`), each Gate 6 folder under `observability/alerts/`.
+- [ ] No unbounded metric labels, no logs in hot loops, a sampling ratio for every trace.

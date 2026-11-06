@@ -1,8 +1,6 @@
 version: '3'
 
-# One task set per chart under infra/. The task key is the chart directory's own
-# name, so `infra/root_chart` is `root_chart:<verb>`. A new chart gets its own
-# tasks and its own vars block; never re-point a shared chart variable.
+# One task set and vars block per chart; never re-point a shared chart variable.
 tasks:
   root_chart:deps:
     desc: Build dependencies for infra/root_chart

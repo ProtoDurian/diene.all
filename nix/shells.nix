@@ -4,30 +4,17 @@
   env,
   shellHook,
 }:
+with env;
 let
-  # ### operator-template-shellhook
-  # #### source: operator-template
-  # Point envtest at the offline nix asset directory (kube-apiserver/etcd/kubectl)
-  # so int-tier envtest suites never download binaries at test time (M14).
   shellHookWithEnvtest = shellHook + ''
-    export KUBEBUILDER_ASSETS="${packages.envtest-assets}"
+    export TEST_ASSET_KUBE_APISERVER="${packages.kubernetes}/bin/kube-apiserver"
+    export TEST_ASSET_ETCD="${packages.etcd}/bin/etcd"
+    export TEST_ASSET_KUBECTL="${packages.kubectl}/bin/kubectl"
   '';
 in
-with env;
 {
-  # `infralint` is the PROVIDER of skopeo, and `.#cd` is the one shell that needs it:
-  # probes/docker-build.ts runs `nix develop .#cd -c skopeo inspect` on the OCI archive.
-  # `cd` is `main ++ system`, neither of which carries `lint`, so without this the
-  # binary is absent here while present in default/ci/releaser — which is why a
-  # toolchain check scoped to `default` cannot answer for `cd`.
-  #
-  # NOT a bare `skopeo`: measured, `buildEnv [ infralint, skopeo ]` fails rc=1 with a
-  # conflicting subpath, and default/ci/releaser all carry lint -> infralint, so a bare
-  # package would collide in three of four shells.
-  # NOT the whole `lint` group: `cd` is the deploy shell for every image and chart job,
-  # and lint carries actionlint/pre-commit/treefmt/golangci-lint/staticcheck.
   cd = pkgs.mkShell {
-    buildInputs = main ++ system ++ [ packages.infralint ];
+    buildInputs = main ++ system;
     shellHook = shellHookWithEnvtest;
   };
 

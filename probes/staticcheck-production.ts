@@ -1,10 +1,8 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
-import { plantGoFile } from './lib/go.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic, plantGoFile } from './lib/go.ts';
 
-// The production staticcheck component, invoked directly rather than through the composite dispatcher.
 const gate = 'nix develop .#ci -c ./scripts/local/staticcheck-production.sh';
 
-// Deadcode only tracks functions, so an unused unexported type can only be reported by staticcheck.
 const unusedType = 'type probeStaticcheckProduction struct{}';
 
 export default {

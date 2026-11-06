@@ -1,13 +1,4 @@
-# operator-template
-
-The reusable kubebuilder/controller-runtime operator skeleton in family
-conventions — a manager image plus manager chart, proven on a toy CRD pair.
-
-Diene's reproducible development environment is managed by Nix. Run `direnv allow` once, then use `task` tasks from the loaded shell.
-
-This repository inherits the all-features workspace baseline: split CI/CD, Docker, Helm, secrets, release configuration, validators, standards, and vendored agent-skill synchronization.
-
-## Commands
+# Commands
 
 Run `task --list` for every available task and its description. The task set is
 declared in [`Taskfile.yaml`](Taskfile.yaml), whose `includes:` block maps each
@@ -17,23 +8,61 @@ live under [`infra/`](infra) and may be plural, so their tasks are keyed per
 artifact. See [the Taskfile standard](docs/standards/taskfile/index.md) for the
 conventions.
 
-## Go commands
+# Development Environment
 
-- `task build` — create `dist/manager`.
-- `task typecheck` — compile every source package without running tests.
-- `task test` — run the unit and integration tiers.
-- `task test:coverage` — enforce the scoped unit and integration coverage ledgers.
-- `task deadcode` — run strict whole-repository and production passes plus the LLM-lax report.
-- `task run -- --help` — run the manager from source.
-- `task preview -- --help` — run the compiled manager artifact.
-- `task operator:generate` — regenerate CRDs, RBAC, and deepcopy from the Go types.
-- `task operator:e2e` — run the k3d end-to-end journey.
+All binaries, tools, and PATH are managed by **Nix**. Do not install tools manually or modify PATH outside of the nix configuration.
 
-See the [Go baseline](docs/developer/go-baseline.md) for the language contract and
-template-maintenance boundary, and the
-[operator conventions](docs/domain/operator-conventions.md) for the operator surface.
+## Prerequisites
 
-## Standards
+1. **[Nix](https://nixos.org/download)** — package manager
+2. **[Docker](https://docs.docker.com/get-docker)** — container runtime
+3. **[direnv](https://direnv.net/docs/installation.html)** — auto-loads the nix shell on `cd`
+
+## Getting Started
+
+```bash
+direnv allow    # first time only — loads the nix dev shell
+```
+
+Once allowed, direnv automatically loads the development environment whenever you enter the project directory.
+
+## Nix Configuration
+
+See [docs/standards/nix/index.md](docs/standards/nix/index.md) for the full guide on:
+
+- File structure (`flake.nix`, `nix/`, `.envrc`)
+- Adding/removing packages
+- Environment groups and shells
+- Formatters and pre-commit hooks
+- Adding registries
+
+# Go base template
+
+See the [Go baseline](docs/developer/go-baseline.md) for the language-specific
+toolchain, task surface, test tiers, coverage ledgers, dead-code passes and the
+illustrative Note sample. Go variants accompany the shared standards for
+[date/time](docs/standards/datetime/languages/go.md),
+[domain-driven design](docs/standards/domain-driven-design/languages/go.md),
+[functional practices](docs/standards/functional-practices/languages/go.md),
+[SOLID](docs/standards/solid-principles/languages/go.md),
+[stateless OOP/DI](docs/standards/stateless-oop-di/languages/go.md),
+[testing](docs/standards/testing/languages/go.md),
+[utilities](docs/standards/utilities/languages/go.md),
+[validation](docs/standards/validation/languages/go.md), and
+[wire format](docs/standards/wire-format/languages/go.md).
+
+# Operator template
+
+The reusable kubebuilder/controller-runtime operator skeleton: one `cmd/manager`
+binary, a manager image and a manager chart, proven on the toy `Note` and
+`Journal` CRDs. Read the [operator conventions](docs/domain/operator-conventions.md)
+before changing controllers, CRDs, reconcile services, the durable ledger,
+blast-brake, observe mode or the manager chart.
+
+- `task operator:generate` regenerates CRDs, RBAC and deepcopy from the Go types.
+- `task operator:e2e` runs the k3d end-to-end journey on a throwaway cluster.
+
+# Standards
 
 The conventions this repository follows live under
 [`docs/standards/`](docs/standards). Read the standard for the surface you are
@@ -41,16 +70,6 @@ changing before you change it. [`CLAUDE.md`](CLAUDE.md) links the ones an agent
 reaches for most often; it is a convenience, not a required index, and nothing
 checks that it names every surface.
 
-Domain-specific architecture and behavior belongs under
-[`docs/domain/`](docs/domain/README.md), not under `docs/standards/`.
+# Workspace baseline
 
-## Go language variants
-
-- [Date and time](docs/standards/datetime/languages/go.md)
-- [Domain-driven design](docs/standards/domain-driven-design/languages/go.md)
-- [Functional practices](docs/standards/functional-practices/languages/go.md)
-- [SOLID principles](docs/standards/solid-principles/languages/go.md)
-- [Stateless OOP and dependency injection](docs/standards/stateless-oop-di/languages/go.md)
-- [Testing](docs/standards/testing/languages/go.md)
-- [Utilities](docs/standards/utilities/languages/go.md)
-- [Validation](docs/standards/validation/languages/go.md)
+This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, Docker, Helm, secrets, release configuration, validators, and standards.

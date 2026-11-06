@@ -1,39 +1,6 @@
 schemaVersion: 2
 
 types:
-  # THIS NODE'S OWN PRE-MERGE SET, NEITHER TRIMMED NOR GROWN. The cascade from
-  # go-base@8a5d2063 carried this file down with 34 type/scope pairs. This node
-  # declared 17 before that merge, and it declares the same 17 now. The 17 that
-  # arrived by propagation were removed here: chore/many-owner, chore/nix,
-  # chore/workspace, docs/nix, feat/nix, feat/probes, fix/nix, fix/probes,
-  # fix/skills, fix/workspace, the whole `merge` type (merge/default,
-  # merge/main, merge/workspace), perf/probes, refactor/ci, style/probes and
-  # test/probes.
-  #
-  # Why a GAIN is reverted exactly as a loss is restored:
-  #   * A PARENT'S SET IS NOT THIS NODE'S SET. Inheriting the parent's
-  #     vocabulary because a merge happened to carry it is the same unargued
-  #     change as losing vocabulary because a merge happened to drop it. Neither
-  #     direction was decided; both are side effects of a cascade.
-  #   * GAINING PAIRS MOVES THIS NODE OUT OF ITS TIER. The extra scopes name
-  #     surfaces this node does not own (nix modules, the probe corpus, the
-  #     workspace tree). Accepting them would silently widen what a commit here
-  #     is allowed to claim.
-  #   * NOTHING HERE RULES ON go-base. Whether go-base should carry those 34 is
-  #     for the owner of the commit-type policy to settle in writing. This file
-  #     only preserves this node's pre-merge state.
-  #
-  # How to check it again after any cascade: the change auto-merges CLEANLY - no
-  # conflict, no marker, and no gate we run asserts a set. DO NOT COMPARE
-  # COUNTS: a sibling measured 13 types before and after while one was lost and
-  # another gained. Diff the (type, scope) SETS in BOTH directions against the
-  # pre-merge tip.
-  - type: amend
-    desc: Small amendments and typo fixes
-    scopes:
-      default:
-        desc: Amend existing work
-        release: false
   - type: build
     desc: Build-system changes
     scopes:
@@ -98,6 +65,12 @@ types:
       default:
         desc: Fix a bug
         release: patch
+  - type: merge
+    desc: Branch merges
+    scopes:
+      default:
+        desc: Merge a branch
+        release: false
   - type: perf
     desc: Performance improvements
     section: 🚀 Performance Improvement 🚀
@@ -198,7 +171,6 @@ release:
     releasedLabels:
       - released
   hooks:
-    # Hook point a downstream node fills; a version file enters commit.assets in
-    # the same edit as the command that writes it.
+    # A file a hook writes joins commit.assets in the same edit.
     prepare: []
     success: []

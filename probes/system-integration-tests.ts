@@ -1,6 +1,5 @@
-import { expectGreen } from './lib/helpers.ts';
+import { expectGreen } from './lib/go.ts';
 
-// The CI system-integration lane is self-contained: it sets the repository up and runs the compiled artifact against a real Redis.
 const gate = 'nix develop .#ci -c ./scripts/ci/sit.sh';
 const gateTimeoutMs = 600000;
 
@@ -10,7 +9,8 @@ export default {
   probes: [
     {
       name: 'baseline-system-integration-tests-green',
-      description: 'The CI system-integration entrypoint builds the artifact and completes the tier on its own.',
+      description:
+        'The CI system-integration entrypoint builds the artifact and runs the sample Note/KV journey against Redis.',
       kind: 'baseline',
       async run(repo: any) {
         await expectGreen(repo, gate, 'system-integration-tests', gateTimeoutMs);

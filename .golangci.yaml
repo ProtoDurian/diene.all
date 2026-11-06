@@ -38,6 +38,7 @@ linters:
     - rowserrcheck
     - sloglint
     - staticcheck
+    - testpackage
     - unconvert
     - unparam
     - unused
@@ -72,6 +73,10 @@ linters:
           disabled: true
         - name: package-comments
           disabled: true
+    testpackage:
+      # export_test.go and package main get no white-box exemption
+      allow-packages: [none]
+      skip-regexp: ^$
   exclusions:
     generated: lax
     rules:
