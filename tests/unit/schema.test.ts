@@ -9,7 +9,10 @@ import { ConfigRegistry } from '../../src/lib/registry.js';
 import { JsonSchemaGenerator } from '../../src/lib/schema.js';
 
 const registry = ConfigRegistry.create()
-  .register('server', z.object({ port: z.coerce.number(), host: z.string(), tags: z.array(z.string()).optional() }))
+  .register(
+    'server',
+    z.object({ port: z.coerce.number().default(8080), host: z.string(), tags: z.array(z.string()).optional() }),
+  )
   .register('client', z.object({ name: z.string() }));
 
 const SNAPSHOT = {
@@ -19,22 +22,19 @@ const SNAPSHOT = {
     server: {
       type: 'object',
       properties: {
-        port: { type: 'number' },
+        port: { default: 8080, type: 'number' },
         host: { type: 'string' },
         tags: { type: 'array', items: { type: 'string' } },
       },
-      required: ['port', 'host'],
-      additionalProperties: false,
+      required: ['host'],
     },
     client: {
       type: 'object',
       properties: { name: { type: 'string' } },
       required: ['name'],
-      additionalProperties: false,
     },
   },
   required: ['server', 'client'],
-  additionalProperties: false,
 };
 
 const generator = new JsonSchemaGenerator();
@@ -65,6 +65,7 @@ describe('JsonSchemaGenerator.generate — editor validation of a sample YAML', 
 
   it.each([
     { file: 'config.yaml', valid: true, errors: [] },
+    { file: 'defaulted.config.yaml', valid: true, errors: [] },
     { file: 'invalid.config.yaml', valid: false, errors: ['/server/port must be number'] },
   ])('should judge $file with the generated draft 2020-12 schema', async ({ file, valid, errors }) => {
     // Arrange

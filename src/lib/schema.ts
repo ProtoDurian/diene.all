@@ -10,7 +10,7 @@ class JsonSchemaGenerator {
   constructor() {}
 
   generate(registry: SchemaRegistry, options: SchemaGenOptions = {}): Record<string, unknown> {
-    const schema = z.toJSONSchema(registry.rootSchema()) as Record<string, unknown>;
+    const schema = z.toJSONSchema(registry.rootSchema(), { io: 'input' }) as Record<string, unknown>;
     return options.id === undefined ? schema : { $id: options.id, ...schema };
   }
 }
