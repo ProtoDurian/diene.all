@@ -53,6 +53,22 @@ jobs:
     with:
       mode: int
 
+  meta:
+    name: TestHelper Meta Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-test.yaml
+    secrets: inherit
+    with:
+      mode: meta
+
+  package-validate:
+    name: Package Validation
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-package-validate.yaml
+    secrets: inherit
+
   build:
     name: Build Validation
     permissions:

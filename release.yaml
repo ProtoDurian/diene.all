@@ -165,7 +165,7 @@ release:
     assets:
       - Changelog.md
       - docs/developer/CommitConventions.md
-      - App/App.csproj
+      - Version.props
   github:
     enabled: true
     successComment: 'Released in ${version}.'
@@ -173,7 +173,7 @@ release:
       - released
   hooks:
     # A file a hook writes joins commit.assets in the same edit.
-    # bump.sh stamps `App/App.csproj`, so `commit.assets` lists it.
+    # bump.sh stamps `Version.props`, so `commit.assets` lists it.
     prepare:
       - phase: afterWrite
         command: './scripts/release/bump.sh ${version}'

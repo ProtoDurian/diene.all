@@ -9,6 +9,10 @@ includes:
     taskfile: tasks/Taskfile.test.yaml
     vars:
       MODE: int
+  test:meta:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: meta
 
 tasks:
   setup:
@@ -68,7 +72,15 @@ tasks:
       - ./scripts/local/dotnet-dead-code.sh --strict
 
   test:
-    desc: Run unit and integration tests
+    desc: Run unit, integration, and TestHelper meta tests
     cmds:
       - task: test:unit
       - task: test:int
+      - task: test:meta
+
+  test:coverage:
+    desc: Run every test tier with merged blocking coverage
+    cmds:
+      - task: test:unit:coverage
+      - task: test:int:coverage
+      - task: test:meta:coverage

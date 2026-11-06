@@ -61,3 +61,30 @@ checks that it names every surface.
 # Workspace baseline
 
 This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, secrets, release configuration, validators, and standards.
+
+# Publishable library packages
+
+[![NuGet version](https://img.shields.io/nuget/v/AtomiCloud.Diene.Note)](https://www.nuget.org/packages/AtomiCloud.Diene.Note)
+[![NuGet downloads](https://img.shields.io/nuget/dt/AtomiCloud.Diene.Note)](https://www.nuget.org/packages/AtomiCloud.Diene.Note)
+
+This template publishes `AtomiCloud.Diene.Note` and the companion
+`AtomiCloud.Diene.Note.TestHelper` package at one committed version. The Note
+domain is illustrative; the package lifecycle is the reusable product.
+
+```bash
+dotnet add package AtomiCloud.Diene.Note
+dotnet add package AtomiCloud.Diene.Note.TestHelper
+```
+
+```csharp
+using AtomiCloud.Diene.Note;
+using AtomiCloud.Diene.Note.TestHelper.Note;
+
+var summariser = new NoteSummariser();
+var note = new NoteRecord { Title = "Hello", Body = "world" };
+summariser.AssertSummary(note, 80, "Hello — world");
+```
+
+`nix develop .#ci -c ./scripts/ci/pkg-validate.sh` packs both packages, validates
+metadata and symbols, and restores them into a scratch consumer. See [the library baseline](docs/developer/dotnet-lib-baseline.md)
+for release and promotion guidance.
