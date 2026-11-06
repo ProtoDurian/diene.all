@@ -87,7 +87,7 @@ for path in "${files[@]}"; do
       return found;
     };
     const declares = (scope, name, from) => {
-      if (ts.isFunctionLike(scope) && (from === scope.body || scope.parameters?.includes(from)) && (scope.parameters.some(p => binds(p.name, name)) || (scope.body && hoisted(scope.body, name)))) return true;
+      if (ts.isFunctionLike(scope) && (from === scope.body || scope.parameters?.includes(from)) && (scope.parameters.some(p => binds(p.name, name)) || (from === scope.body && hoisted(scope.body, name)))) return true;
       if (ts.isSourceFile(scope) && hoisted(scope, name)) return true;
       if ((ts.isFunctionExpression(scope) || ts.isClassExpression(scope)) && scope.name?.text === name) return true;
       if (ts.isCatchClause(scope) && scope.variableDeclaration && binds(scope.variableDeclaration.name, name)) return true;
