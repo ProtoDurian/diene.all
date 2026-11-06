@@ -21,6 +21,38 @@ describe('migration service', () => {
     expect(actual.output).toContain('remove cache-npm');
   });
 
+  it('should rename atomi_release.yaml to release.yaml when only the legacy name exists', async () => {
+    // Arrange
+    const configs = new FakeConfigRepository(loadedConfig(undefined, 1));
+    const files = new MemoryFileSystem({ 'atomi_release.yaml': 'legacy', '.gitlint': 'legacy' });
+    const subject = new MigrationService(configs, files);
+
+    // Act
+    const actual = await subject.migrate();
+
+    // Assert
+    expect(configs.loadedPath).toBe('atomi_release.yaml');
+    expect(configs.writtenPath).toBe('release.yaml');
+    expect(await files.exists('atomi_release.yaml')).toBe(false);
+    expect(actual.removed).toEqual(['atomi_release.yaml', '.gitlint']);
+    expect(actual.output).toContain('renamed atomi_release.yaml to release.yaml');
+  });
+
+  it('should keep the named path when -c points at a legacy file', async () => {
+    // Arrange
+    const configs = new FakeConfigRepository(loadedConfig(undefined, 1));
+    const files = new MemoryFileSystem({ 'atomi_release.yaml': 'legacy' });
+    const subject = new MigrationService(configs, files);
+
+    // Act
+    const actual = await subject.migrate('atomi_release.yaml');
+
+    // Assert
+    expect(configs.writtenPath).toBe('atomi_release.yaml');
+    expect(await files.exists('atomi_release.yaml')).toBe(true);
+    expect(actual.output).not.toContain('renamed');
+  });
+
   it('should be byte-idempotent for v2 while removing stale legacy files', async () => {
     // Arrange
     const configs = new FakeConfigRepository(loadedConfig());

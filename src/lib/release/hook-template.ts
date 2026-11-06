@@ -25,6 +25,9 @@ function assertNoNul(value: string, subject: string): void {
 }
 
 export class HookTemplate {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor() {}
+
   renderText(template: string, version: string, notes: string): string {
     return template.replaceAll('${version}', version).replaceAll('${notes}', notes.trimEnd());
   }

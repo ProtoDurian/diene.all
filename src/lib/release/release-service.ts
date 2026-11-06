@@ -1,10 +1,14 @@
 import type { RawCommit } from '../commits/model';
+import { DEFAULT_CONFIG_PATH } from '../config/paths';
 import type { ReleaserConfig } from '../config/model';
 import { ReleaseError, ReleaserError } from '../errors';
+import { bumpPath, bumpPreset } from './bump-presets';
 import type { ConventionsService } from './conventions-service';
 import type { HookTemplate } from './hook-template';
+import { unifiedDiff } from './line-diff';
 import type { NotesService } from './notes-service';
 import type { IClock, IConfigRepository, IFileSystem, IGit, IGitHub, IHookRunner, LoadedConfig } from './ports';
+import { renderRefusal, type TagGuard } from './tag-guard';
 import type { ReleaseTag, VersionService } from './version-service';
 
 export interface ReleasePreview {
@@ -20,6 +24,45 @@ export interface ReleasePreview {
 
 const LOCK_FILES = ['bun.lock', 'bun.lockb', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'] as const;
 const SKIP_CI = /\[(?:skip ci|ci skip)\]/i;
+
+type ConventionsCheckStatus = 'match' | 'missing' | 'drift';
+
+export interface ConventionsCheck {
+  readonly status: ConventionsCheckStatus;
+  readonly path: string;
+  readonly configPath: string;
+  readonly expected: string;
+  readonly actual: string | null;
+  readonly diff: string;
+  readonly warnings: readonly string[];
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+function remedyCommand(configPath: string): string {
+  return configPath === DEFAULT_CONFIG_PATH
+    ? 'releaser conventions'
+    : `releaser conventions -c ${shellQuote(configPath)}`;
+}
+
+export function describeConventionsCheck(check: ConventionsCheck): string {
+  const remedy = remedyCommand(check.configPath);
+  if (check.status === 'match') return `${check.path} is up to date with ${check.configPath}`;
+  if (check.status === 'missing') {
+    return [
+      `D9: releaser-generated documents are regenerate-only, and ${check.path} is missing.`,
+      `Run \`${remedy}\` to generate it.`,
+    ].join('\n');
+  }
+  return [
+    `D9: releaser-generated documents are regenerate-only, and ${check.path} has drifted from ${check.configPath}.`,
+    `Hand-edits are not permitted; run \`${remedy}\` to regenerate it.`,
+    '',
+    check.diff,
+  ].join('\n');
+}
 
 async function runPhase<T>(phase: string, action: () => Promise<T>): Promise<T> {
   try {
@@ -93,9 +136,32 @@ export class ReleaseService {
     private readonly conventions: ConventionsService,
     private readonly templates: HookTemplate,
     private readonly clock: IClock,
+    private readonly guard: TagGuard,
   ) {}
 
-  async preview(configPath = 'atomi_release.yaml'): Promise<ReleasePreview | null> {
+  // No bypass flag by design: a tag collision would strand a committed, untagged release.
+  private async refuseOnExistingTag(refusal: Awaited<ReturnType<TagGuard['checkVisibility']>>): Promise<void> {
+    if (refusal !== null) throw new ReleaseError(renderRefusal(refusal), 'tag-guard');
+  }
+
+  private async writeBumps(config: ReleaserConfig, version: string): Promise<readonly string[]> {
+    const pending: { path: string; content: string }[] = [];
+    for (const entry of config.release.bumps) {
+      const path = bumpPath(entry.type, entry.file);
+      const current = await this.files.readTextIfExists(path);
+      if (current === null) throw new ReleaseError(`bump target ${path} does not exist`, 'write:versions');
+      pending.push({ path, content: bumpPreset(entry.type).apply(path, current, version).content });
+    }
+    for (const write of pending) await this.files.writeAtomic(write.path, write.content);
+    return pending.map(write => write.path);
+  }
+
+  async bump(version: string, configPath = DEFAULT_CONFIG_PATH): Promise<readonly string[]> {
+    const loaded = await this.configs.load(configPath);
+    return this.writeBumps(loaded.config, version);
+  }
+
+  async preview(configPath = DEFAULT_CONFIG_PATH): Promise<ReleasePreview | null> {
     const loaded = await this.configs.load(configPath);
     const branch = await this.git.currentBranch();
     assertAllowedBranch(loaded.config, branch);
@@ -129,10 +195,13 @@ export class ReleaseService {
     };
   }
 
-  async release(configPath = 'atomi_release.yaml', dryRun = false): Promise<ReleasePreview | null> {
+  async release(configPath = DEFAULT_CONFIG_PATH, dryRun = false): Promise<ReleasePreview | null> {
+    await this.refuseOnExistingTag(await this.guard.checkVisibility());
     if (!(await this.git.isClean())) throw new ReleaseError('working tree must be clean', 'precondition');
     const preview = await this.preview(configPath);
-    if (preview === null || dryRun) return preview;
+    if (preview === null) return preview;
+    await this.refuseOnExistingTag(await this.guard.checkVersion(preview.version, preview.tag));
+    if (dryRun) return preview;
     const beforeLocks = await lockHashes(this.files);
 
     for (const hook of preview.config.release.hooks.prepare.filter(candidate => candidate.phase === 'beforeWrite')) {
@@ -151,6 +220,8 @@ export class ReleaseService {
         prependNotes(current, preview.config.release.changelog.title, preview.notes),
       );
     });
+
+    await runPhase('write:versions', () => this.writeBumps(preview.config, preview.version));
 
     for (const hook of preview.config.release.hooks.prepare.filter(candidate => candidate.phase === 'afterWrite')) {
       await runPhase('prepare:afterWrite', () =>
@@ -208,10 +279,29 @@ export class ReleaseService {
     return preview;
   }
 
-  async writeConventions(configPath = 'atomi_release.yaml'): Promise<LoadedConfig> {
+  async writeConventions(configPath = DEFAULT_CONFIG_PATH): Promise<LoadedConfig> {
     const loaded = await this.configs.load(configPath);
     await this.files.writeAtomic(loaded.config.conventions.path, this.conventions.render(loaded.config));
     return loaded;
+  }
+
+  // Never writes: a check that fixes what it judges cannot prove CI clean.
+  async checkConventions(configPath = DEFAULT_CONFIG_PATH): Promise<ConventionsCheck> {
+    const loaded = await this.configs.load(configPath);
+    const expected = this.conventions.render(loaded.config);
+    const path = loaded.config.conventions.path;
+    const actual = await this.files.readTextIfExists(path);
+    const base = { path, configPath, expected, actual, warnings: loaded.warnings } as const;
+    if (actual === null) return { ...base, status: 'missing', diff: '' };
+    if (actual === expected) return { ...base, status: 'match', diff: '' };
+    return {
+      ...base,
+      status: 'drift',
+      diff: unifiedDiff(expected, actual, {
+        expectedLabel: `expected (generated from ${configPath})`,
+        actualLabel: `actual (${path} on disk)`,
+      }),
+    };
   }
 }
 

@@ -6,27 +6,31 @@ import {
   FakeConfigRepository,
   FakeGit,
   FakeGitHub,
+  FakeTagReader,
   FakeHookRunner,
   loadedConfig,
   MemoryFileSystem,
 } from '../helpers/fakes';
 
-describe('controller registration', () => {
-  it('should register exactly the six public commands', () => {
-    // Arrange
-    const program = createProgram();
-    const files = new MemoryFileSystem();
+function registeredProgram() {
+  const program = createProgram();
+  registerDomain(program, {
+    io: captureIo(),
+    files: new MemoryFileSystem(),
+    configs: new FakeConfigRepository(loadedConfig()),
+    git: new FakeGit(),
+    hooks: new FakeHookRunner(),
+    github: new FakeGitHub(),
+    tags: new FakeTagReader(),
+    clock: new FakeClock(),
+  });
+  return program;
+}
 
-    // Act
-    registerDomain(program, {
-      io: captureIo(),
-      files,
-      configs: new FakeConfigRepository(loadedConfig()),
-      git: new FakeGit(),
-      hooks: new FakeHookRunner(),
-      github: new FakeGitHub(),
-      clock: new FakeClock(),
-    });
+describe('controller registration', () => {
+  it('should register exactly the seven public commands', () => {
+    // Arrange / Act
+    const program = registeredProgram();
 
     // Assert
     expect(program.commands.map(command => command.name())).toEqual([
@@ -34,8 +38,29 @@ describe('controller registration', () => {
       'lint-commit',
       'next',
       'changelog',
+      'bump',
       'conventions',
       'migrate',
+    ]);
+  });
+
+  it('should give every command the same -c/--config option with the same default', () => {
+    // Arrange / Act
+    const program = registeredProgram();
+
+    // Assert
+    const configOptions = program.commands.map(command => {
+      const option = command.options.find(candidate => candidate.long === '--config');
+      return [command.name(), option?.flags ?? null, option?.defaultValue ?? null] as const;
+    });
+    expect(configOptions).toEqual([
+      ['release', '-c, --config <path>', 'release.yaml'],
+      ['lint-commit', '-c, --config <path>', 'release.yaml'],
+      ['next', '-c, --config <path>', 'release.yaml'],
+      ['changelog', '-c, --config <path>', 'release.yaml'],
+      ['bump', '-c, --config <path>', 'release.yaml'],
+      ['conventions', '-c, --config <path>', 'release.yaml'],
+      ['migrate', '-c, --config <path>', 'release.yaml'],
     ]);
   });
 });

@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import { type ReleaseService, userMessage } from '../../lib/release/release-service';
+import { describeConventionsCheck, type ReleaseService, userMessage } from '../../lib/release/release-service';
 import type { ICliIo } from '../terminal/console-io';
 import { EXIT_ERROR, EXIT_OK } from './exit-codes';
 
@@ -13,12 +13,18 @@ export class ConventionsController {
     program
       .command('conventions')
       .description('write the configured commit-conventions document')
-      .action(() => this.handle());
+      .option('-c, --config <path>', 'release configuration path', 'release.yaml')
+      .option('--check', 'verify the document matches the configuration instead of writing it')
+      .action((options: { config: string; check?: boolean }) => this.handle(options.config, options.check === true));
   }
 
-  async handle(): Promise<void> {
+  async handle(configPath: string, check = false): Promise<void> {
     try {
-      const loaded = await this.releases.writeConventions();
+      if (check) {
+        await this.report(configPath);
+        return;
+      }
+      const loaded = await this.releases.writeConventions(configPath);
       for (const warning of loaded.warnings) this.io.writeError(`warning: ${warning}\n`);
       this.io.write(`wrote ${loaded.config.conventions.path}\n`);
       this.io.setExitCode(EXIT_OK);
@@ -26,5 +32,18 @@ export class ConventionsController {
       this.io.writeError(`${userMessage(error)}\n`);
       this.io.setExitCode(EXIT_ERROR);
     }
+  }
+
+  private async report(configPath: string): Promise<void> {
+    const result = await this.releases.checkConventions(configPath);
+    for (const warning of result.warnings) this.io.writeError(`warning: ${warning}\n`);
+    const verdict = describeConventionsCheck(result);
+    if (result.status === 'match') {
+      this.io.write(`${verdict}\n`);
+      this.io.setExitCode(EXIT_OK);
+      return;
+    }
+    this.io.writeError(`${verdict}\n`);
+    this.io.setExitCode(EXIT_ERROR);
   }
 }

@@ -44,6 +44,9 @@ function applyLevel(version: SemVer, level: Exclude<ReleaseLevel, false>): SemVe
 }
 
 export class VersionService {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor() {}
+
   parseTag(tag: string, tagFormat: string): SemVer | null {
     const parts = tagFormat.split('${version}');
     if (parts.length !== 2) return null;

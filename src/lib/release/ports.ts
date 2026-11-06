@@ -38,6 +38,13 @@ export interface IGit {
   push(branch: string, tag: string): Promise<void>;
 }
 
+// Names only: the guard must refuse a tag whoever minted it.
+export interface ITagReader {
+  allTags(): Promise<readonly string[]>;
+  visibleTags(): Promise<readonly string[]>;
+  isShallow(): Promise<boolean>;
+}
+
 export interface IHookRunner {
   run(command: string): Promise<void>;
 }

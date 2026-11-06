@@ -63,6 +63,9 @@ function renderVae(config: ReleaserConfig): string {
 }
 
 export class ConventionsService {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor() {}
+
   render(config: ReleaserConfig): string {
     const marker = MARKERS.find(candidate => config.conventions.template.includes(candidate));
     if (marker === undefined) {

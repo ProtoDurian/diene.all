@@ -9,6 +9,7 @@ import type {
   IGit,
   IGitHub,
   IHookRunner,
+  ITagReader,
   LoadedConfig,
 } from '../../src/lib/release/ports';
 
@@ -52,6 +53,7 @@ export const TEST_CONFIG: ReleaserConfig = {
     branches: ['main'],
     tagFormat: 'v${version}',
     changelog: { path: 'Changelog.md', title: '# Changelog' },
+    bumps: [],
     commit: {
       message: 'release: ${version}\n\n${notes}',
       assets: ['Changelog.md', 'docs/developer/CommitConventions.md'],
@@ -105,15 +107,41 @@ export class MemoryFileSystem implements IFileSystem {
 
 export class FakeConfigRepository implements IConfigRepository {
   written: ReleaserConfig | null = null;
+  loadedPath: string | null = null;
+  writtenPath: string | null = null;
 
   constructor(readonly loaded: LoadedConfig) {}
 
-  async load(_path: string): Promise<LoadedConfig> {
+  async load(path: string): Promise<LoadedConfig> {
+    this.loadedPath = path;
     return this.loaded;
   }
 
-  async writeCanonical(_path: string, config: ReleaserConfig): Promise<void> {
+  async writeCanonical(path: string, config: ReleaserConfig): Promise<void> {
+    this.writtenPath = path;
     this.written = config;
+  }
+}
+
+export class FakeTagReader implements ITagReader {
+  all: string[] = [];
+  visible: string[] = [];
+  shallow = false;
+  failure: Error | null = null;
+
+  async allTags(): Promise<readonly string[]> {
+    if (this.failure !== null) throw this.failure;
+    return this.all;
+  }
+
+  async visibleTags(): Promise<readonly string[]> {
+    if (this.failure !== null) throw this.failure;
+    return this.visible;
+  }
+
+  async isShallow(): Promise<boolean> {
+    if (this.failure !== null) throw this.failure;
+    return this.shallow;
   }
 }
 

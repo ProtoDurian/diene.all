@@ -55,6 +55,31 @@ fury-wiring)
   rg -F -- '--config "${credential_config}"' scripts/release/fury.sh
   ! rg -F '${FURY_TOKEN}@' scripts/release/fury.sh
   ;;
+changelog-format)
+  for required in prettier diff; do
+    command -v "${required}" >/dev/null 2>&1 || {
+      echo "❌ ${required} is not available, so this check cannot run" >&2
+      exit 1
+    }
+  done
+  tmp="$(mktemp -d)"
+  before="$(mktemp -d)"
+  trap 'rm -rf "${tmp}" "${before}"' EXIT
+  # Control: the formatter must rewrite this, or every "unchanged" below proves nothing.
+  printf '#   Bad   Spacing\n\n\n\ntext   here\n' >"${tmp}/control.md"
+  cp tests/fixtures/golden/*-notes.md "${tmp}/"
+  cp "${tmp}"/*.md "${before}/"
+  prettier --write "${tmp}"/*.md >/dev/null 2>&1 || true
+  diff -q "${before}/control.md" "${tmp}/control.md" >/dev/null 2>&1 && echo '❌ the formatter did not rewrite the control' >&2 && exit 1
+  for generated in "${tmp}"/*-notes.md; do
+    name="$(basename "${generated}")"
+    diff -q "${before}/${name}" "${generated}" >/dev/null 2>&1 || {
+      echo "❌ generated changelog notes are not formatter-stable: ${name}" >&2
+      diff "${before}/${name}" "${generated}" >&2 | head -10
+      exit 1
+    }
+  done
+  ;;
 installer-checksum)
   rg -F 'checksums.txt' scripts/release/install.sh
   rg -e 'sha256sum -c|shasum -a 256' scripts/release/install.sh

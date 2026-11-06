@@ -34,10 +34,13 @@ function renderEntry(entry: NoteEntry, repositoryUrl: string | null): string {
   const prefix = entry.scope === null ? '' : `**${entry.scope}:** `;
   const shortSha = entry.sha.slice(0, 7);
   const reference = repositoryUrl === null ? shortSha : `[${shortSha}](${repositoryUrl}/commit/${entry.sha})`;
-  return `* ${prefix}${entry.subject} (${reference})`;
+  return `- ${prefix}${entry.subject} (${reference})`;
 }
 
 export class NotesService {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor() {}
+
   render(request: NotesRequest): string {
     const heading =
       request.previousTag === null || request.repositoryUrl === null
@@ -59,6 +62,6 @@ export class NotesService {
         `### ${type.section}\n\n${entries.map(entry => renderEntry(entry, request.repositoryUrl)).join('\n')}`,
       );
     }
-    return `${blocks.join('\n\n\n')}\n`;
+    return `${blocks.join('\n\n')}\n`;
   }
 }

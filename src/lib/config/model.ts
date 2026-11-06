@@ -1,4 +1,3 @@
-/** The one normalized configuration model consumed by linting and releasing. */
 export type ReleaseLevel = 'major' | 'minor' | 'patch' | false;
 
 interface Vae {
@@ -79,11 +78,18 @@ interface CommitConfig {
   readonly assets: readonly string[];
 }
 
+interface BumpEntry {
+  readonly type: 'node-version' | 'dart-version' | 'dotnet-version' | 'plain-version';
+  readonly file: string | null;
+  readonly reason: string | null;
+}
+
 interface ReleaseConfig {
   readonly branches: readonly string[];
   readonly tagFormat: string;
   readonly changelog: ChangelogConfig;
   readonly commit: CommitConfig;
+  readonly bumps: readonly BumpEntry[];
   readonly github: GitHubConfig;
   readonly hooks: HooksConfig;
 }

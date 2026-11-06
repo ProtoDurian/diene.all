@@ -4,13 +4,11 @@ set -euo pipefail
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
-releaser conventions
+releaser conventions -c release.yaml
 skills-sync sync
 
 echo "📦 Installing dependencies..."
-install_args=(--frozen-lockfile)
-[[ ${BUN_INSTALL_OFFLINE:-0} == "1" ]] && install_args+=(--offline)
-bun install "${install_args[@]}"
+bun install --frozen-lockfile
 echo "✅ Dependencies installed"
 
 echo "✅ setup completed"

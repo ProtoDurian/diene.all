@@ -34,6 +34,7 @@ describe('real-history goldens', () => {
     it(`should reproduce ${fixture.name} version and notes bytes`, async () => {
       // Arrange
       const root = await materialize(fixture.name, fixture.sha);
+      // Fixtures predate the v2 rename, so they keep the legacy config name.
       const config = (await new YamlConfigRepository(new BunFileSystem(root)).load('atomi_release.yaml')).config;
       const git = new GitCli(root);
       const versions = new VersionService();

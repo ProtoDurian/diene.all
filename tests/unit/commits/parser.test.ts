@@ -8,8 +8,11 @@ describe('commit parser', () => {
     ['feat!: replace interface', 'feat', null, true],
     ['feat(api)!: replace interface', 'feat', 'api', true],
   ])('should parse %s', (message, type, scope, breaking) => {
+    // Arrange
+    const keywords = ['BREAKING CHANGE'];
+
     // Act
-    const actual = parseCommitMessage(message, ['BREAKING CHANGE']);
+    const actual = parseCommitMessage(message, keywords);
 
     // Assert
     expect(actual.kind).toBe('conventional');
@@ -38,11 +41,25 @@ describe('commit parser', () => {
   it.each(['Merge branch main', 'Revert "feat: x"', 'fixup! feat: x', 'amend! feat: x', 'squash! feat: x'])(
     'should ignore %s',
     message => {
-      expect(parseCommitMessage(message, []).kind).toBe('ignored');
+      // Arrange
+      const keywords: string[] = [];
+
+      // Act
+      const actual = parseCommitMessage(message, keywords);
+
+      // Assert
+      expect(actual.kind).toBe('ignored');
     },
   );
 
   it('should mark malformed headers', () => {
-    expect(parseCommitMessage('not conventional', []).kind).toBe('malformed');
+    // Arrange
+    const message = 'not conventional';
+
+    // Act
+    const actual = parseCommitMessage(message, []);
+
+    // Assert
+    expect(actual.kind).toBe('malformed');
   });
 });

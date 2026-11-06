@@ -26,6 +26,9 @@ function codePointLength(value: string): number {
 }
 
 export class CommitLinter {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor() {}
+
   lint(message: string, config: ReleaserConfig): readonly LintDiagnostic[] {
     const lines = contentLines(message);
     const title = lines[0];

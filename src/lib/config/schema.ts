@@ -97,6 +97,21 @@ const commit = z.strictObject({
   assets: z.array(z.string().min(1)).nonempty(),
 });
 
+const bump = z
+  .strictObject({
+    type: z.enum(['node-version', 'dart-version', 'dotnet-version', 'plain-version']),
+    file: z.string().min(1).nullable().default(null),
+    reason: z.string().min(1).nullable().default(null),
+  })
+  .refine(value => value.file === null || value.reason !== null, {
+    message: 'a bump entry that names a file must give a non-empty reason for the override',
+    path: ['reason'],
+  })
+  .refine(value => value.type !== 'dotnet-version' || value.file !== null, {
+    message: 'dotnet-version has no default file, so the entry must name one explicitly',
+    path: ['file'],
+  });
+
 const release = z.strictObject({
   branches: z.array(z.string().min(1)).nonempty(),
   tagFormat: z
@@ -108,6 +123,7 @@ const release = z.strictObject({
     }),
   changelog,
   commit,
+  bumps: z.array(bump).default([]),
   github: github.default(false),
   hooks,
 });

@@ -13,7 +13,7 @@ generated commit-convention document, and how a release commits and publishes.
 Everything about releases in this repository is configured in that one file. There
 is no standalone `.gitlint` file and one must not be added.
 
-The tool that reads it is registry-supplied `releaser` v2, and it **replaces** semantic-release: there is
+The tool that reads it is `releaser` v2, built from this repository (`.#releaser`), and it **replaces** semantic-release: there is
 no plugin list, no package manager invoked at release time, and no separate
 `.releaserc.yaml`. The configuration is `schemaVersion: 2`.
 
@@ -27,12 +27,10 @@ groups, so it is on `PATH` in the default shell and in the release shell:
 - a release runs end to end from `⚡reusable-release.yaml`;
 - the commit-conventions document is generated from this file, not hand-written.
 
-**Nothing runs a schema gate as a separate step**, and it does not need one: every
-`releaser` subcommand loads and validates this file before it does anything, and
-refuses with the offending field named. The standalone validator script that used to
-assert the shape was deleted because it duplicated the tool. Break the file and
-`releaser lint-commit` fails on your next commit — which is the earliest place a
-check could fire.
+The `a-releaser-config` pre-commit hook runs `releaser conventions --check` when
+`release.yaml` or the generated document changes: it validates this file and fails
+when the generated document has drifted. Every other `releaser` subcommand also
+validates the file before it does anything.
 
 ## How releases are configured
 

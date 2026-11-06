@@ -56,10 +56,12 @@ describe('GitHub API adapter', () => {
   });
 
   it('should keep the production composition root pinned to the official API base', () => {
+    // Arrange / Act
     const world = buildWorld(process.cwd(), {
       GITHUB_TOKEN: 'secret-token',
       RELEASER_GITHUB_API_URL: 'http://127.0.0.1:1',
     });
+    // Assert
     expect((world.github as unknown as { baseUrl: string }).baseUrl).toBe('https://api.github.com');
   });
 
@@ -85,6 +87,7 @@ describe('GitHub API adapter', () => {
   });
 
   it('should reject invalid JSON and declared or streamed oversized responses', async () => {
+    // Arrange
     const invalidJson = new GitHubApi('secret-token', 'http://example.invalid', (() =>
       Promise.resolve(new Response('not-json'))) as unknown as typeof fetch);
     const declaredOversize = new GitHubApi('secret-token', 'http://example.invalid', (() =>
@@ -104,12 +107,14 @@ describe('GitHub API adapter', () => {
         ),
       )) as unknown as typeof fetch);
 
+    // Act / Assert
     await expect(invalidJson.publishRelease(releaseRequest())).rejects.toThrow('invalid JSON');
     await expect(declaredOversize.publishRelease(releaseRequest())).rejects.toThrow('too large');
     await expect(streamedOversize.publishRelease(releaseRequest())).rejects.toThrow('too large');
   });
 
   it('should enforce request timeout and validate repository and SHA before any request', async () => {
+    // Arrange
     const timeoutFetch = ((_input: string | URL | Request, init?: RequestInit) =>
       new Promise<Response>((_resolve, reject) => {
         const signal = init?.signal;
@@ -124,14 +129,17 @@ describe('GitHub API adapter', () => {
         signal.addEventListener('abort', () => reject(signal.reason), { once: true });
       })) as typeof fetch;
     const timeout = new GitHubApi('secret-token', 'http://example.invalid', timeoutFetch, 5);
+    // Act / Assert
     await expect(timeout.publishRelease(releaseRequest())).rejects.toThrow('GitHub API POST');
 
+    // Arrange
     let requests = 0;
     const countingFetch = (() => {
       requests += 1;
       return Promise.resolve(Response.json({ ok: true }));
     }) as unknown as typeof fetch;
     const validating = new GitHubApi('secret-token', 'http://example.invalid', countingFetch);
+    // Act / Assert
     await expect(validating.publishRelease(releaseRequest({ repository: 'owner/../repository' }))).rejects.toThrow(
       'repository identity',
     );

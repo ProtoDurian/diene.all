@@ -52,7 +52,7 @@ class InProcessCliDriver implements CliDriver {
     };
     const world = { ...buildWorld(cwd, { ...process.env, ...env }), io };
     const program = createProgram();
-    registerDomain(program, world);
+    // Must precede registerDomain: subcommands copy the output config when created.
     program.configureOutput({
       writeOut: text => {
         out += text;
@@ -61,6 +61,7 @@ class InProcessCliDriver implements CliDriver {
         err += text;
       },
     });
+    registerDomain(program, world);
     try {
       await program.parseAsync(['bun', 'releaser', ...args]);
     } catch (error) {

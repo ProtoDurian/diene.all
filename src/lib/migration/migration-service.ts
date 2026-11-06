@@ -1,3 +1,4 @@
+import { DEFAULT_CONFIG_PATH, LEGACY_CONFIG_PATH } from '../config/paths';
 import type { IConfigRepository, IFileSystem } from '../release/ports';
 
 const CHECKLIST = [
@@ -21,10 +22,16 @@ export class MigrationService {
     private readonly files: IFileSystem,
   ) {}
 
-  async migrate(configPath = 'atomi_release.yaml'): Promise<MigrationResult> {
-    const loaded = await this.configs.load(configPath);
-    if (loaded.sourceVersion === 1) await this.configs.writeCanonical(configPath, loaded.config);
-    const candidates = [...new Set([loaded.legacyGitlintPath, '.releaserc.yaml'])];
+  async migrate(configPath = DEFAULT_CONFIG_PATH): Promise<MigrationResult> {
+    const renaming =
+      configPath === DEFAULT_CONFIG_PATH &&
+      !(await this.files.exists(configPath)) &&
+      (await this.files.exists(LEGACY_CONFIG_PATH));
+    const loaded = await this.configs.load(renaming ? LEGACY_CONFIG_PATH : configPath);
+    if (loaded.sourceVersion === 1 || renaming) await this.configs.writeCanonical(configPath, loaded.config);
+    const candidates = [
+      ...new Set([...(renaming ? [LEGACY_CONFIG_PATH] : []), loaded.legacyGitlintPath, '.releaserc.yaml']),
+    ];
     const removed: string[] = [];
     for (const path of candidates) {
       if (await this.files.exists(path)) {
@@ -33,7 +40,8 @@ export class MigrationService {
       }
     }
     const lines = [
-      loaded.sourceVersion === 2 ? 'already v2' : 'migrated atomi_release.yaml to schemaVersion 2',
+      loaded.sourceVersion === 2 ? 'already v2' : `migrated ${configPath} to schemaVersion 2`,
+      ...(renaming ? [`renamed ${LEGACY_CONFIG_PATH} to ${configPath}`] : []),
       `removed legacy files: ${removed.length === 0 ? 'none' : removed.join(', ')}`,
       ...(loaded.warnings.length === 0 ? [] : ['normalizations:', ...loaded.warnings.map(warning => `- ${warning}`)]),
       'consumer checklist:',

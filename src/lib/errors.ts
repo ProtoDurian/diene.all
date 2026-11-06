@@ -1,4 +1,3 @@
-/** Stable, user-facing failures emitted by the pure releaser domain. */
 export class ReleaserError extends Error {
   constructor(message: string) {
     super(message);
@@ -6,9 +5,19 @@ export class ReleaserError extends Error {
   }
 }
 
-export class ConfigError extends ReleaserError {}
+export class ConfigError extends ReleaserError {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor(message: string) {
+    super(message);
+  }
+}
 
-export class UnsupportedModuleError extends ConfigError {}
+export class UnsupportedModuleError extends ConfigError {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor(message: string) {
+    super(message);
+  }
+}
 
 export class ReleaseError extends ReleaserError {
   constructor(
@@ -19,8 +28,23 @@ export class ReleaseError extends ReleaserError {
   }
 }
 
-export class GitError extends ReleaserError {}
+export class GitError extends ReleaserError {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor(message: string) {
+    super(message);
+  }
+}
 
-export class HookError extends ReleaserError {}
+export class HookError extends ReleaserError {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor(message: string) {
+    super(message);
+  }
+}
 
-export class GitHubError extends ReleaserError {}
+export class GitHubError extends ReleaserError {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor(message: string) {
+    super(message);
+  }
+}

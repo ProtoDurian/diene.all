@@ -21,7 +21,13 @@ describe('conventions service', () => {
   });
 
   it('should reject a template without a supported marker', () => {
+    // Arrange
     const config = { ...TEST_CONFIG, conventions: { ...TEST_CONFIG.conventions, template: '# No marker' } };
-    expect(() => subject.render(config)).toThrow('must contain');
+
+    // Act
+    const act = () => subject.render(config);
+
+    // Assert
+    expect(act).toThrow('must contain');
   });
 });
