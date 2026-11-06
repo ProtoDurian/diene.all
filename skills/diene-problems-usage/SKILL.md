@@ -1,20 +1,24 @@
 ---
 name: diene-problems-usage
-description: Declare, emit, transform, and test RFC 9457 Problems with @atomicloud/diene.problems.
+description: Use when registering, emitting, transforming, or asserting RFC 9457 Problems with @atomicloud/diene.problems, including the six generic problems and the expectProblem TestHelper.
 ---
 
 # Diene Problems usage
 
-Read `docs/standards/problems/index.md` before changing a Problem contract.
+Read `docs/standards/problems/index.md` in the package before changing a
+Problem contract. Copy-ready snippets are in [patterns.md](patterns.md).
 
-- Create one `ProblemRegistry` from the configured `ErrorPortalConfig`; never
-  hand-format type URIs.
-- Use `createGenericProblemRegistry` or `registerGenericProblems` for
-  ValidationError, EntityNotFound, and Unauthorized. Register domain Problems
-  only in the consuming service.
-- Declare endpoint/recoverability metadata with `ProblemCatalog`, then emit the
-  committed primordial-chart row with `emitProblemResource`.
-- Transform unknown errors with `ProblemTransformer`; keep HTTP-to-`Result`
-  bridging in `@atomicloud/diene.api-engine`.
-- In tests, import `expectProblem`, `buildProblem`, and
-  `buildProblemFromRegistry` from `@atomicloud/diene.problems/test-helper`.
+- Build one `ProblemRegistry` from the configured `ErrorPortalConfig`. Never
+  format a type URI by hand; the registry builds it.
+- Get the six generics (`validation_error`, `entity_not_found`, `conflict`,
+  `unauthenticated`, `unauthorized`, `invalid_json`) from
+  `new GenericProblemCatalog().createGenericProblemRegistry(portal)`. Register
+  domain problems in your service, never in this package.
+- Bump `version` to change a published problem; a new version is a new type.
+- Declare endpoints with `ProblemCatalog.declare`, then emit the primordial
+  chart row with `ProblemResourceEmitter.emitProblemResource`.
+- Map unknown errors with `ProblemTransformer`; HTTP-to-`Result` bridging lives
+  in `@atomicloud/diene.api-engine`.
+- In tests, use `ProblemTestHelper` from
+  `@atomicloud/diene.problems/test-helper`:
+  `helper.expectProblem(actual).toBe(entry, { data })`.
