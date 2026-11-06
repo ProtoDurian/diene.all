@@ -4,6 +4,8 @@ set -euo pipefail
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
+name="$(jq -r .name package.json)"
+
 echo "🧹 Cleaning dist/..."
 rm -rf dist
 
@@ -18,48 +20,53 @@ bun build ./src/test-helper/index.ts --outfile dist/test-helper.cjs --format cjs
 echo "🔠 Typechecking..."
 bunx tsc -p tsconfig.json
 
-echo "📝 Emitting bundled declarations..."
+echo "📝 Emitting flat root type declarations..."
 bunx dts-bundle-generator -o dist/index.d.ts src/index.ts --no-check
 cp dist/index.d.ts dist/index.d.cts
+
+echo "📝 Emitting /test-helper declarations that import the root package..."
 bunx tsc -p tsconfig.declarations.json
-# The helper references the root and sibling packages by name, so a single emitted
-# declaration resolves correctly under both the import (.d.ts) and require (.d.cts)
-# conditions — no per-format specifier rewrite is required.
-cp dist/.declarations/test-helper/index.d.ts dist/test-helper.d.ts
-cp dist/.declarations/test-helper/index.d.ts dist/test-helper.d.cts
+[[ "$(cat dist/.declarations/test-helper/index.d.ts)" == "export * from './helper.js';" ]] || {
+  echo "❌ src/test-helper/index.ts must be exactly: export * from './helper.js';" >&2
+  exit 1
+}
+cp dist/.declarations/test-helper/helper.d.ts dist/test-helper.d.ts
+cp dist/.declarations/test-helper/helper.d.ts dist/test-helper.d.cts
 rm -rf dist/.declarations
 
-echo "🔎 Verifying build artifacts..."
+echo "🔎 Verifying artifacts..."
 for artifact in \
   dist/index.js dist/index.cjs dist/index.d.ts dist/index.d.cts \
   dist/test-helper.js dist/test-helper.cjs dist/test-helper.d.ts dist/test-helper.d.cts; do
-  [[ ! -f ${artifact} ]] && echo "❌ Build artifact missing: ${artifact}" >&2 && exit 1
+  [[ ! -f ${artifact} ]] && echo "❌ build artifact missing: ${artifact}" >&2 && exit 1
 done
 
-cmp -s dist/index.d.ts dist/index.d.cts || {
-  echo "❌ dist/index.d.cts must be a byte-copy of dist/index.d.ts" >&2
-  exit 1
-}
-cmp -s dist/test-helper.d.ts dist/test-helper.d.cts || {
-  echo "❌ dist/test-helper.d.cts must be a byte-copy of dist/test-helper.d.ts" >&2
-  exit 1
-}
-
-echo "🔎 Verifying the root bundle does not self-import the otel package..."
-if grep -qF "@atomicloud/diene.otel" dist/index.js; then
-  echo "❌ dist/index.js must not self-import the otel package" >&2
+echo "🔎 Verifying /test-helper imports the root package instead of inlining it..."
+for artifact in dist/test-helper.js dist/test-helper.cjs dist/test-helper.d.ts; do
+  grep -qF "'${name}'" "${artifact}" || grep -qF "\"${name}\"" "${artifact}" || {
+    echo "❌ ${artifact} must import ${name} by name" >&2
+    exit 1
+  }
+done
+for artifact in dist/index.js dist/index.cjs; do
+  if grep -qF "${name}" "${artifact}"; then
+    echo "❌ ${artifact} must not import ${name}" >&2
+    exit 1
+  fi
+done
+roots='OtelBootstrap|OtelPlanner|ResourceIdentityMapper|TraceError|TraceRecordValidator|OtelSchemaFactory|OtelBlock|OtelRuntime|TraceEmitter|TraceRecord|AppIdentity'
+if grep -nE "^\s*((export )?(declare )?(class|interface|type) (${roots})\b|var (${roots}) = class\b)" \
+  dist/test-helper.js dist/test-helper.cjs dist/test-helper.d.ts; then
+  echo "❌ the /test-helper bundle re-declares a root class or type" >&2
   exit 1
 fi
 
-echo "🏃 Verifying ESM and CJS runtime exports (canonical block round-trips through the schema)..."
-node --input-type=module -e "import { otelBlockSchema, defaultOtelBlock } from './dist/index.js'; const parsed = otelBlockSchema.parse(defaultOtelBlock); if (!parsed.logs.enabled || parsed.traces.sampler.ratio !== 1) process.exit(1)"
-node -e "const { otelBlockSchema, defaultOtelBlock } = require('./dist/index.cjs'); const parsed = otelBlockSchema.parse(defaultOtelBlock); if (!parsed.logs.enabled || parsed.traces.sampler.ratio !== 1) process.exit(1)"
+echo "🏃 Verifying ESM and CJS runtime exports..."
+proof="const runtime = new OtelBootstrap().init(defaultOtelBlock, new AppIdentityBuilder().build(), { environment: {} }); const run = new OtelTestHarness().start(); const error = await run.traces.emit({ name: '' }).unwrapErr(); if (runtime.active.traces || otelBlockSchema.parse(defaultOtelBlock).traces.sampler.ratio !== 1 || !(error instanceof TraceError)) process.exit(1); await runtime.shutdown();"
+node --input-type=module -e "import { OtelBootstrap, TraceError, defaultOtelBlock, otelBlockSchema } from './dist/index.js'; import { AppIdentityBuilder, OtelTestHarness } from './dist/test-helper.js'; ${proof}"
+node -e "const { OtelBootstrap, TraceError, defaultOtelBlock, otelBlockSchema } = require('./dist/index.cjs'); const { AppIdentityBuilder, OtelTestHarness } = require('./dist/test-helper.cjs'); (async () => { ${proof} })().catch(() => process.exit(1))"
 
-echo "🏃 Verifying the telemetry test double loads under ESM and CJS..."
-node --input-type=module -e "import { InMemoryTraceEmitter } from './dist/test-helper.js'; if (typeof InMemoryTraceEmitter !== 'function') process.exit(1)"
-node -e "const { InMemoryTraceEmitter } = require('./dist/test-helper.cjs'); if (typeof InMemoryTraceEmitter !== 'function') process.exit(1)"
-
-echo "🔎 Verifying Node16 consumer type resolution..."
-bunx tsc -p fixtures/package-consumer/tsconfig.json
+echo "🏃 Verifying a TraceError crosses the ESM and CJS builds..."
+node --input-type=module -e "import { createRequire } from 'node:module'; import { TraceError } from './dist/index.js'; const cjs = createRequire(import.meta.url)('./dist/index.cjs'); if (!(new cjs.TraceError('io', 'emit', 'x') instanceof TraceError) || !(new TraceError('io', 'emit', 'x') instanceof cjs.TraceError)) process.exit(1)"
 
 echo "✅ Built dist/index.{js,cjs,d.ts,d.cts} and dist/test-helper.{js,cjs,d.ts,d.cts}"

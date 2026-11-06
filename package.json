@@ -64,7 +64,7 @@
     "@atomicloud/diene.core-utils": "^1.0.0",
     "@atomicloud/diene.interfaces": "^1.0.0",
     "@atomicloud/diene.result": "^1.0.2",
-    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/api": "~1.9.0",
     "@opentelemetry/exporter-metrics-otlp-proto": "^0.221.0",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.221.0",
     "@opentelemetry/resources": "^2.10.0",

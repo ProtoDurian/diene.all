@@ -31,7 +31,9 @@ if [[ ${mode} == "content" || ${mode} == "all" ]]; then
     package/dist/test-helper.d.ts
     package/dist/test-helper.d.cts
     package/skills/diene-otel-usage/SKILL.md
-    package/skills/diene-otel-usage/patterns.md
+    package/skills/diene-otel-usage/assets/consumer.cjs
+    package/skills/diene-otel-usage/assets/consumer.ts
+    package/skills/diene-otel-usage/assets/test-helper.md
   )
   missing=0
   for path in "${expected[@]}"; do
@@ -41,7 +43,9 @@ if [[ ${mode} == "content" || ${mode} == "all" ]]; then
     fi
   done
   [ "${missing}" -ne 0 ] && exit 1
-  echo "✅ pack-content: all declared artifacts present"
+  extra="$(grep -vxF -e package/package.json -e package/LICENSE -e package/README.md "${expected[@]/#/-e}" <<<"${listing}" || true)"
+  [[ -n ${extra} ]] && echo "❌ tarball ships undeclared paths:"$'\n'"${extra}" >&2 && exit 1
+  echo "✅ pack-content: exactly the declared artifacts"
 fi
 
 if [[ ${mode} == "publint" || ${mode} == "all" ]]; then
@@ -52,8 +56,6 @@ fi
 if [[ ${mode} == "attw" || ${mode} == "all" ]]; then
   echo "🔎 Checking type resolvability (attw)..."
   ./node_modules/.bin/attw pkg.tgz --profile node16
-  echo "🔎 Checking root and test-helper type identity (Node16 consumer)..."
-  ./node_modules/.bin/tsc -p fixtures/package-consumer/tsconfig.json
 fi
 
 if [[ ${mode} == "consumer" || ${mode} == "all" ]]; then
