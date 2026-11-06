@@ -3,10 +3,10 @@ name: chlorine
 description: AtomiCloud secret-rotation restart engine - pure passthrough of stakater/reloader (annotation opt-in)
 type: application
 version: 0.1.0
-appVersion: 'v1.4.19'
+appVersion: 'v1.4.23'
 kubeVersion: '>=1.27.0-0'
 dependencies:
   - name: reloader
     alias: upstream
-    version: 2.2.14
+    version: 2.2.19
     repository: oci://ghcr.io/stakater/charts

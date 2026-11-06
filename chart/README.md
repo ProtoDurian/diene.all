@@ -1,6 +1,6 @@
 # chlorine
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v1.4.19](https://img.shields.io/badge/AppVersion-v1.4.19-informational?style=flat-square)
+![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v1.4.23](https://img.shields.io/badge/AppVersion-v1.4.23-informational?style=flat-square)
 
 AtomiCloud secret-rotation restart engine - pure passthrough of stakater/reloader (annotation opt-in)
 
@@ -10,7 +10,7 @@ Kubernetes: `>=1.27.0-0`
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/stakater/charts | upstream(reloader) | 2.2.14 |
+| oci://ghcr.io/stakater/charts | upstream(reloader) | 2.2.19 |
 
 ## Values
 
