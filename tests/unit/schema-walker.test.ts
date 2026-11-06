@@ -165,9 +165,29 @@ describe('SchemaWalker.caught', () => {
       expected: true,
     },
     {
-      label: 'a union with an uncaught boolean',
+      label: 'a union with one caught boolean branch',
       schema: z.union([z.boolean().catch(false), z.boolean()]),
+      expected: true,
+    },
+    {
+      label: 'a union with a later caught boolean branch',
+      schema: z.union([z.boolean(), z.boolean().catch(false)]),
+      expected: true,
+    },
+    {
+      label: 'a union with a caught null branch',
+      schema: z.union([z.boolean(), z.null().catch(null)]),
+      expected: true,
+    },
+    {
+      label: 'an intersection with one caught side',
+      schema: z.boolean().catch(false).and(z.boolean()),
       expected: false,
+    },
+    {
+      label: 'an intersection with both sides caught',
+      schema: z.boolean().catch(false).and(z.boolean().catch(true)),
+      expected: true,
     },
     { label: 'a plain boolean', schema: z.boolean(), expected: false },
     { label: 'an optional boolean', schema: z.boolean().optional(), expected: false },

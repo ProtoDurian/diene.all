@@ -1,5 +1,5 @@
 import { describe, it } from 'bun:test';
-import 'should';
+import should from 'should';
 import { z } from 'zod';
 import { EnvOverrides, NESTING_SEPARATOR } from '../../src/lib/env.js';
 import { ConfigLoaderError } from '../../src/lib/errors.js';
@@ -617,6 +617,24 @@ describe('EnvOverrides.apply — preprocess, null members and catch', () => {
       path: ['m'],
       expected: false,
     },
+    {
+      label: 'the fallback of a union whose first boolean branch is caught',
+      schema: z.object({ m: z.union([z.boolean().catch(false), z.boolean()]) }),
+      base: {},
+      name: 'ATOMI_M',
+      raw: 'yes',
+      path: ['m'],
+      expected: false,
+    },
+    {
+      label: 'the fallback of a union whose second boolean branch is caught',
+      schema: z.object({ m: z.union([z.boolean(), z.boolean().catch(false)]) }),
+      base: {},
+      name: 'ATOMI_M',
+      raw: 'yes',
+      path: ['m'],
+      expected: false,
+    },
   ])('should reach $label', ({ schema, base, name, raw, path, expected }) => {
     // Arrange
     const env = { [name]: raw };
@@ -627,5 +645,17 @@ describe('EnvOverrides.apply — preprocess, null members and catch', () => {
     // Assert
     const leaf = path.reduce<unknown>((node, key) => (node as Record<string, unknown>)[key], actual);
     (leaf as object).should.equal(expected);
+  });
+
+  it('should let a caught null branch of a union take a non-boolean word', () => {
+    // Arrange
+    const schema = z.object({ m: z.union([z.boolean(), z.null().catch(null)]) });
+    const env = { ATOMI_M: 'yes' };
+
+    // Act
+    const actual = schema.parse(overrides.apply({}, env, PREFIX, schema));
+
+    // Assert
+    should(actual.m).be.null();
   });
 });

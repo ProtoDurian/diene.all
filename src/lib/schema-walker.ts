@@ -23,11 +23,6 @@ interface Definition {
   entries?: Record<string, unknown>;
 }
 
-interface Candidate {
-  definition: Definition;
-  caught: boolean;
-}
-
 const WRAPPERS = new Set(['optional', 'nullable', 'default', 'prefault', 'readonly', 'catch', 'nonoptional']);
 const ABSENT = new Set(['null', 'undefined', 'void', 'never']);
 const OPAQUE = new Set(['custom', 'map', 'set', 'promise', 'function', 'transform', 'file']);
@@ -67,7 +62,8 @@ class SchemaWalker {
   }
 
   kind(node: SchemaNode): LeafKind {
-    const kinds = new Set(this.present(node).map(candidate => this.kindOf(candidate.definition)));
+    const present = this.resolve(node).filter(definition => !this.absent(definition));
+    const kinds = new Set(present.map(definition => this.kindOf(definition)));
     const [only] = kinds;
     return kinds.size === 1 && only !== undefined ? only : 'unknown';
   }
@@ -77,12 +73,20 @@ class SchemaWalker {
   }
 
   caught(node: SchemaNode): boolean {
-    const present = this.present(node);
-    return present.length > 0 && present.every(candidate => candidate.caught);
+    return node.some(schema => this.catches(schema));
   }
 
-  private present(node: SchemaNode): Candidate[] {
-    return this.candidates(node, false).filter(candidate => !this.absent(candidate.definition));
+  private catches(schema: z.ZodType): boolean {
+    const definition = schema._zod.def as unknown as Definition;
+    if (definition.type === 'catch') return true;
+    if (WRAPPERS.has(definition.type) && definition.innerType) return this.catches(definition.innerType);
+    if (definition.type === 'pipe' && definition.in) return this.catches(this.pipeSide(definition.in, definition.out));
+    if (definition.type === 'lazy' && definition.getter) return this.catches(definition.getter());
+    if (definition.type === 'union') return (definition.options ?? []).some(option => this.catches(option));
+    if (definition.type === 'intersection' && definition.left && definition.right) {
+      return this.catches(definition.left) && this.catches(definition.right);
+    }
+    return false;
   }
 
   private absent(definition: Definition): boolean {
@@ -130,28 +134,23 @@ class SchemaWalker {
   }
 
   private resolve(node: SchemaNode): Definition[] {
-    return this.candidates(node, false).map(candidate => candidate.definition);
-  }
-
-  private candidates(node: SchemaNode, caught: boolean): Candidate[] {
     return node.flatMap(schema => {
       const definition = schema._zod.def as unknown as Definition;
-      if (WRAPPERS.has(definition.type) && definition.innerType) {
-        return this.candidates([definition.innerType], caught || definition.type === 'catch');
-      }
-      if (definition.type === 'pipe' && definition.in) {
-        const input = this.candidates([definition.in], caught);
-        const output = definition.out;
-        const preprocessed = output !== undefined && input.every(step => step.definition.type === 'transform');
-        return preprocessed ? this.candidates([output], caught) : input;
-      }
-      if (definition.type === 'lazy' && definition.getter) return this.candidates([definition.getter()], caught);
-      if (definition.type === 'union') return this.candidates(definition.options ?? [], caught);
+      if (WRAPPERS.has(definition.type) && definition.innerType) return this.resolve([definition.innerType]);
+      if (definition.type === 'pipe' && definition.in)
+        return this.resolve([this.pipeSide(definition.in, definition.out)]);
+      if (definition.type === 'lazy' && definition.getter) return this.resolve([definition.getter()]);
+      if (definition.type === 'union') return this.resolve(definition.options ?? []);
       if (definition.type === 'intersection' && definition.left && definition.right) {
-        return this.candidates([definition.left, definition.right], caught);
+        return this.resolve([definition.left, definition.right]);
       }
-      return [{ definition, caught }];
+      return [definition];
     });
+  }
+
+  private pipeSide(input: z.ZodType, output: z.ZodType | undefined): z.ZodType {
+    const preprocessed = output !== undefined && this.resolve([input]).every(step => step.type === 'transform');
+    return preprocessed ? output : input;
   }
 }
 
