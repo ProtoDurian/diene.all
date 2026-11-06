@@ -1,110 +1,100 @@
-# Diene workspace agent guide
-
-## Agent skills
+# Agent skills
 
 `.claude/skills/vendor/` is tool-owned and is never hand-edited. Nothing in this
 tree writes it: the tool that does is consumed per-template from the Nix registry,
 and this tree declares no packages for it to vendor.
 
-## CI/CD workflows
-
-See [docs/standards/ci-cd/index.md](docs/standards/ci-cd/index.md).
-
-## Conventional commits
-
-See [docs/standards/conventional-commits/index.md](docs/standards/conventional-commits/index.md).
-
-## Data validation
-
-See [docs/standards/validation/index.md](docs/standards/validation/index.md).
-
-## Date and time
-
-See [docs/standards/datetime/index.md](docs/standards/datetime/index.md).
-
-## Domain-driven design
-
-See [docs/standards/domain-driven-design/index.md](docs/standards/domain-driven-design/index.md).
-
-## Functional practices
-
-See [docs/standards/functional-practices/index.md](docs/standards/functional-practices/index.md).
-
-## Infisical and secrets
-
-See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).
-
-## Linting and pre-commit
-
-See [docs/standards/linting/index.md](docs/standards/linting/index.md).
-
-## Nix flakes and development shells
-
-Use the repository's Nix shell for every command. Read
-[docs/standards/nix/index.md](docs/standards/nix/index.md) before changing the
-flake or `nix/` modules.
-
-## Release automation
-
-See [docs/standards/semantic-release/index.md](docs/standards/semantic-release/index.md).
-
-## Repository standards
-
-Follow the linked standard before changing its surface. Domain-specific
-architecture and behavior belongs under [docs/domain/](docs/domain/README.md),
-not under `docs/standards/`.
-
-## Service-tree identity
-
-See [docs/standards/service-tree/index.md](docs/standards/service-tree/index.md).
-
-## Shell scripts
-
-See [docs/standards/shell-scripts/index.md](docs/standards/shell-scripts/index.md).
-
-## Software design philosophy
-
-See [docs/standards/software-design-philosophy/index.md](docs/standards/software-design-philosophy/index.md).
-
-## SOLID principles
-
-See [docs/standards/solid-principles/index.md](docs/standards/solid-principles/index.md).
-
-## Stateless OOP and dependency injection
-
-See [docs/standards/stateless-oop-di/index.md](docs/standards/stateless-oop-di/index.md).
-
-## Taskfile conventions
-
-See [docs/standards/taskfile/index.md](docs/standards/taskfile/index.md).
-
-## Testing
-
-See [docs/standards/testing/index.md](docs/standards/testing/index.md).
-
-## Three-layer architecture
-
-See [docs/standards/three-layer-architecture/index.md](docs/standards/three-layer-architecture/index.md).
-
-## Utility libraries
-
-See [docs/standards/utilities/index.md](docs/standards/utilities/index.md).
-
-<!-- ### bun-base -->
-<!-- #### source: bun-base -->
-
-## Bun and TypeScript
+# Bun and TypeScript
 
 Read [the Bun baseline](docs/developer/bun-baseline.md) before changing the Bun
 toolchain, task surface, test tiers, coverage ledgers, build, or illustrative
 sample. Follow the TypeScript variants linked from that baseline alongside the
 shared engineering standards.
 
-<!-- ### bun-config -->
-<!-- #### source: lib/bun/config -->
+# CI/CD workflows
 
-## Configuration
+See [docs/standards/ci-cd/index.md](docs/standards/ci-cd/index.md).
 
-Read [docs/standards/config/index.md](docs/standards/config/index.md) before
+# Configuration
+
+See [docs/standards/config/index.md](docs/standards/config/index.md) before
 changing the config loader, the 4-tier merge, the env-override contract, the
-`/build-time` variant, `$schema` generation, or the meta-test contract.
+`/build-time` variant, `$schema` generation or the TestHelper.
+
+# Conventional commits
+
+See [docs/standards/conventional-commits/index.md](docs/standards/conventional-commits/index.md).
+
+# CyanPrint-managed files
+
+`.cyan_state.yaml` records what CyanPrint manages here:
+
+- `files`: every path the last generation wrote.
+- `provenance`: per path, how it was merged: `source` (the winning template),
+  `decision` (`added`, `resolver-merged` or `lww-override`), `resolver` and
+  `contributors` (every template that supplied a version).
+
+Check a file there before you edit it:
+
+- **Not listed:** yours. Edit freely.
+- **Listed:** make the smallest line-level edit. No reformatting, reordering,
+  rewriting or renaming, so the next `cyanprint update` 3-way merge stays clean.
+- **More than one contributor:** merged from several templates. Change only your
+  own part.
+- Never hand-edit or delete `.cyan_state.yaml`.
+
+To pull template changes, use the `cyanprint-update` skill.
+
+# Development Environment
+
+All binaries, tools, and PATH are managed by **Nix**. Do not install tools manually or modify PATH outside of the nix configuration.
+
+## Prerequisites
+
+1. **Nix** — package manager ([install](https://nixos.org/download))
+2. **Docker** — container runtime ([install](https://docs.docker.com/get-docker))
+3. **direnv** — auto-loads the nix shell on `cd` ([install](https://direnv.net/docs/installation.html))
+
+## Getting Started
+
+```bash
+direnv allow    # first time only — loads the nix dev shell
+```
+
+## Nix Configuration
+
+See **[docs/standards/nix/index.md](docs/standards/nix/index.md)** for the full guide on:
+
+- File structure (`flake.nix`, `nix/`, `.envrc`)
+- Adding/removing packages
+- Environment groups and shells
+- Formatters and pre-commit hooks
+- Adding registries
+
+# Infisical and secrets
+
+See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).
+
+# Linting and pre-commit
+
+See [docs/standards/linting/index.md](docs/standards/linting/index.md).
+
+# Release automation
+
+See [docs/standards/semantic-release/index.md](docs/standards/semantic-release/index.md).
+
+# Repository standards
+
+Follow the linked standard before changing its surface.
+
+# Service-tree identity
+
+See [docs/standards/service-tree/index.md](docs/standards/service-tree/index.md).
+
+# Shell scripts
+
+See [docs/standards/shell-scripts/index.md](docs/standards/shell-scripts/index.md).
+
+# Taskfile conventions
+
+See [docs/standards/taskfile/index.md](docs/standards/taskfile/index.md).

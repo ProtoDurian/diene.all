@@ -70,8 +70,8 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@atomicloud/diene.core-utils": "^1.0.0",
-    "@atomicloud/diene.result": "^1.0.2",
+    "@atomicloud/diene.core-utils": "1.0.0",
+    "@atomicloud/diene.result": "1.0.2",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
@@ -85,5 +85,15 @@
     "publint": "^0.3.16",
     "should": "^13.2.3",
     "typescript": "^6.0.3"
+  },
+  "typesVersions": {
+    "*": {
+      "build-time": [
+        "./dist/build-time.d.ts"
+      ],
+      "test-helper": [
+        "./dist/test-helper.d.ts"
+      ]
+    }
   }
 }

@@ -6,12 +6,12 @@ export default {
   probes: [
     {
       name: 'baseline-dual-build-green',
-      description: 'pls build emits ESM, CJS, .d.ts, and a byte-identical .d.cts (D7).',
+      description: 'task build emits ESM, CJS, .d.ts, and a byte-identical .d.cts (D7).',
       kind: 'baseline',
       async run(repo: any) {
         await expectBunGreen(
           repo,
-          "nix develop .#ci -c bash -lc './scripts/local/setup.sh && pls build'",
+          "nix develop .#ci -c bash -lc './scripts/local/setup.sh && task build'",
           'dual-build',
         );
         for (const artifact of ['dist/index.js', 'dist/index.cjs', 'dist/index.d.ts', 'dist/index.d.cts']) {

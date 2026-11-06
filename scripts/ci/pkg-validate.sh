@@ -6,9 +6,9 @@ cd "${root_dir}"
 
 mode="${1:-all}"
 case "${mode}" in
-content | publint | attw | all) ;;
+content | publint | attw | consumer | all) ;;
 *)
-  echo "❌ mode must be 'content', 'publint', 'attw', or 'all'" >&2
+  echo "❌ mode must be 'content', 'publint', 'attw', 'consumer', or 'all'" >&2
   exit 1
   ;;
 esac
@@ -58,6 +58,11 @@ if [[ ${mode} == "attw" || ${mode} == "all" ]]; then
   # (/build-time, /test-helper); profile to node16 so its EOL resolver does not
   # false-fail the multi-entry package. node16 (CJS+ESM) and bundler are checked.
   ./node_modules/.bin/attw pkg.tgz --profile node16
+fi
+
+if [[ ${mode} == "consumer" || ${mode} == "all" ]]; then
+  echo "🔎 Consuming the tarball (consumer fixture)..."
+  ./scripts/ci/consumer-smoke.sh
 fi
 
 echo "✅ Package validation (${mode}) passed"

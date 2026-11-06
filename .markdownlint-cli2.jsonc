@@ -1,9 +1,4 @@
 {
-  // One config for one linter. The rule set lived in a second .markdownlint.json
-  // until the wave-5 cascade; markdownlint-cli2 reads both, so two files for one
-  // tool meant two places to look and two places to drift.
-  // Changelog.md and docs/developer/CommitConventions.md are written by the
-  // releaser, so linting them would refuse tool output the tree cannot hand-fix.
   "ignores": [
     ".claude/skills/vendor/**",
     "Changelog.md",

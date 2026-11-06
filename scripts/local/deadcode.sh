@@ -11,6 +11,6 @@ echo "📝 Repository dead-code review"
 ./node_modules/.bin/knip --config knip.llm.json --no-exit-code
 
 echo "📝 Production dead-code review"
-./node_modules/.bin/knip --config knip.production.llm.json --no-exit-code
+./node_modules/.bin/knip --config knip.production.llm.json --production --no-exit-code
 
 echo "✅ Dead-code review complete"
