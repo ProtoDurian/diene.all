@@ -70,7 +70,7 @@ awk 'NF >= 5 && $2 ~ /^[0-9]+m$/ && $4 ~ /^[0-9]+Mi$/ { ok = 1 } END { exit !ok 
   { echo "❌ the metrics-server pod is not ready or restarted" >&2 && exit 1; }
 echo "✅ kubectl top nodes answers through xenon"
 
-PUBLISH_MODE=oci PUBLISH_DRY_RUN=false RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/oci" OCI_REGISTRY="localhost:${registry_port}" OCI_REPOSITORY=charts OCI_PLAIN_HTTP=true bash ./scripts/ci/publish.sh
+PUBLISH_MODE=oci PUBLISH_DRY_RUN=false RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/oci" OCI_REGISTRY="localhost:${registry_port}" OCI_REPOSITORY=charts OCI_PLAIN_HTTP=true bash ./scripts/local/with-chart-repos.sh bash ./scripts/ci/publish.sh
 helm pull "oci://localhost:${registry_port}/charts/xenon" --version 0.1.0 --plain-http --destination "${tmp}"
 test -s "${tmp}/xenon-0.1.0.tgz"
 

@@ -60,5 +60,5 @@ have no floor.
 ## Publishing
 
 OCI is the default mode and git is secondary (inherited `scripts/ci/publish.sh`). The package is `xenon-<version>.tgz`.
-`publish.sh` and `task build` run `helm dependency build` through `scripts/local/with-chart-repos.sh`, which registers
+`task build` runs `helm dependency build` through `scripts/local/with-chart-repos.sh`, which registers
 the https repositories named in `chart/Chart.yaml` in a throwaway Helm repo config (metrics-server has no OCI chart).

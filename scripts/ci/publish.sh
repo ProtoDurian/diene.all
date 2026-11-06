@@ -21,7 +21,7 @@ manifest_version="$(yq -r '.version' chart/Chart.yaml)"
 
 helm-docs --chart-search-root chart
 mkdir -p "${output_dir}"
-bash ./scripts/local/with-chart-repos.sh helm dependency build chart
+helm dependency build chart
 helm package chart --destination "${output_dir}" --version "${version}"
 package="${output_dir}/xenon-${version}.tgz"
 [ ! -s "${package}" ] && echo "❌ chart package was not created" >&2 && exit 1
