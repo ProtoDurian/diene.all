@@ -1,6 +1,5 @@
 package kv_test
 
-// DOMAIN WIRING: replaceable Note Redis adapter integration test.
 import (
 	"context"
 	"testing"
@@ -52,5 +51,3 @@ func TestRedisStore(t *testing.T) {
 		t.Fatalf("Close() error = %v", err)
 	}
 }
-
-// END DOMAIN WIRING

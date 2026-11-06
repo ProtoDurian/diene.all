@@ -33,11 +33,7 @@ jobs:
     timeout-minutes: ${{ startsWith(github.ref, 'refs/tags/') && 45 || 30 }}
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
-        with:
-          namespacelabs: 'true'
       - uses: AtomiCloud/actions.setup-docker@v2
-        with:
-          namespacelabs: 'true'
       - name: Build and push Docker
         env:
           CI_DOCKER_CONTEXT: ${{ inputs.context }}

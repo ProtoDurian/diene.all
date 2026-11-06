@@ -3,7 +3,6 @@ import { expectGreen, expectRedWithDiagnostic, plantGoFile } from './lib/go.ts';
 
 const gate = 'nix develop .#ci -c ./scripts/local/staticcheck-production.sh';
 
-// Deadcode only tracks functions, so an unused unexported type can only be reported by staticcheck.
 const unusedType = 'type probeStaticcheckProduction struct{}';
 
 export default {

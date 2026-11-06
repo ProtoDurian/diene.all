@@ -5,9 +5,9 @@ parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ shared .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 
-topics='datetime|domain-driven-design|functional-practices|solid-principles|stateless-oop-di|testing|utilities|validation'
-source='(adapters|cmd|lib|tests/(unit|int|sit))/.+\.go|go\.(mod|sum)|\.golangci\.yaml|\.config/go-base\.coverage\.yaml|tests/fixtures/(govulncheck-double\.sh|vulnerable/govulncheck\.json)'
-scripts='scripts/ci/(build|deadcode|sit|test|vuln)\.sh|scripts/local/(build|deadcode|deadcode-(lax|production|strict|whole)|down|staticcheck-(production|whole)|test|typecheck|up|vuln)\.sh|scripts/validate/(go-[a-z-]+|sample-journey)\.(sh|awk)'
+topics='datetime|domain-driven-design|functional-practices|solid-principles|stateless-oop-di|testing|utilities|validation|wire-format'
+source='(adapters|cmd|lib|tests/(unit|int|sit))/.+\.go|go\.(mod|sum)|\.golangci\.yaml|\.config/go-base\.coverage\.yaml|pins\.go'
+scripts='scripts/ci/(build|deadcode|sit|test|vuln)\.sh|scripts/local/(build|deadcode|deadcode-(lax|production|strict|whole)|staticcheck-(production|whole)|test|typecheck|vuln)\.sh|scripts/validate/go-coverage\.sh'
 probes='probes/[a-z-]+\.ts|probes/lib/go\.ts'
 docs="docs/developer/go-baseline\\.md|docs/standards/(${topics})/languages/go\\.md"
 added_pattern="^((${source})|(${scripts})|(${probes})|(${docs})|tasks/Taskfile\\.test\\.yaml|\\.github/workflows/⚡reusable-(build|dead-code|test|vuln)\\.yaml|\\.claude/skills/go-baseline/SKILL\\.md|\\.github/named-checks/go-base/[^/]+)$"

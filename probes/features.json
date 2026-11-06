@@ -276,11 +276,6 @@
   },
   {
     "template": "diene/go-base",
-    "name": "sample-domain-journey",
-    "class": "smoke"
-  },
-  {
-    "template": "diene/go-base",
     "name": "system-integration-tests",
     "class": "smoke"
   },
