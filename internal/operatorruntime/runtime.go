@@ -1,4 +1,3 @@
-// Package operatorruntime owns the manager's configuration and controller wiring.
 package operatorruntime
 
 import (
@@ -28,13 +27,10 @@ import (
 
 const leaderElectionID = "operator-template.diene.atomi.cloud"
 
-// ErrLedgerEndpointRequired reports an enabled Note controller without a ledger endpoint.
 var ErrLedgerEndpointRequired = errors.New("note controller enabled but --ledger-endpoint/LEDGER_ENDPOINT is empty; set an endpoint or disable the Note controller (--enable-note=false)")
 
-// ErrNoteLedgerRequired reports an enabled Note controller without its runtime dependency.
 var ErrNoteLedgerRequired = errors.New("note controller enabled without a ledger service")
 
-// Config is the manager configuration populated by its real command-line flags.
 type Config struct {
 	EnableNote       bool
 	EnableJournal    bool
@@ -53,7 +49,6 @@ type Config struct {
 	LedgerSecretKey  string
 }
 
-// DefaultConfig returns production-safe defaults, including leader election and secured metrics.
 func DefaultConfig(getenv func(string) string) Config {
 	ledgerBucket := getenv("LEDGER_BUCKET")
 	if ledgerBucket == "" {
@@ -77,7 +72,6 @@ func DefaultConfig(getenv func(string) string) Config {
 	}
 }
 
-// BindFlags binds the manager's public runtime interface directly to config.
 func BindFlags(flags *flag.FlagSet, config *Config) {
 	flags.BoolVar(&config.EnableNote, "enable-note", config.EnableNote, "enable the Note controller")
 	flags.BoolVar(&config.EnableJournal, "enable-journal", config.EnableJournal, "enable the Journal controller")
@@ -94,14 +88,12 @@ func BindFlags(flags *flag.FlagSet, config *Config) {
 	flags.StringVar(&config.LedgerNotePrefix, "ledger-note-prefix", config.LedgerNotePrefix, "per-controller ledger object prefix for the Note controller")
 }
 
-// ControllerDependencies contains replaceable runtime dependencies for registration tests.
 type ControllerDependencies struct {
 	Clock      kube.Clock
 	Metrics    operatormetrics.Recorder
 	NoteLedger *ledger.Service
 }
 
-// NewScheme returns the scheme used by both the production manager and fixtures.
 func NewScheme() (*runtime.Scheme, error) {
 	scheme := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
@@ -113,7 +105,6 @@ func NewScheme() (*runtime.Scheme, error) {
 	return scheme, nil
 }
 
-// NewManager constructs the controller-runtime manager without registering controllers.
 func NewManager(restConfig *rest.Config, scheme *runtime.Scheme, config Config) (ctrl.Manager, error) {
 	return ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme: scheme,
@@ -128,7 +119,6 @@ func NewManager(restConfig *rest.Config, scheme *runtime.Scheme, config Config) 
 	})
 }
 
-// RegisterControllers applies the real per-controller enable flags to manager registration.
 func RegisterControllers(manager ctrl.Manager, config Config, dependencies ControllerDependencies) error {
 	clock := dependencies.Clock
 	if clock == nil {
@@ -174,7 +164,6 @@ func RegisterControllers(manager ctrl.Manager, config Config, dependencies Contr
 	return nil
 }
 
-// AddHealthChecks registers the manager's health and readiness endpoints.
 func AddHealthChecks(manager ctrl.Manager) error {
 	if err := manager.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		return fmt.Errorf("add healthz check: %w", err)
@@ -185,7 +174,6 @@ func AddHealthChecks(manager ctrl.Manager) error {
 	return nil
 }
 
-// Start constructs and runs the production manager until context cancellation.
 func Start(ctx context.Context, restConfig *rest.Config, config Config) error {
 	scheme, err := NewScheme()
 	if err != nil {
@@ -225,8 +213,7 @@ func productionDependencies(ctx context.Context, config Config) (ControllerDepen
 		return ControllerDependencies{}, fmt.Errorf("build ledger client: %w", err)
 	}
 	store := ledgerstore.NewMinioStore(client, config.LedgerBucket, config.LedgerNotePrefix)
-	// Bound the startup bucket check: a black-holed ledger endpoint must fail fast
-	// rather than block manager.Start (and the health server) indefinitely.
+	// Bounded so a black-holed ledger endpoint fails fast instead of blocking Start.
 	bctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if err := store.EnsureBucket(bctx); err != nil {

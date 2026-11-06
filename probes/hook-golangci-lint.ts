@@ -1,10 +1,7 @@
 import { restoreProbeState } from './lib/helpers.ts';
 import { expectGreen, expectRedWithDiagnostic, plantGoFile } from './lib/go.ts';
 
-// Per-process golangci cache. This node's baseline and mutation arms run concurrently
-// over one sandbox, and a shared cache lets one arm answer with the other arm's result.
-// It lives on the gate rather than inside expectGreen because the helpers are required
-// to hand repo.exec the caller's bytes unchanged (probes/lib/helpers.test.ts asserts it).
+// Per-process cache: concurrent probe arms must not share golangci results.
 const gate =
   'GOLANGCI_LINT_CACHE="$PWD/.git/cyanprint-golangci-cache-$$" nix develop .#ci -c pre-commit run a-golangci-lint --all-files';
 

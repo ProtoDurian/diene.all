@@ -13,40 +13,27 @@ import (
 
 const payloadKey = "payload"
 
-// OwnedConfigMap is an owner-verified projection of a managed ConfigMap.
 type OwnedConfigMap struct {
 	Name    string
 	Payload string
 }
 
-// ConfigMapPort is the narrow owned-resource port a controller uses to converge a
-// Note's owned ConfigMap set. Ownership is decided by the controller
-// OwnerReference UID, never by a mutable label, so a foreign or spoof-labelled
-// object is never counted, overwritten, or deleted.
 type ConfigMapPort interface {
-	// ListOwned returns the ConfigMaps whose controller-owner UID matches owner and
-	// the subset of desiredNames held by a non-owned (foreign) object.
 	ListOwned(ctx context.Context, owner client.Object, desiredNames []string) (owned []OwnedConfigMap, foreign []string, err error)
-	// Upsert creates or updates an owner-referenced ConfigMap to payload.
 	Upsert(ctx context.Context, owner client.Object, name, payload string) error
-	// Delete removes a ConfigMap only when its controller-owner UID matches owner.
 	Delete(ctx context.Context, owner client.Object, name string) error
 }
 
-// ConfigMapAdapter implements ConfigMapPort over a controller-runtime client.
 type ConfigMapAdapter struct {
 	client client.Client
 	scheme *runtime.Scheme
 	label  string
 }
 
-// NewConfigMapAdapter constructs a ConfigMapPort. The label is applied for
-// observability only; ownership decisions use the controller-owner UID.
 func NewConfigMapAdapter(c client.Client, scheme *runtime.Scheme, label string) ConfigMapAdapter {
 	return ConfigMapAdapter{client: c, scheme: scheme, label: label}
 }
 
-// ListOwned classifies the namespace's ConfigMaps by controller-owner UID.
 func (a ConfigMapAdapter) ListOwned(ctx context.Context, owner client.Object, desiredNames []string) ([]OwnedConfigMap, []string, error) {
 	var list corev1.ConfigMapList
 	if err := a.client.List(ctx, &list, client.InNamespace(owner.GetNamespace())); err != nil {
@@ -67,14 +54,11 @@ func (a ConfigMapAdapter) ListOwned(ctx context.Context, owner client.Object, de
 		case desired[cm.Name]:
 			foreign = append(foreign, cm.Name)
 		default:
-			// unrelated ConfigMap: neither owned nor a desired-name collision.
 		}
 	}
 	return owned, foreign, nil
 }
 
-// Upsert creates the ConfigMap or updates its payload when owned. A pre-existing
-// foreign object at the name is reported as an already-exists conflict.
 func (a ConfigMapAdapter) Upsert(ctx context.Context, owner client.Object, name, payload string) error {
 	var cm corev1.ConfigMap
 	err := a.client.Get(ctx, client.ObjectKey{Namespace: owner.GetNamespace(), Name: name}, &cm)
@@ -108,7 +92,6 @@ func (a ConfigMapAdapter) Upsert(ctx context.Context, owner client.Object, name,
 	return a.client.Update(ctx, &cm)
 }
 
-// Delete removes an owned ConfigMap. A foreign or absent object is left untouched.
 func (a ConfigMapAdapter) Delete(ctx context.Context, owner client.Object, name string) error {
 	var cm corev1.ConfigMap
 	err := a.client.Get(ctx, client.ObjectKey{Namespace: owner.GetNamespace(), Name: name}, &cm)

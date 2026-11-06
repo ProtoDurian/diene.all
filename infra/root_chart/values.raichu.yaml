@@ -1,4 +1,3 @@
-# Landscape overlay: raichu (production landscape).
 controllers:
   note: true
 ledger:

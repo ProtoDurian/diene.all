@@ -48,7 +48,6 @@ async function first(repo: ProbeRepo, glob: string): Promise<string> {
   return paths[0];
 }
 
-// Pinned targets: this node asserts through testify require and writes ConfigMaps, so the parent matchers find nothing.
 export async function flipGoAssertion(repo: ProbeRepo): Promise<string> {
   return replaceOnce(
     repo,

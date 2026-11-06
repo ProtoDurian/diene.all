@@ -32,7 +32,6 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Note is the Schema for the notes API.
         properties:
           apiVersion:
             description: |-
@@ -52,15 +51,11 @@ spec:
           metadata:
             type: object
           spec:
-            description: NoteSpec is the desired state of a Note.
             properties:
               body:
-                description: Body is the note contents rendered into the owned ConfigMap
-                  set.
                 minLength: 1
                 type: string
               category:
-                description: Category classifies the note.
                 enum:
                 - personal
                 - work
@@ -68,16 +63,11 @@ spec:
                 type: string
               replicas:
                 default: 1
-                description: |-
-                  Replicas is the desired number of owned ConfigMap copies. It drives the
-                  blast-brake demonstration when a reconcile would delete more than the
-                  configured share of existing copies in a single tick.
                 format: int32
                 maximum: 50
                 minimum: 0
                 type: integer
               title:
-                description: Title is the human-readable note title.
                 maxLength: 253
                 minLength: 1
                 type: string
@@ -87,12 +77,8 @@ spec:
             - title
             type: object
           status:
-            description: NoteStatus is the observed state of a Note.
             properties:
               conditions:
-                description: |-
-                  Conditions follow the standard metav1.Condition vocabulary
-                  (Ready / Drifted / Conflict / WaitingForEndpoint / BlastBrakeTripped).
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -152,17 +138,12 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               ledgerRef:
-                description: |-
-                  LedgerRef is a pointer to the durable ledger entry for this Note. It is a
-                  coordinate, never a secret value.
+                description: LedgerRef is a ledger coordinate, never a secret value.
                 type: string
               observedGeneration:
-                description: ObservedGeneration is the spec generation last reconciled.
                 format: int64
                 type: integer
               ownedConfigMaps:
-                description: OwnedConfigMaps counts the owned ConfigMap copies currently
-                  converged.
                 format: int32
                 type: integer
             type: object

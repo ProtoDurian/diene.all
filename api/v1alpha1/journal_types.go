@@ -4,35 +4,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ─── DOMAIN WIRING (sample) ──────────────────────────────────────────────────
-// Journal is the deliberately minimal second toy controller. It exists only to
-// prove independent per-controller `--enable` registration and the shared
-// condition vocabulary; it owns no external resource and keeps no ledger entry.
-
-// JournalSpec is the desired state of a Journal.
 type JournalSpec struct {
-	// Message is the journal entry text.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=1024
 	Message string `json:"message"`
 }
 
-// JournalStatus is the observed state of a Journal.
 type JournalStatus struct {
-	// Conditions follow the standard metav1.Condition vocabulary (Ready only).
 	// +optional
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// ObservedGeneration is the spec generation last reconciled.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-// Journal is the Schema for the journals API.
-//
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Namespaced,shortName=jn
@@ -46,8 +34,6 @@ type Journal struct {
 	Status JournalStatus `json:"status,omitempty"`
 }
 
-// JournalList contains a list of Journal.
-//
 // +kubebuilder:object:root=true
 type JournalList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -56,5 +42,3 @@ type JournalList struct {
 }
 
 var _ = SchemeBuilder.Register(&Journal{}, &JournalList{})
-
-// ─── END DOMAIN WIRING (sample) ──────────────────────────────────────────────

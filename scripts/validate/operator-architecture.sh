@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# tools/archcheck is AST-aware, so it catches a leaked decision whatever it imports.
-
 echo "🔎 checking operator layer imports"
 
 k8s_in_domain="$(grep -rnE '"(k8s\.io|sigs\.k8s\.io)/' lib/operator || true)"

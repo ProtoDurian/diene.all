@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Consumers reuse this k3d harness by overriding the chart, values, fixtures, and image.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Resolved dynamically so copied consumer harnesses remain relocatable; the helper
-# is checked independently by the same shellcheck hook.
 # shellcheck disable=SC1091
 source "${script_dir}/lib/cluster-name.sh"
-# Explicit overrides are honored verbatim; defaults share a unique invocation ID
-# so parallel probe sandboxes cannot collide on k3d or Docker resource names.
 invocation_id="$(e2e_invocation_id "${script_dir}" "$$")"
 cluster="$(e2e_cluster_name "${CLUSTER:-}" "${invocation_id}")"
 chart="${CHART:-infra/root_chart}"

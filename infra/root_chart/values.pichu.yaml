@@ -1,4 +1,3 @@
-# Landscape overlay: pichu.
 controllers:
   note: true
 ledger:

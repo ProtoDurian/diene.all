@@ -15,9 +15,6 @@ import (
 
 const journalController = "journal"
 
-// JournalReconciler reconciles a Journal. It is the deliberately minimal second
-// controller proving independent per-controller registration and the shared
-// condition vocabulary; it owns no external resource and no ledger entry.
 type JournalReconciler struct {
 	client.Client
 	Clock    kube.Clock
@@ -28,7 +25,6 @@ type JournalReconciler struct {
 // +kubebuilder:rbac:groups=sample.diene.atomi.cloud,resources=journals,verbs=get;list;watch
 // +kubebuilder:rbac:groups=sample.diene.atomi.cloud,resources=journals/status,verbs=get;update;patch
 
-// Reconcile marks a Journal Ready.
 func (r *JournalReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Metrics.Tick(journalController)
 
@@ -49,7 +45,6 @@ func (r *JournalReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{}, r.Status().Update(ctx, &journal)
 }
 
-// SetupWithManager registers the Journal controller with the manager.
 func (r *JournalReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1alpha1.Journal{}).

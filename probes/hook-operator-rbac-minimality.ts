@@ -19,8 +19,6 @@ export default {
       description: 'Granting an overbroad destructive verb on the Note CR must redden the RBAC hook.',
       kind: 'mutation',
       async run(repo: any) {
-        // Add a create grant on the primary Note CR — outside the least-privilege
-        // allowlist (the reconciler only reads Notes).
         await repo.patch('infra/root_chart/templates/rbac/role.yaml', {
           find: '  - notes\n  verbs:\n  - get',
           replace: '  - notes\n  verbs:\n  - create\n  - get',

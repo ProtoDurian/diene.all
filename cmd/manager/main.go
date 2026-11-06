@@ -1,4 +1,3 @@
-// Command manager is the single composition root for the operator template.
 package main
 
 import (

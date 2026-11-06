@@ -26,7 +26,6 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Journal is the Schema for the journals API.
         properties:
           apiVersion:
             description: |-
@@ -46,10 +45,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: JournalSpec is the desired state of a Journal.
             properties:
               message:
-                description: Message is the journal entry text.
                 maxLength: 1024
                 minLength: 1
                 type: string
@@ -57,11 +54,8 @@ spec:
             - message
             type: object
           status:
-            description: JournalStatus is the observed state of a Journal.
             properties:
               conditions:
-                description: Conditions follow the standard metav1.Condition vocabulary
-                  (Ready only).
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -121,7 +115,6 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               observedGeneration:
-                description: ObservedGeneration is the spec generation last reconciled.
                 format: int64
                 type: integer
             type: object

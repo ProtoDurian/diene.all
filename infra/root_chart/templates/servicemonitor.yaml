@@ -14,9 +14,6 @@ spec:
     - port: metrics
       scheme: https
       interval: {{ .Values.serviceMonitor.interval }}
-      # An enabled ServiceMonitor must always present an authorized identity: the
-      # chart-owned least-privilege scraper token, or an externally-provisioned
-      # authorized bearer-token Secret. Neither is a render-time error.
       {{- if .Values.serviceMonitor.scraper.create }}
       authorization:
         type: Bearer

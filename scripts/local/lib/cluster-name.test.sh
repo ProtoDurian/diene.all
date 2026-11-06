@@ -1,16 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Regression coverage for the k3d cluster-name derivation. Pure and offline:
-# no Docker, k3d, or network is touched.
-
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Resolved dynamically so the offline test remains relocatable; the helper is
-# checked independently by the same shellcheck hook.
 # shellcheck disable=SC1091
 source "${here}/cluster-name.sh"
 
-# One invocation ID is deterministic for identical inputs and changes with PID.
 id_a="$(e2e_invocation_id "/same/worktree" 1000)"
 id_b="$(e2e_invocation_id "/same/worktree" 2000)"
 id_c="$(e2e_invocation_id "/same/worktree" 1000)"
@@ -24,7 +18,6 @@ id_c="$(e2e_invocation_id "/same/worktree" 1000)"
 }
 echo "✅ invocation IDs are unique and deterministic"
 
-# Explicit, non-empty resource overrides are emitted verbatim.
 got="$(e2e_cluster_name "my-fixed-cluster" "${id_a}")"
 [ "${got}" = "my-fixed-cluster" ] || {
   echo "❌ override not preserved: ${got}" >&2
@@ -37,7 +30,6 @@ got_image="$(e2e_image_name "registry.example/manager:fixed" "${id_a}")"
 }
 echo "✅ resource overrides preserved"
 
-# Two default invocations use distinct cluster and image names.
 a="$(e2e_cluster_name "" "${id_a}")"
 b="$(e2e_cluster_name "" "${id_b}")"
 [ "${a}" != "${b}" ] || {
@@ -52,7 +44,6 @@ image_b="$(e2e_image_name "" "${id_b}")"
 }
 echo "✅ default resource names unique per invocation"
 
-# Default names are k3d-safe: lowercase RFC1123 and within the 32-char limit.
 for name in "${a}" "${b}"; do
   [[ ${name} =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] || {
     echo "❌ name not k3d-safe: ${name}" >&2

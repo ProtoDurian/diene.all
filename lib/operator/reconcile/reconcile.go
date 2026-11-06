@@ -1,13 +1,3 @@
-// Package reconcile is the pure application service for the Note domain. It owns
-// every domain and application decision — desired content projection, the
-// owner-safe diff (create/update/delete + foreign-name conflict), the blast-brake
-// decision, observe-mode planning, the durable-ledger transition selection, the
-// endpoint-gating (WaitingForEndpoint), and Ready-after-confirm — and returns a
-// pure Decision the controller executes. The controller depends only on this
-// package (plus the ledger repository and the kube ports); it never imports the
-// decision internals (note/plan/brake). The architecture gate enforces that.
-//
-// This package is pure domain: it imports no k8s.io/* or sigs.k8s.io/* packages.
 package reconcile
 
 import (
@@ -19,15 +9,10 @@ import (
 	"github.com/AtomiCloud/diene.go-base/lib/operator/plan"
 )
 
-// Condition re-exports the pure, k8s-free condition type so controllers depend
-// only on this service.
 type Condition = plan.Condition
 
-// Spec re-exports the pure Note desired state.
 type Spec = note.Spec
 
-// Re-exported condition vocabulary so controllers depend only on this service and
-// never on the decision internals (the architecture gate enforces that).
 const (
 	TypeReady              = plan.TypeReady
 	TypeDrifted            = plan.TypeDrifted
@@ -38,55 +23,44 @@ const (
 	StatusFalse            = plan.StatusFalse
 )
 
-// DesiredNames returns the deterministic owned-ConfigMap names for a spec. The
-// controller uses it only to address the resource port; the diff decision stays
-// in Decide.
 func DesiredNames(owner string, spec Spec) []string {
 	return note.DesiredCopies(owner, spec)
 }
 
-// Kubernetes event types the controller emits.
 const (
 	EventNormal  = "Normal"
 	EventWarning = "Warning"
 )
 
-// Event is a reconcile outcome the controller publishes as a Kubernetes event.
 type Event struct {
 	Type    string
 	Reason  string
 	Message string
 }
 
-// Owned is an owner-UID-verified owned ConfigMap projection.
 type Owned struct {
 	Name    string
 	Payload string
 }
 
-// LedgerState projects the durable ledger entry for the Note's coordinate.
 type LedgerState struct {
 	Exists bool
 	Phase  ledger.Phase
 }
 
-// LedgerPre is the ledger transition run before resource convergence.
 type LedgerPre string
 
-// Ledger pre-actions.
 const (
 	LedgerPreNone   LedgerPre = "none"
 	LedgerPreIntent LedgerPre = "intent"
 	LedgerPreAdopt  LedgerPre = "adopt"
 )
 
-// Upsert is a desired owned ConfigMap: create it or update it to Payload.
 type Upsert struct {
 	Name    string
 	Payload string
 }
 
-// Input is everything the service needs to decide a reconcile.
 type Input struct {
 	Owner    string
 	Spec     Spec
@@ -97,7 +71,6 @@ type Input struct {
 	BrakeCap int
 }
 
-// Decision is the pure reconcile plan the controller executes in order.
 type Decision struct {
 	Write        bool
 	LedgerPre    LedgerPre
@@ -109,7 +82,6 @@ type Decision struct {
 	OwnedCount   int32
 }
 
-// Decide computes the reconcile plan for a Note.
 func Decide(in Input) Decision {
 	d := Decision{LedgerPre: LedgerPreNone}
 
@@ -181,9 +153,6 @@ func Decide(in Input) Decision {
 	return d
 }
 
-// WaitingForEndpoint is the condition the controller sets when a durable-ledger
-// operation fails (the endpoint is unreachable). It is exported because the
-// failure surfaces in the controller's I/O path, not in Decide.
 func WaitingForEndpoint(message string) Condition {
 	return Condition{Type: plan.TypeWaitingForEndpoint, Status: plan.StatusTrue, Reason: "LedgerUnavailable", Message: message}
 }
@@ -230,8 +199,6 @@ func countMembers(names []string, set map[string]bool) int {
 	return n
 }
 
-// count converts an owned-copy count to int32. Counts are bounded by the CRD's
-// replicas maximum, so the conversion cannot overflow.
 func count(n int) int32 {
 	return int32(n) //nolint:gosec // bounded by the Note CRD replicas maximum
 }

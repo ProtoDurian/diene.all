@@ -1,7 +1,4 @@
 {{- if and .Values.serviceMonitor.enabled .Values.serviceMonitor.scraper.create }}
-# Least-privilege metrics scraper identity. controller-runtime's metrics filter
-# requires the caller to be authenticated and authorized for GET /metrics; the
-# manager's own token is deliberately not granted that access.
 apiVersion: v1
 kind: ServiceAccount
 metadata:

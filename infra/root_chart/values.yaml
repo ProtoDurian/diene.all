@@ -31,9 +31,7 @@ ledger:
 
 # -- Per-controller enablement flags.
 controllers:
-  # -- Enable the ledger-backed Note controller. Off by default so a zero-config
-  # install never crashes on an empty ledger endpoint; landscape/e2e overlays
-  # enable it together with a real ledger.endpoint.
+  # -- Enable the ledger-backed Note controller; needs ledger.endpoint.
   note: false
   # -- Enable the Journal controller (no external dependency).
   journal: true
@@ -52,9 +50,7 @@ metrics:
   # -- Metrics bind port (HTTPS, authn/authz filtered).
   port: 8443
 
-# -- ServiceMonitor for Prometheus scraping of the secured metrics endpoint. The
-# endpoint uses controller-runtime's authn/authz filter, so the scraper must
-# present an authorized identity, not merely the manager's own token.
+# -- ServiceMonitor for the secured metrics endpoint.
 serviceMonitor:
   # -- Ship a ServiceMonitor.
   enabled: true
@@ -66,11 +62,7 @@ serviceMonitor:
     create: true
     # -- ServiceAccount name; defaults to <release>-metrics-reader when empty.
     serviceAccountName: ''
-    # -- When create=false, an externally-provisioned authorized bearer-token
-    # Secret must be named here (with its key). An enabled ServiceMonitor with
-    # neither create=true nor an external secret is rejected at render time —
-    # an unauthenticated scrape of the authn/authz-filtered endpoint is never
-    # allowed.
+    # -- Bearer-token Secret for the scraper; required when create=false.
     externalSecret:
       name: ''
       key: token

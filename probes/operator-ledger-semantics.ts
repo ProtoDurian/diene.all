@@ -1,7 +1,5 @@
 import { expectGreen, expectRed } from './lib/helpers.ts';
 
-// Runs against a real testcontainers MinIO backend (Docker); the closer runs it
-// in the host quiet window.
 const cmd = 'nix develop .#ci -c go test -count=1 -run TestMinioLedgerLifecycle ./tests/int/operator/';
 
 export default {

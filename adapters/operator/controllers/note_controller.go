@@ -16,15 +16,11 @@ import (
 	"github.com/AtomiCloud/diene.go-base/lib/operator/reconcile"
 )
 
-// NoteOwnerLabel decorates the owned ConfigMap set for observability. Ownership
-// decisions use the controller OwnerReference UID, never this label.
+// NoteOwnerLabel is display only; ownership is decided by the controller OwnerReference UID.
 const NoteOwnerLabel = "operator-template.diene.atomi.cloud/note"
 
 const noteController = "note"
 
-// NoteReconciler reconciles a Note. It is thin: it maps API input, invokes the
-// pure reconcile service, executes the returned plan through the ports, and flips
-// Kubernetes status, events, and metrics. It carries no domain decisions.
 type NoteReconciler struct {
 	client.Client
 	Clock      kube.Clock
@@ -33,10 +29,8 @@ type NoteReconciler struct {
 	Ledger     ledger.Service
 	Metrics    metrics.Recorder
 
-	// Observe selects read-only mode. BrakeCap is the destructive-write cap.
-	Observe  bool
-	BrakeCap int
-	// Platform and Landscape scope the ledger coordinate per instance.
+	Observe   bool
+	BrakeCap  int
 	Platform  string
 	Landscape string
 }
@@ -50,7 +44,6 @@ type NoteReconciler struct {
 // +kubebuilder:rbac:groups=authorization.k8s.io,resources=subjectaccessreviews,verbs=create
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;create;update
 
-// Reconcile drives a Note toward its desired state.
 func (r *NoteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Metrics.Tick(noteController)
 
@@ -115,8 +108,7 @@ func (r *NoteReconciler) converge(ctx context.Context, note *apiv1alpha1.Note) (
 		if dec.ConfirmAfter {
 			ref, cerr := r.confirmLedger(ctx, coord)
 			if cerr != nil {
-				// Writes already applied: publish the freshly applied count, not the
-				// stale pre-write status value, before flipping WaitingForEndpoint.
+				// Publish the freshly applied count, not the stale pre-write status.
 				note.Status.OwnedConfigMaps = dec.OwnedCount
 				return r.ledgerUnavailable(ctx, note, cerr)
 			}
@@ -152,8 +144,6 @@ func (r *NoteReconciler) confirmLedger(ctx context.Context, coord ledger.Coordin
 	return entry.Coordinate.Key(), nil
 }
 
-// ledgerUnavailable records a durable-ledger failure, flips WaitingForEndpoint,
-// and requeues.
 func (r *NoteReconciler) ledgerUnavailable(ctx context.Context, note *apiv1alpha1.Note, cause error) (ctrl.Result, error) {
 	r.Metrics.LedgerFailure(noteController)
 	r.publish(note, note.Status.OwnedConfigMaps,
@@ -209,7 +199,6 @@ func toOwned(cms []kube.OwnedConfigMap) []reconcile.Owned {
 	return out
 }
 
-// SetupWithManager registers the Note controller with the manager.
 func (r *NoteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1alpha1.Note{}).

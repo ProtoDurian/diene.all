@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# controller-gen emits a valid-but-weaker CRD when a required marker is absent — docs/domain/operator-conventions.md.
-
 types_dir="api/v1alpha1"
 controllers_dir="adapters/operator/controllers"
 crd_dir="infra/root_chart/templates/crds"
@@ -11,7 +9,7 @@ crd_dir="infra/root_chart/templates/crds"
 [ ! -d "${controllers_dir}" ] && echo "❌ operator marker lint: missing controllers directory ${controllers_dir}" >&2 && exit 1
 [ ! -d "${crd_dir}" ] && echo "❌ operator marker lint: missing CRD directory ${crd_dir}" >&2 && exit 1
 
-# Facts: type|<Kind>|<marker> · printcolumn|<Kind>|<column> · field|<Type>.<Field>|<marker> · rbac|<controller>|<marker>
+# One fact per line: type|printcolumn|field|rbac, then the subject and the marker.
 required="$(
   cat <<'EOF'
 type|Note|kubebuilder:object:root=true
@@ -58,7 +56,6 @@ EOF
 
 echo "🔎 extracting kubebuilder markers from ${types_dir} and ${controllers_dir}"
 
-# Each marker block counts only at the declaration it precedes, never file-wide.
 facts=""
 open='struct {'
 for file in "${types_dir}"/*_types.go; do
@@ -103,13 +100,11 @@ while IFS= read -r want; do
   ! grep -qxF "${want}" <<<"${facts}" && echo "❌ operator marker lint: required marker missing → ${want}" >&2 && exit 1
 done <<<"${required}"
 
-# The declared grants are the whole grant set, so an unlisted one is a silent privilege addition.
 while IFS= read -r got; do
   [ -z "${got}" ] && continue
   ! grep -qxF "${got}" <<<"${required}" && echo "❌ operator marker lint: RBAC marker outside the declared grant set → ${got}" >&2 && exit 1
 done <<<"$(grep '^rbac|' <<<"${facts}" || true)"
 
-# A newly served kind must arrive with its own requirement instead of inheriting silence.
 while IFS= read -r kind; do
   [ -z "${kind}" ] && continue
   ! grep -qxF "type|${kind}|kubebuilder:subresource:status" <<<"${required}" && echo "❌ operator marker lint: served kind ${kind} has no status-subresource requirement in this gate" >&2 && exit 1

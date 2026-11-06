@@ -1,13 +1,3 @@
-// Command archcheck enforces the positive thin-controller boundary: the
-// controllers package must delegate reconcile decisions to the pure
-// lib/operator/reconcile service, and must contain no inline business decision.
-//
-// "Inline business decision" is detected structurally (AST-aware), independent of
-// which packages are imported: any arithmetic or magnitude-comparison operator
-// (* / % < > <= >=) in the controllers package signals a decision that belongs in
-// the pure service. Equality/inequality guards (== !=) and boolean logic are
-// allowed. This catches a decision moved into the controller even when it uses
-// only standard-library or Kubernetes APIs and imports nothing new.
 package main
 
 import (
@@ -22,6 +12,7 @@ import (
 
 const controllersDir = "adapters/operator/controllers"
 
+// Arithmetic or magnitude comparison in controllers is a business decision; == and != are allowed.
 var forbidden = map[token.Token]string{
 	token.MUL: "*", token.QUO: "/", token.REM: "%",
 	token.LSS: "<", token.GTR: ">", token.LEQ: "<=", token.GEQ: ">=",
@@ -69,7 +60,6 @@ func run() error {
 							fset.Position(node.Pos()), op))
 				}
 			default:
-				// other node kinds are not boundary-relevant
 			}
 			return true
 		})

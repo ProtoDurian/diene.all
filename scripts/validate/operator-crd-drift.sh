@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Regeneration overwrites the working tree, so any remaining diff is real committed drift.
-
 crd_dir="infra/root_chart/templates/crds"
 
 echo "🔨 regenerating CRDs and deepcopy from ./api"

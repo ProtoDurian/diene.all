@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# A positive allowlist, not a wildcard rejection: an unlisted grant is a new privilege.
-
 committed="infra/root_chart/templates/rbac/role.yaml"
 [ ! -f "${committed}" ] && echo "❌ operator RBAC: missing committed Role at ${committed}" >&2 && exit 1
 
@@ -48,7 +46,6 @@ while IFS= read -r triple; do
   ! grep -qxF "${triple}" <<<"${allowed}" && echo "❌ operator RBAC: grant outside the least-privilege allowlist: ${triple}" >&2 && exit 1
 done <<<"${granted}"
 
-# The scraper identity owns /metrics, so the manager Role never needs a non-resource URL.
 nonresource="$(yq -r '.rules[] | select(.nonResourceURLs != null) | .nonResourceURLs[]' "${committed}" || true)"
 [ -n "${nonresource}" ] && echo "❌ operator RBAC: manager Role must not hold nonResourceURLs grants: ${nonresource}" >&2 && exit 1
 

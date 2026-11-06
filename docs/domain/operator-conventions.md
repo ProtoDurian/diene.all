@@ -1,7 +1,7 @@
 # Operator conventions
 
 The reusable operator skeleton restated in family conventions. Every dogfood
-consumer (`dependency-operator`/T3, `boron`, `logto-operator`, `error-portal`)
+consumer (`dependency-operator`, `boron`, `logto-operator`, `error-portal`)
 implements these conventions; it does not reinvent them. The toy `Note` and
 `Journal` controllers in this template exercise the generic subset end to end.
 

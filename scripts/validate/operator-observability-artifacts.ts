@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// Parse rendered YAML and embedded payloads so the presence proof cannot false-green on text matches.
 
 import { execFileSync, execSync } from 'node:child_process';
 
@@ -69,7 +68,6 @@ check(
   const rules: any[] = groups.flatMap(g => g?.spec?.rules ?? []);
   check(rules.length > 0, 'GrafanaAlertRuleGroup must declare rules');
 
-  // Every rule is a query (A, prometheus) + threshold expression (C, __expr__).
   for (const r of rules) {
     const uid = r?.uid ?? '(no uid)';
     check(r?.condition === 'C', `rule ${uid} must reference threshold condition C`);
@@ -128,7 +126,6 @@ check(
     'missing provisioning-duration alert (must be consumer-extension)',
   );
 
-  // Only the five pathological webhook states alert; owned is the healthy sixth state.
   for (const state of ['double-own', 'no-owner', 'misroute', 'dead-letter', 'lag']) {
     const wr = rules.find(r => r?.labels?.webhook_state === state);
     check(!!wr, `missing webhook alert for state ${state}`);
@@ -138,7 +135,6 @@ check(
         new RegExp(`operator_template_webhook_events_total\\{[^}]*state="${state}"`).test(exprOf(wr)),
         `webhook ${state} alert must query state="${state}"`,
       );
-      // Lag is a classified event rate, never a seconds budget.
       if (state === 'lag') {
         const ev = wr?.data?.[1]?.model?.conditions?.[0]?.evaluator;
         check(
