@@ -258,5 +258,10 @@
     "template": "diene/aseity",
     "name": "aseity-web-pwa",
     "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-admin-grant",
+    "class": "smoke"
   }
 ]

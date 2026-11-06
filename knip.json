@@ -6,14 +6,10 @@
     "src/index.ts",
     "cli/index.ts",
     "web/src/main.tsx",
-    "web/vite.config.ts"
+    "web/vite.config.ts",
+    "tests/support/e2e-worker.ts"
   ],
-  "project": [
-    "src/**/*.ts",
-    "tests/**/*.ts",
-    "cli/**/*.ts",
-    "web/**/*.{ts,tsx}"
-  ],
+  "project": ["src/**/*.ts", "tests/**/*.ts", "cli/**/*.ts", "web/**/*.{ts,tsx}"],
   "rules": {
     "devDependencies": "off"
   }

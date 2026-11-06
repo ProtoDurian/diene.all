@@ -11,6 +11,11 @@ includes:
     vars:
       MODE: int
       CONFIG: bunfig.int.toml
+  e2e:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: e2e
+      CONFIG: bunfig.e2e.toml
 
 tasks:
   setup:
@@ -29,7 +34,7 @@ tasks:
       - '[ -d node_modules ] && find node_modules -mindepth 1 -maxdepth 1 -exec rm -rf {} + || true'
 
   build:
-    desc: Build the Bun bundle to dist/
+    desc: Build the web app to dist/web and the Worker bundle to dist/worker
     cmds:
       - ./scripts/local/build.sh
 
@@ -49,10 +54,11 @@ tasks:
       - ./scripts/local/deadcode.sh
 
   test:
-    desc: Run unit and integration suites without coverage
+    desc: Run unit, integration and e2e suites without coverage
     cmds:
       - task: unit:default
       - task: int:default
+      - task: e2e:default
 
   test:unit:
     desc: Run the unit suite without coverage
@@ -69,11 +75,22 @@ tasks:
     cmds:
       - task: unit:coverage
       - task: int:coverage
+      - task: e2e:coverage
 
   test:unit:coverage:
     desc: Run the unit suite with coverage
     cmds:
       - task: unit:coverage
+
+  test:e2e:
+    desc: Run the e2e suite (local workerd, CLI binary) without coverage
+    cmds:
+      - task: e2e:default
+
+  test:e2e:coverage:
+    desc: Run the e2e suite with its ledger
+    cmds:
+      - task: e2e:coverage
 
   test:int:coverage:
     desc: Run the integration suite with coverage
@@ -86,12 +103,24 @@ tasks:
       - task: unit:watch
 
   run:
-    desc: Run the Bun source entry point
+    desc: Run the aseity CLI from source
     cmds:
-      - bun run ./src/index.ts -- {{.CLI_ARGS}}
+      - bun run ./cli/index.ts {{.CLI_ARGS}}
 
   preview:
-    desc: Build and run the bundled Bun artifact
-    deps: [build]
+    desc: Compile the aseity CLI and run the binary
+    deps: [compile]
     cmds:
-      - bun run ./dist/index.js -- {{.CLI_ARGS}}
+      - ./dist/bin/aseity {{.CLI_ARGS}}
+
+  dev:
+    desc: Start the local Postgres and MinIO stack, then the Worker on local workerd
+    cmds:
+      - docker compose -f compose.dev.yaml up -d --wait
+      - ./node_modules/.bin/vite build --config web/vite.config.ts
+      - wrangler dev
+
+  down:
+    desc: Stop the local Postgres and MinIO stack
+    cmds:
+      - docker compose -f compose.dev.yaml down

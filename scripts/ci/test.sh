@@ -2,7 +2,7 @@
 set -euo pipefail
 
 mode="${1:-}"
-[[ ${mode} != "unit" && ${mode} != "int" ]] && echo "❌ usage: $0 <unit|int>" >&2 && exit 2
+[[ ${mode} != "unit" && ${mode} != "int" && ${mode} != "e2e" ]] && echo "❌ usage: $0 <unit|int|e2e>" >&2 && exit 2
 
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
@@ -13,6 +13,7 @@ config="bunfig.${mode}.toml"
 report_dir="reports/unit"
 scope="src/lib/"
 [[ ${mode} == "int" ]] && report_dir="reports/integration" && scope="src/adapters/"
+[[ ${mode} == "e2e" ]] && report_dir="reports/e2e" && scope=""
 coverage_file="${report_dir}/lcov.info"
 
 echo "🧪 Running ${mode} tests with coverage..."
@@ -25,6 +26,9 @@ bun test --config="${config}" --coverage
   echo "❌ no coverage artifact at ${coverage_file}" >&2
   exit 1
 }
+# The e2e Worker runs in workerd, so its ledger only records the test process.
+[[ -z ${scope} ]] && echo "✅ e2e tests passed; ledger at ${coverage_file}" && exit 0
+
 sources="$(rg -N --replace '' '^SF:' "${coverage_file}" || true)"
 [[ -z ${sources} ]] && echo "❌ coverage ledger at ${coverage_file} names no source file" >&2 && exit 1
 outside="$(printf '%s\n' "${sources}" | rg -v "(^|/)${scope}" || true)"
