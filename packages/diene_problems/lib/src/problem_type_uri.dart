@@ -12,7 +12,7 @@ final class ErrorPortal {
     required this.module,
   });
 
-  /// `http` or `https`.
+  /// URI scheme, conventionally `https`.
   final ProblemTypeSegment scheme;
 
   /// A bare `host` or `host:port` serving the problem docs.
@@ -43,11 +43,11 @@ class InvalidProblemTypeSegmentError extends ArgumentError {
 /// Landscape, platform, service and module segments.
 final RegExp problemSegmentPattern = RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]*$');
 
-/// Wire problem ids: snake_case, at most 63 characters.
-final RegExp problemWireIdPattern = RegExp(r'^[a-z][a-z0-9_]{0,62}$');
+/// Wire problem ids: snake_case.
+final RegExp problemWireIdPattern = RegExp(r'^[a-z][a-z0-9_]*$');
 
-/// Contract versions: `v1`, `v2`, …
-final RegExp problemVersionPattern = RegExp(r'^v[1-9][0-9]*$');
+/// Contract versions: `v` and digits, e.g. `v1`.
+final RegExp problemVersionPattern = RegExp(r'^v[0-9]+$');
 
 final RegExp _hostForbidden = RegExp(r'[/\\\s@?#]');
 
@@ -65,9 +65,7 @@ String problemTypeUri({
   required ProblemTypeSegment version,
   required ProblemTypeSegment id,
 }) {
-  if (portal.scheme != 'http' && portal.scheme != 'https') {
-    throw InvalidProblemTypeSegmentError('scheme', portal.scheme);
-  }
+  _check('scheme', portal.scheme, problemSegmentPattern);
   final String host = portal.host;
   if (host.isEmpty ||
       _hostForbidden.hasMatch(host) ||

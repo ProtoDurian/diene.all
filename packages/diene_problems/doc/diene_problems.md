@@ -41,12 +41,11 @@ The coordinates come from an `ErrorPortal` config block. `version` is part of
 the problem's identity: bumping it mints a new problem type. The builder throws
 `InvalidProblemTypeSegmentError`, naming the bad segment, when:
 
-- `scheme` is not `http` or `https`;
 - `host` is not a bare canonical `host` or `host:port`;
-- a landscape, platform, service or module segment does not match
-  `^[A-Za-z0-9][A-Za-z0-9._-]*$`;
-- `version` does not match `^v[1-9][0-9]*$`;
-- `id` is not a snake_case wire id of at most 63 characters.
+- `scheme`, or a landscape, platform, service or module segment, does not
+  match `^[A-Za-z0-9][A-Za-z0-9._-]*$`;
+- `version` does not match `^v[0-9]+$`;
+- `id` does not match the wire id pattern `^[a-z][a-z0-9_]*$`.
 
 Registry, catalog, transformer, `LocalError` and the TestHelper builders all
 call it. Never format the string yourself.
@@ -105,6 +104,10 @@ Domain problems are declared by the service that owns them.
   would let two different rows share a name.
 - A problem without data publishes the schema `{"not":{}}`.
 - Problems are sorted by id. Every entry must have been built for this row.
+- The CR is stricter than the builder: it needs an `https` portal, DNS-1123
+  label identity fields, a version `v1`, `v2`, … of at most 63 characters and
+  a name of at most 253 characters. Any failure, including an entry the
+  builder rejects, throws `ProblemResourceError`.
 
 The service's chart renders this payload; erbium merges the resources and
 publishes the error portal at the edge. Clients, including the `flutter-base`

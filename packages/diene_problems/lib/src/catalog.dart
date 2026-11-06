@@ -73,6 +73,12 @@ const Set<String> _httpMethods = <String>{
 
 final RegExp _dnsLabel = RegExp(r'^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$');
 
+final RegExp _dnsSubdomain = RegExp(
+  r'^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$',
+);
+
+final RegExp _resourceVersion = RegExp(r'^v[1-9][0-9]{0,61}$');
+
 /// The cataloged problems of one service, keyed by id.
 final class ProblemCatalog {
   ProblemCatalog({required this.portal, List<CatalogEntry>? entries})
@@ -138,8 +144,19 @@ final class ProblemCatalog {
         throw ProblemResourceError('$field "$value" is not a DNS-1123 label');
       }
     });
-    if (!problemVersionPattern.hasMatch(version)) {
-      throw ProblemResourceError('version "$version" is not v<n>');
+    if (!_resourceVersion.hasMatch(version)) {
+      throw ProblemResourceError(
+        'version "$version" is not v1, v2, … within 63 characters',
+      );
+    }
+    final String name = <String>[
+      portal.service,
+      portal.module,
+      portal.landscape,
+      version,
+    ].join('.');
+    if (name.length > 253 || !_dnsSubdomain.hasMatch(name)) {
+      throw ProblemResourceError('name "$name" is not a DNS-1123 subdomain');
     }
     final List<CatalogEntry> sorted = _entries.values.toList()
       ..sort((CatalogEntry a, CatalogEntry b) => a.id.compareTo(b.id));
@@ -149,15 +166,7 @@ final class ProblemCatalog {
     return <String, Object?>{
       'apiVersion': 'atomi.cloud/v1alpha1',
       'kind': 'Problem',
-      'metadata': <String, Object?>{
-        'name': <String>[
-          portal.service,
-          portal.module,
-          portal.landscape,
-          version,
-        ].join('.'),
-        'namespace': portal.platform,
-      },
+      'metadata': <String, Object?>{'name': name, 'namespace': portal.platform},
       'spec': <String, Object?>{
         ...identity,
         'version': version,
@@ -169,11 +178,12 @@ final class ProblemCatalog {
   }
 
   void _checkEntry(CatalogEntry entry, String version) {
-    final String expected = problemTypeUri(
-      portal: portal,
-      version: version,
-      id: entry.id,
-    );
+    final String expected;
+    try {
+      expected = problemTypeUri(portal: portal, version: version, id: entry.id);
+    } on InvalidProblemTypeSegmentError catch (error) {
+      throw ProblemResourceError('problem ${entry.id}: ${error.message}');
+    }
     if (entry.typeUri != expected) {
       throw ProblemResourceError(
         'problem ${entry.typeUri} does not belong to the row $expected',

@@ -92,9 +92,9 @@ void main() {
       );
     });
 
-    test('rejects a scheme other than http or https', () {
+    test('rejects a scheme that is not a single segment', () {
       // Arrange
-      final ErrorPortal portal = _portal(scheme: 'ftp');
+      final ErrorPortal portal = _portal(scheme: 'ht tp');
 
       // Act
       void act() => _expectRejected('scheme', portal: portal);
@@ -141,9 +141,9 @@ void main() {
       portals.forEach(act);
     });
 
-    test('rejects a version outside v1, v2, …', () {
+    test('rejects a version that is not v and digits', () {
       // Arrange
-      const List<String> versions = <String>['', '1', 'V1', 'v', 'v0', 'v1.2'];
+      const List<String> versions = <String>['', '1', 'V1', 'v', 'v1.2'];
 
       // Act
       void act(String version) => _expectRejected('version', version: version);
@@ -152,7 +152,7 @@ void main() {
       versions.forEach(act);
     });
 
-    test('rejects a wire id that is not snake_case or is too long', () {
+    test('rejects a wire id that is not snake_case', () {
       // Arrange
       final List<String> ids = <String>[
         'entity-not-found',
@@ -160,7 +160,6 @@ void main() {
         '1entity',
         '_entity',
         'has/slash',
-        'a${'b' * 63}',
       ];
 
       // Act
@@ -168,7 +167,32 @@ void main() {
 
       // Assert
       ids.forEach(act);
-      expect(problemWireIdPattern.hasMatch('a${'b' * 62}'), isTrue);
+    });
+
+    test('accepts every input the 0.1.1 builder accepted', () {
+      // Arrange
+      final String longId = 'a${'b' * 80}';
+
+      // Act
+      final List<String> uris = <String>[
+        problemTypeUri(
+          portal: _portal(scheme: 'ftp'),
+          version: 'v1',
+          id: 'x',
+        ),
+        problemTypeUri(portal: _portal(), version: 'v0', id: 'x'),
+        problemTypeUri(portal: _portal(), version: 'v01', id: 'x'),
+        problemTypeUri(portal: _portal(), version: 'v1', id: longId),
+      ];
+
+      // Assert
+      expect(
+        uris[0],
+        startsWith('ftp://docs.raichu.cluster.atomi.cloud/docs/'),
+      );
+      expect(uris[1], endsWith('/v0/x'));
+      expect(uris[2], endsWith('/v01/x'));
+      expect(uris[3], endsWith('/v1/$longId'));
     });
   });
 }

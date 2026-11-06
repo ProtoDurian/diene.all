@@ -204,6 +204,87 @@ void main() {
       );
     });
 
+    test('refuses builder inputs a Problem CR cannot carry', () {
+      // Arrange
+      final ProblemCatalog ftp = ProblemCatalog(
+        portal: _portalWith(scheme: 'ftp'),
+      );
+      final ProblemCatalog https = ProblemCatalog(portal: _portal);
+
+      // Act
+      void act(ProblemCatalog catalog, String version) => expect(
+        () => catalog.toProblemResource(version: version),
+        throwsA(isA<ProblemResourceError>()),
+        reason: '${catalog.portal.scheme} $version',
+      );
+
+      // Assert
+      act(ftp, 'v1');
+      act(https, 'v01');
+      act(https, 'v${'1' * 300}');
+    });
+
+    test('refuses a resource name longer than 253 characters', () {
+      // Arrange
+      final String label = 'a' * 63;
+      final ProblemCatalog catalog = ProblemCatalog(
+        portal: ErrorPortal(
+          scheme: 'https',
+          host: 'errors.atomi.cloud',
+          landscape: label,
+          platform: 'nitroso',
+          service: label,
+          module: label,
+        ),
+      );
+
+      // Act
+      void act() => catalog.toProblemResource(version: 'v${'1' * 62}');
+
+      // Assert
+      expect(
+        act,
+        throwsA(
+          isA<ProblemResourceError>().having(
+            (ProblemResourceError error) => error.message,
+            'message',
+            contains('DNS-1123 subdomain'),
+          ),
+        ),
+      );
+    });
+
+    test('reports a direct entry the builder rejects as a CR error', () {
+      // Arrange
+      final ProblemCatalog catalog = ProblemCatalog(
+        portal: _portal,
+        entries: <CatalogEntry>[
+          const CatalogEntry(
+            id: 'Bad',
+            typeUri: '$_base/v1/Bad',
+            title: 'Bad',
+            status: 400,
+            recoverable: false,
+          ),
+        ],
+      );
+
+      // Act
+      void act() => catalog.toProblemResource(version: 'v1');
+
+      // Assert
+      expect(
+        act,
+        throwsA(
+          isA<ProblemResourceError>().having(
+            (ProblemResourceError error) => error.message,
+            'message',
+            contains('problem Bad'),
+          ),
+        ),
+      );
+    });
+
     test('refuses an entry built for another row', () {
       // Arrange
       final ProblemCatalog catalog = ProblemCatalog(portal: _portal)

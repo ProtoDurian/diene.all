@@ -18,14 +18,15 @@ Breaking changes:
   list, a `message` and an optional `code`.
 - `entity_not_found` and `conflict` data are now `{ entityType, id }`, both
   required strings.
-- `problemTypeUri` accepts only the `http` and `https` schemes, versions from
-  `v1` up (`v0` is rejected) and wire ids of at most 63 characters.
-- `r14WireId` is removed; wire ids are snake_case everywhere.
-- The generated release projection (`package:diene_problems/c0_problem.dart`,
-  `c0ProblemContract` and its types) is removed. Conformance is now checked by
-  local fixtures in the package's own test suite.
-- `ProblemMatcherError` messages for `data` now compare nested maps by key
-  presence as well as value.
+- `r14WireId` is removed. It rewrote kebab-case ids to snake_case for old
+  sample data; every wire id is now snake_case, so nothing needs rewriting.
+- The library `package:diene_problems/c0_problem.dart` is removed, with
+  `c0ProblemContract` and the types `C0ProblemContract`,
+  `C0ProblemReleaseProvenance` and `C0ProblemSourcePin`. They were a generated
+  copy of an external fixture release; the package's own test suite now checks
+  conformance against pinned copies of those fixtures.
+- `expectProblem` now treats a `data` key that is missing as different from a
+  key that holds `null`.
 
 Added:
 
@@ -33,8 +34,10 @@ Added:
   platform, service, module, landscape and version row, named
   `{service}.{module}.{landscape}.{version}` with dots, with its problems sorted
   by id. It throws `ProblemResourceError` for a non-https portal, a field that
-  is not a DNS-1123 label, a bad version, an entry built for another row, or an
-  invalid or repeated endpoint.
+  is not a DNS-1123 label, a version other than `v1`, `v2`, … (at most 63
+  characters), a name longer than 253 characters, an entry the type-URI builder
+  rejects or that was built for another row, or an invalid or repeated
+  endpoint. `problemTypeUri` itself still accepts every input 0.1.1 accepted.
 - `noProblemDataSchema`, the schema published for a data-less problem.
 - `expectProblem(..., noData: true)` asserts a problem carries no data.
 - The package moves to the `ProtoDurian/diene.dart_problems` repository.
