@@ -11,6 +11,9 @@ describe('SafePath.safeJoin', () => {
     { root: '/srv/app', segments: [], expected: '/srv/app' },
     { root: '/srv/app', segments: ['/srv/app/inner'], expected: '/srv/app/inner' },
     { root: '/', segments: ['etc', 'hosts'], expected: '/etc/hosts' },
+    { root: '/', segments: [], expected: '/' },
+    { root: '/', segments: ['/etc/hosts'], expected: '/etc/hosts' },
+    { root: '/srv/app', segments: ['', 'a', ''], expected: '/srv/app/a' },
   ])('should join $segments beneath $root', async ({ root, segments, expected }) => {
     // Arrange
     const safePath = new SafePath();
@@ -29,6 +32,11 @@ describe('SafePath.safeJoin', () => {
     { label: 'a parent traversal', root: '/srv/app', segments: ['..', 'etc'], message: /beneath root/ },
     { label: 'a sibling-prefix escape', root: '/srv/app', segments: ['../app-other'], message: /beneath root/ },
     { label: 'an absolute escape', root: '/srv/app', segments: ['/etc/passwd'], message: /beneath root/ },
+    { label: 'a parent traversal under /', root: '/', segments: ['..'], message: /beneath root/ },
+    { label: 'a nested traversal under /', root: '/', segments: ['a/../..'], message: /beneath root/ },
+    { label: 'an absolute traversal under /', root: '/', segments: ['/..'], message: /beneath root/ },
+    { label: 'a traversal after an empty segment', root: '/srv/app', segments: ['', '..'], message: /beneath root/ },
+    { label: 'a re-entering traversal', root: '/srv/app', segments: ['..', 'app', 'x'], message: /beneath root/ },
     { label: 'a NUL segment', root: '/srv/app', segments: ['a\0b'], message: /NUL-free/ },
   ])('should return a vfs invalid-input Err for $label', async ({ root, segments, message }) => {
     // Arrange
