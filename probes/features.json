@@ -246,21 +246,6 @@
   },
   {
     "template": "diene/bun-lib",
-    "name": "publish-tag-policy",
-    "class": "gate"
-  },
-  {
-    "template": "diene/bun-lib",
-    "name": "publish-credential-policy",
-    "class": "gate"
-  },
-  {
-    "template": "diene/bun-lib",
-    "name": "publish-command-policy",
-    "class": "gate"
-  },
-  {
-    "template": "diene/bun-lib",
     "name": "package-metadata",
     "class": "gate"
   },
