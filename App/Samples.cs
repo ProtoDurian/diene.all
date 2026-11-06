@@ -1,6 +1,6 @@
 using AtomiCloud.Diene.Results;
 
-namespace AtomiCloud.Diene.Results.App;
+namespace AtomiCloud.DotnetBase.App;
 
 /// <summary>
 /// Exercises the full published surface of <c>AtomiCloud.Diene.Result</c> as an

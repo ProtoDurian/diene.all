@@ -1,11 +1,9 @@
 using AtomiCloud.Diene.Results;
 
-namespace AtomiCloud.Diene.Results.App;
+namespace AtomiCloud.DotnetBase.App;
 
-/// <summary>Minimal consumer demonstrating railway composition.</summary>
 public static class Program
 {
-    /// <summary>Runs the sample.</summary>
     public static void Main()
     {
         Samples.RunAll();

@@ -1,9 +1,9 @@
 using System.Text.Json;
 using AtomiCloud.Diene.Results;
-using AtomiCloud.Diene.Results.App;
+using AtomiCloud.DotnetBase.App;
 using FluentAssertions;
 
-namespace AtomiCloud.Diene.Results.IntTest;
+namespace AtomiCloud.DotnetBase.IntTest;
 
 public class C0Fixture_RoundTrip
 {

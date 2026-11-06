@@ -22,7 +22,6 @@ const ASSERTION_FLIPS: Replacement[] = [
   { find: /\.toEqual\(true\)/, replace: '.toEqual(false)' },
   { find: /\.toBeTruthy\(\)/, replace: '.toBeFalsy()' },
   { find: /\.Should\(\)\.BeTrue\(\)/, replace: '.Should().BeFalse()' },
-  { find: /\.Should\(\)\.Be\(/, replace: '.Should().NotBe(' },
   { find: /\bAssert\.True\(/, replace: 'Assert.False(' },
   { find: /\brequire\.True\(t,/, replace: 'require.False(t,' },
   { find: /\bassert\.True\(t,/, replace: 'assert.False(t,' },
@@ -153,6 +152,23 @@ export async function plantSecret(
   if (options?.staged) {
     await expectSuccess(repo, `git add -- ${shellQuote(path)}`);
   }
+  return { path };
+}
+
+export async function staleHelmDocs(repo: ProbeRepo, options?: { globs?: string[] }): Promise<MutationResult> {
+  const candidates = await uniquePaths(
+    repo,
+    options?.globs ?? ['infra/**/values.yaml', 'charts/**/values.yaml', 'values.yaml'],
+  );
+  if (candidates.length === 0) {
+    throw new Error('no Helm values file found for a stale helm-docs mutation');
+  }
+  const path = candidates[0];
+  const source = await repo.read(path);
+  await repo.write(
+    path,
+    `${source.trimEnd()}\n\n# -- Probe-only value that makes generated Helm docs stale.\nprobeHelmDocsStale: true\n`,
+  );
   return { path };
 }
 

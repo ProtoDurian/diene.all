@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-./scripts/ci/setup.sh
-
 version="$(xmlstarlet sel -t -v '/Project/PropertyGroup/Version' Version.props)"
 artifacts="artifacts/package"
 
@@ -29,7 +27,7 @@ printf '%s\n' \
   '' \
   'var result = Result.Ok<int, string>(42);' \
   'result.Should().BeOk(42);' >"${scratch}/Program.cs"
-dotnet restore "${scratch}" --source "$(pwd)/${artifacts}" >/dev/null
+dotnet restore "${scratch}" --source "$(pwd)/${artifacts}" --packages "${scratch}/packages" >/dev/null
 dotnet build "${scratch}" -c Release --no-restore >/dev/null
 
 echo "✅ Package validation and scratch consumption passed"

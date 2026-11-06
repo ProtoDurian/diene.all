@@ -2,7 +2,7 @@ using AtomiCloud.Diene.Results;
 using AtomiCloud.Diene.Results.TestHelper;
 using FluentAssertions;
 
-namespace AtomiCloud.Diene.Results.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 public class AsyncTests
 {

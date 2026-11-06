@@ -1,4 +1,4 @@
-import { expectGreen } from './lib/helpers.ts';
+import { expectGreen } from './lib/dotnet.ts';
 
 export default {
   contractVersion: 1,
@@ -11,7 +11,7 @@ export default {
       async run(repo: any) {
         await expectGreen(
           repo,
-          'nix develop .#default -c pls preview | rg -F "Success: 42"',
+          'nix develop .#default -c task preview | rg -F "Success: 42"',
           'dotnet-base-probe-preview',
         );
       },

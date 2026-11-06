@@ -27,13 +27,11 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
-  <!-- ### dotnet-lib-package-metadata -->
-  <!-- #### source: dotnet-lib -->
   <PropertyGroup>
     <Authors>AtomiCloud</Authors>
     <Company>AtomiCloud</Company>
-    <RepositoryUrl>https://github.com/AtomiCloud/diene.dotnet-result</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/AtomiCloud/diene.dotnet-result</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ProtoDurian/diene.dotnet-result</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/ProtoDurian/diene.dotnet-result</PackageProjectUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIcon>logo.png</PackageIcon>

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <RootNamespace>AtomiCloud.Diene.Results.IntTest</RootNamespace>
+    <RootNamespace>AtomiCloud.DotnetBase.IntTest</RootNamespace>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>

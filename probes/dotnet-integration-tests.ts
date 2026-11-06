@@ -1,4 +1,4 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRed } from './lib/dotnet.ts';
 
 export default {
   contractVersion: 1,
@@ -9,7 +9,7 @@ export default {
       description: 'The source-owned versioned C0 fixture round-trips through the shipped codecs.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, 'nix develop .#ci -c pls test:int', 'dotnet-integration-tests', 600000);
+        await expectGreen(repo, 'nix develop .#ci -c task test:int', 'dotnet-integration-tests', 600000);
       },
     },
     {
@@ -22,7 +22,7 @@ export default {
           find: '    "ok": ["ok", 42],',
           replace: '    "ok": ["ok", 43],',
         });
-        await expectRed(repo, 'nix develop .#ci -c pls test:int', 'dotnet-integration-tests', 600000);
+        await expectRed(repo, 'nix develop .#ci -c task test:int', 'dotnet-integration-tests', 600000);
       },
     },
   ],

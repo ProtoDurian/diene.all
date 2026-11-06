@@ -3,7 +3,7 @@ using AtomiCloud.Diene.Results.TestHelper;
 using FluentAssertions;
 using FluentAssertions.Execution;
 
-namespace AtomiCloud.Diene.Results.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 public class ResultTests
 {
