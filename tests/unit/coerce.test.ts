@@ -57,16 +57,26 @@ describe('ScalarCoercer.coerceAs', () => {
     { raw: '7', kind: 'array', expected: '7' },
     { raw: '7', kind: 'object', expected: '7' },
     { raw: '7', kind: 'unknown', expected: 7 },
-    { raw: '', kind: 'string', expected: undefined },
   ] as const)('should coerce "$raw" for a $kind target to $expected', ({ raw, kind, expected }) => {
     // Arrange
     const input = raw;
 
     // Act
-    const actual = coercer.coerceAs(input, kind);
+    const actual: unknown = coercer.coerceAs(input, kind);
 
     // Assert
-    should(actual).equal(expected);
+    (actual as object).should.equal(expected);
+  });
+
+  it('should treat a blank value as unset for a string target', () => {
+    // Arrange
+    const raw = '';
+
+    // Act
+    const actual = coercer.coerceAs(raw, 'string');
+
+    // Assert
+    should(actual).be.undefined();
   });
 });
 
@@ -92,10 +102,10 @@ describe('ScalarCoercer.coerce', () => {
     const input = raw;
 
     // Act
-    const actual = coercer.coerce(input);
+    const actual: unknown = coercer.coerce(input);
 
     // Assert
-    should(actual).equal(expected);
+    (actual as object).should.equal(expected);
   });
 
   it('should treat a blank value as unset', () => {
