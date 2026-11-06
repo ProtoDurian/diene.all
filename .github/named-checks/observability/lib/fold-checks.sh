@@ -112,20 +112,24 @@ mode_of() {
   git ls-tree "$1" -- "$2" | cut -d' ' -f1
 }
 
-# one line per hunk: the old line before it, the old line after it, then its -/+ lines
+# one line per hunk: up to 3 non-blank old lines before it, the same after it, then its -/+ lines
 hunks_of() {
-  awk 'NR == FNR { old[FNR] = $0; next }
+  awk 'function near(i, step, out, k) {
+      for (k = 0; i >= 1 && i <= lines && k < 3; i += step) if (old[i] ~ /[^[:space:]]/) { out = out old[i] "\035"; k++ }
+      return out
+    }
+    NR == FNR { old[FNR] = $0; lines = FNR; next }
     /^@@ / {
       if (n++) print rec
       split($2, a, ","); start = substr(a[1], 2) + 0; count = (2 in a) ? a[2] + 0 : 1
-      rec = old[count ? start - 1 : start] "\036" old[count ? start + count : start + 1] "\036"
+      rec = near(count ? start - 1 : start, -1) "\036" near(count ? start + count : start + 1, 1) "\036"
       next
     }
     n { rec = rec $0 "\037" }
     END { if (n) print rec }' <(git show "$1:$3") <(git -c core.quotePath=false diff --no-renames -U0 "$1" "$2" -- "$3")
 }
 
-# same hunks in the same order, each still next to the line it was next to in the payload
+# same hunks in the same order, each still next to the lines it was next to in the payload
 same_hunks() {
   local -a want got
   local i wb wa wl gb ga gl
