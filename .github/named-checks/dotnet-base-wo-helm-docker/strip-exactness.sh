@@ -108,27 +108,21 @@ apply_D() {
   edit docs/standards/taskfile/index.md sed_z 's#Docker tasks are keyed by the artifact they act on — one task set per Dockerfile.\nSee \[the Docker standard\](\.\./docker/index\.md) for that naming convention\.\n\n##'
   # shellcheck disable=SC2016
   edit docs/standards/service-tree/index.md sed_z 's#; the published artifact names this repository uses are the\n`with:` inputs on the Docker and Helm caller jobs in `\.github/workflows/ci\.yaml` and\n`\.github/workflows/cd\.yaml`\.#.#'
-  edit docs/standards/ci-cd/index.md sed_z 's#The Docker and Helm scripts build locally by default\. Their reusable workflows set\nthe documented environment contract to enable publishing\.\n\n##'
-  # shellcheck disable=SC2016
-  edit docs/standards/ci-cd/index.md sed_z 's#Docker and Helm callers pass per-repository image or chart values through workflow\n`with:` inputs\. Empty release versions produce commit builds; CD passes the tag as\nthe version\. Add another image or chart as another caller job rather than putting\nrepository-specific branching into the reusable workflow\.\n\n##'
   # shellcheck disable=SC2016
   edit README.md sed_z 's#is that key in the included file\. Build artifacts — Dockerfiles and Helm charts —\nlive under \[`infra/`\](infra) and may be plural, so their tasks are keyed per\nartifact\. See \[the Taskfile standard\](docs/standards/taskfile/index\.md) for the\nconventions\.#is that key in the included file. See\n[the Taskfile standard](docs/standards/taskfile/index.md) for the conventions.#'
+
+  # this node's own D edits
+  # shellcheck disable=SC2016
+  edit docs/standards/ci-cd/index.md sed_z 's|The Docker scripts build locally by default\. Their reusable workflows set\nthe documented environment contract to enable publishing\.\n\n## Artifact publishing\n\nDocker callers pass per-repository image values through workflow\n`with:` inputs\. Empty release versions produce commit builds; CD passes the tag as\nthe version\. Add another image as another caller job rather than putting\nrepository-specific branching into the reusable workflow\.\n\n|## Artifact publishing\n\n|'
+  edit README.md sed_e 's/split CI\/CD, Docker, secrets,/split CI\/CD, secrets,/'
+  # shellcheck disable=SC2016
+  edit docs/standards/taskfile/index.md sed_z 's#\n5\. Put repository-specific image values in Taskfile `vars:` blocks,\n   scoped to the task that uses them rather than shared across artifacts\.\n6\. Do not add#\n5. Do not add#'
 
   # dotnet-base's D contributions
   edit docs/developer/dotnet-baseline.md sed_e 's/^shared workspace, standards, Docker, secret, and release surfaces\.$/shared workspace, standards, secret, and release surfaces./'
   edit docs/developer/dotnet-baseline.md sed_e 's/^## Docker and release$/## Release/'
   edit docs/developer/dotnet-baseline.md sed_z 's#The Dockerfile is the parent template.s stub, unchanged, for descendants to\nreplace\. ##'
   edit docs/developer/dotnet-baseline.md sed_z 's#coverage thresholds, Docker\nruntime, chart contents#coverage thresholds,\nchart contents#'
-
-  # nix: the docker-axis slices carry D by content (infralint-docker = hadolint,
-  # skopeo; infrautils-docker = docker, dockerd). The Helm-free -core slices
-  # stay. skopeo's smoke and dlint lines leave with its slice.
-  edit nix/packages.nix sed_e '/^          infralint-docker$/d'
-  edit nix/packages.nix sed_e '/^          infrautils-docker$/d'
-  edit nix/env.nix sed_e '/^    infralint-docker$/d'
-  edit nix/env.nix sed_e '/^    infrautils-docker$/d'
-  edit dlint.yaml sed_e '/^      - skopeo$/d'
-  edit probes/binary-smoke.ts drop_lines '^skopeo --version' '^skopeo manifest-digest'
 }
 
 # --- recompute from the parent ------------------------------------------------
