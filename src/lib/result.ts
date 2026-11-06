@@ -4,22 +4,32 @@ import { KOption } from './option.js';
 
 type ResultSerial<T, E> = ['ok', T] | ['err', E];
 
-const settledSerials = new WeakMap<object, ResultSerial<unknown, unknown>>();
+const Settled = {
+  serials: new WeakMap<object, ResultSerial<unknown, unknown>>(),
 
-function settle<T, X>(serial: ResultSerial<T, X>): Result<T, X> {
-  const result = new KResult<T, X>(Promise.resolve(serial));
-  settledSerials.set(result, serial);
-  return result;
-}
+  of<T, X>(serial: ResultSerial<T, X>): Result<T, X> {
+    const result = new KResult<T, X>(Promise.resolve(serial));
+    Settled.serials.set(result, serial);
+    return result;
+  },
 
-// A throwing `then` getter takes the async path so it still yields a rejected Result.
-function isThenable<V>(v: V | PromiseLike<V>): v is PromiseLike<V> {
-  try {
-    return typeof (v as { then?: unknown } | null | undefined)?.then === 'function';
-  } catch {
-    return true;
-  }
-}
+  has(result: object): boolean {
+    return Settled.serials.has(result);
+  },
+
+  get<T, X>(result: object): ResultSerial<T, X> {
+    return Settled.serials.get(result) as ResultSerial<T, X>;
+  },
+
+  // A throwing `then` getter takes the async path so it still yields a rejected Result.
+  isThenable<V>(v: V | PromiseLike<V>): v is PromiseLike<V> {
+    try {
+      return typeof (v as { then?: unknown } | null | undefined)?.then === 'function';
+    } catch {
+      return true;
+    }
+  },
+};
 
 // Creates a new instance of `Result` as the `err` variant.
 /**
@@ -28,8 +38,8 @@ function isThenable<V>(v: V | PromiseLike<V>): v is PromiseLike<V> {
  * @returns {Result<T,X>} - new instance of `Result` as the `err` variant
  */
 function Err<T, X>(error: X | Promise<X>): Result<T, X> {
-  if (!isThenable(error)) {
-    return settle<T, X>(['err', error]);
+  if (!Settled.isThenable(error)) {
+    return Settled.of<T, X>(['err', error]);
   }
   return new KResult<T, X>(
     (async () => {
@@ -46,8 +56,8 @@ function Err<T, X>(error: X | Promise<X>): Result<T, X> {
  * @returns {Result<T,X>} - new instance of `Result` as the `ok` variant
  */
 function Ok<T, X = never>(val: T | Promise<T>): Result<T, X> {
-  if (!isThenable(val)) {
-    return settle<T, X>(['ok', val]);
+  if (!Settled.isThenable(val)) {
+    return Settled.of<T, X>(['ok', val]);
   }
   return new KResult<T, X>(
     (async () => {
@@ -81,8 +91,8 @@ const Res = {
    * @return {Result<T,E>} - new instance of `Result` by deserializing the serial format
    */
   fromSerial<T, E>(a: ResultSerial<T, E> | Promise<ResultSerial<T, E>>): Result<T, E> {
-    if (!isThenable(a)) {
-      return settle<T, E>(a);
+    if (!Settled.isThenable(a)) {
+      return Settled.of<T, E>(a);
     }
     const p = Promise.resolve(a) satisfies Promise<ResultSerial<T, E>>;
     return new KResult<T, E>(p);
@@ -299,10 +309,10 @@ class KResult<T, X> implements Result<T, X> {
   }
 
   private sync(): ResultSerial<T, X> {
-    if (!settledSerials.has(this)) {
+    if (!Settled.has(this)) {
       throw new UnwrapError('Failed to inspect synchronously', 'result', 'Expected settled got pending');
     }
-    return settledSerials.get(this) as ResultSerial<T, X>;
+    return Settled.get<T, X>(this);
   }
 
   isOkSync(): boolean {
