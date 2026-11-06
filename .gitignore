@@ -1,6 +1,3 @@
-### helm
-infra/root_chart/uploads/
-
 ### nix-init
 .direnv
 .pre-commit-config.yaml

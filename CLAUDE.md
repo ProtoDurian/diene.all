@@ -58,10 +58,6 @@ See **[docs/standards/nix/index.md](docs/standards/nix/index.md)** for the full 
 - Formatters and pre-commit hooks
 - Adding registries
 
-# Helm charts and publishing
-
-See [docs/standards/helm/index.md](docs/standards/helm/index.md).
-
 # Infisical and secrets
 
 See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).

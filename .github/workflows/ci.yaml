@@ -27,14 +27,3 @@ jobs:
       contents: read
     uses: ./.github/workflows/⚡reusable-named-checks.yaml
     secrets: inherit
-
-  helm:
-    name: Helm Chart
-    permissions:
-      contents: read
-      id-token: write
-      packages: write
-    uses: ./.github/workflows/⚡reusable-helm.yaml
-    secrets: inherit
-    with:
-      chart_path: ./infra/root_chart
