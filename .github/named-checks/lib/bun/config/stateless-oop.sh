@@ -1,84 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# src/ is stateless OOP + DI: outside class bodies, interfaces and type aliases
-# no arrow or function expression appears anywhere at module level.
+# src/ is stateless OOP + DI: every function, arrow and method body lives inside
+# a class body (parsed with TypeScript, so types never count).
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"
 mapfile -t files < <(git ls-tree -r --name-only "${tree}" -- src | grep -E '\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$' || true)
 [[ ${#files[@]} -gt 0 ]] || { echo "❌ no sources under src/" >&2 && exit 1; }
+[[ -d node_modules/typescript ]] || bun install --frozen-lockfile --ignore-scripts >/dev/null 2>&1 || { echo "❌ cannot install the TypeScript parser" >&2 && exit 1; }
 
 failed=0
 for path in "${files[@]}"; do
   # shellcheck disable=SC2016
-  report="$(git show "${tree}:${path}" | bun -e '
-    const src = await Bun.stdin.text();
-    // Blank comments, strings, templates and regexes in place so offsets and lines survive.
-    const code = src.split("");
-    const blank = (from, to) => { for (let k = from; k < to; k++) if (code[k] !== "\n") code[k] = " "; };
-    const regexBefore = /[(,=:[!&|?{};+\-*%<>~^]$|\b(return|typeof|case|do|else|in|of|void|yield|await)$/;
-    let i = 0;
-    while (i < src.length) {
-      const c = src[i], n = src[i + 1], start = i;
-      if (c === "/" && n === "/") { while (i < src.length && src[i] !== "\n") i++; blank(start, i); continue; }
-      if (c === "/" && n === "*") { i = src.indexOf("*/", i + 2); i = i < 0 ? src.length : i + 2; blank(start, i); continue; }
-      if (c === "\x27" || c === "\"") {
-        for (i++; i < src.length && src[i] !== c; i++) if (src[i] === "\\") i++;
-        i++; blank(start + 1, i - 1); continue;
-      }
-      if (c === "`") {
-        let from = i + 1;
-        for (i++; i < src.length && src[i] !== "`"; i++) {
-          if (src[i] === "\\") { i++; continue; }
-          if (src[i] === "$" && src[i + 1] === "{") {
-            blank(from, i);
-            for (let depth = 0; i < src.length; i++) { if (src[i] === "{") depth++; else if (src[i] === "}" && --depth === 0) break; }
-            from = i + 1;
-          }
-        }
-        blank(from, i); i++; continue;
-      }
-      if (c === "/" && regexBefore.test(code.slice(Math.max(0, i - 200), i).join("").trimEnd())) {
-        for (i++; i < src.length && src[i] !== "/" && src[i] !== "\n"; i++) {
-          if (src[i] === "\\") i++;
-          else if (src[i] === "[") { while (i < src.length && src[i] !== "]") { if (src[i] === "\\") i++; i++; } }
-        }
-        i++; blank(start + 1, i - 1); continue;
-      }
-      i++;
-    }
-    const text = code.join("");
-    const out = text.split("");
-    const lineOf = at => text.slice(0, at).split("\n").length;
-    const matchBrace = at => {
-      let depth = 0;
-      for (let k = at; k < text.length; k++) {
-        if (text[k] === "{") depth++;
-        else if (text[k] === "}" && --depth === 0) return k;
-      }
-      return text.length - 1;
+  report="$(git show "${tree}:${path}" | FILE="${path}" bun -e '
+    const ts = require(`${process.cwd()}/node_modules/typescript`);
+    const file = process.env.FILE;
+    const sf = ts.createSourceFile(file, await Bun.stdin.text(), ts.ScriptTarget.Latest, true, /x$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const kind = n => ts.isArrowFunction(n) ? "arrow" : ts.isFunctionExpression(n) || ts.isFunctionDeclaration(n) ? "function"
+      : ts.isMethodDeclaration(n) || ts.isGetAccessorDeclaration(n) || ts.isSetAccessorDeclaration(n) ? "method" : undefined;
+    const visit = n => {
+      if (ts.isClassLike(n)) { ts.forEachChild(n, child => ts.isClassElement(child) ? undefined : visit(child)); return; }
+      const k = kind(n);
+      if (k) console.log(`${sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1}:${k}`);
+      ts.forEachChild(n, visit);
     };
-    const wipe = (from, to) => { for (let k = from; k <= to; k++) if (out[k] !== "\n") out[k] = " "; };
-    // Class bodies hold the methods; interfaces and type aliases hold only types.
-    for (const m of text.matchAll(/(?<![.\w$])(?:class|interface)(?![\w$])(?!\s*[(<])[^{;(]*\{/g)) {
-      const open = m.index + m[0].length - 1;
-      if (out[open] === "{") wipe(open, matchBrace(open));
-    }
-    for (const m of text.matchAll(/(^|[\s;}])(?:export\s+)?(?:declare\s+)?type\s+[A-Za-z_$][\w$]*(?=\s*[<=])/g)) {
-      let depth = 0, k = m.index + m[0].length;
-      for (; k < text.length; k++) {
-        const c = text[k];
-        if ("([{<".includes(c)) depth++;
-        else if (")]}".includes(c) || (c === ">" && text[k - 1] !== "=")) depth--;
-        else if (c === ";" && depth <= 0) break;
-      }
-      wipe(m.index + m[0].length, k);
-    }
-    const rest = out.join("");
-    for (const m of rest.matchAll(/=>|\bfunction\b/g)) console.log(`${lineOf(m.index)}:${m[0] === "=>" ? "arrow" : "function"}`);
-    for (const m of rest.matchAll(/\)\s*(?::[^{;=]*)?\{/g)) console.log(`${lineOf(m.index)}:method`);
+    visit(sf);
   ')"
   if [[ -n ${report} ]]; then
     while IFS=: read -r line name; do echo "❌ ${path}:${line}: free ${name} outside a class body" >&2; done <<<"${report}"

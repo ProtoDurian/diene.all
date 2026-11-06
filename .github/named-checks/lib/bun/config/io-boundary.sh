@@ -11,6 +11,7 @@ cd "$(git rev-parse --show-toplevel)"
 tree="$(git write-tree)"
 mapfile -t files < <(git ls-tree -r --name-only "${tree}" -- src)
 [[ ${#files[@]} -gt 0 ]] || { echo "❌ no sources under src/" >&2 && exit 1; }
+[[ -d node_modules/typescript ]] || bun install --frozen-lockfile --ignore-scripts >/dev/null 2>&1 || { echo "❌ cannot install the TypeScript parser" >&2 && exit 1; }
 
 failed=0
 for path in "${files[@]}"; do
@@ -30,62 +31,74 @@ for path in "${files[@]}"; do
   fi
   # shellcheck disable=SC2016
   report="$(git show "${tree}:${path}" | ALLOWED="${allowed}" ALLOW_GLOBAL="${allow_global}" FILE="${path}" bun -e '
-    const scan = src => {
-    const strings = [];
-    let out = "", i = 0, prev = "";
-    const regexBefore = /[(,=:[!&|?{};+\-*%<>~^]$|\b(return|typeof|case|do|else|in|of|void|yield|await)$/;
-    const readString = q => {
-      let s = "";
-      for (i++; i < src.length && src[i] !== q; i++) s += src[i] === "\\" ? src[i] + src[++i] : src[i];
-      i++;
-      return s;
-    };
-    while (i < src.length) {
-      const c = src[i], n = src[i + 1];
-      if (c === "/" && n === "/") { while (i < src.length && src[i] !== "\n") i++; continue; }
-      if (c === "/" && n === "*") { i = src.indexOf("*/", i + 2); i = i < 0 ? src.length : i + 2; continue; }
-      if (c === "\x27" || c === "\"") { strings.push(readString(c)); out += `"S${strings.length - 1}"`; prev = "\""; continue; }
-      if (c === "`") {
-        let s = "", dynamic = false;
-        for (i++; i < src.length && src[i] !== "`"; i++) {
-          if (src[i] === "\\") { s += src[i] + src[++i]; continue; }
-          if (src[i] === "$" && src[i + 1] === "{") { dynamic = true; let depth = 0; for (; i < src.length; i++) { if (src[i] === "{") depth++; if (src[i] === "}" && --depth === 0) break; out += src[i] === "$" ? " " : src[i] === "{" ? " " : src[i]; } continue; }
-          s += src[i];
-        }
-        i++;
-        if (dynamic) { out += " T "; } else { strings.push(s); out += `"S${strings.length - 1}"`; }
-        prev = "\"";
-        continue;
-      }
-      if (c === "/" && regexBefore.test(out.trimEnd())) {
-        for (i++; i < src.length && src[i] !== "/"; i++) { if (src[i] === "\\") i++; else if (src[i] === "[") { while (i < src.length && src[i] !== "]") { if (src[i] === "\\") i++; i++; } } }
-        for (i++; /[a-z]/.test(src[i] ?? ""); i++);
-        out += " R ";
-        continue;
-      }
-      out += c; i++;
-    }
-    return { out, strings };
-    };
-    const raw = await Bun.stdin.text();
-    let { out, strings } = scan(raw);
-    const allowed = new RegExp(process.env.ALLOWED);
-    const specifier = /(?:\bfrom|\bimport|\bimport\s*\(|\brequire\s*\()\s*"S(\d+)"/g;
-    for (const m of out.matchAll(specifier)) if (!allowed.test(strings[+m[1]])) console.log(`import ${strings[+m[1]]}`);
+    const ts = require(`${process.cwd()}/node_modules/typescript`);
     const { dirname, join } = require("node:path/posix");
-    for (const m of out.matchAll(specifier)) {
-      const spec = strings[+m[1]];
-      if (/^\.{1,2}\//.test(spec) && !process.env.FILE.startsWith("src/adapters/") && process.env.FILE !== "src/index.ts" && (/^src\/adapters(\/|$)/.test(join(dirname(process.env.FILE), spec)) || /^src(\/index(\.[jt]s)?)?\/?$/.test(join(dirname(process.env.FILE), spec)))) console.log(`import ${spec} (the domain reaches into src/adapters/ or the root barrel)`);
-    }
-    for (const m of out.matchAll(/\b(import|require)\s*\(\s*(?!"S\d+"\s*\))/g)) console.log(`non-literal ${m[1]}()`);
-    // Types are stripped first, so every Date or Function left is a value.
-    ({ out, strings } = scan(new Bun.Transpiler({ loader: "ts", trimUnusedImports: false }).transformSync(raw)));
-    for (const m of out.matchAll(/\bimport\s*\.\s*meta\b|\bMath\s*\.\s*random\b|(?<![.\w$])Function(?![\w$])(?!\s*\.\s*prototype\s*\[\s*Symbol\s*\.\s*hasInstance\s*\])|\.\s*constructor\b/g)) console.log(`global ${m[0].replace(/\s+/g, "")}`);
-    for (const m of out.matchAll(/"S(\d+)"/g)) if (strings[+m[1]] === "constructor") console.log("global constructor (by string key)");
-    for (const m of out.matchAll(/(?<![.\w$])Date(?![\w$])/g)) if (!/\binstanceof\s*$/.test(out.slice(0, m.index))) console.log("global Date");
-    const globals = /(?<![.\w$])(process|Bun|Deno|globalThis|global|window|self|console|Buffer|fetch|require|module|exports|__dirname|__filename|setInterval|setTimeout|setImmediate|queueMicrotask|eval|crypto|Reflect|performance|navigator|XMLHttpRequest|WebSocket)(?![\w$])(?!\s*:)/g;
-    const allowGlobal = new RegExp(process.env.ALLOW_GLOBAL);
-    for (const m of out.matchAll(globals)) if (!allowGlobal.test(m[1])) console.log(`global ${m[1]}`);
+    const file = process.env.FILE;
+    const sf = ts.createSourceFile(file, await Bun.stdin.text(), ts.ScriptTarget.Latest, true, /x$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const allowed = new RegExp(process.env.ALLOWED), allowGlobal = new RegExp(process.env.ALLOW_GLOBAL);
+    const S = ts.SyntaxKind;
+    const GLOBALS = new Set(["process", "Bun", "Deno", "globalThis", "global", "window", "self", "console", "Buffer", "fetch", "require", "module", "exports", "__dirname", "__filename", "setInterval", "setTimeout", "setImmediate", "queueMicrotask", "eval", "crypto", "Reflect", "performance", "navigator", "XMLHttpRequest", "WebSocket", "Date", "Function", "Math"]);
+    const FORBIDDEN_KEYS = new Set(["constructor", "__proto__"]);
+    const say = line => console.log(line);
+    const importOf = spec => {
+      if (!allowed.test(spec)) say(`import ${spec}`);
+      const target = join(dirname(file), spec);
+      if (/^\.{1,2}\//.test(spec) && !file.startsWith("src/adapters/") && file !== "src/index.ts" && (/^src\/adapters(\/|$)/.test(target) || /^src(\/index(\.[jt]s)?)?\/?$/.test(target))) say(`import ${spec} (the domain reaches into src/adapters/ or the root barrel)`);
+    };
+    const constant = e => {
+      while (e && (ts.isParenthesizedExpression(e) || ts.isAsExpression(e) || ts.isNonNullExpression(e) || ts.isTypeAssertionExpression(e) || ts.isSatisfiesExpression(e))) e = e.expression;
+      if (!e) return undefined;
+      if (ts.isStringLiteralLike(e) || ts.isNumericLiteral(e)) return e.text;
+      if (ts.isBinaryExpression(e) && e.operatorToken.kind === S.PlusToken) {
+        const a = constant(e.left), b = constant(e.right);
+        return a === undefined || b === undefined ? undefined : a + b;
+      }
+      if (ts.isTemplateExpression(e)) {
+        let text = e.head.text;
+        for (const span of e.templateSpans) { const v = constant(span.expression); if (v === undefined) return undefined; text += v + span.literal.text; }
+        return text;
+      }
+      return undefined;
+    };
+    const inType = n => {
+      for (let p = n.parent; p; p = p.parent) {
+        if (ts.isExpressionWithTypeArguments(p)) return !(p.parent.token === S.ExtendsKeyword && ts.isClassLike(p.parent.parent));
+        if (ts.isTypeNode(p) || ts.isInterfaceDeclaration(p) || ts.isTypeAliasDeclaration(p)) return true;
+      }
+      return false;
+    };
+    const named = n => {
+      const p = n.parent;
+      if ((ts.isPropertyAccessExpression(p) || ts.isQualifiedName(p)) && (p.name ?? p.right) === n) return true;
+      if ((ts.isImportSpecifier(p) || ts.isExportSpecifier(p) || ts.isBindingElement(p)) && p.propertyName === n) return true;
+      if (ts.isLabeledStatement(p) || ts.isBreakOrContinueStatement(p)) return true;
+      return p.name === n && !ts.isShorthandPropertyAssignment(p);
+    };
+    const hasInstanceOfFunction = n => {
+      const proto = n.parent, access = proto.parent, key = access && access.argumentExpression;
+      return ts.isPropertyAccessExpression(proto) && proto.name.text === "prototype" && ts.isElementAccessExpression(access) && ts.isPropertyAccessExpression(key) && key.expression.getText() === "Symbol" && key.name.text === "hasInstance";
+    };
+    const visit = n => {
+      if (ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) { if (n.moduleSpecifier && ts.isStringLiteralLike(n.moduleSpecifier)) importOf(n.moduleSpecifier.text); }
+      else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference)) { const e = n.moduleReference.expression; if (ts.isStringLiteralLike(e)) importOf(e.text); else say("non-literal require()"); }
+      else if (ts.isCallExpression(n) && (n.expression.kind === S.ImportKeyword || (ts.isIdentifier(n.expression) && n.expression.text === "require"))) {
+        const kind = n.expression.kind === S.ImportKeyword ? "import" : "require";
+        const arg = n.arguments[0];
+        if (arg && ts.isStringLiteralLike(arg)) importOf(arg.text); else say(`non-literal ${kind}()`);
+      }
+      else if (ts.isMetaProperty(n) && n.keywordToken === S.ImportKeyword) say("global import.meta");
+      else if (ts.isPropertyAccessExpression(n) && n.name.text === "constructor") say("global .constructor");
+      else if (ts.isIdentifier(n) && GLOBALS.has(n.text) && !named(n) && !inType(n)) {
+        const p = n.parent;
+        if (n.text === "Date") { if (!(ts.isBinaryExpression(p) && p.operatorToken.kind === S.InstanceOfKeyword && p.right === n)) say("global Date"); }
+        else if (n.text === "Function") { if (!hasInstanceOfFunction(n)) say("global Function"); }
+        else if (n.text === "Math") { if (!(ts.isPropertyAccessExpression(p) && p.expression === n)) say("global Math"); else if (p.name.text === "random") say("global Math.random"); }
+        else if (!allowGlobal.test(n.text)) say(`global ${n.text}`);
+      }
+      if ((ts.isStringLiteralLike(n) || ts.isBinaryExpression(n) || ts.isTemplateExpression(n)) && FORBIDDEN_KEYS.has(constant(n)) && !ts.isImportDeclaration(n.parent)) say("global constructor (by string key)");
+      ts.forEachChild(n, visit);
+    };
+    visit(sf);
   ')"
   if [[ -n ${report} ]]; then
     while read -r line; do echo "❌ ${path}: ${line}" >&2; done <<<"$(sort -u <<<"${report}")"
