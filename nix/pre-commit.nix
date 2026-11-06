@@ -76,6 +76,21 @@ pre-commit-lib.run {
       language = "system";
     };
 
+    a-rule-ids = {
+      enable = true;
+      name = "Corpus rule IDs";
+      entry = "${pkgs.gawk}/bin/awk -f scripts/ci/rule-ids.awk";
+      types = [ "text" ];
+      excludes = [
+        "^\\.claude/skills/vendor/"
+        "^\\.github/named-checks/"
+        "^\\.ratchet/"
+        "^tests/fixtures/rule-ids/"
+      ];
+      pass_filenames = true;
+      language = "system";
+    };
+
     a-skills-sync = {
       enable = true;
       name = "Vendored skills";

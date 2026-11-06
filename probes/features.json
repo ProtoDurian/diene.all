@@ -173,5 +173,10 @@
     "template": "diene/shared",
     "name": "thin-skills",
     "class": "presence"
+  },
+  {
+    "template": "diene/shared",
+    "name": "rule-ids",
+    "class": "gate"
   }
 ]
