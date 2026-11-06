@@ -10,7 +10,7 @@ set -euo pipefail
 # LEDGER — read this section to review the strip. It is workspace's own D
 # ledger (.github/named-checks/workspace/removal-points.sh apply_D, plus its
 # D+H set edits: H is already gone, so infra/ and cd.yaml carry only D) and the
-# D contributions bun-base adds on top of it.
+# D contributions bun-base adds on top of it, then this node's own D edits.
 
 # --- whole paths removed ------------------------------------------------------
 D_PATHS=(
@@ -109,22 +109,19 @@ apply_D() {
   edit docs/standards/service-tree/index.md sed_z 's#; the published artifact names this repository uses are the\n`with:` inputs on the Docker and Helm caller jobs in `\.github/workflows/ci\.yaml` and\n`\.github/workflows/cd\.yaml`\.#.#'
   # shellcheck disable=SC2016
   edit README.md sed_z 's#is that key in the included file\. Build artifacts — Dockerfiles and Helm charts —\nlive under \[`infra/`\](infra) and may be plural, so their tasks are keyed per\nartifact\. See \[the Taskfile standard\](docs/standards/taskfile/index\.md) for the\nconventions\.#is that key in the included file. See\n[the Taskfile standard](docs/standards/taskfile/index.md) for the conventions.#'
+
+  # this node's own D edits
   # shellcheck disable=SC2016
-  edit docs/standards/ci-cd/index.md sed_z 's|The Docker and Helm scripts build locally by default\. Their reusable workflows set\nthe documented environment contract to enable publishing\.\n\n## Artifact publishing\n\nDocker and Helm callers pass per-repository image or chart values through workflow\n`with:` inputs\. Empty release versions produce commit builds; CD passes the tag as\nthe version\. Add another image or chart as another caller job rather than putting\nrepository-specific branching into the reusable workflow\.\n\n|## Artifact publishing\n\n|'
+  edit docs/standards/ci-cd/index.md sed_z 's|The Docker scripts build locally by default\. Their reusable workflows set\nthe documented environment contract to enable publishing\.\n\n## Artifact publishing\n\nDocker callers pass per-repository image values through workflow\n`with:` inputs\. Empty release versions produce commit builds; CD passes the tag as\nthe version\. Add another image as another caller job rather than putting\nrepository-specific branching into the reusable workflow\.\n\n|## Artifact publishing\n\n|'
+  edit README.md sed_e 's/split CI\/CD, Docker, secrets,/split CI\/CD, secrets,/'
+  # shellcheck disable=SC2016
+  edit docs/standards/taskfile/index.md sed_z 's#\n5\. Put repository-specific image values in Taskfile `vars:` blocks,\n   scoped to the task that uses them rather than shared across artifacts\.\n6\. Do not add#\n5. Do not add#'
 
   # bun-base's D contributions
   # shellcheck disable=SC2016
   edit docs/developer/bun-baseline.md sed_e '/^- `task docker:build` and `task docker:run` build and run the Bun image\.$/d;s/^- Integration tests and Docker image builds require a Docker runtime\.$/- Integration tests require a Docker runtime./;s/^- Unit, integration, build, and Docker are separate CI jobs\.$/- Unit, integration, and build are separate CI jobs./'
   # shellcheck disable=SC2016
   edit docs/developer/bun-baseline.md sed_z 's#The local build and CI build share `scripts/local/build\.sh`\. The Dockerfile\nuses version-pinned `oven/bun` build and runtime stages, installs from the\nfrozen lockfile, bundles the sample, and runs as the unprivileged `bun` user\.\nThe sample#The local build and CI build share `scripts/local/build.sh`.\nThe sample#;s#coverage thresholds, the\nDocker entry point, badges, and the fenced#coverage thresholds,\nbadges, and the fenced#'
-
-  # nix: the docker-axis slices carry D by content (infralint-docker = hadolint,
-  # skopeo; infrautils-docker = docker, dockerd). The Helm-free -core slices
-  # stay. skopeo's smoke and dlint lines leave with its slice.
-  edit nix/packages.nix sed_e '/^          infralint-docker$/d;/^          infrautils-docker$/d'
-  edit nix/env.nix sed_e '/^    infralint-docker$/d;/^    infrautils-docker$/d'
-  edit dlint.yaml sed_e '/^      - skopeo$/d'
-  edit probes/binary-smoke.ts drop_lines '^skopeo --version' '^skopeo manifest-digest'
 }
 
 # --- recompute from the parent ------------------------------------------------
