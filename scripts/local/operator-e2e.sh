@@ -77,7 +77,7 @@ spec:
     spec:
       containers:
         - name: minio
-          image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+          image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
           args: ["server", "/data"]
           env:
             - { name: MINIO_ROOT_USER, value: minioadmin }

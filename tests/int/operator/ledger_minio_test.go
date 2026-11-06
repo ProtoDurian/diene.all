@@ -20,7 +20,7 @@ func startMinio(t *testing.T) *minio.Client {
 	ctx := context.Background()
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
-			Image:        "minio/minio:RELEASE.2024-01-16T16-07-38Z",
+			Image:        "pgsty/minio:RELEASE.2026-08-04T00-00-00Z",
 			Cmd:          []string{"server", "/data"},
 			Env:          map[string]string{"MINIO_ROOT_USER": "minioadmin", "MINIO_ROOT_PASSWORD": "minioadmin"},
 			ExposedPorts: []string{"9000/tcp"},
