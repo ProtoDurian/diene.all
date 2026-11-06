@@ -14,6 +14,10 @@ tiers=".config/bun-base.coverage.yaml"
 tests="$(yq ".tiers.${tier}.tests // \"\"" "${tiers}")"
 scope="$(yq ".tiers.${tier}.scope // \"\"" "${tiers}")"
 [[ -z ${tests} ]] && echo "❌ ${tiers} gives tier ${tier} no tests folder" >&2 && exit 2
+[[ "$(yq ".tiers.${tier} | has(\"scope\")" "${tiers}")" == "true" ]] || {
+  echo "❌ ${tiers} gives tier ${tier} no scope; use '' to opt out of coverage" >&2
+  exit 2
+}
 
 config="bunfig.${tier}.toml"
 report_dir="reports/${tier}"
