@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The delta from go-base .3 is shared .3..observability .3 byte-for-byte; only this dir is extra.
-
 here="$(dirname "$0")"
 own_dir='.github/named-checks/go-base-w-observability/'
 
