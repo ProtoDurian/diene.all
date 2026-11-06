@@ -3,10 +3,10 @@ set -euo pipefail
 
 # The inherited strip state still holds: nothing of D (docker) or H (helm)
 # survives — no axis path, no reference to one, no axis job, include, hook,
-# Dependabot entry, dlint smoke or probe row. Absence is proved by files; helm
-# on PATH from the whole infralint bundle is fine. dotnet-lib re-adds cd.yaml
-# for its NuGet publish job only, so cd.yaml is checked for axis jobs instead
-# of absence.
+# Dependabot entry, dlint smoke, probe row or publishing prose. Absence is
+# proved by files; helm on PATH from the whole infralint bundle is fine.
+# dotnet-lib re-adds cd.yaml for its NuGet publish job only, so cd.yaml is
+# checked for axis jobs instead of absence.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -84,6 +84,9 @@ done
 [[ "$(show probes/features.json | jq '[.[] | select(.name | test("docker|helm"))] | length')" == 0 ]] || fail "features.json still has a docker/helm row"
 if show CLAUDE.md | grep -Eqi '^# (docker|helm)'; then fail "CLAUDE.md still has a Docker/Helm section"; fi
 if show probes/binary-smoke.ts | grep -Eq '^(docker|dockerd|hadolint|helm|helm-docs|helmlint) '; then fail "binary-smoke.ts still smokes a D/H binary"; fi
+if git grep -n -i -E 'helm|image or chart|Docker (scripts|callers)' "${tree}" -- docs/standards/ci-cd/index.md; then fail "ci-cd publishing prose still names Docker or Helm"; fi
+if git grep -n -E 'image (and chart )?values' "${tree}" -- docs/standards/taskfile/index.md; then fail "taskfile rule 5 still names images or charts"; fi
+if git grep -n -E 'CI/CD, Docker, (Helm, )?secrets' "${tree}" -- README.md; then fail "README.md still lists Docker or Helm"; fi
 
 # --- the many-owner files the strip edited still parse and lint ---------------------
 # Reads the working tree on purpose: these tools take paths, and CI checks out HEAD.
@@ -102,4 +105,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ stripped-axis-absence: no D/H path, reference, entry or smoke line; cd.yaml is publish-only; edited files valid"
+echo "✅ stripped-axis-absence: no D/H path, reference, entry, smoke line or prose; cd.yaml is publish-only; edited files valid"
