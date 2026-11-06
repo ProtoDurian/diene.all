@@ -81,6 +81,11 @@ See [docs/standards/semantic-release/index.md](docs/standards/semantic-release/i
 
 Follow the linked standard before changing its surface.
 
+# Result and Option
+
+See [docs/standards/result/index.md](docs/standards/result/index.md) before
+changing the monad surface, wire format, TestHelper assertions, or meta tier.
+
 # Service-tree identity
 
 See [docs/standards/service-tree/index.md](docs/standards/service-tree/index.md).

@@ -16,17 +16,18 @@ export default {
     },
     {
       name: 'mutation-bun-deadcode-caught',
-      description: 'An unused exported library member turns the repository Knip hook red.',
+      description: 'An unused library module or exported member turns the repository Knip hook red.',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
         const entrySource = await repo.read('src/index.ts');
-        const path = (await repo.glob('src/lib/**/*.ts')).sort().find((candidate: string) => {
+        const internal = (await repo.glob('src/lib/**/*.ts')).sort().find((candidate: string) => {
           const modulePath = `./${candidate.replace(/^src\//, '').replace(/\.ts$/, '')}`;
-          return !entrySource.includes(`export * from '${modulePath}'`);
+          return !['', '.js'].some(ext => entrySource.includes(`export * from '${modulePath}${ext}'`));
         });
-        if (!path) throw new Error('no internal TypeScript library source found');
-        await repo.write(path, `${await repo.read(path)}\nexport const probeDead = 1;\n`);
+        const path = internal ?? 'src/lib/__probe_dead__.ts';
+        const prior = internal ? await repo.read(path) : '';
+        await repo.write(path, `${prior}\nexport const probeDead = 1;\n`);
         await expectBunRed(repo, command, 'bun-deadcode');
       },
     },
