@@ -227,6 +227,20 @@ void main() {
       expect(() => okWire.add(1), throwsUnsupportedError);
     });
 
+    test('serial keeps a null returned by the payload encoder', () {
+      // Arrange
+      const Result<int> ok = Result<int>.ok(21);
+      const Option<int> some = Option<int>.some(21);
+
+      // Act
+      final ResultSerial okWire = ok.serial(encodeOk: (int _) => null);
+      final OptionSerial someWire = some.serial(encodeSome: (int _) => null);
+
+      // Assert
+      expect(okWire, <Object?>['ok', null]);
+      expect(someWire, <Object?>['some', null]);
+    });
+
     test('malformed Result wire values fail before decoding payloads', () {
       // Arrange
       final List<ResultSerial> malformed = <ResultSerial>[

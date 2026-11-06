@@ -98,7 +98,7 @@ sealed class Option<T> {
       switch (this) {
         Some<T>(:final value) => taggedWire(
           'some',
-          encodeSome?.call(value) ?? value,
+          encodeSome == null ? value : encodeSome(value),
         ),
         None<T>() => taggedWire('none', null),
       };

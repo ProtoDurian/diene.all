@@ -136,7 +136,10 @@ sealed class Result<T> {
   };
 
   ResultSerial serial({Object? Function(T value)? encodeOk}) => switch (this) {
-    Ok<T>(:final value) => taggedWire('ok', encodeOk?.call(value) ?? value),
+    Ok<T>(:final value) => taggedWire(
+      'ok',
+      encodeOk == null ? value : encodeOk(value),
+    ),
     Err<T>(:final problem) => taggedWire('err', problem.toJson()),
   };
 }
