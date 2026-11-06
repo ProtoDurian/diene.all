@@ -36,66 +36,57 @@ describe('UserService', () => {
 });
 ```
 
-## Assertions (should)
+## Arrange / Act / Assert
+
+House convention: every test body is up to three blocks, each opened by its
+marker comment and separated by a blank line. Leave out a block that would be
+empty, together with its marker.
 
 ```typescript
-import should from 'should';
+it('should compose a namespaced key', () => {
+  // Arrange
+  const subject = new KeyComposer('Bun Base');
 
-// Equality
-actual.should.equal(expected); // strict equality
-actual.should.deepEqual(expected); // deep equality
+  // Act
+  const actual = subject.compose('Sample Key');
 
-// Boolean
-result.should.be.true();
-result.should.be.false();
+  // Assert
+  actual.should.equal('bun-base:sample-key');
+});
+```
 
-// Null/undefined
-should(value).be.null();
-should(value).be.undefined();
-value.should.not.be.undefined();
+## Assertions (should)
 
-// Truthiness
+Prototype form everywhere: the value first, then `.should`. `should(value)` is
+only for `null` and `undefined`, which have no prototype.
+
+| Check            | Write                                                     | Never                                 |
+| ---------------- | --------------------------------------------------------- | ------------------------------------- |
+| strict equality  | `actual.should.equal(expected)`                           | `should(actual).equal(expected)`      |
+| deep equality    | `actual.should.deepEqual(expected)`                       | `should(actual).eql(expected)`        |
+| boolean          | `result.should.be.true()`                                 | `should(result).be.true()`            |
+| defined          | `value.should.not.be.undefined()`                         | `should(value).not.be.undefined()`    |
+| null / undefined | `should(value).be.null()`, `should(value).be.undefined()` | `value.should.be.null()`              |
+| throws           | `act.should.throw(ErrorType)`                             | `should(act).throw(ErrorType)`        |
+| rejects          | `await promise.should.be.rejectedWith(ErrorType)`         | `await should(promise).be.rejected()` |
+
+Import `'should'` for its side effect; import the default only when a test
+calls `should(...)`:
+
+```typescript
+import 'should'; // prototype assertions only
+import should from 'should'; // also asserts null or undefined
+```
+
+More prototype assertions:
+
+```typescript
 value.should.be.ok(); // truthy
-value.should.not.be.ok(); // falsy
-
-// Numbers
-count.should.be.above(5);
-count.should.be.below(10);
 count.should.be.within(1, 10);
-
-// Strings
 text.should.containEql('substring');
-text.should.startWith('prefix');
-text.should.endWith('suffix');
-
-// Arrays
 items.should.have.length(3);
-items.should.containEql('item');
-items.should.be.an.Array();
-
-// Objects
-obj.should.have.property('key');
 obj.should.have.property('key', 'value');
-
-// Types
 value.should.be.a.String();
-value.should.be.a.Number();
-value.should.be.an.Object();
-value.should.be.an.Array();
-value.should.be.a.Function();
-
-// Errors
-should(() => fn()).throw();
-should(() => fn()).throw('message');
-should(() => fn()).throw(Error);
-
-// Async
-await promise.should.be.resolved();
-await promise.should.be.resolvedWith(value);
-await promise.should.be.rejected();
-await promise.should.be.rejectedWith(Error);
-
-// Negation
 actual.should.not.equal(other);
 ```
 
@@ -103,7 +94,7 @@ actual.should.not.equal(other);
 
 ```typescript
 import { describe, it } from 'bun:test';
-import should from 'should';
+import 'should';
 
 describe('StatusFormatter', () => {
   it.each([
@@ -111,8 +102,13 @@ describe('StatusFormatter', () => {
     { input: 'running', expected: 'Running' },
     { input: 'completed', expected: 'Completed' },
   ])('should format status "$input" as "$expected"', async ({ input, expected }) => {
+    // Arrange
     const subject = new StatusFormatter();
+
+    // Act
     const actual = subject.format(input);
+
+    // Assert
     actual.should.equal(expected);
   });
 });
@@ -187,11 +183,14 @@ function repoContractTests(name: string, createRepo: () => ITaskRepository) {
     });
 
     it('should save and retrieve by id', async () => {
+      // Arrange
       const input = createTestTask();
 
+      // Act
       await subject.save(input);
       const actual = await subject.findById(input.id);
 
+      // Assert
       should(actual).not.be.null();
       actual!.name.should.equal(input.name);
     });

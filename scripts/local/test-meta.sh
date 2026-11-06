@@ -9,7 +9,7 @@ coverage_mode="${2:-}"
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
-[[ ${coverage_mode} == "coverage" ]] && rm -rf coverage/meta
+[[ ${coverage_mode} == "coverage" ]] && rm -rf reports/meta
 
 helper_source="$(find src/test-helper -type f -name '*.ts' -print -quit 2>/dev/null || true)"
 meta_test="$(find tests/meta -type f -name '*.test.ts' -print -quit 2>/dev/null || true)"

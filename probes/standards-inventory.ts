@@ -1,9 +1,4 @@
-// The ten language-agnostic topics this node owns. Parent-owned tooling
-// standards are deliberately absent: their skill names do not track their
-// directory names, and asserting them here would be a topology check.
-// `authorization` left this node with the .NET layer that is its only user, and
-// the contributor-doc segment was removed outright, so neither is asserted here
-// any more — see the shared forward review.
+// Parent-owned tooling standards are deliberately absent.
 export const topics = [
   'datetime',
   'domain-driven-design',
