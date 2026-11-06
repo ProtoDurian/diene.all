@@ -19,7 +19,6 @@
 .markdownlint.json
 .prettierrc.yaml
 atomi_release.yaml
-codecov.yml
 flake.lock
 flake.nix
 Taskfile.yaml

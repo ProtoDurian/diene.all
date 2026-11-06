@@ -7,9 +7,6 @@ on:
         description: Test mode to run (unit or meta)
         required: true
         type: string
-    secrets:
-      CODECOV_TOKEN:
-        required: false
 
 jobs:
   test:
@@ -32,13 +29,3 @@ jobs:
           name: coverage-${{ inputs.mode }}
           path: reports/${{ inputs.mode }}
           if-no-files-found: warn
-      - name: Upload ${{ inputs.mode }} coverage to Codecov
-        if: always() && hashFiles(format('reports/{0}/lcov.info', inputs.mode)) != ''
-        continue-on-error: true
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
-        with:
-          files: reports/${{ inputs.mode }}/lcov.info
-          flags: ${{ inputs.mode }}
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-          disable_search: true
