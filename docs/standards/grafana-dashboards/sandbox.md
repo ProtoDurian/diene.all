@@ -1,124 +1,96 @@
-# Grafana Dashboard Sandbox & Verification Reference
+# Dashboard Sandbox
 
-Everything needed to run the self-verification loop locally. Copy these files into a
-scratch directory (not the repo) unless the project already has a `sandbox/` setup.
+A local Grafana, image renderer and Prometheus, so you can render a dashboard with synthetic data and look at it before merge. Rules for what to check: [Grafana Dashboards](/docs/standards/grafana-dashboards/index.md#visual-checklist).
 
-All CLI tools used here (`jq`, `dashboard-linter`, `promtool`, `docker`) come from the
-repo's **nix dev shell** — add missing ones to `flake.nix` (see the `nix` skill).
-Never instruct or perform ad-hoc installs.
+## What it checks, and what it does not
 
-## 1. Sandbox: docker compose
+- **Metrics only.** The sandbox has Prometheus, but no log store (Loki) or trace store (Tempo). Log and trace panels show "No data" or a datasource error here; they are the [`UNVERIFIED`](/docs/standards/grafana-dashboards/index.md#log-and-trace-panels) ones.
+- **No folders.** Dashboards land in Grafana's General folder. The service folder (`<platform>-<service>-folder`, see [Shipping](/docs/standards/observability/shipping.md)) is checked after deploy.
+- **One sandbox at a time.** Ports 3000 (Grafana) and 9090 (Prometheus) are fixed.
+- **Alert condition.** It also proves the chart's alert condition fires on a value-0 series ([Check the alert condition](#check-the-alert-condition)).
 
-`compose.yaml`:
+## Tools
 
-```yaml
-services:
-  grafana:
-    image: grafana/grafana:12.1.0
-    ports: ['3000:3000']
-    environment:
-      GF_AUTH_ANONYMOUS_ENABLED: 'true'
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
-      GF_RENDERING_SERVER_URL: http://renderer:8081/render
-      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
-    volumes:
-      - ./provisioning:/etc/grafana/provisioning
-      - ./dashboards:/var/lib/grafana/dashboards
-  renderer:
-    image: grafana/grafana-image-renderer:latest
-    environment:
-      AUTH_TOKEN: '-'
-  prometheus:
-    image: prom/prometheus:latest
-    ports: ['9090:9090']
-    volumes:
-      - ./prom-data:/prometheus
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-```
+Every tool comes from this repo's nix shell. Run `command -v jq curl file awk sed docker dashboard-linter promtool`; that is the check: each must print a `/nix/store/…` path. In `nix/env.nix`, `dashboard-linter` is in the `lint` group, `promtool` comes from `prometheus.cli` in the `dev` group (default shell), and the rest are expected from atomiutils and infrautils: tool bundles from the nix registry this repo's `flake.nix` uses (input `atomipkgs`); `command -v <tool>` shows which bundle a tool comes from. If `command -v` prints nothing or a non-`/nix/store` path, add the tool to `nix/packages.nix`. The Docker CLI comes from infrautils; the Docker daemon comes from your Docker install (`CLAUDE.md`, Prerequisites) and must be running.
 
-`provisioning/datasources/datasources.yaml`:
+## Files
 
-```yaml
-apiVersion: 1
-datasources:
-  - name: Prometheus
-    uid: prometheus # match the datasource uid your dashboard queries
-    type: prometheus
-    access: proxy
-    url: http://prometheus:9090
-    isDefault: true
-  - name: TestData
-    uid: testdata # layout prototyping only — cannot run PromQL
-    type: grafana-testdata-datasource
-    access: proxy
-```
+Everything lives in `.claude/skills/grafana-dashboards/sandbox/`:
 
-`provisioning/dashboards/default.yaml`:
+| File                     | What it is                                                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `compose.yaml`           | The three containers, pinned by digest, bound to `127.0.0.1` only                                                   |
+| `provisioning/`          | Adds the Prometheus datasource (uid `prometheus`), loads `dashboards/` and the alert-condition rules in `alerting/` |
+| `generate-metrics.awk`   | Writes 6 hours of synthetic metrics for two landscapes, with an incident, from the list at its top                  |
+| `dashboards/sample.json` | A small fixture dashboard that passes strict lint and renders with that data                                        |
+| `dashboards/.lint`       | Example `dashboard-linter` exclusions, each with a reason                                                           |
 
-```yaml
-apiVersion: 1
-providers:
-  - name: local
-    type: file
-    options:
-      path: /var/lib/grafana/dashboards
-      foldersFromFilesStructure: true
-```
+For your own dashboard, write one line per metric and label set its queries use to `$sb/rows.txt`, in the format of the list at the top of `generate-metrics.awk` (type, name, labels, normal value, incident value), including error series and values near your thresholds, so threshold colors show. Pass it with `-v rows=`, and pass your platform, service and module, as your queries select them, with `-v identity=`; if your queries still say `{service}`, set `service=sandbox` (the `sed` line below puts `sandbox` there).
 
-Copy the JSONs from `observability/dashboards/` into `./dashboards/` — file provisioning
-reloads every ~10s, so edit → save → re-render is the whole iteration loop.
+## Run it
 
-## 2. Synthetic data (so panels render with real lines, not "No data")
-
-TestData cannot execute PromQL, so backfill Prometheus with OpenMetrics series that
-match the dashboard's metric names:
+First pass step 1 of [Check it before merge](/docs/standards/grafana-dashboards/index.md#check-it-before-merge). Then, from the repo root:
 
 ```bash
-# generate synthetic series (bun script or shell loop) → openmetrics.txt, e.g.:
-# http_requests_total{service="checkout",status="200"} 1027 1719999000
-# http_requests_total{service="checkout",status="500"} 3 1719999000
-# ... one sample per series per 15-60s step, covering now-6h → now, ending with # EOF
+dashboard=observability/dashboards/overview.json # first try: .claude/skills/grafana-dashboards/sandbox/dashboards/sample.json
+sb="$(mktemp -d)"
+cp -r .claude/skills/grafana-dashboards/sandbox/. "$sb"
+board="$sb/dashboards/$(basename "$dashboard")"
+cp "$dashboard" "$board"
+sed -i 's/\([^{]\){platform}/\1sandbox/g; s/\([^{]\){service}/\1sandbox/g; s/\([^{]\){module}/\1api/g' "$board"
+# your rows in "$sb/rows.txt" and your identity (see above); for sample.json, drop both -v options
+mkdir "$sb/prom-data"
+awk -v rows="$sb/rows.txt" -v identity=platform=sandbox,service=sandbox,module=api -f "$sb/generate-metrics.awk" > "$sb/metrics.om"
+promtool tsdb create-blocks-from openmetrics "$sb/metrics.om" "$sb/prom-data"
 
-promtool tsdb create-blocks-from openmetrics openmetrics.txt ./prom-data
-docker compose restart prometheus
+export SANDBOX_UID="$(id -u)" SANDBOX_GID="$(id -g)"
+project="dash-sandbox-$(date +%s)"
+docker compose -p "$project" -f "$sb/compose.yaml" up -d
+for _ in $(seq 60); do
+  curl -fsS http://127.0.0.1:9090/-/ready >/dev/null 2>&1 &&
+    curl -fsS http://127.0.0.1:3000/api/health >/dev/null 2>&1 && break
+  sleep 2
+done
 ```
 
-Rules for the generator:
+- The `sed` line fills `{platform}`, `{service}` and `{module}`, if still unknown, with `sandbox`, `sandbox` and `api` in the sandbox copy only, because Grafana uids allow only `A-Za-z0-9-_`. It leaves `{{…}}` legend names alone.
+- `promtool tsdb create-blocks-from openmetrics` writes the synthetic history straight into Prometheus's storage, so no scraping is needed.
+- `SANDBOX_UID`/`SANDBOX_GID` make Prometheus run as you, so it can write `prom-data`.
+- The unique project name keeps the containers and volumes apart from other stacks.
+- Grafana is anonymous admin, which is why every port is bound to `127.0.0.1`.
+- Grafana re-reads `$sb/dashboards/` about every 10 seconds: copy an edited JSON there and render again.
 
-- Cover **every metric name and label combination** the dashboard queries.
-- Include error-path series (5xx, failures) so error panels and thresholds show color.
-- Counters must increase monotonically; gauges should vary (test y-axis scaling).
+## Check the alert condition
 
-## 3. Render endpoints
+`provisioning/alerting/condition-check.yaml` loads three known-answer alert rules, evaluated every 10 seconds. `cond-A` uses its query as the condition; `cond-B` uses the condition the chart renders for every rule ([Shipping](/docs/standards/observability/shipping.md#what-the-chart-adds-to-each-alert)). Both query `vector(0) < 1`, which returns one series with value 0, as in a total outage. `absent` is an `absent_over_time` rule on a metric that does not exist. Grafana must show `cond-B` and `absent` firing and `cond-A` not; the last line prints `true`:
 
 ```bash
-# full dashboard (kiosk hides chrome)
-curl -s -o board.png "http://localhost:3000/render/d/<uid>/x?kiosk&width=1600&height=1200&from=now-6h&to=now&tz=UTC"
-
-# single panel
-curl -s -o panel.png "http://localhost:3000/render/d-solo/<uid>/x?panelId=<id>&width=1000&height=500&from=now-6h&to=now"
+rules=http://127.0.0.1:3000/api/prometheus/grafana/api/v1/rules
+check='[.data.groups[].rules[] | {(.name): .state}] | add | .["cond-A"] == "inactive" and .["cond-B"] == "firing" and .absent == "firing"'
+for _ in $(seq 30); do curl -fsS "$rules" | jq -e "$check" >/dev/null && break; sleep 2; done
+curl -fsS "$rules" | jq -e "$check"
 ```
 
-- Tall dashboards: raise `height` until the bottom row is visible in the PNG.
-- Against a real (non-anonymous) Grafana, add `-H "Authorization: Bearer <sa-token>"`.
-- Then **Read the PNG files** and inspect against the [visual checklist](./index.md#visual-checklist-looks-good-defined).
-
-## 4. Lint configuration
-
-`dashboard-linter` checks Prometheus dashboards: datasource/job/instance template
-variables, `$__rate_interval` usage, counter aggregation (`rate` before `sum`), panel
-titles/descriptions/units, PromQL validity.
+## Render and look
 
 ```bash
-dashboard-linter lint dashboard.json --strict [--fix]
+uid="$(jq -r .uid "$board")"
+curl -fsS -o "$sb/board.png" \
+  "http://127.0.0.1:3000/render/d/$uid/x?kiosk&width=1600&height=1200&from=now-6h&to=now&tz=UTC&var-landscape=pichu"
+file "$sb/board.png" | grep -q 'PNG image data' && test -s "$sb/board.png"
+
+curl -fsS -o "$sb/panel-2.png" \
+  "http://127.0.0.1:3000/render/d-solo/$uid/x?panelId=2&width=1000&height=500&from=now-6h&to=now&var-landscape=pichu"
 ```
 
-Justified exclusions go in a `.lint` file next to the dashboard:
+- Render once per landscape (`var-landscape=pichu`, `raichu`) to prove the variable changes the data.
+- Raise `height` until the bottom row is in the picture.
+- `panelId=2` is an example: use the id of a panel an alert links to, or any panel that is not a row.
+- Open every PNG and go through the [visual checklist](/docs/standards/grafana-dashboards/index.md#visual-checklist).
 
-```yaml
-exclusions:
-  template-job-rule:
-    reason: single-tenant dashboard, job selector not applicable
+## Clean up
+
+```bash
+docker compose -p "$project" -f "$sb/compose.yaml" down -v
+rm -rf "$sb"
 ```

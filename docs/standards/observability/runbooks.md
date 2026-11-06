@@ -1,90 +1,29 @@
 # Runbooks and the System Overview
 
-**Every alert has its own runbook, in the same folder as the alert.** The folder structure is the enforcement: the primordial-chart transformer fails an alert set without a `runbook.md`. Shared context lives once in `observability/overview.md` — runbooks link to it instead of repeating it.
+- **Every alert set has its own runbook** at `observability/alerts/<slug>/runbook.md`.
+- **Shared context lives once** in `observability/overview.md`. Runbooks link to it instead of repeating it.
+- **Namespace, workload, team, channel and Grafana URL** come from the platform team; see [Values the platform team gives you](/docs/standards/observability/index.md#values-the-platform-team-gives-you).
+- **Commands use `kubectl`** (expected from the infrautils [bundle](/docs/standards/grafana-dashboards/sandbox.md#tools); check with `command -v kubectl`). Cluster access comes from the platform team.
 
-```text
-observability/
-├── overview.md                 # shared system context — written once, linked everywhere
-└── alerts/
-    └── <alert-slug>/
-        ├── critical.yaml       # one file per tier — the filename is the severity
-        ├── warning.yaml
-        └── runbook.md          # THE runbook for this alert
-```
+## The system overview
 
-Fill-in templates ship with the `grafana-runbook` skill (`templates/runbook-template.md`, `templates/overview-template.md`).
+Write `observability/overview.md` from [the overview template](/.claude/skills/grafana-runbook/templates/overview-template.md). It is the one page a responder who has never seen this service reads first. Fill every section, and keep it to one screen. A command used by more than one runbook goes in its Common commands table, not in each runbook.
 
----
+## The per-alert runbook
 
-## The System Overview (`observability/overview.md`)
+Start from [the runbook template](/.claude/skills/grafana-runbook/templates/runbook-template.md). The reader is half awake, so every step is copy-paste and every judgment is spelled out.
 
-One distilled page of context for the whole repo — what a responder who has never seen this service needs before any runbook makes sense. Structure (all sections required):
+- **Triage, Remediation and Escalation are required sections.** A branchy alert may open Triage with a small Mermaid flowchart (a text diagram language GitHub renders).
+- **Every fix ends with a check.** Example: "Restart the consumer. Confirm with: `kubectl rollout status {workload} -n {namespace}`".
+- **Say what good looks like.** Example: "Normal is under 100; over 1000 means the consumer is stuck."
+- **Record past incidents** on the template's Known causes line, e.g. `Known causes: 2026-03-02 — expired TLS cert on the partner endpoint.` Updating the runbook is part of every incident follow-up.
+- **Code blocks hold only commands, queries or output.** Prose goes outside them. Tag each fence with its language: `bash`, `promql`, `logql` or `traceql`.
+- **A runbook that only restates the alert** means nobody can act on it, so the alert fails Gate 5. Go back to [Signal decisions](/docs/standards/observability/signals.md).
 
-| Section              | Content                                                                                                                                                                                               |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `## What it does`    | One short paragraph, plain language, including who its users are                                                                                                                                      |
-| `## How it works`    | The modules and the data flow between them — bullets or a small Mermaid diagram, max ~10 lines                                                                                                        |
-| `## Dependencies`    | Table: direction (calls / called-by / stores), system, purpose, what happens here when it fails                                                                                                       |
-| `## Failure modes`   | The 2–3 dominant ways this service actually breaks, one line each                                                                                                                                     |
-| `## Common commands` | ONE table: kubectl status commands, the 3–5 PromQL queries answering "healthy / loaded / erroring", the LogQL error query, the TraceQL slow-trace query, rollout commands. Placeholders in `{braces}` |
-| `## Links`           | Curated dashboard, generic dashboard (LPSM pre-filled URL), deployment, docs/TRD                                                                                                                      |
+## Review checklist
 
-Keep it distilled: if the overview exceeds a screen, it has stopped being an overview. Commands used by multiple runbooks belong here, not copied into each runbook.
-
----
-
-## The Per-Alert Runbook (`alerts/<slug>/runbook.md`)
-
-The reader is a half-awake responder. Every step copy-pasteable, every judgment call spelled out. **The canonical fill-in skeleton is the `grafana-runbook` skill's `templates/runbook-template.md`** — the outline below defines the required shape:
-
-````markdown
-# <Alert base name>
-
-> Covers: 🚨 <critical name> · ⚠️ <warning name> (whichever tiers exist)
-> Context: [System overview](../../overview.md) · [Dashboard panel](url)
-
-<Meaning + user impact — 2 sentences, plain language.>
-
-## Triage
-
-1. <First check — the fastest discriminator:>
-   ```bash
-   <command>
-   ```
-   <What the output means. Normal: X. Bad: Y → step N.>
-
-## Remediation
-
-- **<Likely cause 1>**: <fix>. Confirm with: `<command>`
-- **<Likely cause 2>**: <fix>. Confirm with: `<command>`
-
-Known cause: YYYY-MM-DD — <one-line incident summary>.
-
-## Escalation
-
-If not resolved in <30m>, or <condition>, escalate to <team/escalation chain> via #<channel>.
-Declare an incident if <user-impact condition>.
-````
-
-Rules:
-
-- **Triage / Remediation / Escalation are mandatory sections.** A complex, branchy alert may open Triage with a small Mermaid flowchart; simple alerts go straight to numbered steps.
-- Every Remediation fix ends with a verification command ("Confirm with: …").
-- Commands specific to this alert live here; commands shared across alerts live in the overview's Common commands table — link, don't copy.
-- Record past incidents inline (`Known cause: …`) — runbooks are institutional memory, and updating them is a standing post-incident action item.
-- A runbook that just restates the alert means the alert fails the actionability gate → back to the alert-set review.
-
-Style: imperative voice; code blocks contain only commands/queries/output; when a step needs judgment, state what GOOD looks like ("normal is <100; >1000 means the consumer is stuck").
-
----
-
-## Verification
-
-The primordial-chart transformer enforces the folder contract (every alert set has its tier files + `runbook.md` — it fails otherwise). Runbook section completeness and the overview's required sections are PR-review checks.
-
-Then check manually:
-
-- [ ] Every Remediation fix ends with a verification command
-- [ ] Any Mermaid parses (paste into mermaid.live)
-- [ ] No code block contains prose; all `{placeholders}` filled or intentionally generic
-- [ ] The overview still fits on one screen
+- [ ] Triage, Remediation and Escalation are present and filled.
+- [ ] Every fix ends with "Confirm with: …".
+- [ ] Any Mermaid diagram renders (checked in the pull request, where GitHub draws it).
+- [ ] Every `{placeholder}` is filled, except platform-team values not known yet (they keep their name), a dependency owner nobody knows yet (write `unknown (ask {team})` in the Dependencies table) and `{landscape}` in queries, which the responder fills in.
+- [ ] `overview.md` still fits on one screen.

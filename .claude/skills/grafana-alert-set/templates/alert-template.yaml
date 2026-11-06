@@ -1,12 +1,7 @@
-# observability/alerts/{alert-slug}/{critical|warning|info}.yaml
-# ONE FILE PER TIER — the FILENAME is the severity (no severity field exists).
-# Pure Grafana-domain definition: no Kubernetes, no labels, no plumbing — the
-# service's primordial-chart transformer derives everything else (emoji prefix,
-# uid, CR wrapper, LPSM labels, runbook/dashboard links). Flat dict only.
-title: '{short symptom, ≤48 chars — NO emoji, it is derived from the filename}'
-datasource: '{metrics | logs}' # metrics = PromQL, logs = LogQL
-expr: '{boolean expr, e.g. my_metric{service="x"} > 5000}'
+title: '{the symptom, e.g. Retry queue saturated}'
+datasource: '{metrics | logs}'
+expr: '{query that is true while the problem lasts, e.g. queue_depth{service="zinc"} > 5000}'
 for: '{10m}'
-summary: '{symptom + magnitude, e.g. Queue at {{ $values.A }} — dropping work}'
-description: '{context + first action to take}'
-panel: '{panel id in dashboards/overview.json — DELETE this line to link the generic dashboard instead}'
+summary: '{what and how bad, e.g. Queue at {{ $values.A.Value }}; dropping work}'
+description: '{the first thing to do}'
+# panel: {a panel id in observability/dashboards/overview.json; uncomment to set, leave out for the generic dashboard}

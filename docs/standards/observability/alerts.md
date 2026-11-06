@@ -1,233 +1,149 @@
-# Alert Rules and Alert Sets
+# Alerts
 
-How to write one well-formed alert (the contract), how to choose the alert type, and how alert sets are organized.
+How to write the files of an alert set. Whether an alert should exist at all is Gate 5 of [Signal decisions](/docs/standards/observability/signals.md). How the files become Grafana alert rules is in [Shipping](/docs/standards/observability/shipping.md). Examples use the made-up service from [Terms](/docs/standards/observability/index.md#terms).
 
-Whether an alert should exist at all is decided upstream — see [Signal Decisions](./signals.md), Gate 5.
+## One alert set = one folder
 
-## The unit of work: one alert set = one folder
-
-An **alert set** is one measured thing (a signal family) with 1–3 severity tiers, plus its runbook — bundled in one folder so the runbook can't be forgotten:
+An alert set covers one measured thing, with one to three severity tiers and one runbook:
 
 ```text
-observability/alerts/<alert-slug>/
-├── critical.yaml       # ONE FILE PER TIER — the filename IS the severity
-├── warning.yaml        #   (info.yaml for a third tier; delete files you don't need)
-└── runbook.md          # THE runbook for this alert — see Runbooks
+observability/alerts/retry-queue/
+├── critical.yaml
+├── warning.yaml
+└── runbook.md
 ```
 
-- **The filename is the severity**: `critical.yaml` / `warning.yaml` / `info.yaml`. No severity field exists, so a severity/emoji mismatch is unrepresentable, and the filesystem enforces at most one rule per tier.
-- **Not everything needs tiers**: 1 file (critical only) for binary failures; 2 for capacity/degradation; 3 only when the trend itself is worth recording. A single-file set is perfectly normal.
-- Tiered files share the base symptom title and the folder's runbook.
-- Thresholds between tiers need real gaps (>20% apart) — tiers closer than that are one alert pretending to be two.
+- **The file name is the severity**: `critical.yaml`, `warning.yaml` or `info.yaml`. There is no severity field, so the two can never disagree.
+- **Use only the tiers you need**: one file for a plain failure; two for capacity, slow decline or an SLO [burn rate](/docs/standards/observability/index.md#terms) (fast critical, slow warning); three only when the trend itself is worth recording.
+- **Tiers need real gaps**: for `>`, critical ≥ warning × 1.2 (4000 → 5000 is fine); for `<`, critical ≤ warning ÷ 1.2. For burn-rate tiers, compare the burn rates (14.4× vs 6×).
+- **The folder name is the slug, and the folders match [Gate 6](/docs/standards/observability/signals.md#gate-6--alert-set-folders) exactly.** No Gate 5 YES at all means no `alerts/<slug>/` folders, which is fine.
+- **One page per root cause**: if two sets fire for the same cause, keep the one users feel (the symptom) and demote or delete the other. One burn-rate set usually replaces several hand-made error and latency sets.
 
-**Slug** = the alert base name, lowercased, spaces → hyphens, `[a-z0-9-]` only (`Webhook retry queue` → `webhook-retry-queue`). It names the folder and everything derived from it.
+## The tier file
 
-Repo-level rules across sets: every "Gate 5 (Alerts) = YES" row in `SIGNALS.md` has a folder, and every folder traces back to SIGNALS.md — a repo whose SIGNALS.md has no Gate-5 YES has no `alerts/` directory at all, which is a valid outcome. De-duplicate across sets — if two sets can fire for the same root cause, keep the user-facing SYMPTOM as the pager and demote or delete the cause-side one. A burn-rate set usually replaces 2–3 hand-rolled error/latency threshold sets. The expected noise budget (e.g. "≤2 pages/month") is recorded in SIGNALS.md Gate 5.
-
-## Format: one flat file per tier — pure Grafana-domain, no Kubernetes
-
-Alert definitions are **Grafana-domain objects**: authors never write Kubernetes wrappers, CR plumbing, or LPSM labels. Each tier file is a single flat YAML dictionary:
+One flat YAML map per file. Start from [the alert template](/.claude/skills/grafana-alert-set/templates/alert-template.yaml).
 
 ```yaml
-# observability/alerts/webhook-retry-queue/critical.yaml   (the filename IS the severity)
-title: Webhook retry queue saturated # plain symptom — emoji is derived from the filename
-datasource: metrics # metrics (PromQL) | logs (LogQL)
+title: Retry queue saturated
+datasource: metrics
 expr: webhook_retry_queue_depth{service="zinc"} > 5000
 for: 10m
-summary: 'Retry queue at {{ $values.A }} — deliveries dropping'
-description: 'Check downstream health — queue drains only if endpoints are up.'
-panel: 2 # panel in dashboards/overview.json; omit → links the generic dashboard
+summary: 'Retry queue at {{ $values.A.Value }}; deliveries dropping'
+description: 'Check downstream health; the queue drains only if endpoints are up.'
+panel: 2
 ```
 
-Copy the skeleton from the `grafana-alert-set` skill's `templates/alert-template.yaml`.
+| Field         | Where people see it                            | Rule                                                                                                                                                                                                                                      |
+| ------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`       | The notification title: lock screen, chat line | Required. The symptom, ≤48 characters, no emoji (🚨/⚠️/ℹ️ is added from the file name). Tiers of one set may share a title                                                                                                                |
+| `datasource`  | —                                              | Required. `metrics` (PromQL) or `logs` (LogQL)                                                                                                                                                                                            |
+| `expr`        | —                                              | Required. A query that is true while the problem lasts; its shape comes from the type below. Any series the `expr` returns fires, even with value 0 (the chart adds a condition for this), so never use `bool`: let the comparison filter |
+| `for`         | —                                              | Required. How long it must stay true before firing; `0m` fires at once                                                                                                                                                                    |
+| `summary`     | First line of the notification body            | Required. What and how bad; put the value in with `{{ $values.A.Value }}` (`{{ humanizePercentage $values.A.Value }}` for a ratio)                                                                                                        |
+| `description` | Alert detail view                              | Required. The first thing to do                                                                                                                                                                                                           |
+| `panel`       | The "view panel" link                          | Optional integer: a panel id in `observability/dashboards/overview.json`. Leave it out to link the generic dashboard, e.g. for a burn rate on the standard HTTP metric                                                                    |
 
-## The Transformation Contract
+Front-load the symptom: `Retry queue saturated`, not `The webhook delivery retry queue has become saturated`. Keep LPSM names and query values out of the title. Route and silence by the `severity` label, never by emoji. Moving an alert to another tier changes its name, so silences on the old name stop working.
 
-The standard specifies the mapping implemented by the reusable primordial-chart helper. The service's primordial chart reads the folder and produces **Grafana-managed alerts** (NOT `PrometheusRule` resources — no Prometheus/Mimir ruler is involved), deriving:
+`expr` may select `service` or `module`, but never `landscape`: each landscape's rules already read only that landscape's data ([Shipping](/docs/standards/observability/shipping.md#where-things-run)).
 
-| Derived                                                                                                                                                                                                                                                       | From                                                                                                                             |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `severity` label + 🚨/⚠️/ℹ️ title prefix                                                                                                                                                                                                                      | the **filename** — a mismatch is unrepresentable                                                                                 |
-| Rule `uid`                                                                                                                                                                                                                                                    | `<slug>-<severity>`                                                                                                              |
-| Grafana rule plumbing (`condition: A`, `refId: A`, `data`, `relativeTimeRange`, `noDataState: OK`, `execErrState: Error`, instant query)                                                                                                                      | fixed                                                                                                                            |
-| `datasourceUid`                                                                                                                                                                                                                                               | `datasource: metrics \| logs` → the platform's pinned UIDs                                                                       |
-| `runbook_url`                                                                                                                                                                                                                                                 | the repo's https URL + `observability/alerts/<slug>/runbook.md` — always this set's own runbook                                  |
-| `__dashboardUid__` + `__panelId__`                                                                                                                                                                                                                            | `panel` present → the curated overview (`<platform>-<service>-overview`) + that panel; absent → the platform's generic dashboard |
-| **LPSM labels** (built in — never authored)                                                                                                                                                                                                                   | the deployment context (chart values / central config), merged into the rule's labels dict                                       |
-| **One file → one CR**: group name `<platform>-<service>-<slug>-<severity>`, `rules` list with exactly one element, `folderRef` (`<platform>-<service>-folder` — the app folder uid; the `-folder` suffix keeps it out of the shared dashboard/group uid pool) | service tree + folder name + filename — no grouping or array assembly anywhere                                                   |
+## Pick the alert type
 
-**Golden example** — the conformance fixture. The `critical.yaml` above, in service tree `{landscape: raichu, platform: tracker, service: zinc, module: webhook}`, MUST become exactly:
+The type decides the shape of `expr`. Everything else stays the same.
+
+| Type                | `expr` shape                                                                                 | Use for                                               | Avoid when                              |
+| ------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------- |
+| Static threshold    | `metric > N` plus `for`                                                                      | Hard limits: disk %, queue depth, cert expiry         | The metric rises and falls with the day |
+| Absence / heartbeat | `absent_over_time(metric{service="zinc"}[15m])`                                              | Scrape gone, cron did not run, consumer silent        | Scrapes are flaky (fix those first)     |
+| Event (logs)        | `sum(count_over_time({service="zinc"} \|= "panic" [5m])) > 0`, `for: 0m`, `datasource: logs` | Panics, out-of-memory kills, corruption markers       | A metric exists for it (use the metric) |
+| SLO burn rate       | Error ratio over two windows (example below)                                                 | The preferred page for user-facing errors and latency | Internal-only signals                   |
+| Seasonal deviation  | This week vs last week, with a floor (example below)                                         | Traffic-shaped metrics: volume, cost                  | Under 2 weeks of history                |
+| Forecast            | `predict_linear(metric[6h], 4*3600) < limit` plus a threshold backstop                       | Slow resources: disk full in 4 hours, quota           | Fast, spiky metrics                     |
+| Outlier             | One pod more than 3 standard deviations above its peers                                      | One pod unlike the others                             | Fewer than 4 peers                      |
+
+**SLO burn rate** ([burn rate](/docs/standards/observability/index.md#terms); 99.9% SLO, so the error budget is 0.001). The fast-burn critical tier fires when both the 5m and 1h windows burn 14.4× faster than allowed, with `for: 2m`. The slow-burn warning tier uses 6× over 30m and 6h, with `for: 15m`. The example `alerts/errors/critical.yaml` uses the [standard HTTP metric](/docs/standards/observability/otel.md#standard-http-metrics); `expr: |` keeps a multi-line query as one YAML string:
 
 ```yaml
-apiVersion: grafana.integreatly.org/v1beta1
-kind: GrafanaAlertRuleGroup
-metadata:
-  name: tracker-zinc-webhook-retry-queue-critical # one file → one CR
-spec:
-  folderRef: tracker-zinc-folder
-  interval: 1m
-  rules: # always exactly ONE element — written inline, never assembled
-    - uid: webhook-retry-queue-critical
-      title: 🚨 Webhook retry queue saturated
-      condition: A
-      for: 10m
-      noDataState: OK
-      execErrState: Error
-      data:
-        - refId: A
-          relativeTimeRange: { from: 600, to: 0 }
-          datasourceUid: mimir
-          model: { expr: 'webhook_retry_queue_depth{service="zinc"} > 5000', instant: true }
-      labels:
-        severity: critical
-        landscape: raichu
-        platform: tracker
-        service: zinc
-        module: webhook
-      annotations:
-        summary: 'Retry queue at {{ $values.A }} — deliveries dropping'
-        description: 'Check downstream health — queue drains only if endpoints are up.'
-        runbook_url: https://github.com/atomicloud/tracker-zinc/blob/main/observability/alerts/webhook-retry-queue/runbook.md
-        __dashboardUid__: tracker-zinc-overview
-        __panelId__: '2'
+title: Errors burning the SLO budget
+datasource: metrics
+expr: |
+  ( sum(rate(http_server_request_duration_seconds_count{service="zinc",http_response_status_code=~"5.."}[5m]))
+    / sum(rate(http_server_request_duration_seconds_count{service="zinc"}[5m])) ) > (14.4 * 0.001)
+  and
+  ( sum(rate(http_server_request_duration_seconds_count{service="zinc",http_response_status_code=~"5.."}[1h]))
+    / sum(rate(http_server_request_duration_seconds_count{service="zinc"}[1h])) ) > (14.4 * 0.001)
+for: 2m
+summary: '{{ humanizePercentage $values.A.Value }} of requests failing; SLO budget burning fast'
+description: 'Check the error panels and recent deploys first.'
 ```
 
-**The deployment home is fixed** — the service's own primordial chart includes the helm-wrapper helper and deploys these resources to Primordial. The app chart stays pure runtime; there is no central many-repository observability chart. The one-file-per-tier + one-file-per-CR mapping keeps the implementation trivial: a single `.Files.Glob` loop where each file (`fromYaml` → a _dict_, never an array) emits one complete manifest; label injection is a native dict merge — e.g. `mergeOverwrite (dict "severity" (base $path | trimSuffix ".yaml")) $.Values.serviceTree` — and the `rules` list always has exactly one inline element. No array assembly, no grouping logic, no structural YAML surgery anywhere. See [Primordial-Chart Rendering](./primordial-chart.md).
-
-**Multi-datasource rules** (one condition over metrics AND logs) don't fit the minimal schema — and usually shouldn't exist: decompose into two single-signal alerts. A set that truly needs one ships a justified raw `GrafanaAlertRuleGroup` from the same service-owned primordial chart.
-
----
-
-## The Rule Contract
-
-### 1. It passed Gate 5 (Alerts)
-
-The existence gates — no self-healing, actionable, routable — are owned by [Signal Decisions](./signals.md); an alert that isn't a Gate-5 YES in `SIGNALS.md` must not exist. The self-healing gate in practice:
-
-| Condition                             | Self-healing exists? | Alert?                                 |
-| ------------------------------------- | -------------------- | -------------------------------------- |
-| CPU 80%, HPA/autoscaler enabled       | ✅ autoscaling       | ❌ — scaling is the response           |
-| CPU 80%, no autoscaler                | ❌                   | ✅ `warning` (+ forecast tier)         |
-| Autoscaler at max AND still saturated | mechanism exhausted  | ✅ `critical` — the self-healer failed |
-| Single pod restart                    | ✅ restart policy    | ❌; sustained crash-loop → ✅          |
-| Retry queue growing _despite_ retries | mechanism losing     | ✅                                     |
-
-Actionability reminder: the runbook says what to DO — "watch it" → demote to `info` or delete.
-
-### 2. Correct type for the signal shape
-
-The type determines the `expr` (and occasionally the datasource). Everything else is boilerplate.
-
-| Type                      | expr shape                                                                                                         | Best for                                                                                                            | Avoid when                                              |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| **Static threshold**      | `metric > N` + `for` duration                                                                                      | Known hard limits without self-healing: disk %, queue depth, cert expiry                                            | Seasonal metrics (threshold lies twice a day)           |
-| **Absence / heartbeat**   | `absent(metric)` or `rate(metric[15m]) == 0`                                                                       | Scrape target gone, cron didn't run, consumer silent                                                                | Flaky scrapes — fix the scrape first                    |
-| **Event-based (LogQL)**   | `sum(count_over_time({service="x"} \| json \| level="ERROR" \|= "panic" [5m])) > 0`, `for: 0m`, `datasource: logs` | Discrete events: panics, OOMKills, security/corruption markers                                                      | A metric counterpart exists (prefer the metric)         |
-| **SLO burn-rate**         | Multi-window error-ratio (below)                                                                                   | THE preferred pager: user-facing error/latency symptoms                                                             | Non-user-facing internals                               |
-| **Seasonal deviation**    | `metric / metric offset 1w > 1.3` **and** absolute floor + smoothing                                               | Traffic-shaped metrics vs last week/month: volume, cost, throughput                                                 | <2 weeks of history, or no absolute floor               |
-| **Prediction / forecast** | `predict_linear(metric[6h], 4*3600) < limit` + static backstop rule                                                | Slow-moving resources — act before impact: disk-full-in-4h, quota                                                   | Fast/spiky metrics (linear fit is meaningless)          |
-| **Outlier**               | value − group avg > 3 × group `stddev`, ≥4 peers                                                                   | One instance unlike its peers, where the group defines normal                                                       | Small groups — no statistical peer set                  |
-| **Mixed (metric + log)**  | multi-query: `A` = PromQL metric, `B` = LogQL, combined in a condition (`$A > N && $B > 0`)                        | Corroborate before paging — "error-rate up **and** error logs present"; suppress a metric blip with no log evidence | Either signal alone is sufficient (use its single type) |
-
-Type-specific expr examples:
-
-**SLO burn-rate** (99.9% SLO → error budget 0.001; plain PromQL, no special tooling):
+In `summary`, `$values.A.Value` is the left side of `and`, here the 5m error ratio. Its `warning.yaml` has the same `expr` with `[30m]`, `[6h]` and `(6 * 0.001)`, and `for: 15m`:
 
 ```text
-# 🚨 fast burn: both windows above 14.4× budget → pages within minutes of a real burn
-( sum(rate(http_requests_total{service="zinc",status=~"5.."}[5m]))
-  / sum(rate(http_requests_total{service="zinc"}[5m])) ) > (14.4 * 0.001)
+( sum(rate(http_server_request_duration_seconds_count{service="zinc",http_response_status_code=~"5.."}[30m]))
+  / sum(rate(http_server_request_duration_seconds_count{service="zinc"}[30m])) ) > (6 * 0.001)
 and
-( sum(rate(http_requests_total{service="zinc",status=~"5.."}[1h]))
-  / sum(rate(http_requests_total{service="zinc"}[1h])) ) > (14.4 * 0.001)
-
-# ⚠️ slow burn: 6× budget over 30m and 6h → ticket
+( sum(rate(http_server_request_duration_seconds_count{service="zinc",http_response_status_code=~"5.."}[6h]))
+  / sum(rate(http_server_request_duration_seconds_count{service="zinc"}[6h])) ) > (6 * 0.001)
 ```
 
-Log-based services: the same shape in LogQL (`sum(rate({service="zinc"} | status >= 500 [5m])) / sum(rate({service="zinc"}[5m]))`) with `datasource: logs`. Trace signals: alert on span-derived metrics (the tracing pipeline's RED metrics) — TraceQL alerting exists but is experimental and not for production.
-
-**Seasonal deviation** (both guards mandatory — absolute floor and smoothing):
+**Seasonal deviation** (traffic below half of last week, smoothed over 1h, and only when last week had real traffic):
 
 ```text
-(
-  avg_over_time(sum(rate(webhook_deliveries_processed_total{service="zinc"}[5m]))[1h:])
-  /
-  avg_over_time(sum(rate(webhook_deliveries_processed_total{service="zinc"}[5m]))[1h:] offset 1w)
-) < 0.5
+avg_over_time(sum(rate(webhook_deliveries_total{service="zinc"}[5m]))[1h:])
+  / avg_over_time(sum(rate(webhook_deliveries_total{service="zinc"}[5m]))[1h:] offset 1w) < 0.5
 and
-avg_over_time(sum(rate(webhook_deliveries_processed_total{service="zinc"}[5m]))[1h:] offset 1w) > 1
+avg_over_time(sum(rate(webhook_deliveries_total{service="zinc"}[5m]))[1h:] offset 1w) > 1
 ```
 
-**Prediction + backstop** (never rely on the forecast alone — pair it with a plain threshold rule):
+**Forecast with backstop** (two tier files in one set):
 
 ```text
-predict_linear(dlq_disk_free_bytes{service="zinc"}[6h], 4*3600) < 0     # ⚠️ full in <4h
-dlq_disk_used_ratio{service="zinc"} > 0.95                              # 🚨 backstop
+warning.yaml:  predict_linear(dlq_disk_free_bytes{service="zinc"}[6h], 4*3600) < 0
+critical.yaml: dlq_disk_used_ratio{service="zinc"} > 0.95
 ```
 
-**Outlier** (peer deviation, ≥4 peers):
+**Outlier** (p99 latency per pod, from a histogram):
 
 ```text
-(
-  webhook_delivery_duration_seconds{service="zinc", quantile="0.99"}
-  - on() group_left avg(webhook_delivery_duration_seconds{service="zinc", quantile="0.99"})
-)
-> on() group_left 3 * stddev(webhook_delivery_duration_seconds{service="zinc", quantile="0.99"})
+histogram_quantile(0.99, sum by (le, pod) (rate(webhook_delivery_duration_seconds_bucket{service="zinc"}[5m])))
+> on() group_left
+  avg(histogram_quantile(0.99, sum by (le, pod) (rate(webhook_delivery_duration_seconds_bucket{service="zinc"}[5m]))))
+  + 3 * stddev(histogram_quantile(0.99, sum by (le, pod) (rate(webhook_delivery_duration_seconds_bucket{service="zinc"}[5m]))))
 ```
 
-**Mixed (metric + log)** — two queries against two datasources, combined so the alert fires only when
-BOTH conditions hold. Cuts false pages: a metric blip with no corroborating error logs (or a log spike
-a healthy metric contradicts) doesn't page.
-
-```text
-# refId A — datasource: metrics — the metric symptom
-A: sum(rate(http_requests_total{service="zinc",status=~"5.."}[5m]))
-   / sum(rate(http_requests_total{service="zinc"}[5m])) > 0.05
-# refId B — datasource: logs — corroborating evidence
-B: sum(count_over_time({service="zinc"} | level="error" [5m])) > 0
-# condition — a math/expression node combining them
-C: $A && $B
-```
-
-Grafana evaluates each query against its own datasource, then a reduce/math node combines them into the
-rule condition. This needs the **multi-query rule contract** — a `queries:` list (each with its own
-`datasource` + `expr`) and an explicit combining `condition`, NOT the single `datasource`/`expr` a
-one-signal tier carries. **Transformer note:** the `observability-lib` transformer today emits a single
-instant query per tier (`condition: A`), so it renders single-datasource metric and log alerts but not
-yet mixed ones — a mixed alert requires extending the transformer per the
-[Transformation Contract](#the-transformation-contract) (multi-query `data:` + condition). Author mixed
-alerts only once that support lands; until then, a metric alert plus a sibling log alert in the same set
-is the portable approximation.
-
-### 3. Title — short symptom (≤48 chars, no emoji)
-
-**The title becomes the notification title** — what shows on a locked phone screen and in a Slack line, prefixed with the severity emoji by the transformer (🚨 critical / ⚠️ warning / ℹ️ info — derived from the tier filename; shape-distinct, colorblind-safe). Keep the authored title **≤48 characters** so the final title stays ≤50. Front-load the symptom: `Retry queue saturated`, not `The webhook delivery retry queue has become saturated`. No LPSM in the title; no query values (they go in `summary`).
-
-The `severity` field stays the machine-readable source of truth — search, route, and silence by label, never by emoji. Re-tiering renames the alert — silences on the old name die; accept knowingly.
-
-### 4. summary and description — each has a distinct job
-
-| Field         | Where the responder sees it                                                       | So write it as                                                                                |
-| ------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| _(title)_     | **Notification title** — lock screen, Slack line, alert list row                  | The symptom, ≤48 chars                                                                        |
-| `summary`     | **First line of the notification body** and the alert list — the compact surfaces | One line: symptom + magnitude; template the value in with `{{ $values.A }}`                   |
-| `description` | The **alert detail view** and the expanded notification body — read after opening | Context + the first action to take ("Check downstream health — queue drains only if X is up") |
-
-Rule of thumb: **title = what**, **summary = what + how bad**, **description = what to do first**, **panel = what it looks like**. If summary and description say the same thing, the description is wasted.
-
-### 5. Every alert links a dashboard panel
-
-A responder's first move is looking at the signal, not reading. The `panel` field controls the link the transformer emits:
-
-- **`panel: <id>`** — the alert lands on that panel of the curated overview dashboard (`observability/dashboards/overview.json`). The panel must exist there — dashboards are IaC; reviewers check the id (see Validation).
-- **`panel` omitted** — the alert links the platform's generic dashboard (standard signals: RED, resources), pre-filtered by LPSM.
-
----
+**One alert cannot combine metrics and logs.** A tier file has one `datasource` and one `expr`. To confirm a metric with logs, add the log alert as its own set, or as another tier of the same set.
 
 ## Validation
 
-There is no behavioral test for Grafana alert rules (deliberate simplicity trade — revisit if a dead alert ever bites). Three layers, no code in this repo:
+Before merge:
 
-1. **The primordial-chart transformer validates structurally** — it refuses to produce output on: missing required fields (`title`/`datasource`/`expr`/`summary`/`description`), unknown tier filename (only `critical.yaml`/`warning.yaml`/`info.yaml`), title >48 chars, missing `runbook.md` in the folder. The Helm helper uses `required`/`fail`, so `helm template` fails in CI and on every render.
-2. **PR review checklist (semantic)** — tier thresholds >20% apart; `panel` points at the right panel id in `overview.json`; runbook and overview sections complete; every SIGNALS.md Gate-6 folder exists and vice versa; slug is lowercase-kebab.
-3. **Preview before merge (manual)**: open the rule in Grafana (sandbox or dev stack) and use **Preview** to confirm the query returns data and the condition evaluates — the only check that catches an alert that can never fire (typo'd metric name, impossible threshold). State in the PR that Preview was done.
+1. **Structure**, once the set's `runbook.md` exists: the [structural checks](/docs/standards/observability/shipping.md#structural-checks).
+2. **Review**: tier gaps, `panel` points at the right panel, runbook complete, slug correct, and the Gate 5 Owner follows [Gate 5, check 3](/docs/standards/observability/signals.md#gate-5--alerts-default-no).
+3. **Fire it offline** (metric alerts). `promtool` (from `prometheus.cli` in the `dev` group of `nix/env.nix`, so in the default shell) runs the tier file's `expr` and `for` against made-up series: it must stay quiet while healthy and fire when bad. `yq` (expected from the atomiutils [bundle](/docs/standards/grafana-dashboards/sandbox.md#tools); check with `command -v yq`) pulls both from the tier file, so nothing is copied by hand. The example tests the burn-rate `critical.yaml` above: errors just under the 0.1% budget for an hour, so a threshold set too low fails the test, then 10% errors. Change the series labels to match every selector in your `expr`, or the bad case never fires.
+
+   ```bash
+   tier=observability/alerts/errors/critical.yaml
+   t="$(mktemp -d)"
+   yq '{"groups": [{"name": "check", "rules": [{"alert": "tier", "expr": .expr, "for": .for}]}]}' "$tier" >"$t/rules.yaml"
+   cat >"$t/test.yaml" <<'EOF'
+   rule_files: [rules.yaml]
+   tests:
+     - interval: 1m
+       input_series:
+         - series: http_server_request_duration_seconds_count{service="zinc",http_response_status_code="200"}
+           values: 0+600x120
+         - series: http_server_request_duration_seconds_count{service="zinc",http_response_status_code="500"}
+           values: 0+0.6x60 96+60x59
+       alert_rule_test:
+         - { eval_time: 60m, alertname: tier, exp_alerts: [] }
+         - { eval_time: 90m, alertname: tier, exp_alerts: [{ exp_labels: {} }] }
+   EOF
+   promtool test rules "$t/test.yaml"
+   ```
+
+   A test for an `[Nh]` window needs more than N hours of samples. For `warning.yaml` (`[6h]`), use `values: 0+600x600` and `0+0.6x420 312+60x179`, and expect no alert at `eval_time: 420m` and the alert at `600m`. For a threshold alert, one series is enough, e.g. `values: 100x20 6000x20` with `exp_labels` holding the labels its `expr` keeps.
+
+4. **Preview against real data**, for a metric or log stream that already exists. In the landscape's Grafana: Alerting → Alert rules → New alert rule, pick the datasource, paste `expr`, press **Preview**, then leave without saving. It must return data; this catches a misspelled metric or label.
+
+Say in the PR which of these you ran.
