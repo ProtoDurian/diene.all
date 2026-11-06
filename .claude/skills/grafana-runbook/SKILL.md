@@ -5,6 +5,6 @@ description: Write or update an alert set's runbook.md or the shared observabili
 
 # Grafana Runbook
 
-1. Follow [Runbooks](docs/standards/observability/runbooks.md).
-2. Runbook: start from [the runbook template](.claude/skills/grafana-runbook/templates/runbook-template.md), save it as `observability/alerts/<slug>/runbook.md`.
-3. Overview: fill [the overview template](.claude/skills/grafana-runbook/templates/overview-template.md) into `observability/overview.md`.
+1. Follow [Runbooks](/docs/standards/observability/runbooks.md).
+2. Runbook: copy `.claude/skills/grafana-runbook/templates/runbook-template.md` to `observability/alerts/<slug>/runbook.md` and fill it.
+3. Overview: fill `.claude/skills/grafana-runbook/templates/overview-template.md` into `observability/overview.md`.

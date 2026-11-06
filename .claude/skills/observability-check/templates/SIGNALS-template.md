@@ -1,6 +1,6 @@
 # Signals — `{platform}`/`{service}`
 
-One block per feature. Answer every gate with a reason and a cost. Rules: [Signal decisions](docs/standards/observability/signals.md).
+One block per feature. To add one, copy [the SIGNALS template](/.claude/skills/observability-check/templates/SIGNALS-template.md) from `## Feature:` to the end. Answer every gate with a reason and a cost; rules: [Signal decisions](/docs/standards/observability/signals.md).
 
 ## Feature: `{feature name}` ({PR link or date})
 
@@ -27,9 +27,9 @@ One block per feature. Answer every gate with a reason and a cost. Rules: [Signa
 **Decision:** YES | NO
 **Why:** {which user flow; NO only if there is no per-request flow}
 
-| Span          | Attributes                 | Sampling                                 |
-| ------------- | -------------------------- | ---------------------------------------- |
-| `{span name}` | LPSM + `{key ids, values}` | {e.g. keep all errors, sample successes} |
+| Span          | Attributes                 | Sampling               |
+| ------------- | -------------------------- | ---------------------- |
+| `{span name}` | LPSM + `{key ids, values}` | {head ratio, e.g. 0.1} |
 
 ### Gate 4 — Dashboard
 
@@ -46,9 +46,9 @@ One block per feature. Answer every gate with a reason and a cost. Rules: [Signa
 **Already healed by:** {autoscaler, restarts, retries… and why that does not cover it}
 **Noise budget:** {expected fire rate, e.g. ≤2 pages/month}
 
-| Alert name  | Type                                                        | Tiers | Thresholds                      |
-| ----------- | ----------------------------------------------------------- | ----- | ------------------------------- |
-| `{symptom}` | threshold/absence/event/burn rate/seasonal/forecast/outlier | 1/2/3 | `{warning at X, critical at Y}` |
+| Alert name  | Type                                                        | Tiers | Thresholds                                     |
+| ----------- | ----------------------------------------------------------- | ----- | ---------------------------------------------- |
+| `{symptom}` | threshold/absence/event/burn rate/seasonal/forecast/outlier | 1/2/3 | `{warning X, critical Y; or SLO + burn rates}` |
 
 ### Gate 6 — Alert-set folders
 

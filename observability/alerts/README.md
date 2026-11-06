@@ -1,1 +1,1 @@
-# Alert sets: one folder per alert, see [Alerts](docs/standards/observability/alerts.md).
+# Alert sets: one folder per alert set, see [Alerts](/docs/standards/observability/alerts.md).

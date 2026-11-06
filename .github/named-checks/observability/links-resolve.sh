@@ -32,10 +32,13 @@ for file in "${files[@]}"; do
     target="${target%%#*}"
     [[ -z ${target} ]] && continue
     checked=$((checked + 1))
-    if exists "${target}"; then
+    if [[ ${target} == /* ]]; then
+      exists "${target#/}" && continue
+    elif [[ ${file} == .claude/skills/* ]]; then
+      echo "❌ ${file}: ${target} (skills must link from the repo root, with a leading /)" >&2
+      failed=1
       continue
-    fi
-    if [[ ${file} != .claude/skills/* ]] && exists "${dir}/${target}"; then
+    elif exists "${dir}/${target}"; then
       continue
     fi
     echo "❌ ${file}: ${target}" >&2
@@ -48,7 +51,7 @@ for file in "${files[@]}"; do
 done
 
 if [[ ${failed} -ne 0 ]]; then
-  echo "❌ links-resolve: links above resolve neither from the repo root nor (outside .claude/skills/) from their file's folder" >&2
+  echo "❌ links-resolve: links above do not resolve (a leading / resolves from the repo root, anything else from the file's folder)" >&2
   exit 1
 fi
 

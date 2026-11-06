@@ -44,13 +44,29 @@
   },
   "panels": [
     {
+      "id": 4,
+      "type": "text",
+      "title": "About this dashboard",
+      "description": "Purpose, audience and where to go next.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Sandbox fixture: request rate, errors and latency of the `sample` service. For whoever checks that the sandbox renders. Next: [System overview]({repo-url}/blob/main/observability/overview.md) · [Generic dashboard](/d/{generic-dashboard-uid})"
+      }
+    },
+    {
       "id": 1,
       "type": "timeseries",
       "title": "Requests / second",
       "description": "Requests per second by outcome. Bad: a sudden drop while traffic is expected.",
       "gridPos": {
         "x": 0,
-        "y": 0,
+        "y": 3,
         "w": 8,
         "h": 9
       },
@@ -122,7 +138,7 @@
       "description": "Share of requests that failed. Over 1% needs a look; over 5% means users see errors.",
       "gridPos": {
         "x": 8,
-        "y": 0,
+        "y": 3,
         "w": 8,
         "h": 9
       },
@@ -187,7 +203,7 @@
       "description": "95th percentile request duration. Over 250 ms needs a look; over 500 ms users wait.",
       "gridPos": {
         "x": 16,
-        "y": 0,
+        "y": 3,
         "w": 8,
         "h": 9
       },

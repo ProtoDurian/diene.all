@@ -1,6 +1,8 @@
 # OpenTelemetry Configuration
 
-Backend services send logs, metrics and traces with OpenTelemetry (OTel). Bun, .NET and Go each have their own OTel library, but all three read the same `otel:` config block, set the same resource attributes and start and stop the same way. Frontends use Grafana Faro instead; see [Faro](docs/standards/observability/faro.md).
+Applies only if this repo has backend code (Bun, .NET or Go). The language template that adds the code also adds its OTel library, its config library and the config files; this repo has none of them yet.
+
+Backend services send logs, metrics and traces with OpenTelemetry (OTel). All three languages read the same `otel:` config block and set the same resource attributes. Frontends use Grafana Faro instead; see [Faro](/docs/standards/observability/faro.md).
 
 ## The config block
 
@@ -14,7 +16,6 @@ otel:
       otlp:
         enabled: false
         endpoint: ''
-        protocol: http/protobuf
         headers: {}
         timeout: PT10S
   metrics:
@@ -25,7 +26,6 @@ otel:
       otlp:
         enabled: false
         endpoint: ''
-        protocol: http/protobuf
         headers: {}
         timeout: PT10S
     interval: PT60S
@@ -40,39 +40,33 @@ otel:
       otlp:
         enabled: false
         endpoint: ''
-        protocol: http/protobuf
         headers: {}
         timeout: PT10S
 ```
 
-The base config turns the three signals on and every exporter off. Each landscape's config file turns on the exporter it needs and sets its endpoint.
+The base config turns the three signals on and every exporter off. Each landscape's config turns on the exporters it needs, e.g. `otel.traces.exporter.otlp: { enabled: true, endpoint: '{otlp-endpoint}' }` (endpoint from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you)).
 
 Rules:
 
 - The signal keys are exactly `logs`, `metrics` and `traces`.
 - Each exporter is switched by its own `enabled` boolean, not by a string such as `exporter: otlp`.
-- OTLP always uses HTTP/protobuf on port 4318.
+- OTLP is always HTTP/protobuf (port 4318 by default); there is no protocol setting.
 - Durations are ISO 8601 strings: `PT10S` is 10 seconds.
-- The sampler `type` is `parentbased_traceidratio`, `always_on` or `always_off`; `ratio` is between 0 and 1.
-- A disabled exporter creates no network client and no background worker.
+- The sampler `type` is `parentbased_traceidratio`, `always_on` or `always_off`; `ratio` (0 to 1) is the share of new traces kept.
 - An enabled exporter with an empty `endpoint` fails config validation before startup.
-
-## Who owns what
-
-| Part                                                     | Owner                                        |
-| -------------------------------------------------------- | -------------------------------------------- |
-| The `otel:` block's types and schema                     | The language's OTel library                  |
-| Loading YAML and env vars, merge order, final validation | The language's config library                |
-| Database, cache and storage presets                      | The config library (never the `otel:` block) |
-| The logging and metrics interfaces the code calls        | The language's common interfaces library     |
-| The real SDK behind those interfaces                     | The language's OTel library                  |
-| Calling start and shutdown, and testing real export      | This service                                 |
-
-The service adds the OTel schema to its root config schema in one line, without copying or wrapping it.
 
 ## Resource attributes
 
-The library builds these from the validated `app:` block (the service-tree values). Never set them by hand.
+The library builds these from the `app:` block of the config. Never set them by hand.
+
+```yaml
+app:
+  landscape: raichu
+  platform: tracker
+  service: zinc
+  module: webhook
+  version: 1.4.0
+```
 
 | `app:` value | OTel attribute                |
 | ------------ | ----------------------------- |
@@ -81,7 +75,7 @@ The library builds these from the validated `app:` block (the service-tree value
 | service      | `service.name`                |
 | version      | `service.version`             |
 
-It also sets the raw values as `atomi.landscape`, `atomi.platform`, `atomi.service`, `atomi.module` and `atomi.version`.
+It also sets `atomi.landscape`, `atomi.platform`, `atomi.service`, `atomi.module` and `atomi.version`. `atomi.*` is the organisation's own attribute namespace: it holds the raw values (including `module`, which has no standard attribute), so queries match the LPSM labels exactly.
 
 ## Standard `OTEL_*` environment variables win
 
@@ -89,23 +83,16 @@ If a standard `OTEL_*` variable is set (endpoint, headers, resource attributes, 
 
 ## Start and shutdown
 
-Every library:
-
-1. validates the `otel:` block;
-2. builds the resource attributes from `app:`;
-3. starts each enabled signal exactly once;
-4. gives the service a logger, meter and tracer;
-5. offers an explicit flush and shutdown;
-6. never registers process signal handlers. The service calls flush and shutdown from its own shutdown hook.
+Start telemetry once at startup. Call the library's flush and shutdown from the service's own shutdown hook (e.g. on `SIGTERM`); the library never installs signal handlers itself.
 
 Per language:
 
-- **Bun**: pino for logs, with the trace context added, written as JSON to stdout. Grafana Alloy (the collector agent on each node) reads stdout. Metrics and traces go over OTLP. Sending logs over OTLP is not implemented yet.
+- **Bun**: pino writes JSON logs, with the trace context, to stdout, and Grafana Alloy (the collector) reads stdout, so leave `otel.logs.exporter.otlp.enabled: false`. Metrics and traces go over OTLP.
 - **.NET**: `Microsoft.Extensions.Logging` and the OpenTelemetry hosting integration.
 - **Go**: `slog` and the OpenTelemetry Go SDK.
 
 ## Testing
 
-- **Unit tests**: the schema accepts and rejects the right configs; resource and sampler mapping; disabled exporters create nothing.
-- **Integration tests**: use the libraries' in-memory telemetry; never start a fake collector.
-- **Real export**: tested end to end by the deployed service through the real collector.
+- **Unit tests**: every landscape's config passes validation.
+- **Integration tests**: use the library's in-memory telemetry; never start a fake collector.
+- **Real export**: checked after deploy, in Grafana Explore.

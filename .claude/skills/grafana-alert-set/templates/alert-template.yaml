@@ -1,8 +1,8 @@
-# Save as observability/alerts/{slug}/{critical|warning|info}.yaml; the file name is the severity.
-title: '{symptom, max 48 characters, no emoji}'
+# Save as observability/alerts/{slug}/{critical|warning|info}.yaml; rules: docs/standards/observability/alerts.md
+title: '{the symptom, e.g. Retry queue saturated}'
 datasource: '{metrics | logs}'
 expr: '{query that is true while the problem lasts, e.g. queue_depth{service="zinc"} > 5000}'
 for: '{10m}'
 summary: '{what and how bad, e.g. Queue at {{ $values.A }}; dropping work}'
 description: '{the first thing to do}'
-panel: '{panel id in observability/dashboards/overview.json; delete this line to link the generic dashboard}'
+panel: 0 # an integer: the panel id in observability/dashboards/overview.json; delete the line to link the generic dashboard

@@ -6,7 +6,7 @@
 
 ## How it works
 
-{The modules and how data flows between them: bullets or a small Mermaid diagram, at most 10 lines.}
+{The modules (`{module}`, …) and how data flows between them: bullets or a small Mermaid diagram, at most 10 lines.}
 
 ## Dependencies
 
@@ -23,16 +23,16 @@
 
 ## Common commands
 
-| Purpose               | Command                                                                   |
-| --------------------- | ------------------------------------------------------------------------- |
-| Pod status            | `kubectl get pods -n {namespace}`                                         |
-| Recent errors (LogQL) | `{service="{service}", landscape="{landscape}"} \| json \| level="ERROR"` |
-| Request rate (PromQL) | `sum by (status) (rate({metric}_total{service="{service}"}[5m]))`         |
-| {Key domain query}    | `{query}`                                                                 |
-| Slow traces (TraceQL) | `{ resource.service.name="{service}" && duration > 2s }`                  |
-| Rollout restart       | `kubectl argo rollouts restart {workload} -n {namespace}`                 |
+| Purpose               | Command                                                                                      |
+| --------------------- | -------------------------------------------------------------------------------------------- |
+| Pod status            | `kubectl get pods -n {namespace}`                                                            |
+| Recent errors (LogQL) | `{service="{service}", landscape="{landscape}"} \| json \| {error filter from log-notes.md}` |
+| {Key domain query}    | `{query}`                                                                                    |
+| Slow traces (TraceQL) | `{ resource.service.name="{service}" && duration > 2s }`                                     |
+| Restart               | `kubectl rollout restart {workload} -n {namespace}`                                          |
 
 ## Links
 
-- [Curated dashboard]({url}) · [Generic dashboard]({url with LPSM variables})
+- Owner: {team} in {#channel}
+- [Curated dashboard]({grafana-url}/d/{platform}-{service}-overview) · [Generic dashboard]({grafana-url}/d/{generic-dashboard-uid}?{its LPSM variables})
 - [Deployment]({url}) · [Design doc]({url})

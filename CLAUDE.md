@@ -76,7 +76,7 @@ See [docs/standards/linting/index.md](docs/standards/linting/index.md).
 
 # Observability standards
 
-See [docs/standards/observability/index.md](docs/standards/observability/index.md).
+See [/docs/standards/observability/index.md](/docs/standards/observability/index.md).
 
 # Release automation
 

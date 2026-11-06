@@ -1,7 +1,7 @@
 # {Alert name}
 
 > Covers: 🚨 {critical title} · ⚠️ {warning title} (keep the tiers that exist)
-> Context: `observability/overview.md` · [Dashboard panel]({panel url}) · Escalation: #{channel}
+> Context: [System overview](/observability/overview.md) · [Dashboard panel]({grafana-url}/d/{platform}-{service}-overview?viewPanel={panel}) · Escalation: {team} in {#channel}
 
 {What this means and who is affected, in two plain sentences.}
 
@@ -31,8 +31,8 @@
 
 - **{Likely cause 2}**: {fix}. Confirm with: `{command}`
 
-Known cause: {YYYY-MM-DD} — {one-line incident summary}.
+Known causes: {YYYY-MM-DD — one-line incident summary}, or "none recorded yet".
 
 ## Escalation
 
-If not fixed in {30m}, or {condition}, escalate to {team} in #{channel}. Declare an incident if {user-impact condition}.
+If not fixed in {30m}, or {condition}, escalate to {team} in {#channel}. Declare an incident if {user-impact condition}.

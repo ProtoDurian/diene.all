@@ -1,8 +1,8 @@
 # Signal Decisions
 
-Use this page whenever a feature is added or changed. Walk the six gates in order, answer every one with a reason and a cost, and record the answers as one block in `observability/SIGNALS.md`. The block format is [the SIGNALS template](.claude/skills/observability-check/templates/SIGNALS-template.md).
+Use this page whenever a feature is added or changed. Walk the six gates in order, answer every one with a reason and a cost, and record the answers as one block in `observability/SIGNALS.md`. The block format is [the SIGNALS template](/.claude/skills/observability-check/templates/SIGNALS-template.md).
 
-Terms such as LPSM and ATS are defined in [Observability Standards](docs/standards/observability/index.md#terms).
+Terms such as LPSM, ATS and SLO are defined in [Observability Standards](/docs/standards/observability/index.md#terms).
 
 ## Cost: strict on metrics, liberal on logs and traces
 
@@ -10,9 +10,9 @@ Terms such as LPSM and ATS are defined in [Observability Standards](docs/standar
 | ------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | Metrics | ATS = product of each label's number of values; a histogram is about 10–15× that | **Strict.** Estimate ATS first; over 100 ATS for one feature needs a written reason |
 | Logs    | Lines × bytes × retention                                                        | **Liberal**, as long as logs follow events, not loops                               |
-| Traces  | Spans × traffic × retention                                                      | **Liberal.** The platform samples traces to control volume                          |
+| Traces  | Spans × traffic × retention                                                      | **Liberal.** The platform team samples traces in the collector                      |
 
-An unbounded label (user ID, URL, request ID) turns one metric into millions of ATS. Put IDs in logs and span attributes instead.
+An unbounded label (user ID, URL, request ID) turns one metric into millions of ATS. Put IDs in logs and span attributes instead. If the collector keeps a per-pod label (`pod` or `instance`; check one series in Grafana Explore), multiply the ATS by the replica count.
 
 ## The six gates
 
@@ -30,15 +30,15 @@ Example: one INFO line per delivery attempt with `delivery_id`, `target`, `attem
 
 ### Gate 3 — Traces (default YES for user flows)
 
-Add a span for each meaningful stage of a user flow, with key IDs as attributes. State the sampling you want. Skip tracing only for internal work with no per-request flow.
+Add a span for each meaningful stage of a user flow, with key IDs as attributes. Skip tracing only for internal work with no per-request flow. The service sets only its head-sampling `ratio` (the share of new traces kept); keeping every error trace is the collector's tail sampling, run by the platform team.
 
-Example: span `webhook.deliver` with `delivery_id`; keep every error trace, sample successes.
+Example: span `webhook.deliver` with `delivery_id`, ratio 0.1.
 
 ### Gate 4 — Dashboard (default: the generic dashboard is enough)
 
-The generic dashboard already shows request rate, errors, duration and resource use; never copy those panels. Only custom metrics from Gate 1 can earn a panel on a curated dashboard. No custom metrics means no curated dashboard. See [Dashboards](docs/standards/grafana-dashboards/index.md).
+The generic dashboard already shows request rate, errors, duration and resource use; never copy those panels. Only custom metrics from Gate 1 can earn a panel on a curated dashboard. No custom metrics means no curated dashboard. See [Dashboards](/docs/standards/grafana-dashboards/index.md).
 
-Example: "Retry queue depth" panel in the detail row.
+Example: "Retry queue depth" panel in a detail row.
 
 ### Gate 5 — Alerts (default NO)
 
@@ -46,7 +46,7 @@ An alert must pass all three checks:
 
 1. **Nothing heals it already.** If an autoscaler, restart policy or retry loop fixes the condition, do not alert on it. Alert when that mechanism is exhausted.
 2. **Someone can act.** The runbook must say what to do. "Watch it" means `info` at most, or no alert.
-3. **It can be routed.** Its LPSM labels lead to the team that owns it.
+3. **Someone owns it.** The owner team in `observability/overview.md` agrees to receive it. Delivery is the platform team's routing; if `{platform}` has no route yet, ask them.
 
 | Condition                             | Already healed by         | Alert?                          |
 | ------------------------------------- | ------------------------- | ------------------------------- |
@@ -56,28 +56,17 @@ An alert must pass all three checks:
 | One pod restart                       | restart policy            | No; a sustained crash loop: yes |
 | Retry queue growing despite retries   | retries are losing        | Yes                             |
 
-For each alert that survives, record its tier count (1 for a plain failure, 2 for capacity or slow decline, 3 only when the trend matters), its type (see [Alerts](docs/standards/observability/alerts.md)), and a **noise budget**: how often you expect it to fire, e.g. "≤2 pages/month". An alert that fires more often than someone acts fails check 2.
+For each alert that survives, record its tiers ([how many](/docs/standards/observability/alerts.md#one-alert-set--one-folder)), its type (see [Alerts](/docs/standards/observability/alerts.md)), any SLO it uses, and a **noise budget**: how often you expect it to fire, e.g. "≤2 pages/month". An alert that fires more often than someone acts fails check 2.
 
 ### Gate 6 — Alert-set folders
 
-Each Gate 5 alert becomes one folder, `observability/alerts/<slug>/`, with its tier files and `runbook.md`, in the same PR. The slug is the alert name in lower case with spaces turned into hyphens, using only `a-z`, `0-9` and `-`: `Webhook retry queue` → `webhook-retry-queue`.
-
-## Worked example
-
-| Gate      | Decision                                                                                              | Why                                                       |
-| --------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Metrics   | Yes: `webhook_retry_queue_depth` (gauge, ~4 ATS), `webhook_delivery_failures_total` (counter, ~8 ATS) | Queue depth drives capacity; failures give the error rate |
-| Logs      | Yes: one line per delivery attempt, one ERROR per permanent failure                                   | Rebuild the order of events when debugging                |
-| Traces    | Yes: span per delivery attempt; keep errors, sample successes                                         | See why one delivery was slow or failed                   |
-| Dashboard | Curated: queue depth (detail row), failure rate (overview row)                                        | Custom metrics                                            |
-| Alerts    | Yes: 2 tiers on queue depth; none on retry rate                                                       | Retrying is the healing; alert when it is losing          |
-| Folders   | `alerts/webhook-retry-queue/`                                                                         |                                                           |
+Each Gate 5 alert becomes one folder, `observability/alerts/<slug>/`, with its tier files and `runbook.md`, in the same PR. The slug is the alert name in lower case with spaces turned into hyphens, using only `a-z`, `0-9` and `-`: `Retry queue` → `retry-queue`. Keep it short: it is part of a uid with a length limit ([Shipping](/docs/standards/observability/shipping.md#structural-checks)).
 
 ## Review checklist
 
 - [ ] The feature has a block in `SIGNALS.md` with all six gates answered.
 - [ ] Every answer has a one-line reason; a bare YES or NO fails review.
 - [ ] Every YES names its metric, log event, span, panel or folder, and its cost (ATS, log volume or sampling).
-- [ ] Every Gate 5 YES has a tier count, an alert type and a noise budget.
-- [ ] Everything named exists in the PR: the metric in code, each Gate 6 folder under `observability/alerts/`.
-- [ ] No unbounded metric labels, no logs in hot loops, a sampling choice for every trace.
+- [ ] Every Gate 5 YES has its tiers, an alert type and a noise budget.
+- [ ] Everything named exists in the PR: the metric in the service code, each Gate 6 folder under `observability/alerts/`.
+- [ ] No unbounded metric labels, no logs in hot loops, a sampling ratio for every trace.

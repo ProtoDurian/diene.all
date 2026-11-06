@@ -1,22 +1,23 @@
 # Runbooks and the System Overview
 
-- **Every alert set has its own runbook** at `observability/alerts/<slug>/runbook.md`. The chart refuses to render a set without one.
+- **Every alert set has its own runbook** at `observability/alerts/<slug>/runbook.md`.
 - **Shared context lives once** in `observability/overview.md`. Runbooks link to it instead of repeating it.
+- **Namespace, workload, team, channel and Grafana URL** come from the platform team; see [Values the platform team gives you](/docs/standards/observability/index.md#values-the-platform-team-gives-you).
 
 ## The system overview
 
-Write `observability/overview.md` from [the overview template](.claude/skills/grafana-runbook/templates/overview-template.md). It is the one page a responder who has never seen this service reads first. Fill every section, and keep it to one screen. A command used by more than one runbook goes in its Common commands table, not in each runbook.
+Write `observability/overview.md` from [the overview template](/.claude/skills/grafana-runbook/templates/overview-template.md). It is the one page a responder who has never seen this service reads first. Fill every section, and keep it to one screen. A command used by more than one runbook goes in its Common commands table, not in each runbook.
 
 ## The per-alert runbook
 
-Start from [the runbook template](.claude/skills/grafana-runbook/templates/runbook-template.md). The reader is half awake, so every step is copy-paste and every judgment is spelled out.
+Start from [the runbook template](/.claude/skills/grafana-runbook/templates/runbook-template.md). The reader is half awake, so every step is copy-paste and every judgment is spelled out.
 
 - **Triage, Remediation and Escalation are required sections.** A branchy alert may open Triage with a small Mermaid flowchart.
-- **Every fix ends with a check.** Example: "Restart the consumer. Confirm with: `kubectl rollout status deploy/zinc-webhook -n tracker`".
+- **Every fix ends with a check.** Example: "Restart the consumer. Confirm with: `kubectl rollout status {workload} -n {namespace}`".
 - **Say what good looks like.** Example: "Normal is under 100; over 1000 means the consumer is stuck."
-- **Record past incidents** in place: `Known cause: 2026-03-02 — expired TLS cert on the partner endpoint.` Updating the runbook is part of every incident follow-up.
+- **Record past incidents** in place: `Known cause: 2026-03-02 — expired TLS cert on the partner endpoint.` A new service writes `Known causes: none recorded yet.` Updating the runbook is part of every incident follow-up.
 - **Code blocks hold only commands, queries or output.** Prose goes outside them.
-- **A runbook that only restates the alert** means nobody can act on it, so the alert fails Gate 5. Go back to [Signal decisions](docs/standards/observability/signals.md).
+- **A runbook that only restates the alert** means nobody can act on it, so the alert fails Gate 5. Go back to [Signal decisions](/docs/standards/observability/signals.md).
 
 ## Review checklist
 
