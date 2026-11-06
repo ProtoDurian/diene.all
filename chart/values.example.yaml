@@ -1,5 +1,5 @@
+# Audit landscape: violations warn and audit, nothing is blocked.
 serviceTree:
   landscape: example
 
-primordial:
-  targetLandscape: example
+enforcement: audit
