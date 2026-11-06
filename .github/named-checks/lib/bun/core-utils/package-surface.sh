@@ -36,7 +36,7 @@ exports_want='{".":{"import":{"types":"./dist/index.d.ts","default":"./dist/inde
 for p in src/adapters src/lib/sample src/test-helper src/fs.ts src/lib/fs.ts; do
   [[ -z "$(git ls-tree --name-only "${tree}" -- "${p}")" ]] || fail "path must not be tracked: ${p}"
 done
-[[ -z "$(git ls-tree --name-only "${tree}" -- src | grep -v -e '^src/index.ts$' -e '^src/lib$' || true)" ]] || fail "src/ holds more than index.ts and lib/"
+[[ -z "$(git ls-tree --name-only "${tree}" -- src/ | grep -v -e '^src/index.ts$' -e '^src/lib$' || true)" ]] || fail "src/ holds more than index.ts and lib/"
 [[ "$(git show "${tree}:.github/workflows/ci.yaml" | yq '.jobs | has("int")')" == true ]] || fail "ci.yaml dropped the integration tier (A121 keeps it, empty)"
 [[ -n "$(git ls-tree --name-only "${tree}" -- bunfig.int.toml)" ]] || fail "bunfig.int.toml is not tracked (A121 keeps it)"
 
