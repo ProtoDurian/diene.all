@@ -12,6 +12,8 @@
     "@atomicloud/diene.config": "^1.0.0",
     "@atomicloud/diene.problems": "^1.0.0",
     "@atomicloud/diene.result": "^1.0.2",
+    "@better-auth/api-key": "^1.7.18",
+    "@better-auth/oauth-provider": "^1.7.18",
     "@hono/zod-validator": "^0.9.1",
     "aws4fetch": "^1.0.20",
     "better-auth": "^1.7.18",
