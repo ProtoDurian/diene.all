@@ -1,2 +1,0 @@
-Store artifacts in S3 or Cloudflare R2.
-Near misses stay legal: R2D2, S3_bucket, foo-R2, OD9, RB-x, GAP-, A125, !Ax.

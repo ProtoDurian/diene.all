@@ -5,8 +5,8 @@ parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ workspace .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 
-topics='datetime|domain-driven-design|functional-practices|software-design-philosophy|solid-principles|stateless-oop-di|testing|three-layer-architecture|utilities|validation'
-added_pattern="^(docs/standards/(${topics}|wire-format)/index\.md|\.claude/skills/(${topics})/SKILL\.md|probes/(docs-markdownlint|docs-prettier|rule-ids|standards-inventory|thin-skills)\.ts|scripts/ci/rule-ids\.awk|tests/fixtures/rule-ids/(pass|fail)\.txt|\.github/named-checks/shared/[^/]+|\.markdownlint-cli2\.jsonc)$"
+topics='datetime|domain-driven-design|functional-practices|software-design-philosophy|solid-principles|stateless-oop-di|testing|three-layer-architecture|utilities|validation|wire-format'
+added_pattern="^(docs/standards/(${topics})/index\.md|\.claude/skills/(${topics})/SKILL\.md|probes/(docs-markdownlint|docs-prettier|standards-inventory|thin-skills)\.ts|\.github/named-checks/shared/[^/]+|\.markdownlint-cli2\.jsonc)$"
 insert_only_pattern='^(nix/pre-commit\.nix|probes/features\.json)$'
 
 # index tree == HEAD in CI; keeps local staged mutations visible
