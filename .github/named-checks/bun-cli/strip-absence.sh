@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # Nothing bun-base-wo-helm stripped comes back, and no observability surface
-# arrives: no Helm path, reference, job, include, probe row or helm-carrying
-# nix aggregate; no helm binary in the default shell; no OpenTelemetry or
-# @atomicloud/diene.* observability dependency, import or variable.
+# arrives: no Helm path, reference, job, include, probe row, smoke line or
+# prose; no OpenTelemetry or @atomicloud/diene.* observability dependency,
+# import or variable. Binaries are not checked (owner !A103).
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -57,29 +57,13 @@ show() { git show "${tree}:$1"; }
 deps="$(show package.json | jq -r '[(.dependencies // {}), (.devDependencies // {}), (.peerDependencies // {})] | add | keys[] | select(test("^@opentelemetry/|^@atomicloud/diene\\."))')"
 [[ -z ${deps} ]] || fail "package.json declares observability dependencies: ${deps//$'\n'/, }"
 
-for f in nix/packages.nix nix/env.nix; do
-  if show "${f}" | grep -v '^ *#' | grep -Eq '(^|[^A-Za-z0-9-])(infralint|infrautils|kubernetes-helm|helm|helm-docs|helmlint)([^A-Za-z0-9-]|$)'; then
-    fail "${f} declares a helm-carrying package"
-  fi
-done
-
-# -i clears the caller's PATH, so only the shell's own inputs resolve. The
-# positive control proves the lookup is not vacuous.
-# shellcheck disable=SC2016
-nix develop -i --keep HOME .#default -c bash -c '
-  set -u
-  bad=0
-  for b in helm helm-docs helmlint; do
-    if p="$(command -v "$b")"; then echo "❌ default shell carries $b at $p" >&2; bad=1; fi
-  done
-  for b in docker bun goreleaser; do
-    command -v "$b" >/dev/null || { echo "❌ control: default shell lost $b" >&2; bad=1; }
-  done
-  exit "$bad"
-' || fail "default shell helm absence / control presence"
+if show probes/binary-smoke.ts | grep -Eq '^(helm|helm-docs|helmlint) '; then fail "binary-smoke.ts smokes an H binary"; fi
+if git grep -n -i -E 'helm|image or chart' "${tree}" -- docs/standards/ci-cd/index.md; then fail "ci-cd publishing prose names Helm"; fi
+if git grep -n -F 'Docker, Helm, secrets' "${tree}" -- README.md; then fail "README.md lists Helm"; fi
+if git grep -n -F 'image and chart values' "${tree}" -- docs/standards/taskfile/index.md; then fail "taskfile rule 5 names charts"; fi
 
 if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ strip-absence: no Helm or observability path, reference, entry, dependency, nix aggregate or shell binary"
+echo "✅ strip-absence: no Helm or observability path, reference, entry, dependency, smoke line or prose"
