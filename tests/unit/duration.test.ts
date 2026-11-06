@@ -16,7 +16,7 @@ describe('WireDurationConverter', () => {
     const actual = converter.toMilliseconds(input);
 
     // Assert
-    actual.should.eql(expected);
+    actual.should.equal(expected);
   });
 
   it.each([
