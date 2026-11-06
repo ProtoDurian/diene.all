@@ -9,26 +9,35 @@ fail() {
   failed=1
 }
 
+# evaluated, so Directory.*.props overrides count
+evaluate() {
+  dotnet msbuild "$1" -getProperty:PackageId -getProperty:AssemblyName -getProperty:IsPackable \
+    -getProperty:RootNamespace -getItem:PackageReference
+}
+
 prop() {
-  xmlstarlet sel -t -v "/Project/PropertyGroup/$2" "$1" 2>/dev/null || true
+  jq -r --arg name "$2" '.Properties[$name] // ""' <<<"$1"
 }
 
 for pair in "Lib/Lib.csproj:AtomiCloud.Diene.Result" "TestHelper/TestHelper.csproj:AtomiCloud.Diene.Result.TestHelper"; do
   project="${pair%%:*}"
   want="${pair#*:}"
-  [[ "$(prop "${project}" PackageId)" == "${want}" ]] || fail "${project} PackageId is not ${want}"
-  [[ "$(prop "${project}" AssemblyName)" == "${want}" ]] || fail "${project} AssemblyName is not ${want}"
-  [[ "$(prop "${project}" IsPackable)" == true ]] || fail "${project} is not packable"
+  eval_json="$(evaluate "${project}")" || { fail "${project} does not evaluate" && continue; }
+  [[ "$(prop "${eval_json}" PackageId)" == "${want}" ]] || fail "${project} PackageId is not ${want}"
+  [[ "$(prop "${eval_json}" AssemblyName)" == "${want}" ]] || fail "${project} AssemblyName is not ${want}"
+  [[ "$(prop "${eval_json}" IsPackable)" == true ]] || fail "${project} is not packable"
+  [[ "$(prop "${eval_json}" RootNamespace)" == AtomiCloud.Diene.Results* ]] || fail "${project} RootNamespace leaves AtomiCloud.Diene.Results"
+  if [[ ${project} == Lib/Lib.csproj ]]; then
+    deps="$(jq -r '[.Items.PackageReference[]?.Identity] | join(", ")' <<<"${eval_json}")"
+    [[ -z ${deps} ]] || fail "${project} takes a runtime dependency: ${deps}"
+  fi
 done
 
-for project in Lib/Lib.csproj TestHelper/TestHelper.csproj; do
-  [[ "$(prop "${project}" RootNamespace)" == AtomiCloud.Diene.Results* ]] || fail "${project} RootNamespace leaves AtomiCloud.Diene.Results"
-done
-
-deps="$(xmlstarlet sel -t -v '//PackageReference/@Include' Lib/Lib.csproj 2>/dev/null || true)"
-[[ -z ${deps} ]] || fail "Lib/Lib.csproj takes a runtime dependency: ${deps//$'\n'/, }"
-
-[[ "$(prop App/App.csproj IsPackable)" == false ]] || fail "App/App.csproj must stay IsPackable=false"
+if ! app="$(evaluate App/App.csproj)"; then
+  fail "App/App.csproj does not evaluate"
+elif [[ "$(prop "${app}" IsPackable)" != false ]]; then
+  fail "App/App.csproj must stay IsPackable=false"
+fi
 
 skills="$(git ls-files -- 'skills/*/SKILL.md' | cut -d/ -f2 | sort -u | paste -sd' ' -)"
 [[ ${skills} == diene-dotnet-result-usage ]] || fail "shipped skills are '${skills}', want diene-dotnet-result-usage only"
