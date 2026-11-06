@@ -1,0 +1,29 @@
+name: ⚡ Reusable Aluminium
+
+on:
+  workflow_call:
+
+jobs:
+  unit:
+    name: Aluminium Unit
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Run the unit tier
+        run: nix develop .#ci -c ./scripts/ci/aluminium.sh
+
+  integration:
+    name: Aluminium Integration
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Install on k3d and send OTLP to :4318
+        run: nix develop .#ci -c ./scripts/ci/aluminium-k3d.sh

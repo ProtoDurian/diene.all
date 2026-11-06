@@ -1,12 +1,19 @@
 serviceTree:
   cluster: lapras
 
-# Disabled: their CRDs are not installed in k3d.
+# The k3d emulated stack is unauthenticated and has no ExternalSecret CRD.
 secret:
   enabled: false
 
-webhookRoute:
-  enabled: false
-
-primordial:
-  enabled: false
+upstream:
+  cluster:
+    name: lapras
+  destinations:
+    victoriametrics: { auth: { type: none }, secret: { embed: true } }
+    gigapipe: { auth: { type: none }, secret: { embed: true } }
+  collectorCommon:
+    alloy:
+      labels: &lpsm
+        atomi.cloud/cluster: lapras
+      controller:
+        podLabels: *lpsm

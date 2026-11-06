@@ -1,5 +1,10 @@
 serviceTree:
   landscape: example
 
-primordial:
-  targetLandscape: example
+upstream:
+  collectorCommon:
+    alloy:
+      labels: &lpsm
+        atomi.cloud/landscape: example
+      controller:
+        podLabels: *lpsm
