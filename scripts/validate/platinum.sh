@@ -334,6 +334,35 @@ publish-oci)
   [ ! -s "${tmp}/oci/platinum-0.1.0.tgz" ] && echo "❌ OCI chart package missing" >&2 && exit 1
   rg -q '^oci://registry.example.invalid/charts$' "${tmp}/oci/oci-ref.txt"
   ;;
+publish-https-dep)
+  root="$(pwd)"
+  mkdir -p "${tmp}/repo" "${tmp}/fixture/chart"
+  helm create "${tmp}/upstream" >/dev/null
+  helm package "${tmp}/upstream" --destination "${tmp}/repo" >/dev/null
+  od -An -N16 -tx1 /dev/urandom | tr -d ' \n' >"${tmp}/repo/token"
+  server=""
+  trap 'kill "${server:-}" 2>/dev/null; rm -rf "${tmp}"' EXIT
+  for _ in 1 2 3 4 5; do
+    port=$((20000 + RANDOM % 20000))
+    nc -s 127.0.0.1 -p "${port}" -L httpd "${tmp}/repo" &
+    server=$!
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      curl -fsS "http://127.0.0.1:${port}/token" 2>/dev/null | cmp -s - "${tmp}/repo/token" && break 2
+      sleep 0.5
+    done
+    kill "${server}" 2>/dev/null
+    server=""
+  done
+  [ -z "${server}" ] && echo "❌ could not start the fixture chart repository" >&2 && exit 1
+  helm repo index "${tmp}/repo" --url "http://127.0.0.1:${port}"
+  printf 'apiVersion: v2\nname: platinum\nversion: 0.1.0\ndependencies:\n  - name: upstream\n    version: 0.1.0\n    repository: http://127.0.0.1:%s\n' "${port}" >"${tmp}/fixture/chart/Chart.yaml"
+  HELM_REPOSITORY_CONFIG="${tmp}/lock/repositories.yaml" HELM_REPOSITORY_CACHE="${tmp}/lock/cache" helm dependency update "${tmp}/fixture/chart" >/dev/null
+  (cd "${tmp}/fixture" && HELM_REPOSITORY_CONFIG="${tmp}/empty/repositories.yaml" HELM_REPOSITORY_CACHE="${tmp}/empty/cache" \
+    PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/out" bash "${root}/scripts/ci/publish.sh") >/dev/null
+  tar -tzf "${tmp}/out/platinum-0.1.0.tgz" | rg -q '^platinum/charts/upstream/Chart.yaml$' ||
+    { echo "❌ chart with a repository-URL dependency did not package it" >&2 && exit 1; }
+  [ -e "${tmp}/empty/repositories.yaml" ] && echo "❌ publish wrote to the caller's Helm repository config" >&2 && exit 1
+  ;;
 version)
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh >/dev/null
   expect_red 'tag differs from Chart.yaml' 'does not match tag' env PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v9.9.9 PUBLISH_OUTPUT_DIR="${tmp}/bad" bash ./scripts/ci/publish.sh
