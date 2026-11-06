@@ -1,0 +1,51 @@
+{{- include "vanadium.validateServiceTree" . -}}
+{{- $root := . -}}
+{{- $prefix := include "vanadium.labelPrefix" . -}}
+{{- range $name, $cfg := .Values.policies }}
+{{- if $cfg.enabled }}
+{{- $policy := include (printf "vanadium.policy.%s" $name) $root | fromYaml }}
+{{- $policyName := include "vanadium.resourceName" (dict "root" $root "token" $name) }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ $policyName }}
+  labels:
+    {{- include "vanadium.labels" $root | nindent 4 }}
+  annotations:
+    {{- include "vanadium.annotations" $root | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      {{- include "vanadium.rules" $policy.rules | nindent 6 }}
+  {{- if eq $policy.rules "pods" }}
+  variables:
+    {{- include "vanadium.podVariables" $root | nindent 4 }}
+  {{- else if eq $policy.rules "lpsm" }}
+  variables:
+    {{- include "vanadium.lpsmVariables" $root | nindent 4 }}
+  {{- end }}
+  validations:
+    - expression: {{ $policy.expression | quote }}
+      message: {{ $policy.message | quote }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ $policyName }}
+  labels:
+    {{- include "vanadium.labels" $root | nindent 4 }}
+  annotations:
+    {{- include "vanadium.annotations" $root | nindent 4 }}
+spec:
+  policyName: {{ $policyName }}
+  validationActions: {{ include "vanadium.actions" (dict "root" $root "name" $name "cfg" $cfg) }}
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+        - key: {{ printf "%s/%s" $prefix $root.Values.exemptionLabel | quote }}
+          operator: NotIn
+          values: ['true']
+{{- end }}
+{{- end }}

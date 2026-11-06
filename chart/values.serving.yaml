@@ -1,0 +1,5 @@
+# Enforcing landscape: every policy binds [Deny].
+serviceTree:
+  landscape: serving
+
+enforcement: deny
