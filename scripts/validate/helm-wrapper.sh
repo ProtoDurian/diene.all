@@ -219,19 +219,22 @@ publish-https-dep)
   mkdir -p "${tmp}/repo" "${tmp}/fixture/chart"
   helm create "${tmp}/upstream" >/dev/null
   helm package "${tmp}/upstream" --destination "${tmp}/repo" >/dev/null
+  od -An -N16 -tx1 /dev/urandom | tr -d ' \n' >"${tmp}/repo/token"
+  server=""
+  trap 'kill "${server:-}" 2>/dev/null; rm -rf "${tmp}"' EXIT
   for _ in 1 2 3 4 5; do
     port=$((20000 + RANDOM % 20000))
     nc -s 127.0.0.1 -p "${port}" -L httpd "${tmp}/repo" &
     server=$!
-    sleep 0.5
-    kill -0 "${server}" 2>/dev/null && break
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      curl -fsS "http://127.0.0.1:${port}/token" 2>/dev/null | cmp -s - "${tmp}/repo/token" && break 2
+      sleep 0.5
+    done
+    kill "${server}" 2>/dev/null
     server=""
   done
   [ -z "${server}" ] && echo "❌ could not start the fixture chart repository" >&2 && exit 1
-  trap 'kill "${server}" 2>/dev/null; rm -rf "${tmp}"' EXIT
   helm repo index "${tmp}/repo" --url "http://127.0.0.1:${port}"
-  curl -fsS "http://127.0.0.1:${port}/index.yaml" | cmp -s - "${tmp}/repo/index.yaml" ||
-    { echo "❌ fixture chart repository is not serving its index" >&2 && exit 1; }
   printf 'apiVersion: v2\nname: diene-helm-wrapper\nversion: 0.1.0\ndependencies:\n  - name: upstream\n    version: 0.1.0\n    repository: http://127.0.0.1:%s\n' "${port}" >"${tmp}/fixture/chart/Chart.yaml"
   HELM_REPOSITORY_CONFIG="${tmp}/lock/repositories.yaml" HELM_REPOSITORY_CACHE="${tmp}/lock/cache" helm dependency update "${tmp}/fixture/chart" >/dev/null
   (cd "${tmp}/fixture" && HELM_REPOSITORY_CONFIG="${tmp}/empty/repositories.yaml" HELM_REPOSITORY_CACHE="${tmp}/empty/cache" \
