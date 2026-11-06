@@ -46,7 +46,16 @@ const TimeOfDay = z.iso.time({ precision: 0 }).transform(s => Temporal.PlainTime
 ```typescript
 JSON.stringify({ at: zoned.toInstant().toString({ fractionalSecondDigits: 3 }), zone: zoned.timeZoneId });
 // '{"at":"2024-03-15T14:30:00.000Z","zone":"Asia/Singapore"}'
-const Zoned = z.object({ at: Instant, zone: z.string() }).transform(({ at, zone }) => at.toZonedDateTimeISO(zone));
+const isZone = (zone: string) => {
+  try {
+    return Boolean(Temporal.Now.zonedDateTimeISO(zone));
+  } catch {
+    return false;
+  }
+};
+const Zoned = z
+  .object({ at: Instant, zone: z.string().refine(isZone) })
+  .transform(({ at, zone }) => at.toZonedDateTimeISO(zone));
 ```
 
 ## Duration
