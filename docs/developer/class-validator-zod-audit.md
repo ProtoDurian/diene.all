@@ -20,8 +20,9 @@ helium's `enableImplicitConversion: true` converted each env string from the
 property's reflected TypeScript type (`design:type`). zod has no reflection, so
 the loader walks the registry's root zod schema alongside the env path instead:
 it peels `optional` / `nullable` / `default` / `prefault` / `readonly` / `catch`
-/ `lazy`, takes a pipe's input side, follows every member of a union (including
-discriminated) or intersection, and a record's, tuple's or catchall's value type.
+/ `lazy`, takes a pipe's input side (the output side for `z.preprocess`),
+follows every member of a union (including discriminated) or intersection, and
+a record's, tuple's or catchall's value type.
 It then converts by the one leaf type all candidates agree on.
 
 | leaf type                   | helium (class-transformer)                | this lib                                                                              |
@@ -29,7 +30,7 @@ It then converts by the one leaf type all candidates agree on.
 | `string` (and string enums) | stays a string                            | stays a string (`0123`, `true`, `123456` are kept as text)                            |
 | numeric TS enum             | `Number(value)`                           | zod number parse                                                                      |
 | `number`                    | `Number(value)`, so `''` → 0, `0x10` → 16 | zod number parse of a decimal only; anything else stays a string and fails validation |
-| `boolean`                   | `Boolean(value)`, so `'false'` → true     | `true` / `false` only (any case); anything else throws `ConfigLoaderError`            |
+| `boolean`                   | `Boolean(value)`, so `'false'` → true     | `true` / `false` only (any case); else `ConfigLoaderError`, unless `.catch()` is set  |
 | `bigint`, `date`            | `design:type` constructor                 | stays a string, so `z.coerce.bigint()` / `z.coerce.date()` parse it exactly           |
 | array                       | not converted from env                    | indexed keys `KEY__0`, `KEY__1`, element type applied per index                       |
 | no single type (see gaps)   | not converted                             | plain scalar guess: `true`/`false`, then decimal number, else string                  |

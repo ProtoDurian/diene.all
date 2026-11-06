@@ -37,6 +37,7 @@ build-time/runtime.
 
 Runtime env still wins over a build-time value wherever both exist.
 `BuildTimeValueMapper` keeps only `<prefix>CLIENT__*` and `<prefix>SHARED__*` keys and drops any key with a `BUILD` segment.
+`shared.*` is inlined into client bundles: never put a secret there.
 
 ## Env-override rules
 

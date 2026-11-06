@@ -1,7 +1,7 @@
 # Configuration
 
 `@atomicloud/diene.config` is the one config-loading engine for the AtomiCloud
-TypeScript family (the R14 config contract). It loads YAML layers, deep-merges
+TypeScript family (the config contract). It loads YAML layers, deep-merges
 them, validates the service-composed root schema, and serves typed slices via
 `config(key)`. It is the family's only merger/validator: engine libraries
 (auth-engine, otel, api-engine, …) each own and export their own zod block
@@ -43,21 +43,22 @@ incomplete as long as the merged result satisfies the root schema.
   out-of-range (> 4096) index into a list throws `ConfigLoaderError`.
 - **Shorter paths apply first**, so `ATOMI_A` and `ATOMI_A__B` give the same
   result whatever order the environment lists them in.
-- **Coercion follows the schema's leaf type**, never a hand-rolled `Number()`
-  (M31). The loader sees through wrappers, pipes, `lazy`, unions (including
+- **Coercion follows the schema's leaf type**, never a hand-rolled `Number()`.
+  The loader sees through wrappers, pipes, `lazy`, unions (including
   discriminated), intersections, records, tuples and catchall. A string field
   keeps the raw text (`0123`, `true`, `123456` stay strings), a number field
   is parsed by zod. A field with no single type (a union whose members disagree,
   `unknown`, an unregistered key) gets the plain scalar coercion. A value the type
   cannot take stays a string, so validation reports it.
 - **Booleans take only `true` / `false`**; anything else throws
-  `ConfigLoaderError`. Declare them `z.boolean()` or `z.stringbool()`, never
+  `ConfigLoaderError`, unless the field has a `.catch()`, whose fallback then
+  applies. Declare them `z.boolean()` or `z.stringbool()`, never
   `z.coerce.boolean()`, which reads any other text as `true`.
 - **A key under a schema the loader cannot walk** (`z.custom`, `z.map`,
   `z.set`, …) throws `ConfigLoaderError` instead of being dropped.
 - **Dates come in as ISO text** (`2024-01-31T00:00:00Z`) for `z.coerce.date()`;
   epoch milliseconds are rejected.
-- **A blank env value means UNSET** (M33): it is dropped, leaving the file value,
+- **A blank env value means UNSET**: it is dropped, leaving the file value,
   never written as an empty string.
 - **Secrets are blank in YAML** and injected at runtime (Infisical). Since
   secrets only materialize as runtime env, a fully-static frontend carries none.
