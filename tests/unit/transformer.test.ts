@@ -2,7 +2,7 @@ import { describe, it } from 'bun:test';
 import { ProblemFactory, ProblemGuard, ProblemRegistry, ProblemTransformer } from '@atomicloud/diene.problems';
 import 'should';
 import { z } from 'zod';
-import { portal } from './support/fixtures';
+import { portal, thrown } from './support/fixtures';
 
 class TransformerFixture {
   readonly registry = new ProblemRegistry(portal);
@@ -117,7 +117,7 @@ describe('ProblemTransformer.fromError', () => {
     seen.should.eql([thrownError]);
   });
 
-  it('should take the detail from an Error, string, detail, message, or a default', () => {
+  it('should take the detail from the thrown value, else the first message in the chain, else a default', () => {
     // Arrange
     const { fallback, transformer } = new TransformerFixture();
     const inputs: readonly unknown[] = [
@@ -126,6 +126,8 @@ describe('ProblemTransformer.fromError', () => {
       { detail: 'detail failure' },
       { message: 'message failure' },
       { error: new Error('nested only') },
+      { error: 'boom' },
+      { cause: { detail: 'deep detail' } },
       42,
     ];
 
@@ -140,7 +142,9 @@ describe('ProblemTransformer.fromError', () => {
         'plain failure',
         'detail failure',
         'message failure',
-        'An unexpected error occurred',
+        'nested only',
+        'boom',
+        'deep detail',
         'An unexpected error occurred',
       ]);
     actual.every(problem => problem.type === fallback.type).should.be.true();
@@ -244,5 +248,53 @@ describe('ProblemTransformer.fromHttpError', () => {
     text.detail!.should.equal('plain response');
     empty.detail!.should.equal('Gateway Timeout');
     blank.detail!.should.equal('HTTP request failed');
+  });
+});
+
+describe('ProblemTransformer construction', () => {
+  it('should require fallbackData for a fallback with a data schema', () => {
+    // Arrange
+    const { fallback } = new TransformerFixture();
+    const options = { fallback };
+
+    // Act
+    // @ts-expect-error a fallback with a data schema needs a fallbackData mapper
+    const error = thrown(() => new ProblemTransformer(options));
+
+    // Assert
+    error.should.be.instanceOf(TypeError);
+    error.message.should.equal('Problem transformer fallback unexpected_error needs a fallbackData mapper');
+  });
+
+  it('should refuse fallbackData for a fallback without a data schema', () => {
+    // Arrange
+    const { registry } = new TransformerFixture();
+    const fallback = registry.register({ id: 'gone', title: 'Gone', status: 410, recoverable: false, version: 'v1' });
+    const options = { fallback, fallbackData: () => ({}) };
+
+    // Act
+    // @ts-expect-error a fallback without a data schema takes no fallbackData mapper
+    const error = thrown(() => new ProblemTransformer(options));
+
+    // Assert
+    error.message.should.equal('Problem transformer fallback gone must not take a fallbackData mapper');
+  });
+});
+
+describe('ProblemTransformer.fromHttpError messages', () => {
+  it('should take the first message nested in an HTTP body, else the generic detail', async () => {
+    // Arrange
+    const { transformer } = new TransformerFixture();
+
+    // Act
+    const nested = await transformer.fromHttpError(
+      new Response(JSON.stringify({ error: { message: 'quota exceeded' } }), { status: 429 }),
+    );
+    const silent = await transformer.fromHttpError(new Response(JSON.stringify({ code: 7 }), { status: 500 }));
+
+    // Assert
+    nested.detail!.should.equal('quota exceeded');
+    nested.status.should.equal(429);
+    silent.detail!.should.equal('An unexpected error occurred');
   });
 });
