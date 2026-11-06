@@ -1,0 +1,29 @@
+name: ⚡ Reusable Zinc
+
+on:
+  workflow_call:
+
+jobs:
+  unit:
+    name: Zinc Unit
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Run the unit tier
+        run: nix develop .#ci -c ./scripts/ci/zinc.sh
+
+  integration:
+    name: Zinc Integration
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Install sulfur then zinc on k3d and read the ClusterIssuers back
+        run: nix develop .#ci -c ./scripts/ci/zinc-k3d.sh

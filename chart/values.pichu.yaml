@@ -1,0 +1,8 @@
+# Registered-fleet serving row (Q-I33): LE staging, for rate-limit protection.
+serviceTree:
+  landscape: pichu
+
+issuer:
+  refs:
+    - token: letsencrypt
+      directory: staging

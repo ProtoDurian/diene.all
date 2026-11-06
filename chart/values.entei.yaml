@@ -1,0 +1,13 @@
+# ENTEI host (Q-ENV47): CI issuance selects zinc-staging, trusted interactive TLS selects zinc-production.
+serviceTree:
+  landscape: entei
+
+issuer:
+  dnsZones:
+    - eevee.dev.atomi.cloud
+    - castform.dev.atomi.cloud
+  refs:
+    - token: staging
+      directory: staging
+    - token: production
+      directory: production

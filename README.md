@@ -48,12 +48,11 @@ checks that it names every surface.
 
 This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, Docker, Helm, secrets, release configuration, validators, and standards.
 
-# Helm wrapper
+# Zinc
 
-This branch adds the wrapper chart, stacked values, generated schema, rendered-manifest validation, k3d proof, and dual publish modes.
+This branch materializes the Helm wrapper as `zinc`: the Let's Encrypt ACME DNS-01 (Cloudflare) `ClusterIssuer` set on sulfur's cert-manager, plus the one ExternalSecret for the Cloudflare token. It wraps no upstream chart and renders no `Certificate`.
 
-- `task build` — vendor external config and build pinned chart dependencies.
-- `task test:unit` — run schema, lint, render, contracts, VAP, and publish dry-runs.
-- `task test:int` — install on ephemeral k3d and round-trip the chart through a local OCI registry.
-- `task example:lapras:template` — render the independent landscape + cluster stack.
-- [Helm wrapper baseline](docs/developer/helm-wrapper-baseline.md)
+- `task test:unit` — run schema, lint, render, LPSM, directory map, issuer cardinality, ENTEI, no-Certificate, credential, VAP-stage, and publish checks.
+- `task test:int` — install sulfur then zinc on ephemeral k3d, read the ClusterIssuers back, and round-trip the chart through a local OCI registry.
+- `task pikachu:template` (or `example`, `raichu`, `ampharos`, `pichu`, `entei`) — render one landscape overlay.
+- [Zinc baseline](docs/developer/zinc-baseline.md)

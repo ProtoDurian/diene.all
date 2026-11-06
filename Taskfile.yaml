@@ -2,13 +2,42 @@ version: '3'
 
 includes:
   helm: tasks/Taskfile.helm.yaml
-  example:lapras:
+  example:
     taskfile: tasks/Taskfile.cluster.yaml
     vars:
-      RELEASE_NAME: helm-wrapper
-      NAMESPACE: sample
+      RELEASE_NAME: zinc
+      NAMESPACE: certs
       LANDSCAPE: example
-      CLUSTER: lapras
+  pikachu:
+    taskfile: tasks/Taskfile.cluster.yaml
+    vars:
+      RELEASE_NAME: zinc
+      NAMESPACE: certs
+      LANDSCAPE: pikachu
+  raichu:
+    taskfile: tasks/Taskfile.cluster.yaml
+    vars:
+      RELEASE_NAME: zinc
+      NAMESPACE: certs
+      LANDSCAPE: raichu
+  ampharos:
+    taskfile: tasks/Taskfile.cluster.yaml
+    vars:
+      RELEASE_NAME: zinc
+      NAMESPACE: certs
+      LANDSCAPE: ampharos
+  pichu:
+    taskfile: tasks/Taskfile.cluster.yaml
+    vars:
+      RELEASE_NAME: zinc
+      NAMESPACE: certs
+      LANDSCAPE: pichu
+  entei:
+    taskfile: tasks/Taskfile.cluster.yaml
+    vars:
+      RELEASE_NAME: zinc
+      NAMESPACE: certs
+      LANDSCAPE: entei
 
 tasks:
   setup:
@@ -21,31 +50,15 @@ tasks:
     cmds:
       - pre-commit run --all-files
 
-  build:
-    desc: Vendor config and build chart dependencies
-    cmds:
-      - ./scripts/local/vendor-chart-config.sh
-      - helm dependency build chart
-
-  update:
-    desc: Refresh the pinned upstream chart dependency
-    cmds:
-      - helm dependency update chart
-
-  latest:
-    desc: Resolve the latest real upstream chart and image tags
-    cmds:
-      - ./scripts/local/latest-chart-upstreams.sh
-
   test:unit:
     desc: Run schema, lint, render, policy, and contract validation
     cmds:
-      - ./scripts/ci/helm-wrapper.sh
+      - ./scripts/ci/zinc.sh
 
   test:int:
     desc: Run the local k3d installation proof
     cmds:
-      - ./scripts/validate/helm-wrapper-k3d.sh
+      - ./scripts/ci/zinc-k3d.sh
 
   start:cluster:
     desc: Start the local k3d lapras proof cluster

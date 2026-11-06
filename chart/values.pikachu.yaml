@@ -1,0 +1,8 @@
+# Registered-fleet serving row (Q-I33): LE production.
+serviceTree:
+  landscape: pikachu
+
+issuer:
+  refs:
+    - token: letsencrypt
+      directory: production
