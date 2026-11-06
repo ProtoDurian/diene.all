@@ -549,6 +549,74 @@ describe('EnvOverrides.apply — preprocess, null members and catch', () => {
       path: ['m'],
       expected: false,
     },
+    {
+      label: 'a string or null literal leaf',
+      schema: z.object({ code: z.string().or(z.literal(null)) }),
+      base: {},
+      name: 'ATOMI_CODE',
+      raw: '0123',
+      path: ['code'],
+      expected: '0123',
+    },
+    {
+      label: 'a string or undefined literal leaf',
+      schema: z.object({ code: z.string().or(z.literal(undefined)) }),
+      base: {},
+      name: 'ATOMI_CODE',
+      raw: '0123',
+      path: ['code'],
+      expected: '0123',
+    },
+    {
+      label: 'a literal list holding null, or a string',
+      schema: z.object({ code: z.literal(['auto', null]).or(z.string()) }),
+      base: {},
+      name: 'ATOMI_CODE',
+      raw: '0123',
+      path: ['code'],
+      expected: '0123',
+    },
+    {
+      label: 'a lazy .catch() boolean fallback',
+      schema: z.object({ m: z.lazy(() => z.boolean().catch(false)) }),
+      base: {},
+      name: 'ATOMI_M',
+      raw: 'yes',
+      path: ['m'],
+      expected: false,
+    },
+    {
+      label: 'a .catch() boolean or null fallback',
+      schema: z.object({ m: z.union([z.boolean().catch(false), z.null()]) }),
+      base: {},
+      name: 'ATOMI_M',
+      raw: 'yes',
+      path: ['m'],
+      expected: false,
+    },
+    {
+      label: 'a preprocessed .catch() boolean fallback',
+      schema: z.object({ m: z.preprocess(v => v, z.boolean().catch(false)) }),
+      base: {},
+      name: 'ATOMI_M',
+      raw: 'yes',
+      path: ['m'],
+      expected: false,
+    },
+    {
+      label: 'a transformed .catch() boolean fallback',
+      schema: z.object({
+        m: z
+          .boolean()
+          .catch(false)
+          .transform(v => v),
+      }),
+      base: {},
+      name: 'ATOMI_M',
+      raw: 'yes',
+      path: ['m'],
+      expected: false,
+    },
   ])('should reach $label', ({ schema, base, name, raw, path, expected }) => {
     // Arrange
     const env = { [name]: raw };

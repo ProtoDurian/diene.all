@@ -23,6 +23,11 @@ interface Definition {
   entries?: Record<string, unknown>;
 }
 
+interface Candidate {
+  definition: Definition;
+  caught: boolean;
+}
+
 const WRAPPERS = new Set(['optional', 'nullable', 'default', 'prefault', 'readonly', 'catch', 'nonoptional']);
 const ABSENT = new Set(['null', 'undefined', 'void', 'never']);
 const OPAQUE = new Set(['custom', 'map', 'set', 'promise', 'function', 'transform', 'file']);
@@ -62,8 +67,7 @@ class SchemaWalker {
   }
 
   kind(node: SchemaNode): LeafKind {
-    const present = this.resolve(node).filter(definition => !ABSENT.has(definition.type));
-    const kinds = new Set(present.map(definition => this.kindOf(definition)));
+    const kinds = new Set(this.present(node).map(candidate => this.kindOf(candidate.definition)));
     const [only] = kinds;
     return kinds.size === 1 && only !== undefined ? only : 'unknown';
   }
@@ -73,11 +77,17 @@ class SchemaWalker {
   }
 
   caught(node: SchemaNode): boolean {
-    return node.some(schema => {
-      const definition = schema._zod.def as unknown as Definition;
-      if (definition.type === 'catch') return true;
-      return WRAPPERS.has(definition.type) && definition.innerType !== undefined && this.caught([definition.innerType]);
-    });
+    const present = this.present(node);
+    return present.length > 0 && present.every(candidate => candidate.caught);
+  }
+
+  private present(node: SchemaNode): Candidate[] {
+    return this.candidates(node, false).filter(candidate => !this.absent(candidate.definition));
+  }
+
+  private absent(definition: Definition): boolean {
+    if (definition.type === 'literal') return (definition.values ?? []).every(value => value == null);
+    return ABSENT.has(definition.type);
   }
 
   private childOf(definition: Definition, key: string): z.ZodType[] {
@@ -101,7 +111,8 @@ class SchemaWalker {
   }
 
   private valueKind(values: readonly unknown[]): LeafKind {
-    const kinds = new Set(values.map(value => VALUE_KINDS[typeof value] ?? 'unknown'));
+    const present = values.filter(value => value != null);
+    const kinds = new Set(present.map(value => VALUE_KINDS[typeof value] ?? 'unknown'));
     const [only] = kinds;
     return kinds.size === 1 && only !== undefined ? only : 'unknown';
   }
@@ -119,20 +130,27 @@ class SchemaWalker {
   }
 
   private resolve(node: SchemaNode): Definition[] {
+    return this.candidates(node, false).map(candidate => candidate.definition);
+  }
+
+  private candidates(node: SchemaNode, caught: boolean): Candidate[] {
     return node.flatMap(schema => {
       const definition = schema._zod.def as unknown as Definition;
-      if (WRAPPERS.has(definition.type) && definition.innerType) return this.resolve([definition.innerType]);
+      if (WRAPPERS.has(definition.type) && definition.innerType) {
+        return this.candidates([definition.innerType], caught || definition.type === 'catch');
+      }
       if (definition.type === 'pipe' && definition.in) {
-        const input = this.resolve([definition.in]);
+        const input = this.candidates([definition.in], caught);
         const output = definition.out;
-        return output !== undefined && input.every(step => step.type === 'transform') ? this.resolve([output]) : input;
+        const preprocessed = output !== undefined && input.every(step => step.definition.type === 'transform');
+        return preprocessed ? this.candidates([output], caught) : input;
       }
-      if (definition.type === 'lazy' && definition.getter) return this.resolve([definition.getter()]);
-      if (definition.type === 'union') return this.resolve(definition.options ?? []);
+      if (definition.type === 'lazy' && definition.getter) return this.candidates([definition.getter()], caught);
+      if (definition.type === 'union') return this.candidates(definition.options ?? [], caught);
       if (definition.type === 'intersection' && definition.left && definition.right) {
-        return this.resolve([definition.left, definition.right]);
+        return this.candidates([definition.left, definition.right], caught);
       }
-      return [definition];
+      return [{ definition, caught }];
     });
   }
 }

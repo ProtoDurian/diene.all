@@ -50,6 +50,9 @@ describe('SchemaWalker.kind', () => {
     { label: 'a union of string and null', schema: z.union([z.string(), z.null()]), expected: 'string' },
     { label: 'a string or undefined', schema: z.string().or(z.undefined()), expected: 'string' },
     { label: 'only null', schema: z.null(), expected: 'unknown' },
+    { label: 'a string or null literal', schema: z.string().or(z.literal(null)), expected: 'string' },
+    { label: 'a string or undefined literal', schema: z.string().or(z.literal(undefined)), expected: 'string' },
+    { label: 'a literal list holding null', schema: z.literal(['auto', null]).or(z.string()), expected: 'string' },
     { label: 'a lazy string', schema: z.lazy(() => z.string()), expected: 'string' },
     { label: 'no schema', schema: undefined, expected: 'unknown' },
   ])('should classify $label', ({ schema, expected }) => {
@@ -150,6 +153,22 @@ describe('SchemaWalker.caught', () => {
   it.each([
     { label: 'a catch boolean', schema: z.boolean().catch(false), expected: true },
     { label: 'an optional catch boolean', schema: z.boolean().catch(false).optional(), expected: true },
+    { label: 'a lazy catch boolean', schema: z.lazy(() => z.boolean().catch(false)), expected: true },
+    { label: 'a catch boolean or null', schema: z.union([z.boolean().catch(false), z.null()]), expected: true },
+    { label: 'a preprocessed catch boolean', schema: z.preprocess(v => v, z.boolean().catch(false)), expected: true },
+    {
+      label: 'a transformed catch boolean',
+      schema: z
+        .boolean()
+        .catch(false)
+        .transform(v => v),
+      expected: true,
+    },
+    {
+      label: 'a union with an uncaught boolean',
+      schema: z.union([z.boolean().catch(false), z.boolean()]),
+      expected: false,
+    },
     { label: 'a plain boolean', schema: z.boolean(), expected: false },
     { label: 'an optional boolean', schema: z.boolean().optional(), expected: false },
     { label: 'no schema', schema: undefined, expected: false },
