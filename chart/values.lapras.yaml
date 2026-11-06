@@ -1,6 +1,14 @@
-# Independent cluster overlay for the local lapras/k3d substrate. Thin: it
-# contributes only cluster identity; the landscape overlay owns the landscape
-# label. The reloader engine stays fully enabled — it installs everywhere.
-global:
-  serviceTree:
-    cluster: lapras
+serviceTree:
+  cluster: lapras
+
+upstream:
+  reloader:
+    deployment:
+      labels:
+        atomi.cloud/cluster: lapras
+    serviceAccount:
+      labels:
+        atomi.cloud/cluster: lapras
+    rbac:
+      labels:
+        atomi.cloud/cluster: lapras

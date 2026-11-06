@@ -1,245 +1,238 @@
 #!/usr/bin/env bash
-# Chlorine unit-tier validation (materialized stakater/reloader engine wrapper —
-# S30, no probe matrix). One mode per independently invoked mechanism; the CI
-# orchestrator calls them in order. Positive assertion and its negative fixture
-# live together in each mode.
+# shellcheck disable=SC2016 # jq programs are single-quoted on purpose
 set -euo pipefail
 
 mode="${1:-}"
 release="${RELEASE:-chlorine}"
 namespace="${NAMESPACE:-reloader}"
-landscape_overlay="chart/values.example.yaml"
-cluster_overlay="chart/values.lapras.yaml"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 
 [ -z "${mode}" ] && echo "❌ validation mode not set" >&2 && exit 1
 
-# The committed stacks rendered by the render/lint/manifest gates.
-stacks_render() {
-  local out_prefix="$1"
-  helm template "${release}" chart --namespace "${namespace}" >"${out_prefix}-base.yaml"
-  helm template "${release}" chart --namespace "${namespace}" \
-    --values "${landscape_overlay}" --values "${cluster_overlay}" >"${out_prefix}-stack.yaml"
+stacks=("" "--values chart/values.example.yaml" "--values chart/values.example.yaml --values chart/values.lapras.yaml")
+full=(--values chart/values.example.yaml --values chart/values.lapras.yaml)
+labelled='["ClusterRole/chlorine-reloader-role","ClusterRoleBinding/chlorine-reloader-role-binding","Deployment/chlorine-reloader","Role/chlorine-reloader-metadata-role","RoleBinding/chlorine-reloader-metadata-role-binding","ServiceAccount/chlorine-reloader"]'
+
+render() {
+  local chart="$1"
+  shift
+  helm template "${release}" "${chart}" --namespace "${namespace}" "$@"
+}
+
+json() { yq eval-all -o=json '.' "$1" | jq -s 'map(select(.kind != null))'; }
+
+need_jq() {
+  local reason="$1"
+  shift
+  jq -e "$@" >/dev/null || { echo "❌ ${reason}" >&2 && return 1; }
+}
+
+expect_red() {
+  local label="$1" pattern="$2"
+  shift 2
+  if "$@" >"${tmp}/red.txt" 2>&1; then
+    echo "❌ negative fixture '${label}' was not caught" >&2 && exit 1
+  fi
+  rg -q -- "${pattern}" "${tmp}/red.txt" || { echo "❌ negative fixture '${label}' failed for the wrong reason" >&2 && cat "${tmp}/red.txt" >&2 && exit 1; }
+}
+
+expect_refusal() {
+  local pattern="$1"
+  shift
+  expect_red "refusal: $*" "${pattern}" render chart "$@"
+}
+
+copy_tree() {
+  mkdir -p "$1"
+  cp -a chart "$1/"
+}
+
+# The wanted LPSM set is the merged serviceTree of the stack, under labelPrefix.
+want_lpsm() {
+  local chart="$1"
+  shift
+  local files=("${chart}/values.yaml")
+  while [ "$#" -gt 0 ]; do
+    files+=("${2/chart\//${chart}/}")
+    shift 2
+  done
+  yq eval-all -o=json '. as $item ireduce ({}; . * $item) | .labelPrefix as $p | .serviceTree | with_entries(.key = $p + "/" + .key)' "${files[@]}"
+}
+
+assert_lpsm() {
+  local file="$1" want="$2"
+  json "${file}" | need_jq 'Reloader objects differ from the LPSM label set' --argjson want "${want}" --argjson objs "${labelled}" '
+    def has_lpsm: . as $l | ($want | length) >= 4 and all($want | to_entries[]; $l[.key] == .value);
+    (map(.kind + "/" + .metadata.name) | sort) == $objs and
+    all(.[]; .metadata.labels | has_lpsm) and
+    all(.[] | select(.kind == "Deployment"); .spec.template.metadata.labels | has_lpsm)'
+}
+
+controller() { json "$1" | jq '[.[] | select(.kind == "Deployment")] | if length == 1 then .[0] else error("expected exactly one Deployment") end'; }
+
+assert_opt_in() {
+  controller "$1" | need_jq 'Reloader is not annotation opt-in (auto-reload-all is on)' '
+    (.spec.template.spec.containers[0].args // []) as $a |
+    all($a[]; test("^--auto-reload-all") | not)' || return 1
+  controller "$1" | need_jq 'Reloader does not use the default rolling-restart strategy' '
+    all((.spec.template.spec.containers[0].args // [])[]; test("^--reload-strategy") | not)'
+}
+
+assert_self_opt_in() {
+  controller "$1" | need_jq "the chlorine Deployment does not carry reloader.stakater.com/auto=$2" --arg want "$2" '
+    .metadata.annotations["reloader.stakater.com/auto"] == $want'
+}
+
+assert_payload_pure() {
+  json "$1" | need_jq 'the render ships a monitoring object (ServiceMonitor/PodMonitor/PrometheusRule/dashboard)' '
+    all(.[]; (.kind | IN("ServiceMonitor", "PodMonitor", "PrometheusRule", "GrafanaDashboard")) | not) and
+    all(.[] | select(.kind == "ConfigMap"); (.metadata.labels // {}) | has("grafana_dashboard") | not)'
+}
+
+vap_stage() {
+  kubeconform -strict -summary -schema-location default "$1"
+  yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "$1" >"$1.vap.yaml"
+  json "$1.vap.yaml" | need_jq "the Reloader Deployment is not the VAP input ($2)" '(map(.kind + "/" + .metadata.name)) == ["Deployment/chlorine-reloader"]' || return 1
+  kyverno apply policies/vap --resource "$1.vap.yaml" --detailed-results --remove-color >"$1.vap.txt" 2>&1 ||
+    { cat "$1.vap.txt" >&2 && echo "❌ the Reloader workload fails the VAP ($2)" >&2 && return 1; }
+  rg -q '^pass: [1-9][0-9]*, fail: 0, warn: 0, error: 0' "$1.vap.txt" || { cat "$1.vap.txt" >&2 && echo "❌ the VAP stage evaluated nothing ($2)" >&2 && return 1; }
+}
+
+assert_pin() {
+  local chart="$1" dep version
+  dep="$(yq -o=json '.dependencies[] | select(.name == "reloader")' "${chart}/Chart.yaml")"
+  version="$(jq -r .version <<<"${dep}")"
+  [[ ${version} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "❌ reloader ${version} is not an exact pin" >&2 && return 1; }
+  [ "$(jq -r .alias <<<"${dep}")" = upstream ] || { echo "❌ reloader is not aliased upstream" >&2 && return 1; }
+  [ "$(yq -r '.dependencies[] | select(.name == "reloader") | .version' "${chart}/Chart.lock")" = "${version}" ] || { echo "❌ Chart.lock differs from Chart.yaml" >&2 && return 1; }
+  [ "$(cd "${chart}/charts" && printf '%s\n' *.tgz)" = "reloader-${version}.tgz" ] || { echo "❌ the vendored archive is not reloader-${version}.tgz" >&2 && return 1; }
+  app="$(yq -r .appVersion "${chart}/Chart.yaml")"
+  [ "$(tar -xzOf "${chart}/charts/reloader-${version}.tgz" reloader/Chart.yaml | yq -r .version)" = "${version}" ] || { echo "❌ the vendored archive is not chart ${version}" >&2 && return 1; }
+  [ "$(tar -xzOf "${chart}/charts/reloader-${version}.tgz" reloader/Chart.yaml | yq -r .appVersion)" = "${app}" ] || { echo "❌ appVersion ${app} is not the vendored chart's appVersion" >&2 && return 1; }
+  [ "$(render "${chart}" "${full[@]/chart\//${chart}/}" | yq -N 'select(.kind == "Deployment") | .spec.template.spec.containers[].image')" = "ghcr.io/stakater/reloader:${app}" ] ||
+    { echo "❌ the controller image is not ghcr.io/stakater/reloader:${app}" >&2 && return 1; }
+  mkdir -p "${tmp}/pull"
+  helm pull "$(jq -r .repository <<<"${dep}")/reloader" --version "${version}" --destination "${tmp}/pull" >/dev/null
+  cmp -s "${tmp}/pull/reloader-${version}.tgz" "${chart}/charts/reloader-${version}.tgz" ||
+    { echo "❌ the vendored archive sha256 $(sha256sum "${chart}/charts/reloader-${version}.tgz" | cut -c1-64) is not upstream's $(sha256sum "${tmp}/pull/reloader-${version}.tgz" | cut -c1-64)" >&2 && return 1; }
+  rm -rf "${tmp}/pull"
 }
 
 case "${mode}" in
 schema)
-  helm lint chart --namespace "${namespace}" >/dev/null
-  helm lint chart --namespace "${namespace}" --values "${landscape_overlay}" --values "${cluster_overlay}" >/dev/null
-  ;;
-schema-negative)
-  yq '.global.serviceTree.layer = "notnumeric"' chart/values.yaml >"${tmp}/invalid-values.yaml"
-  if helm lint chart --namespace "${namespace}" --values "${tmp}/invalid-values.yaml" >"${tmp}/schema.stdout" 2>"${tmp}/schema.stderr"; then
-    echo "❌ non-numeric layer passed Helm schema validation" >&2
-    exit 1
-  fi
-  rg -qi 'layer|pattern|does not match' "${tmp}/schema.stdout" "${tmp}/schema.stderr"
+  expect_red 'layer is not numeric' "serviceTree/layer.*does not match pattern|at '/serviceTree/layer'" helm lint chart --namespace "${namespace}" --set-string serviceTree.layer=one
+  expect_red 'dashed platform' "serviceTree/platform.*does not match pattern|at '/serviceTree/platform'" helm lint chart --namespace stakater-reloader --set serviceTree.platform=stakater-reloader
+  expect_red 'autoReloadAll is not a boolean' "autoReloadAll" helm lint chart --namespace "${namespace}" --set-string upstream.reloader.autoReloadAll=yes
   ;;
 schema-drift)
   bash ./scripts/local/generate-chart-schema.sh "${tmp}/values.schema.json" >/dev/null
   cmp chart/values.schema.json "${tmp}/values.schema.json"
   ;;
-dependency)
-  bash ./scripts/local/vendor-reloader.sh build >/dev/null
-  chart_version="$(yq -r '.dependencies[] | select(.name == "reloader") | .version' chart/Chart.yaml)"
-  lock_version="$(yq -r '.dependencies[] | select(.name == "reloader") | .version' chart/Chart.lock)"
-  app_version="$(yq -r '.appVersion' chart/Chart.yaml)"
-  evidence_version="$(yq -r '.chart.version' chart/upstream-evidence.yaml)"
-  evidence_app="$(yq -r '.chart.appVersion' chart/upstream-evidence.yaml)"
-  archive="chart/charts/reloader-${chart_version}.tgz"
-  [ "${chart_version}" != "${lock_version}" ] && echo "❌ Chart.yaml and Chart.lock dependency versions differ" >&2 && exit 1
-  [ "${chart_version}" != "${evidence_version}" ] && echo "❌ selected chart and upstream evidence versions differ" >&2 && exit 1
-  [ "${app_version}" != "${evidence_app}" ] && echo "❌ selected app and upstream evidence versions differ" >&2 && exit 1
-  [ "$(find chart/charts -maxdepth 1 -type f -name 'reloader-*.tgz' | wc -l)" -ne 1 ] && echo "❌ vendored reloader archive inventory is not singular" >&2 && exit 1
-  [ ! -s "${archive}" ] && echo "❌ vendored reloader archive is missing" >&2 && exit 1
-  [ "$(sha256sum "${archive}" | awk '{print $1}')" != "$(yq -r '.chart.sourceArchiveSha256' chart/upstream-evidence.yaml)" ] && echo "❌ vendored reloader archive hash drifted from recorded upstream" >&2 && exit 1
-  ;;
-upstream)
-  bash ./scripts/local/latest-chart-upstreams.sh
-  ;;
 lint)
-  helm lint chart --namespace "${namespace}"
-  echo "🔎 linting landscape+cluster stack"
-  helm lint chart --namespace "${namespace}" --values "${landscape_overlay}" --values "${cluster_overlay}"
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    helm lint chart --namespace "${namespace}" ${stack} >"${tmp}/lint.txt" 2>&1 ||
+      { echo "❌ helm lint rejected the stack '${stack:-values.yaml}'" >&2 && cat "${tmp}/lint.txt" >&2 && exit 1; }
+  done
   ;;
 render)
-  stacks_render "${tmp}/render"
-  # Container names and DNS-1123 object names must be valid RFC-1123 labels/
-  # subdomains — kubeconform does not enforce this, but the API server does.
-  # RBAC object names legitimately use extra dashes and are exempt from the
-  # object-name check.
-  for f in "${tmp}/render-base.yaml" "${tmp}/render-stack.yaml"; do
-    yq eval-all -o=json '.' "${f}" | jq -se '
-      def dnslabel: test("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$");
-      def dnssubdomain: test("^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$");
-      ["Deployment","StatefulSet","DaemonSet","Job","Service","ConfigMap","Secret","ServiceAccount"] as $dns
-      | (map(select(type == "object" and has("kind")))) as $r
-      | (all($r[] | select(.kind as $k | $dns | index($k)); (.metadata.name // "") | dnssubdomain))
-        and (all($r[] | select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job");
-              (((.spec.template.spec.containers // []) + (.spec.template.spec.initContainers // []))
-               | [.[] | select((.name // "") | dnslabel | not)] | length) == 0))
-    ' >/dev/null || {
-      echo "❌ rendered a non-RFC-1123 workload/service object or container name in ${f}" >&2
-      exit 1
-    }
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/render.yaml"
+    json "${tmp}/render.yaml" | need_jq "stack '${stack:-values.yaml}' renders no Reloader controller" 'map(select(.kind == "Deployment")) | length == 1'
   done
+  expect_refusal 'must equal release namespace' "${full[@]}" --namespace other
   ;;
-labels)
-  yq -e '.global.serviceTree | has("platform") | not' chart/values.yaml >/dev/null
-  # The static deployment labels must stay consistent with the serviceTree source of truth.
-  yq -e '.reloader.reloader.deployment.labels."atomi.cloud/service" == .global.serviceTree.service
-    and .reloader.reloader.deployment.labels."atomi.cloud/module" == .global.serviceTree.module
-    and .reloader.reloader.deployment.labels."atomi.cloud/layer" == .global.serviceTree.layer' chart/values.yaml >/dev/null
-  helm template "${release}" chart --namespace "${namespace}" --values "${landscape_overlay}" >"${tmp}/rendered.yaml"
-  yq eval-all -o=json '.' "${tmp}/rendered.yaml" | jq --arg ns "${namespace}" -se '
-    def lpsm($prefix; $namespace):
-      (.[$prefix + "/platform"] == $namespace)
-      and (.[$prefix + "/service"] == "chlorine")
-      and (.[$prefix + "/module"] == "reloader")
-      and (.[$prefix + "/layer"] == "1")
-      and (.[$prefix + "/landscape"] == "example");
-    def staticlpsm($prefix):
-      (.[$prefix + "/service"] == "chlorine")
-      and (.[$prefix + "/module"] == "reloader")
-      and (.[$prefix + "/layer"] == "1")
-      and (.[$prefix + "/landscape"] == "example");
-    (map(select(type == "object" and has("kind")))) as $resources
-    | ($resources | map(select(.kind == "ConfigMap" and .metadata.name == "chlorine-lpsm"))) as $configmaps
-    | ($resources | map(select(.kind == "Deployment"))) as $deployments
-    | ($configmaps | length) == 1
-      and ($deployments | length) == 1
-      and ($configmaps[0].metadata.labels | lpsm("atomi.cloud"; $ns))
-      and ($configmaps[0].metadata.annotations | lpsm("atomi.cloud"; $ns))
-      and (all($deployments[]; .metadata.labels | staticlpsm("atomi.cloud")))
-  ' >/dev/null
-  # Namespace change moves the platform label on the wrapper projection.
-  helm template "${release}" chart --namespace tenant --values "${landscape_overlay}" >"${tmp}/ns.yaml"
-  yq eval-all -o=json '.' "${tmp}/ns.yaml" | jq -se '
-    (map(select(type == "object" and .kind == "ConfigMap" and .metadata.name == "chlorine-lpsm"))[0]) as $cm
-    | $cm.metadata.labels["atomi.cloud/platform"] == "tenant"
-  ' >/dev/null
-  # labelPrefix override reprefixes the wrapper projection and leaves no atomi.cloud key.
-  helm template "${release}" chart --namespace tenant --values "${landscape_overlay}" --set global.labelPrefix=example.dev >"${tmp}/override.yaml"
-  yq eval-all -o=json '.' "${tmp}/override.yaml" | jq -se '
-    def lpsm:
-      (. ["example.dev/platform"] == "tenant")
-      and (. ["example.dev/service"] == "chlorine")
-      and (. ["example.dev/module"] == "reloader")
-      and (. ["example.dev/layer"] == "1")
-      and (. ["example.dev/landscape"] == "example");
-    (map(select(type == "object" and .kind == "ConfigMap" and .metadata.name == "chlorine-lpsm"))[0]) as $cm
-    | ($cm.metadata.labels | lpsm)
-      and ($cm.metadata.annotations | lpsm)
-      and ([$cm.metadata.labels, $cm.metadata.annotations] | map(to_entries[]) | map(select(.key | startswith("atomi.cloud/"))) | length) == 0
-  ' >/dev/null
-  # A duplicate free platform value is rejected at render time.
-  if helm template "${release}" chart --namespace tenant --values "${landscape_overlay}" --set global.serviceTree.platform=wrong >/dev/null 2>&1; then
-    echo "❌ a duplicate free platform value was accepted" >&2
-    exit 1
-  fi
+lpsm-labels)
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/lpsm.yaml"
+    # shellcheck disable=SC2086
+    assert_lpsm "${tmp}/lpsm.yaml" "$(want_lpsm chart ${stack})"
+  done
+  render chart "${full[@]}" --set serviceTree.cluster=other >"${tmp}/drift.yaml"
+  expect_red 'serviceTree changed without its labels' 'differ from the LPSM label set' assert_lpsm "${tmp}/drift.yaml" "$(want_lpsm chart "${full[@]}" | jq -c '.["atomi.cloud/cluster"] = "other"')"
+  render chart "${full[@]}" --set labelPrefix=example.dev >"${tmp}/prefix.yaml"
+  expect_red 'labelPrefix changed without its labels' 'differ from the LPSM label set' assert_lpsm "${tmp}/prefix.yaml" "$(want_lpsm chart "${full[@]}" | jq -c 'with_entries(.key |= sub("^atomi.cloud/"; "example.dev/"))')"
+  copy_tree "${tmp}/nolabels"
+  yq -i 'del(.upstream.reloader.serviceAccount.labels)' "${tmp}/nolabels/chart/values.yaml" "${tmp}/nolabels/chart/values.example.yaml" "${tmp}/nolabels/chart/values.lapras.yaml"
+  render "${tmp}/nolabels/chart" "${full[@]}" >"${tmp}/nolabels.yaml"
+  expect_red 'ServiceAccount LPSM labels dropped' 'differ from the LPSM label set' assert_lpsm "${tmp}/nolabels.yaml" "$(want_lpsm chart "${full[@]}")"
   ;;
-reloader)
-  helm template "${release}" chart --namespace "${namespace}" --values "${landscape_overlay}" >"${tmp}/default.yaml"
-  yq eval-all -o=json '.' "${tmp}/default.yaml" | jq -se '
-    map(select(type == "object" and .kind == "Deployment"))
-    | length == 1
-      and all(.[]; .metadata.annotations["reloader.stakater.com/auto"] == "true")
-  ' >/dev/null
-  # Stateful/unsafe workloads opt out via the values flag.
-  helm template "${release}" chart --namespace "${namespace}" --values "${landscape_overlay}" \
-    --set-string reloader.reloader.deployment.annotations."reloader\.stakater\.com/auto"=false >"${tmp}/optout.yaml"
-  yq eval-all -o=json '.' "${tmp}/optout.yaml" | jq -se '
-    map(select(type == "object" and .kind == "Deployment"))
-    | length == 1
-      and all(.[]; .metadata.annotations["reloader.stakater.com/auto"] == "false")
-  ' >/dev/null
+reload-stance)
+  [ "$(yq -r '.upstream.reloader.autoReloadAll' chart/values.yaml)" = false ] || { echo "❌ values.yaml does not pin autoReloadAll: false" >&2 && exit 1; }
+  for f in chart/values.*.yaml; do
+    [ "$(yq -r '.upstream.reloader.autoReloadAll // "unset"' "${f}")" = unset ] || { echo "❌ ${f} overrides autoReloadAll" >&2 && exit 1; }
+  done
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/stance.yaml"
+    assert_opt_in "${tmp}/stance.yaml"
+    assert_self_opt_in "${tmp}/stance.yaml" true
+  done
+  render chart "${full[@]}" --set upstream.reloader.autoReloadAll=true >"${tmp}/all.yaml"
+  expect_red 'a values flip to auto-reload-all' 'not annotation opt-in' assert_opt_in "${tmp}/all.yaml"
+  render chart "${full[@]}" --set upstream.reloader.reloadStrategy=env-vars >"${tmp}/env.yaml"
+  expect_red 'a non-default reload strategy' 'default rolling-restart strategy' assert_opt_in "${tmp}/env.yaml"
+  render chart "${full[@]}" --set-string 'upstream.reloader.deployment.annotations.reloader\.stakater\.com/auto=false' >"${tmp}/optout.yaml"
+  assert_self_opt_in "${tmp}/optout.yaml" false
+  copy_tree "${tmp}/noself"
+  yq -i 'del(.upstream.reloader.deployment.annotations)' "${tmp}/noself/chart/values.yaml"
+  render "${tmp}/noself/chart" "${full[@]}" >"${tmp}/noself.yaml"
+  expect_red 'Reloader self opt-in dropped' 'reloader.stakater.com/auto=true' assert_self_opt_in "${tmp}/noself.yaml" true
   ;;
-auto-reload-all)
-  # chlorine is annotation OPT-IN, never auto-reload-all: the values flag is false
-  # and the controller renders no --auto-reload-all argument.
-  yq -e '.reloader.reloader.autoReloadAll == false' chart/values.yaml >/dev/null
-  helm template "${release}" chart --namespace "${namespace}" --values "${landscape_overlay}" >"${tmp}/off.yaml"
-  if rg -q -- '--auto-reload-all' "${tmp}/off.yaml"; then
-    echo "❌ chlorine rendered the --auto-reload-all argument with the opt-in default" >&2
-    exit 1
-  fi
-  # Negative: flipping the flag injects the argument, so the hygiene gate is exercised.
-  helm template "${release}" chart --namespace "${namespace}" --values "${landscape_overlay}" \
-    --set reloader.reloader.autoReloadAll=true >"${tmp}/on.yaml"
-  if ! rg -q -- '--auto-reload-all' "${tmp}/on.yaml"; then
-    echo "❌ auto-reload-all negative fixture did not inject the argument; the gate is not exercised" >&2
-    exit 1
-  fi
-  ;;
-fullname)
-  # Every rendered DNS-subdomain object follows the <service>-<token> fullname
-  # convention (exactly one dash, dash-less token). RBAC objects legitimately
-  # carry extra dashes and are exempt.
-  helm template "${release}" chart --namespace "${namespace}" --values "${landscape_overlay}" >"${tmp}/render.yaml"
-  yq eval-all -o=json '.' "${tmp}/render.yaml" | jq -se '
-    ["Deployment","StatefulSet","DaemonSet","Job","Service","ConfigMap","Secret","ServiceAccount"] as $dns
-    | (map(select(type == "object" and has("kind"))))
-    | all(.[] | select(.kind as $k | $dns | index($k)); (.metadata.name // "") | test("^[a-z0-9]+-[a-z0-9]+$"))
-  ' >/dev/null
-  # Negative: a two-dash fullname override breaks the one-dash convention.
-  if helm template "${release}" chart --namespace "${namespace}" --values "${landscape_overlay}" \
-    --set reloader.fullnameOverride=chlorine-reloader-x >"${tmp}/bad.yaml" &&
-    yq eval-all -o=json '.' "${tmp}/bad.yaml" | jq -se '
-      ["Deployment","StatefulSet","DaemonSet","Job","Service","ConfigMap","Secret","ServiceAccount"] as $dns
-      | (map(select(type == "object" and has("kind"))))
-      | all(.[] | select(.kind as $k | $dns | index($k)); (.metadata.name // "") | test("^[a-z0-9]+-[a-z0-9]+$"))
-    ' >/dev/null 2>&1; then
-    echo "❌ a two-dash fullname override was accepted by the fullname convention gate" >&2
-    exit 1
-  fi
+payload-purity)
+  for stack in "${stacks[@]}"; do
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/payload.yaml"
+    assert_payload_pure "${tmp}/payload.yaml"
+  done
+  for kind in serviceMonitor podMonitor; do
+    render chart "${full[@]}" --api-versions monitoring.coreos.com/v1 --set "upstream.reloader.${kind}.enabled=true" >"${tmp}/${kind}.yaml"
+    expect_red "upstream ${kind} on" 'ships a monitoring object' assert_payload_pure "${tmp}/${kind}.yaml"
+  done
   ;;
 rendered-manifests)
-  for spec in "base::" "stack:${landscape_overlay}:${cluster_overlay}"; do
-    label="${spec%%:*}"
-    helm_args=()
-    IFS=':' read -r _ o1 o2 <<<"${spec}"
-    [ -n "${o1}" ] && helm_args+=(--values "${o1}")
-    [ -n "${o2}" ] && helm_args+=(--values "${o2}")
-    helm template "${release}" chart --namespace "${namespace}" "${helm_args[@]}" >"${tmp}/${label}.yaml"
-    kubeconform -strict -summary -ignore-missing-schemas "${tmp}/${label}.yaml"
-    yq eval-all 'select(.kind == "Deployment" or .kind == "StatefulSet" or .kind == "DaemonSet" or .kind == "Job" or .kind == "Service")' "${tmp}/${label}.yaml" >"${tmp}/${label}-vap.yaml"
-    kyverno apply policies/vap --resource "${tmp}/${label}-vap.yaml" --detailed-results --remove-color
+  index=0
+  for stack in "${stacks[@]}"; do
+    index=$((index + 1))
+    # shellcheck disable=SC2086
+    render chart ${stack} >"${tmp}/rendered-${index}.yaml"
+    vap_stage "${tmp}/rendered-${index}.yaml" "stack ${stack:-values.yaml}"
   done
+  render chart "${full[@]}" --set upstream.image.tag=latest >"${tmp}/latest.yaml"
+  expect_red 'a :latest controller image' 'explicit non-latest tag' vap_stage "${tmp}/latest.yaml" latest
   ;;
-vap-sabotage)
-  helm template "${release}" chart --namespace "${namespace}" --values "${landscape_overlay}" --set-string reloader.image.tag=latest >"${tmp}/rendered.yaml" 2>/dev/null
-  yq eval-all 'select(.kind == "Deployment" or .kind == "Service")' "${tmp}/rendered.yaml" >"${tmp}/vap-resources.yaml"
-  if kyverno apply policies/vap --resource "${tmp}/vap-resources.yaml" --remove-color >/dev/null 2>&1; then
-    echo "❌ :latest wiring sabotage was not caught by the VAP stage" >&2
-    exit 1
-  fi
+pin)
+  assert_pin chart
+  copy_tree "${tmp}/tamper"
+  archive="$(cd "${tmp}/tamper/chart/charts" && printf '%s' reloader-*.tgz)"
+  mkdir -p "${tmp}/repack" && tar -xzf "${tmp}/tamper/chart/charts/${archive}" -C "${tmp}/repack"
+  printf '# tampered\n' >>"${tmp}/repack/reloader/values.yaml"
+  tar -czf "${tmp}/tamper/chart/charts/${archive}" -C "${tmp}/repack" reloader
+  expect_red 'a vendored archive that is not upstream bytes' 'is not upstream' assert_pin "${tmp}/tamper/chart"
+  copy_tree "${tmp}/drift"
+  yq -i '.appVersion = "v0.0.1"' "${tmp}/drift/chart/Chart.yaml"
+  expect_red 'appVersion off the vendored chart' "appVersion v0.0.1 is not the vendored chart's appVersion" assert_pin "${tmp}/drift/chart"
   ;;
 publish-git)
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/git" bash ./scripts/ci/publish.sh >/dev/null
-  [ ! -s "${tmp}/git/diene-chlorine-0.1.0.tgz" ] && echo "❌ git chart package missing" >&2 && exit 1
+  [ ! -s "${tmp}/git/chlorine-0.1.0.tgz" ] && echo "❌ git chart package missing" >&2 && exit 1
   [ ! -s "${tmp}/git/index.yaml" ] && echo "❌ git chart index missing" >&2 && exit 1
   ;;
 publish-oci)
   PUBLISH_MODE=oci PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/oci" bash ./scripts/ci/publish.sh >/dev/null
-  [ ! -s "${tmp}/oci/diene-chlorine-0.1.0.tgz" ] && echo "❌ OCI chart package missing" >&2 && exit 1
+  [ ! -s "${tmp}/oci/chlorine-0.1.0.tgz" ] && echo "❌ OCI chart package missing" >&2 && exit 1
   rg -q '^oci://registry.example.invalid/charts$' "${tmp}/oci/oci-ref.txt"
   ;;
 version)
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh >/dev/null
-  if PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.2.0 PUBLISH_OUTPUT_DIR="${tmp}/version-bad" bash ./scripts/ci/publish.sh >/dev/null 2>&1; then
-    echo "❌ version==tag guard did not red on a mismatched tag" >&2
-    exit 1
-  fi
+  expect_red 'a tag that differs from Chart.yaml' 'does not match tag 9.9.9' env PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v9.9.9 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh
   ;;
 presence)
   test -s docs/developer/chlorine-baseline.md
-  test -s chart/upstream-evidence.yaml
-  test -s chart/templates/lpsm-configmap.yaml
-  test -s policies/vap/workload-baseline.yaml
-  test -s policies/vap/service-baseline.yaml
-  test -x scripts/local/vendor-reloader.sh
-  test -x scripts/validate/chlorine-k3d.sh
+  test -s .claude/skills/chlorine/SKILL.md
   ;;
 *)
   echo "❌ unknown validation mode '${mode}'" >&2
@@ -247,4 +240,4 @@ presence)
   ;;
 esac
 
-echo "✅ Chlorine ${mode} validation passed"
+echo "✅ chlorine ${mode} validation passed"

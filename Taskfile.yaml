@@ -22,34 +22,29 @@ tasks:
       - pre-commit run --all-files
 
   build:
-    desc: Vendor and build the pinned reloader dependency
+    desc: Build chart dependencies
     cmds:
-      - ./scripts/local/vendor-reloader.sh build
+      - helm dependency build chart
 
   update:
     desc: Refresh the pinned upstream chart dependency
     cmds:
-      - ./scripts/local/vendor-reloader.sh update
+      - helm dependency update chart
 
   latest:
     desc: Resolve the latest real upstream chart and image tags
     cmds:
       - ./scripts/local/latest-chart-upstreams.sh
 
-  test:
-    desc: Run the chlorine unit/static tier
-    cmds:
-      - ./scripts/ci/chlorine.sh
-
   test:unit:
-    desc: Run schema, lint, render, labels, reloader, and upgrade validation
+    desc: Run schema, lint, render, policy, and contract validation
     cmds:
       - ./scripts/ci/chlorine.sh
 
   test:int:
-    desc: Run the k3d integration tier (engine health + secret-change reload)
+    desc: Run the local k3d installation proof
     cmds:
-      - ./scripts/validate/chlorine-k3d.sh
+      - ./scripts/ci/chlorine-k3d.sh
 
   start:cluster:
     desc: Start the local k3d lapras proof cluster

@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Chlorine integration tier: install the reloader engine on an ephemeral k3d
-# cluster, prove the controller is healthy, and prove the SoS last hop — an
-# annotated Deployment whose referenced Secret changes is rolling-restarted by
-# Reloader (annotation opt-in; autoReloadAll stays off).
 set -euo pipefail
 
 if [ "${K3D_ISOLATE_BY_PATH:-false}" = "true" ]; then
@@ -14,88 +10,122 @@ if [ "${K3D_ISOLATE_BY_PATH:-false}" = "true" ]; then
 fi
 
 cluster_name="${K3D_CLUSTER_NAME:-diene-chlorine}"
-release="${RELEASE:-chlorine}"
-namespace="${NAMESPACE:-reloader}"
-sit_namespace="${SIT_NAMESPACE:-chlorine-sit}"
-context="k3d-${cluster_name}"
+registry_port="${K3D_REGISTRY_PORT:-5001}"
+namespace=reloader
+fixture_ns=chlorine-fixture
+values=(--values chart/values.example.yaml --values chart/values.lapras.yaml)
+helm_k=(--kube-context "k3d-${cluster_name}" --namespace "${namespace}")
+k=(kubectl --context "k3d-${cluster_name}")
+kc=("${k[@]}" --namespace "${namespace}")
+kf=("${k[@]}" --namespace "${fixture_ns}")
 tmp="$(mktemp -d)"
-trap 'bash ./scripts/local/delete-k3d-cluster.sh >/dev/null 2>&1 || true; rm -rf "${tmp}"' EXIT
+diagnose() {
+  "${kc[@]}" get deployments,pods -o wide || true
+  "${kf[@]}" get deployments,replicasets,pods,secrets -o wide || true
+  "${kc[@]}" logs deployment/chlorine-reloader --tail=80 || true
+}
+cleanup() {
+  local status=$?
+  [ "${status}" -ne 0 ] && diagnose
+  bash ./scripts/local/delete-k3d-cluster.sh >/dev/null 2>&1 || true
+  rm -rf "${tmp}"
+  exit "${status}"
+}
+trap cleanup EXIT
 
-bash ./scripts/local/create-k3d-cluster.sh
-bash ./scripts/local/vendor-reloader.sh build
-
-helm upgrade --install "${release}" chart --namespace "${namespace}" --create-namespace \
-  --values chart/values.example.yaml --values chart/values.lapras.yaml --wait --timeout 6m
-
-# The reloader controller must be Available.
-kubectl --context "${context}" --namespace "${namespace}" wait \
-  --for=condition=Available deployment/chlorine-reloader --timeout=4m
-
-# An annotated Deployment referencing a Secret is the SoS last-hop target.
-kubectl --context "${context}" create namespace "${sit_namespace}" --dry-run=client -o yaml | kubectl --context "${context}" apply -f -
-kubectl --context "${context}" --namespace "${sit_namespace}" create secret generic demo-secret \
-  --from-literal=token=before --dry-run=client -o yaml | kubectl --context "${context}" apply -f -
-cat >"${tmp}/demo.yaml" <<YAML
+fixture() {
+  local name="$1" annotate="$2"
+  cat <<YAML
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${name}-secret
+stringData:
+  token: before
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: demo
-  namespace: ${sit_namespace}
-  annotations:
-    reloader.stakater.com/auto: "true"
+  name: ${name}
+  annotations: {${annotate}}
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app: demo
+    matchLabels: {app: ${name}}
   template:
     metadata:
-      labels:
-        app: demo
+      labels: {app: ${name}}
     spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 65534}
       containers:
-        - name: demo
-          image: registry.k8s.io/pause:3.9
-          envFrom:
-            - secretRef:
-                name: demo-secret
+        - name: ${name}
+          image: registry.k8s.io/pause:3.10
+          envFrom: [{secretRef: {name: ${name}-secret}}]
+          resources:
+            requests: {cpu: 5m, memory: 8Mi}
+            limits: {cpu: 50m, memory: 32Mi}
 YAML
-kubectl --context "${context}" apply -f "${tmp}/demo.yaml"
-kubectl --context "${context}" --namespace "${sit_namespace}" rollout status deployment/demo --timeout=2m
+}
 
-before_generation="$(kubectl --context "${context}" --namespace "${sit_namespace}" get deployment demo -o jsonpath='{.metadata.generation}')"
+state() {
+  local pod rs
+  pod="$("${kf[@]}" get pods -l "app=$1" --field-selector=status.phase=Running -o jsonpath='{.items[*].metadata.uid}')"
+  rs="$("${kf[@]}" get replicasets -l "app=$1" -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | sort | tr '\n' ' ')"
+  printf '%s|%s' "${pod}" "${rs}"
+}
 
-# Rotate the referenced Secret — Reloader must roll the annotated Deployment.
-kubectl --context "${context}" --namespace "${sit_namespace}" create secret generic demo-secret \
-  --from-literal=token=after --dry-run=client -o yaml | kubectl --context "${context}" apply -f -
+rotate() {
+  "${kf[@]}" create secret generic "$1-secret" --from-literal=token=after --dry-run=client -o yaml | "${kf[@]}" apply -f - >/dev/null
+}
 
-reloaded=false
+bash ./scripts/local/create-k3d-cluster.sh
+helm dependency build chart
+
+helm install chlorine chart "${helm_k[@]}" --create-namespace "${values[@]}" --wait --timeout 5m
+"${kc[@]}" rollout status deployment/chlorine-reloader --timeout=3m
+"${kc[@]}" get pods -l app=chlorine-reloader -o json |
+  jq -e '.items | length == 1 and all(.[]; .status.phase == "Running" and all(.status.containerStatuses[]; .ready and .restartCount == 0))' >/dev/null ||
+  { echo "❌ the Reloader controller pod is not running and ready" >&2 && exit 1; }
+"${kc[@]}" get deployment chlorine-reloader -o json |
+  jq -e '(.spec.template.spec.containers[0].args // []) | all(.[]; test("^--auto-reload-all") | not)' >/dev/null ||
+  { echo "❌ the live Reloader runs with auto-reload-all" >&2 && exit 1; }
+echo "✅ one plain helm install --wait: Reloader healthy, annotation opt-in"
+
+"${k[@]}" create namespace "${fixture_ns}"
+fixture annotated 'reloader.stakater.com/auto: "true"' | "${kf[@]}" apply -f -
+fixture quiet '' | "${kf[@]}" apply -f -
+for d in annotated quiet; do "${kf[@]}" rollout status "deployment/${d}" --timeout=2m; done
+annotated_before="$(state annotated)"
+quiet_before="$(state quiet)"
+one='^[0-9a-f-]{36}[|][^ ]+ $'
+[[ ${annotated_before} =~ ${one} && ${quiet_before} =~ ${one} ]] ||
+  { echo "❌ fixture baseline is not one running pod and one ReplicaSet each (${annotated_before} / ${quiet_before})" >&2 && exit 1; }
+
+# Rotate quiet first: once annotated restarts, Reloader has already handled quiet's event.
+rotate quiet
+rotate annotated
+restarted=false
 for _ in $(seq 1 60); do
-  reloaded_from="$(kubectl --context "${context}" --namespace "${sit_namespace}" get deployment demo \
-    -o jsonpath='{.spec.template.metadata.annotations.reloader\.stakater\.com/last-reloaded-from}' 2>/dev/null || true)"
-  after_generation="$(kubectl --context "${context}" --namespace "${sit_namespace}" get deployment demo -o jsonpath='{.metadata.generation}')"
-  if [ -n "${reloaded_from}" ] || [ "${after_generation}" -gt "${before_generation}" ]; then
-    reloaded=true
+  now="$(state annotated)"
+  if [ "${now%%|*}" != "${annotated_before%%|*}" ] && [ -n "${now%%|*}" ] && [ "${now#*|}" != "${annotated_before#*|}" ]; then
+    restarted=true
     break
   fi
   sleep 3
 done
+[ "${restarted}" = true ] || { echo "❌ Reloader did not restart the annotated Deployment within 180s of its Secret change (${annotated_before} -> $(state annotated))" >&2 && exit 1; }
+"${kf[@]}" get deployment annotated -o json |
+  jq -e '.spec.template.metadata.annotations // {} | keys | any(startswith("reloader.stakater.com/"))' >/dev/null ||
+  { echo "❌ the annotated Deployment rolled without a Reloader pod-template annotation" >&2 && exit 1; }
+echo "✅ Secret change -> annotated Deployment restarted (new ReplicaSet, new pod UID)"
 
-[ "${reloaded}" != "true" ] && echo "❌ Reloader did not restart the annotated Deployment after its Secret changed" >&2 && exit 1
-kubectl --context "${context}" --namespace "${sit_namespace}" rollout status deployment/demo --timeout=2m
+sleep 15
+quiet_after="$(state quiet)"
+[ "${quiet_after}" = "${quiet_before}" ] || { echo "❌ Reloader restarted the un-annotated Deployment (${quiet_before} -> ${quiet_after})" >&2 && exit 1; }
+echo "✅ Secret change -> un-annotated Deployment untouched (same ReplicaSet and pod UID)"
 
-# Negative control: an un-annotated Deployment referencing an un-annotated Secret
-# is NOT touched (annotation opt-in, not auto-reload-all).
-kubectl --context "${context}" --namespace "${sit_namespace}" create secret generic quiet-secret \
-  --from-literal=token=before --dry-run=client -o yaml | kubectl --context "${context}" apply -f -
-sed 's/name: demo/name: quiet/; s/app: demo/app: quiet/; s/name: demo-secret/name: quiet-secret/; /reloader.stakater.com\/auto/d' "${tmp}/demo.yaml" >"${tmp}/quiet.yaml"
-kubectl --context "${context}" apply -f "${tmp}/quiet.yaml"
-kubectl --context "${context}" --namespace "${sit_namespace}" rollout status deployment/quiet --timeout=2m
-quiet_before="$(kubectl --context "${context}" --namespace "${sit_namespace}" get deployment quiet -o jsonpath='{.metadata.generation}')"
-kubectl --context "${context}" --namespace "${sit_namespace}" create secret generic quiet-secret \
-  --from-literal=token=after --dry-run=client -o yaml | kubectl --context "${context}" apply -f -
-sleep 20
-quiet_after="$(kubectl --context "${context}" --namespace "${sit_namespace}" get deployment quiet -o jsonpath='{.metadata.generation}')"
-[ "${quiet_after}" != "${quiet_before}" ] && echo "❌ Reloader restarted an un-annotated Deployment (opt-in violated)" >&2 && exit 1
+PUBLISH_MODE=oci PUBLISH_DRY_RUN=false RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/oci" OCI_REGISTRY="localhost:${registry_port}" OCI_REPOSITORY=charts OCI_PLAIN_HTTP=true bash ./scripts/ci/publish.sh
+helm pull "oci://localhost:${registry_port}/charts/chlorine" --version 0.1.0 --plain-http --destination "${tmp}"
+test -s "${tmp}/chlorine-0.1.0.tgz"
 
-echo "✅ k3d reloader engine healthy; annotated Secret change rolled the workload, un-annotated stayed put"
+echo "✅ k3d install, Reloader healthy, opt-in restart proven, OCI round-trip passed"
