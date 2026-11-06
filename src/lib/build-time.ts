@@ -1,16 +1,26 @@
+import { EnvKeyMatcher } from './coerce.js';
+import { NESTING_SEPARATOR } from './env.js';
 import type { EnvRecord } from './source.js';
 
 class BuildTimeValueMapper {
-  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
-  constructor() {}
+  constructor(private readonly matcher: EnvKeyMatcher = new EnvKeyMatcher()) {}
 
-  // Blank values are unset, so a secret that only exists at runtime is never inlined.
+  // Only client values may be inlined, and the client BUILD subtree holds build-step secrets.
   map(env: EnvRecord, prefix: string): Record<string, string> {
     return Object.fromEntries(
       Object.entries(env).filter(
-        (entry): entry is [string, string] => entry[0].startsWith(prefix) && entry[1] !== undefined && entry[1] !== '',
+        (entry): entry is [string, string] =>
+          entry[1] !== undefined &&
+          entry[1] !== '' &&
+          entry[0].startsWith(prefix) &&
+          this.inlineable(entry[0].slice(prefix.length)),
       ),
     );
+  }
+
+  private inlineable(name: string): boolean {
+    const [scope, ...rest] = name.split(NESTING_SEPARATOR).map(segment => this.matcher.normalize(segment));
+    return scope === 'client' && rest.length > 0 && !rest.includes('build');
   }
 }
 
