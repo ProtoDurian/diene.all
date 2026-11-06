@@ -1,9 +1,5 @@
 namespace AtomiCloud.DotnetBase.UnitTest.Meta;
 
-/// <summary>
-/// META tier — the published path policy of the in-memory filesystem. Consumers
-/// writing their own fake read this policy, so it is pinned.
-/// </summary>
 public class VfsPathTests
 {
     [Theory]
@@ -17,21 +13,31 @@ public class VfsPathTests
     [InlineData("   ", "/")]
     public void It_should_normalize_separators_and_trailing_slashes(string path, string expected)
     {
-        VfsPath.Normalize(path).Should().Be(expected);
+        // Act
+        var normalized = VfsPath.Normalize(path);
+
+        // Assert
+        normalized.Should().Be(expected);
     }
 
     [Fact]
     public void It_should_reject_a_null_path()
     {
+        // Act
         var act = () => VfsPath.Normalize(null!);
 
+        // Assert
         act.Should().Throw<ArgumentNullException>();
     }
 
     [Fact]
     public void It_should_publish_the_root()
     {
-        VfsPath.Root.Should().Be("/");
+        // Act
+        var root = VfsPath.Root;
+
+        // Assert
+        root.Should().Be("/");
     }
 
     [Theory]
@@ -39,13 +45,21 @@ public class VfsPathTests
     [InlineData("/a", "/")]
     public void It_should_resolve_parents(string path, string expected)
     {
-        VfsPath.Parent(path).Should().BeSome(expected);
+        // Act
+        var parent = VfsPath.Parent(path);
+
+        // Assert
+        parent.Should().BeSome(expected);
     }
 
     [Fact]
     public void It_should_report_no_parent_at_the_root()
     {
-        VfsPath.Parent("/").IsNone().Should().BeTrue();
+        // Act
+        var parent = VfsPath.Parent("/");
+
+        // Assert
+        parent.IsNone().Should().BeTrue();
     }
 
     [Theory]
@@ -57,7 +71,11 @@ public class VfsPathTests
     [InlineData("/", "/", false)]
     public void It_should_decide_descent(string candidate, string ancestor, bool expected)
     {
-        VfsPath.IsBelow(candidate, ancestor).Should().Be(expected);
+        // Act
+        var below = VfsPath.IsBelow(candidate, ancestor);
+
+        // Assert
+        below.Should().Be(expected);
     }
 
     [Theory]
@@ -67,6 +85,10 @@ public class VfsPathTests
     [InlineData("/a", "/a", false)]
     public void It_should_decide_direct_children(string candidate, string parent, bool expected)
     {
-        VfsPath.IsDirectChild(candidate, parent).Should().Be(expected);
+        // Act
+        var child = VfsPath.IsDirectChild(candidate, parent);
+
+        // Assert
+        child.Should().Be(expected);
     }
 }

@@ -1,6 +1,5 @@
 namespace AtomiCloud.DotnetBase.UnitTest.Meta;
 
-/// <summary>Every operation fails, so no contract case can pass.</summary>
 internal sealed class AlwaysFailingVfs : IVfs
 {
     private static SeamError Error => SeamErrors.IoFailure(SeamKind.Vfs, "sabotage", "always fails");
@@ -49,7 +48,6 @@ internal sealed class AlwaysFailingVfs : IVfs
         Task.FromResult(Result.Err<Unit, SeamError>(Error));
 }
 
-/// <summary>Every operation succeeds vacuously, so failure cases cannot pass.</summary>
 internal sealed class AlwaysSucceedingVfs : IVfs
 {
     public Task<Result<bool, SeamError>> Exists(string path, CancellationToken cancellationToken = default) =>
@@ -96,7 +94,6 @@ internal sealed class AlwaysSucceedingVfs : IVfs
         Task.FromResult(Result.Ok<Unit, SeamError>(default));
 }
 
-/// <summary>Throws instead of returning a Result, which S33 forbids.</summary>
 internal sealed class ThrowingVfs : IVfs
 {
     public Task<Result<bool, SeamError>> Exists(string path, CancellationToken cancellationToken = default) =>

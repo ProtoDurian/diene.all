@@ -1,10 +1,5 @@
 namespace AtomiCloud.DotnetBase.UnitTest.Meta;
 
-/// <summary>
-/// META tier — ASSERT THE ASSERTER. Every assertion helper and every contract suite
-/// this library ships is proven to PASS on a known-good subject and to FAIL on a
-/// known-bad one. A helper that cannot fail is not a test, it is decoration.
-/// </summary>
 public class AssertTheAsserterTests
 {
     private static readonly DateTimeOffset Anchor = new(2026, 7, 25, 22, 30, 0, TimeSpan.Zero);
@@ -12,73 +7,109 @@ public class AssertTheAsserterTests
     [Fact]
     public void BeSeamErr_should_pass_on_the_expected_seam_and_id()
     {
-        Result.Err<int, SeamError>(SeamErrors.NotFound("/tmp/a"))
-            .Should().BeSeamErr(SeamKind.Vfs, "not_found")
-            .Which.Data["path"].Should().Be("/tmp/a");
+        // Arrange
+        var result = Result.Err<int, SeamError>(SeamErrors.NotFound("/tmp/a"));
+
+        // Act
+        var error = result.Should().BeSeamErr(SeamKind.Vfs, "not_found").Which;
+
+        // Assert
+        error.Data["path"].Should().Be("/tmp/a");
     }
 
     [Fact]
     public void BeSeamErr_should_fail_on_a_different_id()
     {
-        var act = () => Result.Err<int, SeamError>(SeamErrors.NotFound("/tmp/a"))
-            .Should().BeSeamErr(SeamKind.Vfs, "already_exists");
+        // Arrange
+        var result = Result.Err<int, SeamError>(SeamErrors.NotFound("/tmp/a"));
 
+        // Act
+        var act = () => result.Should().BeSeamErr(SeamKind.Vfs, "already_exists");
+
+        // Assert
         act.Should().Throw<Exception>().WithMessage("*already_exists*not_found*");
     }
 
     [Fact]
     public void BeSeamErr_should_fail_on_a_different_seam()
     {
-        var act = () => Result.Err<int, SeamError>(SeamErrors.NotFound("/tmp/a"))
-            .Should().BeSeamErr(SeamKind.System, "not_found");
+        // Arrange
+        var result = Result.Err<int, SeamError>(SeamErrors.NotFound("/tmp/a"));
 
+        // Act
+        var act = () => result.Should().BeSeamErr(SeamKind.System, "not_found");
+
+        // Assert
         act.Should().Throw<Exception>();
     }
 
     [Fact]
     public void BeSeamErr_should_fail_on_a_successful_result()
     {
-        var act = () => Result.Ok<int, SeamError>(1).Should().BeSeamErr(SeamKind.Vfs, "not_found");
+        // Arrange
+        var result = Result.Ok<int, SeamError>(1);
 
+        // Act
+        var act = () => result.Should().BeSeamErr(SeamKind.Vfs, "not_found");
+
+        // Assert
         act.Should().Throw<Exception>();
     }
 
     [Fact]
     public void BeSeamErr_should_reject_a_null_assertion_subject()
     {
+        // Act
         var act = () => SeamAssertionExtensions.BeSeamErr<int>(null!, SeamKind.Vfs, "not_found");
 
+        // Assert
         act.Should().Throw<ArgumentNullException>();
     }
 
     [Fact]
     public async Task BeConformant_should_pass_on_a_conformant_implementation()
     {
+        // Act
         var report = await SeamContracts.Vfs(new InMemoryVfs(Anchor), "/root");
 
+        // Assert
         report.Should().BeConformant();
         report.Failures.Should().BeEmpty();
         report.ToString().Should().Contain("cases conformant");
     }
 
     [Fact]
-    public async Task BeConformant_should_fail_on_an_implementation_that_always_fails()
+    public async Task A_contract_report_should_fail_every_case_of_an_implementation_that_always_fails()
     {
+        // Act
         var report = await SeamContracts.Vfs(new AlwaysFailingVfs(), "/root");
 
+        // Assert
         report.Conformant.Should().BeFalse();
         report.Failures.Should().HaveCount(report.Cases.Count);
         report.ToString().Should().Contain("cases failed");
+    }
 
+    [Fact]
+    public async Task BeConformant_should_fail_on_an_implementation_that_always_fails()
+    {
+        // Arrange
+        var report = await SeamContracts.Vfs(new AlwaysFailingVfs(), "/root");
+
+        // Act
         var act = () => report.Should().BeConformant();
+
+        // Assert
         act.Should().Throw<Exception>().WithMessage("*conformant*");
     }
 
     [Fact]
     public async Task BeConformant_should_fail_on_an_implementation_that_never_fails()
     {
+        // Act
         var report = await SeamContracts.Vfs(new AlwaysSucceedingVfs(), "/root");
 
+        // Assert
         report.Conformant.Should().BeFalse();
         report.Failures.Should().NotBeEmpty();
         report.Cases.Should().Contain(one => one.Passed);
@@ -87,8 +118,10 @@ public class AssertTheAsserterTests
     [Fact]
     public async Task BeConformant_should_fail_on_an_implementation_that_throws()
     {
+        // Act
         var report = await SeamContracts.Vfs(new ThrowingVfs(), "/root");
 
+        // Assert
         report.Conformant.Should().BeFalse();
         report.Failures.Should().AllSatisfy(failure => failure.Should().Contain("threw InvalidOperationException"));
     }
@@ -96,70 +129,163 @@ public class AssertTheAsserterTests
     [Fact]
     public void HaveLogged_should_pass_on_a_matching_record()
     {
+        // Arrange
         var sink = new InMemoryLoggerSink();
         sink.Emit(new LogRecord(Anchor, LogLevel.Warning, "careful")).Should().BeOk();
 
-        sink.Should().HaveLogged(LogLevel.Warning, "careful").Which.Timestamp.Should().Be(Anchor);
+        // Act
+        var record = sink.Should().HaveLogged(LogLevel.Warning, "careful").Which;
+
+        // Assert
+        record.Timestamp.Should().Be(Anchor);
     }
 
     [Fact]
-    public void HaveLogged_should_fail_on_a_different_level_or_message()
+    public void HaveLogged_should_fail_on_a_different_level()
     {
+        // Arrange
         var sink = new InMemoryLoggerSink();
         sink.Emit(new LogRecord(Anchor, LogLevel.Warning, "careful"));
 
-        var level = () => sink.Should().HaveLogged(LogLevel.Error, "careful");
-        var message = () => sink.Should().HaveLogged(LogLevel.Warning, "other");
+        // Act
+        var act = () => sink.Should().HaveLogged(LogLevel.Error, "careful");
 
-        level.Should().Throw<Exception>().WithMessage("*error*careful*");
-        message.Should().Throw<Exception>();
+        // Assert
+        act.Should().Throw<Exception>().WithMessage("*error*careful*");
+    }
+
+    [Fact]
+    public void HaveLogged_should_fail_on_a_different_message()
+    {
+        // Arrange
+        var sink = new InMemoryLoggerSink();
+        sink.Emit(new LogRecord(Anchor, LogLevel.Warning, "careful"));
+
+        // Act
+        var act = () => sink.Should().HaveLogged(LogLevel.Warning, "other");
+
+        // Assert
+        act.Should().Throw<Exception>();
     }
 
     [Fact]
     public void HaveLogged_should_fail_on_an_empty_sink()
     {
-        var act = () => new InMemoryLoggerSink().Should().HaveLogged(LogLevel.Info, "anything");
+        // Arrange
+        var sink = new InMemoryLoggerSink();
 
+        // Act
+        var act = () => sink.Should().HaveLogged(LogLevel.Info, "anything");
+
+        // Assert
         act.Should().Throw<Exception>();
     }
 
     [Fact]
     public void HaveSampled_should_pass_on_a_matching_sample()
     {
+        // Arrange
         var collector = new InMemoryMetricsCollector();
         collector.Emit(new MetricRecord(Anchor, "app.count", MetricKind.Counter, 1)).Should().BeOk();
 
-        collector.Should().HaveSampled("app.count", MetricKind.Counter, 1).Which.Unit.IsNone().Should().BeTrue();
+        // Act
+        var record = collector.Should().HaveSampled("app.count", MetricKind.Counter, 1).Which;
+
+        // Assert
+        record.Unit.IsNone().Should().BeTrue();
     }
 
     [Fact]
-    public void HaveSampled_should_fail_on_a_different_name_kind_or_value()
+    public void HaveSampled_should_fail_on_a_different_name()
     {
+        // Arrange
         var collector = new InMemoryMetricsCollector();
         collector.Emit(new MetricRecord(Anchor, "app.count", MetricKind.Counter, 1));
 
-        var name = () => collector.Should().HaveSampled("app.other", MetricKind.Counter, 1);
-        var kind = () => collector.Should().HaveSampled("app.count", MetricKind.Gauge, 1);
-        var value = () => collector.Should().HaveSampled("app.count", MetricKind.Counter, 2);
+        // Act
+        var act = () => collector.Should().HaveSampled("app.other", MetricKind.Counter, 1);
 
-        name.Should().Throw<Exception>();
-        kind.Should().Throw<Exception>().WithMessage("*gauge*app.count*");
-        value.Should().Throw<Exception>();
+        // Assert
+        act.Should().Throw<Exception>();
+    }
+
+    [Fact]
+    public void HaveSampled_should_fail_on_a_different_kind()
+    {
+        // Arrange
+        var collector = new InMemoryMetricsCollector();
+        collector.Emit(new MetricRecord(Anchor, "app.count", MetricKind.Counter, 1));
+
+        // Act
+        var act = () => collector.Should().HaveSampled("app.count", MetricKind.Gauge, 1);
+
+        // Assert
+        act.Should().Throw<Exception>().WithMessage("*gauge*app.count*");
+    }
+
+    [Fact]
+    public void HaveSampled_should_fail_on_a_different_value()
+    {
+        // Arrange
+        var collector = new InMemoryMetricsCollector();
+        collector.Emit(new MetricRecord(Anchor, "app.count", MetricKind.Counter, 1));
+
+        // Act
+        var act = () => collector.Should().HaveSampled("app.count", MetricKind.Counter, 2);
+
+        // Assert
+        act.Should().Throw<Exception>();
     }
 
     [Fact]
     public void HaveSampled_should_fail_on_an_empty_collector()
     {
-        var act = () => new InMemoryMetricsCollector().Should().HaveSampled("app.count", MetricKind.Counter, 1);
+        // Arrange
+        var collector = new InMemoryMetricsCollector();
 
+        // Act
+        var act = () => collector.Should().HaveSampled("app.count", MetricKind.Counter, 1);
+
+        // Assert
         act.Should().Throw<Exception>();
     }
 
     [Fact]
-    public void A_contract_case_should_render_its_outcome()
+    public void A_passing_contract_case_should_render_ok()
     {
-        new ContractCase("case", Option.None<string>()).ToString().Should().Be("case: ok");
-        new ContractCase("case", Option.Some("boom")).ToString().Should().Be("case: boom");
-        new ContractCase("case", Option.Some("boom")).Passed.Should().BeFalse();
+        // Arrange
+        var passing = new ContractCase("case", Option.None<string>());
+
+        // Act
+        var rendered = passing.ToString();
+
+        // Assert
+        rendered.Should().Be("case: ok");
+    }
+
+    [Fact]
+    public void A_failing_contract_case_should_render_its_failure()
+    {
+        // Arrange
+        var failing = new ContractCase("case", Option.Some("boom"));
+
+        // Act
+        var rendered = failing.ToString();
+
+        // Assert
+        rendered.Should().Be("case: boom");
+    }
+
+    [Fact]
+    public void A_failing_contract_case_should_not_pass()
+    {
+        // Arrange
+        var failing = new ContractCase("case", Option.Some("boom"));
+
+        // Act
+        var passed = failing.Passed;
+
+        // Assert
+        passed.Should().BeFalse();
     }
 }
