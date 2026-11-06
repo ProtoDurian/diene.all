@@ -254,3 +254,54 @@ describe('Result type surface', () => {
     (await concrete.unwrap()).should.equal(10);
   });
 });
+
+describe('Result sync inspection', () => {
+  it('should inspect Results built from plain values without awaiting', () => {
+    // Arrange
+    const ok = Ok<number, string>(4);
+    const err = Err<number, string>('bad');
+    const wire = Res.fromSerial<number, string>(['ok', 5]);
+    const cases = { ok: (v: number) => `ok:${v}`, err: (e: string) => `err:${e}` };
+
+    // Act
+    const okMatched = ok.matchSync(cases);
+    const errMatched = err.matchSync(cases);
+
+    // Assert
+    ok.isOkSync().should.be.true();
+    ok.isErrSync().should.be.false();
+    ok.unwrapSync().should.equal(4);
+    err.isErrSync().should.be.true();
+    err.isOkSync().should.be.false();
+    err.unwrapErrSync().should.equal('bad');
+    wire.unwrapSync().should.equal(5);
+    okMatched.should.equal('ok:4');
+    errMatched.should.equal('err:bad');
+  });
+
+  it('should throw UnwrapError for a wrong-variant sync unwrap', () => {
+    // Arrange
+    const ok = Ok<number, string>(1);
+    const err = Err<number, string>('no');
+
+    // Act
+    const unwrapErrFromOk = () => ok.unwrapErrSync();
+    const unwrapOkFromErr = () => err.unwrapSync();
+
+    // Assert
+    unwrapErrFromOk.should.throw(UnwrapError, { type: 'Expected Err got Ok' });
+    unwrapOkFromErr.should.throw(UnwrapError, { type: 'Expected Ok got Error' });
+  });
+
+  it('should refuse sync inspection of a pending Result', async () => {
+    // Arrange
+    const pending = Ok<number, string>(Promise.resolve(2)).map(v => v + 1);
+
+    // Act
+    const inspect = () => pending.isOkSync();
+
+    // Assert
+    inspect.should.throw(UnwrapError, { type: 'Expected settled got pending' });
+    (await pending.unwrap()).should.equal(3);
+  });
+});

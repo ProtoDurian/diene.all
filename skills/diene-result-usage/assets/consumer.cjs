@@ -5,5 +5,6 @@ module.exports.consumeResult = async function consumeResult() {
     .map(value => value * 2)
     .unwrap();
   const present = await Opt.fromNative('value').isSome();
-  return { doubled, present };
+  const valid = Ok(1).isOkSync();
+  return { doubled, present, valid };
 };

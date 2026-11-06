@@ -21,5 +21,7 @@ const error: string = await expectErr(failure);
 const some: string = await expectSome(option);
 
 const kind: DU<[['ok', number], ['err', string]]> = { __kind: 'ok', value };
+const checked: string = failure.matchSync({ ok: n => `${n}`, err: e => e });
+const valid: boolean = result.isOkSync();
 
-void [value, error, some, kind];
+void [value, error, some, kind, checked, valid];

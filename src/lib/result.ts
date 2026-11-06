@@ -11,6 +11,9 @@ type ResultSerial<T, E> = ['ok', T] | ['err', E];
  * @returns {Result<T,X>} - new instance of `Result` as the `err` variant
  */
 function Err<T, X>(error: X | Promise<X>): Result<T, X> {
+  if (!KResult.isThenable(error)) {
+    return KResult.settled<T, X>(['err', error]);
+  }
   return new KResult<T, X>(
     (async () => {
       const err = await error;
@@ -26,6 +29,9 @@ function Err<T, X>(error: X | Promise<X>): Result<T, X> {
  * @returns {Result<T,X>} - new instance of `Result` as the `ok` variant
  */
 function Ok<T, X = never>(val: T | Promise<T>): Result<T, X> {
+  if (!KResult.isThenable(val)) {
+    return KResult.settled<T, X>(['ok', val]);
+  }
   return new KResult<T, X>(
     (async () => {
       const v = await val;
@@ -37,6 +43,11 @@ function Ok<T, X = never>(val: T | Promise<T>): Result<T, X> {
 interface ResultMatch<T, E, U> {
   ok: ((val: T) => Promise<U>) | ((val: T) => U);
   err: ((val: E) => Promise<U>) | ((val: E) => U);
+}
+
+interface ResultMatchSync<T, E, U> {
+  ok: (val: T) => U;
+  err: (val: E) => U;
 }
 
 type ResultErr<T extends Result<unknown, unknown>[]> = T extends Array<Result<unknown, infer E>> ? E[] : never;
@@ -53,6 +64,9 @@ const Res = {
    * @return {Result<T,E>} - new instance of `Result` by deserializing the serial format
    */
   fromSerial<T, E>(a: ResultSerial<T, E> | Promise<ResultSerial<T, E>>): Result<T, E> {
+    if (!KResult.isThenable(a)) {
+      return KResult.settled<T, E>(a);
+    }
     const p = Promise.resolve(a) satisfies Promise<ResultSerial<T, E>>;
     return new KResult<T, E>(p);
   },
@@ -137,6 +151,17 @@ interface Result<T, E> {
    * @returns {Promise<boolean>} - boolean indicating whether the variant of the Result is "err"
    */
   isErr(): Promise<boolean>;
+
+  // Sync inspectors read a Result built from a plain value (Ok, Err, fromSerial); a pending one throws UnwrapError.
+  isOkSync(): boolean;
+
+  isErrSync(): boolean;
+
+  unwrapSync(): T;
+
+  unwrapErrSync(): E;
+
+  matchSync<U>(fn: ResultMatchSync<T, E, U>): U;
 
   /**
    * @template T
@@ -252,8 +277,55 @@ interface Result<T, E> {
 class KResult<T, X> implements Result<T, X> {
   value: Promise<ResultSerial<T, X>>;
 
-  constructor(value: Promise<ResultSerial<T, X>>) {
+  private readonly known: ResultSerial<T, X> | undefined;
+
+  constructor(value: Promise<ResultSerial<T, X>>, known?: ResultSerial<T, X>) {
     this.value = value;
+    this.known = known;
+  }
+
+  static settled<T, X>(serial: ResultSerial<T, X>): KResult<T, X> {
+    return new KResult<T, X>(Promise.resolve(serial), serial);
+  }
+
+  static isThenable<V>(v: V | PromiseLike<V>): v is PromiseLike<V> {
+    return typeof (v as { then?: unknown } | null | undefined)?.then === 'function';
+  }
+
+  private sync(): ResultSerial<T, X> {
+    if (this.known === undefined) {
+      throw new UnwrapError('Failed to inspect synchronously', 'result', 'Expected settled got pending');
+    }
+    return this.known;
+  }
+
+  isOkSync(): boolean {
+    return this.sync()[0] === 'ok';
+  }
+
+  isErrSync(): boolean {
+    return this.sync()[0] === 'err';
+  }
+
+  unwrapSync(): T {
+    const [type, val] = this.sync();
+    if (type === 'ok') {
+      return val;
+    }
+    throw new UnwrapError('Failed to unwrap', 'result', 'Expected Ok got Error');
+  }
+
+  unwrapErrSync(): X {
+    const [type, val] = this.sync();
+    if (type === 'err') {
+      return val;
+    }
+    throw new UnwrapError('Failed to unwrap', 'result', 'Expected Err got Ok');
+  }
+
+  matchSync<U>(fn: ResultMatchSync<T, X, U>): U {
+    const [type, val] = this.sync();
+    return type === 'ok' ? fn.ok(val) : fn.err(val);
   }
 
   andThen<U>(fn: ((val: T) => Result<U, X>) | ((val: T) => Promise<Result<U, X>>)): Result<U, X> {
@@ -436,4 +508,4 @@ class KResult<T, X> implements Result<T, X> {
 }
 
 export { Err, Ok, Res, KResult };
-export type { Result, ResultSerial };
+export type { Result, ResultMatchSync, ResultSerial };

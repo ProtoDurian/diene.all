@@ -14,6 +14,9 @@ reach into `src/` or `dist/`.
 
 - Prefer `map`/`mapErr`/`andThen`/`match`; reserve `unwrap*` for proven boundaries.
 - Await predicates, extraction, matching, and serialization: this API is async-native.
+- Inspect a Result built from a plain value (`Ok`, `Err`, `Res.fromSerial`) without
+  awaiting via `isOkSync`/`isErrSync`/`unwrapSync`/`unwrapErrSync`/`matchSync`; a
+  pending Result throws `UnwrapError` there.
 - Send only `serial()` tuples across SSR/process boundaries and rebuild with
   `Res.fromSerial` or `Opt.fromSerial`.
 - In tests, await `expectOk`, `expectErr`, `expectSome`, or `expectNone` from

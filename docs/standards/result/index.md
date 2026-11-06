@@ -13,12 +13,35 @@ making exceptions part of ordinary control flow.
 - `Option<T>` is the interface; `KOption<T>` is its concrete implementation.
 - `Some(value)` and `None()` create Options. `Opt.fromNative`,
   `Opt.fromSerial`, `Opt.fromAsync`, `Opt.async`, and `Opt.all` compose them.
-- `UnwrapError` is thrown only when explicit `unwrap`/`unwrapErr` use asks for
-  the wrong variant.
+- `UnwrapError` is thrown only when explicit `unwrap*` use asks for the wrong
+  variant, or a sync inspector meets a pending Result.
 - `ResultSerial<T, E>` and `OptionSerial<T>` are JSON-safe discriminated tuples.
 
 All predicates, extraction, transforms, matching, projections, and wire methods
 are async-native because constructors accept promised values.
+
+## Sync inspection
+
+A Result built from a plain value by `Ok`, `Err`, or `Res.fromSerial` is settled
+at construction, so it can be inspected without awaiting:
+
+```ts
+import { Err, Ok, type Result } from '@atomicloud/diene.result';
+
+const validate = (name: string): Result<string, string> => (name ? Ok(name) : Err('empty name'));
+
+const checked = validate('');
+if (checked.isErrSync()) {
+  console.error(checked.unwrapErrSync());
+}
+const label = validate('ada').matchSync({ ok: name => `hi ${name}`, err: error => error });
+```
+
+`isOkSync`, `isErrSync`, `unwrapSync`, `unwrapErrSync`, and `matchSync` throw
+`UnwrapError` (type `Expected settled got pending`) on a Result built from a
+promise or derived by `map`, `andThen`, and the other combinators; await those.
+Use sync inspection for synchronous validators instead of a parallel
+`{ ok, value }` type.
 
 ## Compose along the railway
 
