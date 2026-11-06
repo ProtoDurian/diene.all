@@ -19,6 +19,9 @@ testing pyramid, no `probes/`.
 - No Issuer or ClusterIssuer. The engine/issuer split is an invariant: zinc owns the issuer set.
 - No credentials and no cloud IAM. Cloudflare API-token auth is zinc's issuer concern. cert-manager reads a ClusterIssuer's
   Secret from its cluster resource namespace, which is the release namespace `certs`. So zinc's token Secret must land there.
+- Prerequisite: the Gateway API CRDs must be in the cluster before sulfur. With `enableGatewayAPI: true`, the v1.20
+  controller exits when they are absent. Sulfur does not ship them. The k3d tier applies the pinned Gateway API v1.7.0
+  standard bundle (`tests/fixtures/`, the same bytes as charts/kgateway) as a test fixture.
 - The dead `ExperimentalGatewayAPISupport` feature gate (a no-op since v1.15) is never set.
 - ListenerSet support (`enableGatewayAPIListenerSet` + `featureGates.ListenerSets`) stays off and untested until it is needed.
 
@@ -58,7 +61,8 @@ same key to `"false"` under `upstream`, `upstream.webhook` and `upstream.cainjec
   - `rendered-manifests` is the inherited stage: `helm template` → kubeconform → `kyverno apply policies/vap`.
   - Its input is the three Deployments, the startupapicheck Job and the Services.
 - Integration: `scripts/ci/sulfur-k3d.sh` runs one plain `helm install --wait` on a fresh k3d cluster.
-  - It checks that the three pods are healthy, the CRDs are kept, and Gateway API is enabled in the live config.
+  - It applies the Gateway API CRD fixture, then checks that the three pods are healthy and never restart, the CRDs are
+    kept, and Gateway API is enabled in the live config.
   - A self-signed Issuer + Certificate (test fixtures, not chart templates) must reach `Ready=True`.
   - Then `helm upgrade`, then a round-trip of the chart through a local OCI registry.
 - `task latest` prints the newest upstream chart and image tags (quay.io/jetstack).

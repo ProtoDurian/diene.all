@@ -13,6 +13,8 @@ cluster_name="${K3D_CLUSTER_NAME:-diene-sulfur}"
 registry_port="${K3D_REGISTRY_PORT:-5001}"
 namespace=certs
 fixture_ns=sulfur-fixture
+crd_bundle=tests/fixtures/gateway-api-standard-v1.7.0.yaml.gz
+crd_bundle_digest=4e2602c4cbe1afbc394d86f4ac6522e1a5263b01133bba1e40a6d1a549e753a1
 values=(--values chart/values.example.yaml --values chart/values.lapras.yaml)
 helm_k=(--kube-context "k3d-${cluster_name}" --namespace "${namespace}")
 k=(kubectl --context "k3d-${cluster_name}")
@@ -36,6 +38,12 @@ trap cleanup EXIT
 
 bash ./scripts/local/create-k3d-cluster.sh
 helm dependency build chart
+
+# enableGatewayAPI makes the controller exit when the Gateway API CRDs are absent: a cluster prerequisite.
+gzip -dc "${crd_bundle}" >"${tmp}/gateway-api.yaml"
+echo "${crd_bundle_digest}  ${tmp}/gateway-api.yaml" | sha256sum -c --quiet
+"${k[@]}" apply --server-side -f "${tmp}/gateway-api.yaml" >/dev/null
+"${k[@]}" wait --for=condition=Established crd/gateways.gateway.networking.k8s.io crd/httproutes.gateway.networking.k8s.io --timeout=1m
 
 helm install sulfur chart "${helm_k[@]}" --create-namespace "${values[@]}" --wait --wait-for-jobs --timeout 5m
 
@@ -83,6 +91,10 @@ YAML
 openssl x509 -in "${tmp}/tls.crt" -noout -ext subjectAltName | rg -q 'DNS:fixture\.sulfur\.example\.invalid' ||
   { echo "❌ the issued certificate does not carry the requested SAN" >&2 && exit 1; }
 echo "✅ self-signed Issuer + Certificate reached Ready=True and the TLS Secret carries the SAN"
+"${kc[@]}" get pods -l app.kubernetes.io/instance=sulfur,app.kubernetes.io/component -o json |
+  jq -e '[.items[] | select(.metadata.labels["app.kubernetes.io/component"] != "startupapicheck") | .status.containerStatuses[].restartCount] | length == 3 and all(. == 0)' >/dev/null ||
+  { echo "❌ a cert-manager pod restarted (the controller exits if Gateway API is enabled without its CRDs)" >&2 && exit 1; }
+echo "✅ controller, cainjector and webhook never restarted with Gateway API enabled"
 
 helm get manifest sulfur "${helm_k[@]}" | yq -e '[select(.kind == "Issuer" or .kind == "ClusterIssuer")] | length == 0' >/dev/null ||
   { echo "❌ the sulfur release owns an Issuer/ClusterIssuer" >&2 && exit 1; }
