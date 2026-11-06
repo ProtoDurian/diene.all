@@ -24,11 +24,14 @@ checks:
       - gomplate
       - infisical
       - jq
+      - k3d
+      - kubectl version --client
       - nix
       - pre-commit
       - releaser
       - rg
       - shellcheck
+      - skopeo
       - task
       - treefmt
       - yq

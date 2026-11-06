@@ -29,9 +29,7 @@ repairing a commit.
 2. Move conditional or multi-step local logic to `scripts/local/`.
 3. Never call `scripts/ci/*` from a Taskfile; workflows own those entry points.
 4. Use lowercase names and colon-separated namespaces.
-5. Put repository-specific image and chart values in Taskfile `vars:` blocks,
-   scoped to the task that uses them rather than shared across artifacts.
-6. Do not add progress-only `echo` commands; the runner already displays each
+5. Do not add progress-only `echo` commands; the runner already displays each
    command.
 
 Each include remains self-contained so downstream strips can remove only their own
