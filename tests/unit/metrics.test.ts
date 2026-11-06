@@ -14,20 +14,21 @@ import { expectErr, expectOk } from './support/result.js';
 const policy = new MetricsPolicy();
 
 describe('MetricsPolicy.validateRecord', () => {
-  it.each<MetricKind>(['counter', 'gauge', 'histogram'])(
-    'should accept a valid %s metric and freeze it',
-    async kind => {
-      // Act
-      const actual = await expectOk(policy.validateRecord({ kind, name: 'http.requests', value: 3 }));
+  it.each<MetricKind>([
+    'counter',
+    'gauge',
+    'histogram',
+  ])('should accept a valid %s metric and freeze it', async kind => {
+    // Act
+    const actual = await expectOk(policy.validateRecord({ kind, name: 'http.requests', value: 3 }));
 
-      // Assert
-      actual.kind.should.eql(kind);
-      actual.name.should.eql('http.requests');
-      actual.value.should.eql(3);
-      Object.hasOwn(actual, 'attributes').should.be.false();
-      Object.isFrozen(actual).should.be.true();
-    },
-  );
+    // Assert
+    actual.kind.should.eql(kind);
+    actual.name.should.eql('http.requests');
+    actual.value.should.eql(3);
+    Object.hasOwn(actual, 'attributes').should.be.false();
+    Object.isFrozen(actual).should.be.true();
+  });
 
   it('should retain a valid unit and sorted attributes', async () => {
     // Act

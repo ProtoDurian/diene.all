@@ -14,19 +14,23 @@ import { expectErr, expectOk } from './support/result.js';
 const policy = new LoggingPolicy();
 
 describe('LoggingPolicy.validateRecord', () => {
-  it.each<LogLevel>(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])(
-    'should accept the %s level and freeze the normalized record',
-    async level => {
-      // Act
-      const actual = await expectOk(policy.validateRecord({ level, message: 'hello' }));
+  it.each<LogLevel>([
+    'trace',
+    'debug',
+    'info',
+    'warn',
+    'error',
+    'fatal',
+  ])('should accept the %s level and freeze the normalized record', async level => {
+    // Act
+    const actual = await expectOk(policy.validateRecord({ level, message: 'hello' }));
 
-      // Assert
-      actual.level.should.eql(level);
-      actual.message.should.eql('hello');
-      Object.hasOwn(actual, 'attributes').should.be.false();
-      Object.isFrozen(actual).should.be.true();
-    },
-  );
+    // Assert
+    actual.level.should.eql(level);
+    actual.message.should.eql('hello');
+    Object.hasOwn(actual, 'attributes').should.be.false();
+    Object.isFrozen(actual).should.be.true();
+  });
 
   it('should normalize and sort provided attributes', async () => {
     // Act
