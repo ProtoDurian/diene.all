@@ -3,9 +3,10 @@ set -euo pipefail
 
 # The inherited strip state still holds: nothing of D (docker) or H (helm)
 # survives — no axis path, no reference to one, no axis job, include, hook,
-# Dependabot entry, dlint smoke or probe row, no axis-carrying nix package, and
-# no axis binary in the default shell. dotnet-lib re-adds cd.yaml for its NuGet
-# publish job only, so cd.yaml is checked for axis jobs instead of absence.
+# Dependabot entry, dlint smoke or probe row. Absence is proved by files; helm
+# on PATH from the whole infralint bundle is fine. dotnet-lib re-adds cd.yaml
+# for its NuGet publish job only, so cd.yaml is checked for axis jobs instead
+# of absence.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -79,33 +80,10 @@ done
 [[ "$(show .github/workflows/cd.yaml | yq '.jobs | keys | join(",")')" == publish ]] || fail "cd.yaml carries a job other than publish"
 [[ "$(show Taskfile.yaml | yq '.includes | (has("docker") or has("helm"))')" == false ]] || fail "Taskfile.yaml still includes docker/helm"
 [[ "$(show .github/dependabot.yml | yq '[.updates[] | select(.package-ecosystem == "docker" or .package-ecosystem == "helm")] | length')" == 0 ]] || fail "dependabot.yml still has a docker/helm entry"
-[[ "$(show dlint.yaml | yq '[.checks["toolchain-smoke"].binaries[] | select(test("^(docker|dockerd|hadolint|skopeo|helm|helm-docs|helmlint|kubeconform|kyverno)( |$)"))] | length')" == 0 ]] || fail "dlint.yaml still smokes a D/H binary"
+[[ "$(show dlint.yaml | yq '[.checks["toolchain-smoke"].binaries[] | select(test("^(docker|dockerd|hadolint|helm|helm-docs|helmlint|kubeconform|kyverno)( |$)"))] | length')" == 0 ]] || fail "dlint.yaml still smokes a D/H binary"
 [[ "$(show probes/features.json | jq '[.[] | select(.name | test("docker|helm"))] | length')" == 0 ]] || fail "features.json still has a docker/helm row"
 if show CLAUDE.md | grep -Eqi '^# (docker|helm)'; then fail "CLAUDE.md still has a Docker/Helm section"; fi
-if show probes/binary-smoke.ts | grep -Eq '^(docker|dockerd|hadolint|skopeo|helm|helm-docs|helmlint|kubeconform|kyverno) '; then fail "binary-smoke.ts still smokes a D/H binary"; fi
-
-# --- nix: no slice or package that carries D by content -------------------------------
-for f in nix/packages.nix nix/env.nix; do
-  if show "${f}" | grep -v '^ *#' | grep -Eq '(^|[^A-Za-z0-9-])(infralint-docker|infrautils-docker|infralint|infrautils|docker|docker-client|hadolint|skopeo|kubernetes-helm|helm|helm-docs|helmlint)([^A-Za-z0-9-]|$)'; then
-    fail "${f} declares a docker/helm-carrying package"
-  fi
-done
-
-# --- the shell itself: no docker binary, the kept toolchain still there -------------
-# -i clears the caller's PATH, so only the shell's own inputs resolve. The
-# positive control proves the lookup is not vacuous.
-# shellcheck disable=SC2016
-nix develop -i --keep HOME .#default -c bash -c '
-  set -u
-  bad=0
-  for b in docker dockerd hadolint skopeo helm helm-docs helmlint; do
-    if p="$(command -v "$b")"; then echo "❌ default shell carries $b at $p" >&2; bad=1; fi
-  done
-  for b in dotnet tofu kubeconform shellcheck; do
-    command -v "$b" >/dev/null || { echo "❌ control: default shell lost $b" >&2; bad=1; }
-  done
-  exit "$bad"
-' || fail "default shell docker/helm absence / kept-toolchain presence"
+if show probes/binary-smoke.ts | grep -Eq '^(docker|dockerd|hadolint|helm|helm-docs|helmlint) '; then fail "binary-smoke.ts still smokes a D/H binary"; fi
 
 # --- the many-owner files the strip edited still parse and lint ---------------------
 # Reads the working tree on purpose: these tools take paths, and CI checks out HEAD.
@@ -124,4 +102,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ stripped-axis-absence: no D/H path, reference, entry, nix package or shell binary; cd.yaml is publish-only; edited files valid"
+echo "✅ stripped-axis-absence: no D/H path, reference, entry or smoke line; cd.yaml is publish-only; edited files valid"
