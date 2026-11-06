@@ -263,5 +263,20 @@
     "template": "diene/aseity",
     "name": "aseity-admin-grant",
     "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-tofu-validate",
+    "class": "gate"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-sealed-secrets",
+    "class": "gate"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-wrangler-config",
+    "class": "gate"
   }
 ]

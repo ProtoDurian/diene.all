@@ -48,6 +48,16 @@ tasks:
     cmds:
       - ./scripts/release/publish.sh --snapshot
 
+  secrets:init:
+    desc: Seal secrets/ to your own age key (creates the key if missing)
+    cmds:
+      - ./scripts/local/secrets-init.sh
+
+  infra:validate:
+    desc: Validate OpenTofu, sealed secrets and the wrangler contract
+    cmds:
+      - ./scripts/ci/infra.sh
+
   deadcode:
     desc: Review dead code with the LLM Knip views
     cmds:

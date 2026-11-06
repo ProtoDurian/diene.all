@@ -26,5 +26,52 @@
     "S3_REGION": "auto",
     "MAIL_FROM": "Aseity <no-reply@localhost>"
   },
-  "triggers": { "crons": ["* * * * *"] }
+  "secrets": {
+    "required": [
+      "BETTER_AUTH_SECRET",
+      "S3_ACCESS_KEY_ID",
+      "S3_SECRET_ACCESS_KEY",
+      "GITHUB_CLIENT_ID",
+      "GITHUB_CLIENT_SECRET",
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "MAIL_API_KEY"
+    ]
+  },
+  "triggers": { "crons": ["* * * * *"] },
+  "env": {
+    // The deployed Worker. Values here must match infra/tofu/production.tfvars.
+    "production": {
+      "name": "aseity",
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          // Replace with `tofu output -raw hyperdrive_id` after the first apply.
+          "id": "00000000000000000000000000000000"
+        }
+      ],
+      "vars": {
+        "APP_URL": "https://aseity.example.com",
+        "OAUTH_PROXY_URL": "https://aseity.example.com",
+        "TENANT_APPROVAL": "manual",
+        "S3_ENDPOINT": "https://t3.storage.dev",
+        "S3_BUCKET": "aseity-files",
+        "S3_REGION": "auto",
+        "MAIL_FROM": "Aseity <no-reply@aseity.example.com>"
+      },
+      "secrets": {
+        "required": [
+          "BETTER_AUTH_SECRET",
+          "S3_ACCESS_KEY_ID",
+          "S3_SECRET_ACCESS_KEY",
+          "GITHUB_CLIENT_ID",
+          "GITHUB_CLIENT_SECRET",
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET",
+          "MAIL_API_KEY"
+        ]
+      },
+      "triggers": { "crons": ["* * * * *"] }
+    }
+  }
 }

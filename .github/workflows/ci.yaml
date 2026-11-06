@@ -60,3 +60,10 @@ jobs:
     secrets: inherit
     with:
       mode: e2e
+
+  infra:
+    name: Infra Validation
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-infra.yaml
+    secrets: inherit
