@@ -28,7 +28,7 @@ Every fallible port method returns the published `@atomicloud/diene.result`
 returned value instead of using `try`/`catch`.
 
 **Tracing is not here.** Trace/span contracts and their test doubles are owned by
-the OTel package (RB-19); `LoggerSink` and `MetricsCollector` are plain effect
+the OTel package; `LoggerSink` and `MetricsCollector` are plain effect
 seams that OTel composes with.
 
 Read [patterns.md](patterns.md) for the do's, don'ts, a wiring and test example,

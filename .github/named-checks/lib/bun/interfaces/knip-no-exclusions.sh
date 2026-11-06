@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# R12: the four knip configs carry no ignore/exclude entries, negated globs or
+# The four knip configs carry no ignore/exclude entries, negated globs or
 # disabled/warn-only rules at any depth (knip.json may switch off devDependencies
 # only), and the knip hooks pass no exclusion flags.
 

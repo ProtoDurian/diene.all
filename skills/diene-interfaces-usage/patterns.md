@@ -24,8 +24,7 @@
 - Don't rely on side effects at import time — the package is `sideEffects: false`.
 - Don't re-derive a port's invariants in your own adapter. Reuse the package's
   shared validation so your adapter rejects exactly what the mock rejects.
-- Don't look for tracing or span contracts here — they live in the OTel package
-  (RB-19).
+- Don't look for tracing or span contracts here — they live in the OTel package.
 - Don't wrap port calls in `try`/`catch` for normal control flow; ports do not
   throw.
 

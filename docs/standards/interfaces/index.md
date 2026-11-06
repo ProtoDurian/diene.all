@@ -164,7 +164,7 @@ Three layers, three owners — keep them separate:
   or runtime (a real filesystem, a real process spawner, a real metrics registry). They live in
   their own packages, are wired in by dependency injection, and never leak their vendor back
   through the contract type.
-- **OTel (the separate OTel package).** **Tracing is not owned here.** Per RB-19, trace and
+- **OTel (the separate OTel package).** **Tracing is not owned here.** Trace and
   span contracts, their in-memory doubles, and any vendor- or SDK-specific telemetry assertions
   are language-local to the OTel package. `LoggerSink` and `MetricsCollector` here are plain
   effect seams; trace-context propagation and span emission belong to OTel, which composes with
