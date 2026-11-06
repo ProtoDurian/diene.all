@@ -1,7 +1,7 @@
 # Cobalt baseline
 
 `cobalt` is the secrets gateway: the vendored External Secrets Operator (`external-secrets` 2.7.0) plus one chart-owned
-`ClusterSecretStore` named `infisical`. It is a materialized helm-wrapper instance (S30): an ordinary unit + integration
+`ClusterSecretStore` named `infisical`. It is a materialized helm-wrapper instance: an ordinary unit + integration
 testing pyramid, no `probes/`.
 
 ## What the chart renders
