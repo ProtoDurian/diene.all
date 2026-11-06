@@ -3,9 +3,9 @@ set -euo pipefail
 
 # The node-owned consumer fixture: a throwaway package that `bun add`s the
 # library, then proves `import`, `require()` and the TypeScript types of both
-# conditions resolve for all three entry points. With no argument it consumes
-# this tree's packed tarball; pass a registry spec (e.g.
-# @atomicloud/diene.config@2.0.0) to consume a real publish instead.
+# conditions resolve. With no argument it consumes this tree's packed tarball;
+# pass a registry spec (e.g. @atomicloud/diene.config@2.0.0) to consume a real
+# publish instead.
 
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
