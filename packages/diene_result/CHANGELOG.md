@@ -7,12 +7,6 @@ from conventional commits by the repository release workflow.
 
 No public symbol or signature changes from 1.0.0.
 
-Fixed:
-
-- `Result.serial(encodeOk:)` and `Option.serial(encodeSome:)` now write the
-  `null` an encoder returns. Before, a `null` from the encoder silently wrote
-  the raw, unencoded value instead.
-
 Changed:
 
 - The package moves to the `ProtoDurian/diene.dart_result` repository.
