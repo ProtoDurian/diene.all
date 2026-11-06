@@ -47,7 +47,7 @@
     "cjs"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "@atomicloud/diene.interfaces": "1.0.0",

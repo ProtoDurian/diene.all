@@ -40,12 +40,16 @@ cat >"${work}/tsconfig.json" <<JSON
 }
 JSON
 cat >"${work}/esm.mjs" <<JS
-import { Slugger } from '${name}';
+import { Hasher, Slugger } from '${name}';
 if (new Slugger().slugify('Consumer Proof') !== 'consumer-proof') throw new Error('ESM import returned the wrong slug');
+if ((await new Hasher().sha256('abc')) !== 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad') throw new Error('ESM import returned the wrong sha256');
 JS
 cat >"${work}/cjs.cjs" <<JS
-const { Slugger } = require('${name}');
+const { Hasher, Slugger } = require('${name}');
 if (new Slugger().slugify('Consumer Proof') !== 'consumer-proof') throw new Error('CJS require returned the wrong slug');
+new Hasher().sha256('abc').then(digest => {
+  if (digest !== 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad') throw new Error('CJS require returned the wrong sha256');
+});
 JS
 cat >"${work}/types-esm.mts" <<TS
 import { Slugger } from '${name}';
