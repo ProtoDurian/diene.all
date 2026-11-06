@@ -1,21 +1,39 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mode="${1:-}"
-[[ ${mode} != "unit" && ${mode} != "int" ]] && echo "❌ usage: $0 <unit|int>" >&2 && exit 2
+tier="${1:-}"
 
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
+tiers=".config/bun-base.coverage.yaml"
+[[ -n ${tier} && "$(yq ".tiers | has(\"${tier}\")" "${tiers}")" == "true" ]] || {
+  echo "❌ usage: $0 <$(yq '.tiers | keys | join("|")' "${tiers}")>" >&2
+  exit 2
+}
+tests="$(yq ".tiers.${tier}.tests" "${tiers}")"
+scope="$(yq ".tiers.${tier}.scope" "${tiers}")"
+
+if [[ -z "$(rg --files -g '*.test.{ts,tsx}' "${tests}" 2>/dev/null || true)" ]]; then
+  echo "✅ ${tier} tier has no test files under ${tests}; nothing to run"
+  exit 0
+fi
+
 bun install --frozen-lockfile
 
-config="bunfig.${mode}.toml"
-report_dir="reports/unit"
-scope="src/lib/"
-[[ ${mode} == "int" ]] && report_dir="reports/integration" && scope="src/adapters/"
+config="bunfig.${tier}.toml"
+report_dir="reports/${tier}"
+[[ ${tier} == "int" ]] && report_dir="reports/integration"
 coverage_file="${report_dir}/lcov.info"
 
-echo "🧪 Running ${mode} tests with coverage..."
+if [[ -z ${scope} ]]; then
+  echo "🧪 Running ${tier} tests..."
+  bun test --config="${config}"
+  echo "✅ ${tier} tests passed"
+  exit 0
+fi
+
+echo "🧪 Running ${tier} tests with coverage..."
 rm -rf "${report_dir}"
 
 bun test --config="${config}" --coverage
@@ -30,4 +48,4 @@ sources="$(rg -N --replace '' '^SF:' "${coverage_file}" || true)"
 outside="$(printf '%s\n' "${sources}" | rg -v "(^|/)${scope}" || true)"
 [[ -n ${outside} ]] && echo "❌ coverage path outside ${scope}: ${outside}" >&2 && exit 1
 
-echo "✅ ${mode} tests passed; coverage is complete and scoped to ${scope}: ${coverage_file}"
+echo "✅ ${tier} tests passed; coverage is complete and scoped to ${scope}: ${coverage_file}"
