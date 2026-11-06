@@ -33,13 +33,29 @@ There are no sample dependency, `up`/`down`, probe-matrix, or Docker tasks.
 
 The composition root is `bin/releaser.ts`. Pure business logic and ports live in
 `src/lib`; concrete Git, filesystem, HTTP, process, configuration, and terminal
-implementations live in `src/adapters`. TypeScript uses strict no-emit checking,
-Biome linting, treefmt formatting, and strict repository/production Knip views.
+implementations live in `src/adapters`.
 
-Unit tests cover the pure library. Integration tests use temporary directories,
-scratch Git repositories, local bare remotes, and fake HTTP only. SIT runs the
-same user journeys through either the in-process composition seam or the freshly
-compiled Linux x64 binary. No test contacts GitHub or publishes an artifact.
+treefmt runs Biome to format TS, JS and JSON in the style set in `biome.json`;
+Prettier formats only Markdown and YAML. The Biome hook only lints. TypeScript
+uses strict no-emit typechecking. Knip has four dead-code modes, none with ignore or exclude lists:
+
+- `knip.json`: blocking hook over source and tests, so dead test code fails too.
+- `knip.production.json`: blocking `--production` hook from `bin/releaser.ts`
+  that ignores test usage, so a file only tests use fails.
+- `knip.llm.json`: non-blocking repository review for LLMs.
+- `knip.production.llm.json`: non-blocking production review for LLMs.
+
+## Test and coverage tiers
+
+- `.config/bun-base.coverage.yaml` lists the tiers (`unit`, `int`, `meta`,
+  `sit`), each with its test folder and coverage scope;
+  `scripts/ci/test.sh <tier>` reads it.
+- Unit tests cover the pure library under `src/lib/**`.
+- Integration tests use temporary directories, scratch Git repositories, local
+  bare remotes, and fake HTTP only, and cover `src/adapters/**`.
+- SIT runs the same user journeys through either the in-process composition seam
+  or the freshly compiled Linux x64 binary.
+- No test contacts GitHub or publishes an artifact.
 
 ## TypeScript standards
 

@@ -3,7 +3,7 @@ root = "tests/integration"
 coverageReporter = ["text", "lcov"]
 coverageDir = "reports/integration"
 coverageSkipTestFiles = true
-coveragePathIgnorePatterns = ["bin/**", "src/lib/**", "tests/**"]
+coveragePathIgnorePatterns = ["bin/**", "src/lib/**", "src/test-helper/**", "tests/**"]
 
 timeout = 120000
 

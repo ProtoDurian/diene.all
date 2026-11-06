@@ -14,9 +14,35 @@ let
           "Changelog.md"
           "docs/developer/CommitConventions.md"
           "tests/fixtures/golden/*.md"
+          "*.ts"
+          "*.tsx"
+          "*.mts"
+          "*.cts"
+          "*.js"
+          "*.jsx"
+          "*.mjs"
+          "*.cjs"
+          "*.json"
+          "*.jsonc"
         ];
       };
       shfmt.enable = true;
+    };
+
+    settings.formatter.biome = {
+      command = "./scripts/local/biome-format.sh";
+      includes = [
+        "*.ts"
+        "*.tsx"
+        "*.mts"
+        "*.cts"
+        "*.js"
+        "*.jsx"
+        "*.mjs"
+        "*.cjs"
+        "*.json"
+        "*.jsonc"
+      ];
     };
 
   };
