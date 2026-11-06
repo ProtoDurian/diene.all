@@ -31,3 +31,33 @@ describe('FrozenConfig', () => {
     Object.isFrozen(input).should.be.false();
   });
 });
+
+describe('FrozenConfig deep freeze', () => {
+  type Nested = { server: z.ZodType<{ port: number; tags: string[]; tls: { ca: string[] } }> };
+
+  it('should freeze every nested object and array', () => {
+    // Arrange
+    const config = new FrozenConfig<Nested>({ server: { port: 80, tags: ['a'], tls: { ca: ['x'] } } });
+
+    // Act
+    const server = config.get('server');
+
+    // Assert
+    [server, server.tags, server.tls, server.tls.ca]
+      .map(node => Object.isFrozen(node))
+      .should.deepEqual([true, true, true, true]);
+  });
+
+  it('should leave the caller input mutable', () => {
+    // Arrange
+    const input = { server: { port: 80, tags: ['a'], tls: { ca: ['x'] } } };
+
+    // Act
+    new FrozenConfig<Nested>(input);
+
+    // Assert
+    [input.server, input.server.tags, input.server.tls]
+      .map(node => Object.isFrozen(node))
+      .should.deepEqual([false, false, false]);
+  });
+});
