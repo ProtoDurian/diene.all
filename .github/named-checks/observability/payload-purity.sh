@@ -3,11 +3,11 @@ set -euo pipefail
 
 parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
-git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ shared .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
+git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ parent commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 
 skills='observability-check|grafana-dashboards|grafana-alert|grafana-alert-set|grafana-runbook'
 added_pattern="^(docs/standards/(observability|grafana-dashboards)/[^/]+\.md|\.claude/skills/(${skills})/.+|observability/.+|probes/observability-[^/]+|\.github/named-checks/observability/[^/]+)$"
-insert_only_pattern='^(CLAUDE\.md|probes/features\.json)$'
+insert_only_pattern='^(CLAUDE\.md|probes/features\.json|nix/packages\.nix|nix/env\.nix)$'
 
 # index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"
@@ -17,7 +17,7 @@ while IFS=$'\t' read -r status path; do
   case "${status}" in
   A)
     if [[ ! ${path} =~ ${added_pattern} ]]; then
-      echo "❌ added outside the O file-set: ${path}" >&2
+      echo "❌ added outside the observability file set: ${path}" >&2
       failed=1
     fi
     ;;
@@ -45,4 +45,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ payload-purity: O file-set additions and insertion-only registrations against shared .3 ${parent_sha}"
+echo "✅ payload-purity: observability file set added, shared files only gained lines, against parent ${parent_sha}"
