@@ -5,7 +5,7 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "noEmit": false,
-    "outDir": "dist",
+    "outDir": "dist/.declarations",
     "rootDir": "src",
     "skipLibCheck": true
   },

@@ -1,6 +1,6 @@
 {
   "name": "@atomicloud/diene.problems",
-  "version": "1.3.1",
+  "version": "1.0.0",
   "description": "RFC 9457 Problem Details registry, transformer, URI builder, catalog emitter, and TestHelper for the Diene Bun family.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -26,6 +26,13 @@
         "types": "./dist/test-helper.d.cts",
         "default": "./dist/test-helper.cjs"
       }
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "test-helper": [
+        "./dist/test-helper.d.ts"
+      ]
     }
   },
   "files": [

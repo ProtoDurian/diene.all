@@ -4,7 +4,7 @@ set -euo pipefail
 # The node-owned consumer fixture: a throwaway package that `bun add`s the
 # library, then proves `import`, `require()` and the TypeScript types of both
 # conditions resolve. With no argument it consumes this tree's packed tarball;
-# pass a registry spec (e.g. @atomicloud/diene.bun-lib@1.4.0) to consume a real
+# pass a registry spec (e.g. @atomicloud/diene.problems@2.0.0) to consume a real
 # publish instead.
 
 root_dir="$(git rev-parse --show-toplevel)"
@@ -23,9 +23,8 @@ work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
 
 cat >"${work}/package.json" <<JSON
-{ "name": "bun-lib-consumer-fixture", "private": true, "version": "0.0.0" }
+{ "name": "diene-problems-consumer-fixture", "private": true, "version": "0.0.0" }
 JSON
-# The public types reference pino's, which need Node's: give the fixture the repo's pinned @types/node.
 cat >"${work}/tsconfig.json" <<JSON
 {
   "compilerOptions": {
@@ -33,30 +32,39 @@ cat >"${work}/tsconfig.json" <<JSON
     "moduleResolution": "nodenext",
     "strict": true,
     "noEmit": true,
-    "types": ["node"],
-    "typeRoots": ["${root_dir}/node_modules/@types"]
+    "types": []
   },
   "include": ["*.mts", "*.cts"]
 }
 JSON
+uri="https://errors.example/docs/pichu/nitroso/zinc/api/v1/entity_not_found"
+portal="{ scheme: 'https', host: 'errors.example', landscape: 'pichu', platform: 'nitroso', service: 'zinc', module: 'api' }"
 cat >"${work}/esm.mjs" <<JS
-import { KeyComposer } from '${name}';
-if (new KeyComposer('Consumer Proof').compose('ESM') !== 'consumer-proof:esm') throw new Error('ESM import returned the wrong key');
+import { GenericProblemCatalog } from '${name}';
+import { ProblemTestHelper } from '${name}/test-helper';
+const registry = new GenericProblemCatalog().createGenericProblemRegistry(${portal});
+if (registry.require('entity_not_found').type !== '${uri}') throw new Error('ESM import built the wrong type URI');
+const helper = new ProblemTestHelper();
+helper.expectProblem(helper.buildProblemFromRegistry(registry, 'unauthorized', { data: {} })).toBe(registry.require('unauthorized'));
 JS
 cat >"${work}/cjs.cjs" <<JS
-const { KeyComposer } = require('${name}');
-if (new KeyComposer('Consumer Proof').compose('CJS') !== 'consumer-proof:cjs') throw new Error('CJS require returned the wrong key');
+const { GenericProblemCatalog } = require('${name}');
+const { ProblemTestHelper } = require('${name}/test-helper');
+const registry = new GenericProblemCatalog().createGenericProblemRegistry(${portal});
+if (registry.require('entity_not_found').type !== '${uri}') throw new Error('CJS require built the wrong type URI');
+const helper = new ProblemTestHelper();
+helper.expectProblem(helper.buildProblemFromRegistry(registry, 'unauthorized', { data: {} })).toBe(registry.require('unauthorized'));
 JS
-cat >"${work}/types-esm.mts" <<TS
-import { KeyComposer } from '${name}';
-const key: string = new KeyComposer('Consumer Proof').compose('ESM');
-export { key };
+for ext in mts cts; do
+  cat >"${work}/types.${ext}" <<TS
+import { GenericProblemCatalog, type Problem, type RegisteredProblem } from '${name}';
+import { ProblemTestHelper } from '${name}/test-helper';
+const registry = new GenericProblemCatalog().createGenericProblemRegistry(${portal});
+const entry: RegisteredProblem = registry.require('entity_not_found');
+const problem: Problem = new ProblemTestHelper().buildProblem(entry, { data: { entityType: 'Note', id: '1' } });
+export { problem };
 TS
-cat >"${work}/types-cjs.cts" <<TS
-import { KeyComposer } from '${name}';
-const key: string = new KeyComposer('Consumer Proof').compose('CJS');
-export { key };
-TS
+done
 
 echo "📥 bun add ${spec}..."
 (cd "${work}" && bun add --no-progress "${spec}")
