@@ -10,6 +10,7 @@ import { type Counter, createNoopMeter, type Gauge, type Histogram, type Meter }
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto';
 import type { Resource } from '@opentelemetry/resources';
 import {
+  AggregationTemporality,
   ConsoleMetricExporter,
   MeterProvider,
   PeriodicExportingMetricReader,
@@ -18,12 +19,20 @@ import {
 import type { ExporterSelection } from '../../lib/environment.js';
 import type { OtelPlan } from '../../lib/plan.js';
 import type { OtlpExporterOptions } from '../../lib/endpoint.js';
+import type { MetricTemporality } from '../../lib/plan.js';
 
 type Instrument = Counter | Gauge | Histogram;
+type OtlpMetricExporterConfig = NonNullable<ConstructorParameters<typeof OTLPMetricExporter>[0]>;
+
+const TEMPORALITY: Readonly<Record<MetricTemporality, number>> = Object.freeze({
+  cumulative: AggregationTemporality.CUMULATIVE,
+  delta: AggregationTemporality.DELTA,
+  lowmemory: 2,
+});
 
 interface MetricExporterFactories {
   console(): PushMetricExporter;
-  otlp(options: OtlpExporterOptions): PushMetricExporter;
+  otlp(options: OtlpExporterOptions, temporality: MetricTemporality): PushMetricExporter;
 }
 
 interface MetricSignal {
@@ -48,8 +57,12 @@ class SdkMetricExporterFactories implements MetricExporterFactories {
     return new ConsoleMetricExporter();
   }
 
-  otlp(options: OtlpExporterOptions): PushMetricExporter {
-    return new OTLPMetricExporter(options);
+  otlp(options: OtlpExporterOptions, temporality: MetricTemporality): PushMetricExporter {
+    return new OTLPMetricExporter({
+      ...options,
+      compression: options.compression as NonNullable<OtlpMetricExporterConfig['compression']>,
+      temporalityPreference: TEMPORALITY[temporality] as NonNullable<OtlpMetricExporterConfig['temporalityPreference']>,
+    });
   }
 }
 
@@ -114,7 +127,7 @@ class MetricSignalFactory {
   create(input: MetricSignalInput): MetricSignal {
     const exporters = [
       ...(input.selection.console ? [this.exporters.console()] : []),
-      ...(input.selection.otlp ? [this.exporters.otlp(input.settings.otlp)] : []),
+      ...(input.selection.otlp ? [this.exporters.otlp(input.settings.otlp, input.settings.temporality)] : []),
     ];
     if (exporters.length === 0) return this.inactive();
     const readers = exporters.map(

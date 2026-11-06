@@ -1,5 +1,18 @@
 import { Err, Ok, Res, type Result } from '@atomicloud/diene.result';
-import { ProxyTracerProvider, type Span, SpanStatusCode, type Tracer } from '@opentelemetry/api';
+import {
+  type ContextManager,
+  context,
+  ProxyTracerProvider,
+  propagation,
+  type Span,
+  SpanStatusCode,
+  type TextMapPropagator,
+  type Tracer,
+  type TracerProvider,
+  trace,
+} from '@opentelemetry/api';
+import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
+import { CompositePropagator, W3CBaggagePropagator, W3CTraceContextPropagator } from '@opentelemetry/core';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import type { Resource } from '@opentelemetry/resources';
 import {
@@ -12,7 +25,7 @@ import {
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import type { OtlpExporterOptions } from '../../lib/endpoint.js';
 import type { ExporterSelection } from '../../lib/environment.js';
-import type { OtelPlan } from '../../lib/plan.js';
+import type { OtelPlan, SpanBatchSettings } from '../../lib/plan.js';
 import {
   TraceError,
   type TraceEmitter,
@@ -27,7 +40,9 @@ const STATUS_CODES: Readonly<Record<TraceStatus, SpanStatusCode>> = Object.freez
   unset: SpanStatusCode.UNSET,
 });
 
-interface TraceProvider {
+type OtlpTraceExporterConfig = NonNullable<ConstructorParameters<typeof OTLPTraceExporter>[0]>;
+
+interface TraceProvider extends TracerProvider {
   getTracer(name: string, version?: string): Tracer;
   forceFlush(): Promise<void>;
   shutdown(): Promise<void>;
@@ -35,19 +50,20 @@ interface TraceProvider {
 
 interface TraceProviderOptions {
   readonly resource: Resource;
-  readonly sampler?: Sampler;
+  readonly sampler: Sampler;
   readonly spanProcessors: readonly SpanProcessor[];
 }
 
 interface TraceSignalFactories {
   console(): SpanExporter;
   otlp(options: OtlpExporterOptions): SpanExporter;
-  processor(exporter: SpanExporter): SpanProcessor;
+  processor(exporter: SpanExporter, batch: SpanBatchSettings): SpanProcessor;
   provider(options: TraceProviderOptions): TraceProvider;
 }
 
 interface TraceSignal {
   readonly active: boolean;
+  readonly registration: TraceRegistration;
   readonly emitter: TraceEmitter;
   readonly provider?: TraceProvider;
   readonly tracer: Tracer;
@@ -60,6 +76,40 @@ interface TraceSignalInput {
   readonly settings: OtelPlan['traces'];
 }
 
+class TraceRegistration {
+  constructor(
+    readonly tracer: boolean,
+    readonly contextManager: boolean,
+    readonly propagator: boolean,
+  ) {}
+
+  release(): void {
+    if (this.propagator) propagation.disable();
+    if (this.contextManager) context.disable();
+    if (this.tracer) trace.disable();
+  }
+}
+
+class GlobalTraceRegistrar {
+  constructor(
+    private readonly contextManager: () => ContextManager = () => new AsyncLocalStorageContextManager(),
+    private readonly propagator: () => TextMapPropagator = () =>
+      new CompositePropagator({ propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()] }),
+  ) {}
+
+  none(): TraceRegistration {
+    return new TraceRegistration(false, false, false);
+  }
+
+  claim(provider: TracerProvider): TraceRegistration {
+    if (!trace.setGlobalTracerProvider(provider)) return this.none();
+    const manager = this.contextManager().enable();
+    const ownsContext = context.setGlobalContextManager(manager);
+    if (!ownsContext) manager.disable();
+    return new TraceRegistration(true, ownsContext, propagation.setGlobalPropagator(this.propagator()));
+  }
+}
+
 class SdkTraceSignalFactories implements TraceSignalFactories {
   // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
   constructor() {}
@@ -69,21 +119,22 @@ class SdkTraceSignalFactories implements TraceSignalFactories {
   }
 
   otlp(options: OtlpExporterOptions): SpanExporter {
-    return new OTLPTraceExporter(options);
+    return new OTLPTraceExporter({
+      ...options,
+      compression: options.compression as NonNullable<OtlpTraceExporterConfig['compression']>,
+    });
   }
 
-  processor(exporter: SpanExporter): SpanProcessor {
-    return new BatchSpanProcessor(exporter);
+  processor(exporter: SpanExporter, batch: SpanBatchSettings): SpanProcessor {
+    return new BatchSpanProcessor(exporter, batch);
   }
 
   provider(options: TraceProviderOptions): TraceProvider {
-    const provider = new NodeTracerProvider({
+    return new NodeTracerProvider({
       resource: options.resource,
-      ...(options.sampler === undefined ? {} : { sampler: options.sampler }),
+      sampler: options.sampler,
       spanProcessors: [...options.spanProcessors],
     });
-    provider.register();
-    return provider;
   }
 }
 
@@ -149,28 +200,44 @@ class SdkTraceEmitter implements TraceEmitter {
 }
 
 class TraceSignalFactory {
-  constructor(private readonly factories: TraceSignalFactories = new SdkTraceSignalFactories()) {}
+  constructor(
+    private readonly factories: TraceSignalFactories = new SdkTraceSignalFactories(),
+    private readonly registrar: GlobalTraceRegistrar = new GlobalTraceRegistrar(),
+  ) {}
 
   inactive(scope: TraceSignalInput['scope']): TraceSignal {
     const tracer = new ProxyTracerProvider().getTracer(scope.name, scope.version);
-    return Object.freeze({ active: false, emitter: new SdkTraceEmitter(tracer), tracer });
+    return Object.freeze({
+      active: false,
+      emitter: new SdkTraceEmitter(tracer),
+      registration: this.registrar.none(),
+      tracer,
+    });
   }
 
   create(input: TraceSignalInput): TraceSignal {
     const processors = [
-      ...(input.selection.console ? [this.factories.processor(this.factories.console())] : []),
-      ...(input.selection.otlp ? [this.factories.processor(this.factories.otlp(input.settings.otlp))] : []),
+      ...(input.selection.console ? [this.factories.processor(this.factories.console(), input.settings.batch)] : []),
+      ...(input.selection.otlp
+        ? [this.factories.processor(this.factories.otlp(input.settings.otlp), input.settings.batch)]
+        : []),
     ];
     if (processors.length === 0) return this.inactive(input.scope);
     const provider = this.factories.provider({
       resource: input.resource,
-      ...(input.settings.sampler === undefined ? {} : { sampler: input.settings.sampler }),
+      sampler: input.settings.sampler,
       spanProcessors: processors,
     });
     const tracer = provider.getTracer(input.scope.name, input.scope.version);
-    return Object.freeze({ active: true, emitter: new SdkTraceEmitter(tracer, provider), provider, tracer });
+    return Object.freeze({
+      active: true,
+      emitter: new SdkTraceEmitter(tracer, provider),
+      provider,
+      registration: this.registrar.claim(provider),
+      tracer,
+    });
   }
 }
 
 export type { TraceProvider, TraceProviderOptions, TraceSignal, TraceSignalFactories, TraceSignalInput };
-export { SdkTraceEmitter, SdkTraceSignalFactories, TraceSignalFactory };
+export { GlobalTraceRegistrar, SdkTraceEmitter, SdkTraceSignalFactories, TraceRegistration, TraceSignalFactory };

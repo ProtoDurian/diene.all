@@ -21,7 +21,12 @@ const metricSignal = new MetricSignalFactory({
   selection: { console: true, otlp: false },
   resource,
   scope: { name: 'svc', version: '1.0.0' },
-  settings: { intervalMillis: 60_000, timeoutMillis: 1_000, otlp: {} },
+  settings: {
+    intervalMillis: 60_000,
+    timeoutMillis: 1_000,
+    temporality: 'cumulative',
+    otlp: { url: 'http://127.0.0.1:4318/v1/metrics', headers: {}, timeoutMillis: 1_000, compression: 'none' },
+  },
 });
 
 function realSeams(): Seams {

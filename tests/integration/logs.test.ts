@@ -133,3 +133,39 @@ describe('PinoLoggerSink', () => {
     flushed.should.match({ code: 'io', operation: 'flush', details: { cause } });
   });
 });
+
+describe('PinoLoggerSink.flush', () => {
+  function sinkOver(flush: (done: (error?: Error) => void) => void) {
+    const destination = { lines: [] as string[], write: (line: string) => destination.lines.push(line), flush };
+    return { destination, signal: new LoggerSignalFactory().create(true, resource, destination as never) };
+  }
+
+  it('should resolve only after a delayed destination drains', async () => {
+    // Arrange
+    const state = { drained: false };
+    const { signal } = sinkOver(done =>
+      setTimeout(() => {
+        state.drained = true;
+        done();
+      }, 20),
+    );
+    await expectOk(signal.sink.emit({ level: 'info', message: 'queued' }));
+
+    // Act
+    await expectOk(signal.sink.flush());
+
+    // Assert
+    state.drained.should.be.true();
+  });
+
+  it('should turn a failing flush callback into an io error', async () => {
+    // Arrange
+    const { signal } = sinkOver(done => setTimeout(() => done(new Error('disk full')), 5));
+
+    // Act
+    const actual = await expectErr(signal.sink.flush());
+
+    // Assert
+    actual.should.match({ port: 'logging', code: 'io', operation: 'flush', details: { cause: 'disk full' } });
+  });
+});

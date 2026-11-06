@@ -98,3 +98,33 @@ describe('ExporterSelector.selectAll', () => {
     selector.live(allOn, environment).should.eql({ logs: false, metrics: false, traces: false });
   });
 });
+
+describe('OtelEnvironment numbers and pairs', () => {
+  it.each([
+    ['a positive integer', '42', 42],
+    ['zero', '0', undefined],
+    ['a decimal', '1.5', undefined],
+    ['text', 'soon', undefined],
+  ])('should read %s as a positive integer or nothing', (_label, raw, expected) => {
+    // Arrange
+    const environment = new OtelEnvironment({ N: raw });
+
+    // Act
+    const actual = environment.positiveInteger('N');
+
+    // Assert
+    (actual ?? 'none').should.eql(expected ?? 'none');
+  });
+
+  it('should parse percent-encoded pairs and keep a bad escape as written', () => {
+    // Arrange
+    const environment = new OtelEnvironment({ P: 'a=x%20y, =skip,bad,b = %E0%A4%A ,c=1=2' });
+
+    // Act
+    const actual = environment.pairs('P');
+
+    // Assert
+    (actual ?? {}).should.eql({ a: 'x y', b: '%E0%A4%A', c: '1=2' });
+    (environment.pairs('MISSING') === undefined).should.be.true();
+  });
+});

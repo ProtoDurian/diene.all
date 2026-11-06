@@ -1,7 +1,7 @@
 import { describe, it } from 'bun:test';
-import { ParentBasedSampler } from '@opentelemetry/sdk-trace-base';
+import { AlwaysOffSampler, ParentBasedSampler } from '@opentelemetry/sdk-trace-base';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
-import should from 'should';
+import 'should';
 import { OtelPlanner } from '../../src/lib/plan';
 import type { AppIdentity } from '../../src/lib/resource';
 import { defaultOtelBlock, type OtelBlock } from '../../src/lib/schema';
@@ -40,16 +40,29 @@ describe('OtelPlanner', () => {
     actual.metrics.should.eql({
       intervalMillis: 30_000,
       timeoutMillis: 10_000,
-      otlp: { url: 'http://collector:4318/v1/metrics', headers: {}, timeoutMillis: 10_000 },
+      temporality: 'cumulative',
+      otlp: { url: 'http://collector:4318/v1/metrics', headers: {}, timeoutMillis: 10_000, compression: 'none' },
     });
-    actual.traces.otlp.should.eql({ url: 'http://collector:4318/v1/traces', headers: {}, timeoutMillis: 10_000 });
+    actual.traces.otlp.should.eql({
+      url: 'http://collector:4318/v1/traces',
+      headers: {},
+      timeoutMillis: 10_000,
+      compression: 'none',
+    });
+    actual.traces.batch.should.eql({
+      exportTimeoutMillis: 30_000,
+      maxExportBatchSize: 512,
+      maxQueueSize: 2048,
+      scheduledDelayMillis: 5000,
+    });
     (actual.traces.sampler instanceof ParentBasedSampler).should.be.true();
     actual.resourceAttributes[ATTR_SERVICE_NAME]?.should.eql('svc');
     actual.resource.attributes.should.eql(actual.resourceAttributes);
   });
 
   it.each([
-    ['positive integers', '5', '7', 5, 7],
+    ['positive integers', '20', '7', 20, 7],
+    ['an interval below the timeout', '1000', undefined, 1000, 1000],
     ['zero', '0', '0', 30_000, 10_000],
     ['non-numeric text', 'soon', '1s', 30_000, 10_000],
   ])('should read metric export overrides given as %s', (_label, interval, timeout, wantInterval, wantTimeout) => {
@@ -64,7 +77,52 @@ describe('OtelPlanner', () => {
     actual.metrics.timeoutMillis.should.eql(wantTimeout);
   });
 
-  it('should leave the sampler to the SDK when OTEL_TRACES_SAMPLER is set', () => {
+  it('should clamp the reader timeout to a short block interval', () => {
+    // Arrange
+    const short: OtelBlock = { ...block, metrics: { ...block.metrics, interval: 'PT1S' } };
+
+    // Act
+    const actual = planner.plan(short, identity, {});
+
+    // Assert
+    actual.metrics.should.match({ intervalMillis: 1000, timeoutMillis: 1000 });
+  });
+
+  it('should read the batch processor and temporality variables', () => {
+    // Arrange
+    const environment = {
+      OTEL_BSP_EXPORT_TIMEOUT: '1',
+      OTEL_BSP_MAX_EXPORT_BATCH_SIZE: '2',
+      OTEL_BSP_MAX_QUEUE_SIZE: '3',
+      OTEL_BSP_SCHEDULE_DELAY: '4',
+      OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: 'Delta',
+    };
+
+    // Act
+    const actual = planner.plan(block, identity, environment);
+
+    // Assert
+    actual.traces.batch.should.eql({
+      exportTimeoutMillis: 1,
+      maxExportBatchSize: 2,
+      maxQueueSize: 3,
+      scheduledDelayMillis: 4,
+    });
+    actual.metrics.temporality.should.eql('delta');
+  });
+
+  it('should fall back to cumulative for an unknown temporality', () => {
+    // Arrange
+    const environment = { OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: 'sometimes' };
+
+    // Act
+    const actual = planner.plan(block, identity, environment);
+
+    // Assert
+    actual.metrics.temporality.should.eql('cumulative');
+  });
+
+  it('should take the sampler from OTEL_TRACES_SAMPLER', () => {
     // Arrange
     const environment = { OTEL_TRACES_SAMPLER: 'always_off' };
 
@@ -72,7 +130,7 @@ describe('OtelPlanner', () => {
     const actual = planner.plan(block, identity, environment);
 
     // Assert
-    should(actual.traces.sampler).be.undefined();
+    (actual.traces.sampler instanceof AlwaysOffSampler).should.be.true();
   });
 
   it.each([

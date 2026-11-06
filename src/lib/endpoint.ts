@@ -3,11 +3,13 @@ import type { OtelEnvironment } from './environment.js';
 import type { OtelOtlpExporter } from './schema.js';
 
 type OtlpSignal = 'metrics' | 'traces';
+type OtlpCompression = 'gzip' | 'none';
 
 interface OtlpExporterOptions {
-  readonly headers?: Readonly<Record<string, string>>;
-  readonly timeoutMillis?: number;
-  readonly url?: string;
+  readonly compression: OtlpCompression;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly timeoutMillis: number;
+  readonly url: string;
 }
 
 class OtlpEndpointPolicy {
@@ -35,21 +37,35 @@ class OtlpExporterOptionsFactory {
   constructor(
     private readonly durations: WireDurationConverter,
     private readonly endpoints: OtlpEndpointPolicy,
+    private readonly fallbackEndpoint = 'http://localhost:4318',
   ) {}
 
   create(config: OtelOtlpExporter, signal: OtlpSignal, environment: OtelEnvironment): OtlpExporterOptions {
-    const fromEnvironment = (setting: string): boolean =>
-      environment.has(`OTEL_EXPORTER_OTLP_${signal.toUpperCase()}_${setting}`) ||
-      environment.has(`OTEL_EXPORTER_OTLP_${setting}`);
+    const specific = (setting: string) => `OTEL_EXPORTER_OTLP_${signal.toUpperCase()}_${setting}`;
+    const generic = (setting: string) => `OTEL_EXPORTER_OTLP_${setting}`;
+    const signalEndpoint = environment.value(specific('ENDPOINT'));
+    const genericEndpoint = environment.value(generic('ENDPOINT'));
+    const genericHeaders = environment.pairs(generic('HEADERS'));
+    const signalHeaders = environment.pairs(specific('HEADERS'));
+    const compression = (
+      environment.value(specific('COMPRESSION')) ?? environment.value(generic('COMPRESSION'))
+    )?.toLowerCase();
     return Object.freeze({
-      ...(config.endpoint === '' || fromEnvironment('ENDPOINT')
-        ? {}
-        : { url: this.endpoints.signalUrl(config.endpoint, signal) }),
-      ...(fromEnvironment('HEADERS') ? {} : { headers: Object.freeze({ ...config.headers }) }),
-      ...(fromEnvironment('TIMEOUT') ? {} : { timeoutMillis: this.durations.toMilliseconds(config.timeout) }),
+      url:
+        signalEndpoint ??
+        this.endpoints.signalUrl(genericEndpoint ?? (config.endpoint || this.fallbackEndpoint), signal),
+      headers:
+        genericHeaders === undefined && signalHeaders === undefined
+          ? Object.freeze({ ...config.headers })
+          : Object.freeze({ ...genericHeaders, ...signalHeaders }),
+      timeoutMillis:
+        environment.positiveInteger(specific('TIMEOUT')) ??
+        environment.positiveInteger(generic('TIMEOUT')) ??
+        this.durations.toMilliseconds(config.timeout),
+      compression: compression === 'gzip' ? 'gzip' : 'none',
     });
   }
 }
 
-export type { OtlpExporterOptions, OtlpSignal };
+export type { OtlpCompression, OtlpExporterOptions, OtlpSignal };
 export { OtlpEndpointPolicy, OtlpExporterOptionsFactory };

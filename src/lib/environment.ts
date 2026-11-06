@@ -20,8 +20,32 @@ class OtelEnvironment {
     return this.value(name) !== undefined;
   }
 
+  positiveInteger(name: string): number | undefined {
+    const value = this.value(name);
+    return value !== undefined && /^\d+$/.test(value) && Number(value) > 0 ? Number(value) : undefined;
+  }
+
+  pairs(name: string): Readonly<Record<string, string>> | undefined {
+    const value = this.value(name);
+    if (value === undefined) return undefined;
+    const entries = value.split(',').flatMap(entry => {
+      const separator = entry.indexOf('=');
+      const key = entry.slice(0, separator).trim();
+      return separator <= 0 || key === '' ? [] : [[key, this.decode(entry.slice(separator + 1).trim())] as const];
+    });
+    return Object.freeze(Object.fromEntries(entries));
+  }
+
   sdkDisabled(): boolean {
     return this.value('OTEL_SDK_DISABLED')?.toLowerCase() === 'true';
+  }
+
+  private decode(value: string): string {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
   }
 }
 

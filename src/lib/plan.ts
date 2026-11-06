@@ -6,7 +6,16 @@ import { OtlpEndpointPolicy, type OtlpExporterOptions, OtlpExporterOptionsFactor
 import { ExporterSelector, OtelEnvironment, type SignalFlags, type SignalSelections } from './environment.js';
 import { type AppIdentity, appIdentitySchema, ResourceIdentityMapper } from './resource.js';
 import { TraceSamplerFactory } from './sampler.js';
-import { type OtelBlock, type OtelMetrics, otelBlockSchema } from './schema.js';
+import { type OtelBlock, otelBlockSchema } from './schema.js';
+
+type MetricTemporality = 'cumulative' | 'delta' | 'lowmemory';
+
+interface SpanBatchSettings {
+  readonly exportTimeoutMillis: number;
+  readonly maxExportBatchSize: number;
+  readonly maxQueueSize: number;
+  readonly scheduledDelayMillis: number;
+}
 
 interface OtelPlan {
   readonly block: OtelBlock;
@@ -15,9 +24,16 @@ interface OtelPlan {
   readonly selections: SignalSelections;
   readonly resourceAttributes: TelemetryAttributes;
   readonly resource: Resource;
-  readonly metrics: Readonly<{ intervalMillis: number; timeoutMillis: number; otlp: OtlpExporterOptions }>;
-  readonly traces: Readonly<{ sampler: Sampler | undefined; otlp: OtlpExporterOptions }>;
+  readonly metrics: Readonly<{
+    intervalMillis: number;
+    timeoutMillis: number;
+    temporality: MetricTemporality;
+    otlp: OtlpExporterOptions;
+  }>;
+  readonly traces: Readonly<{ sampler: Sampler; batch: SpanBatchSettings; otlp: OtlpExporterOptions }>;
 }
+
+const TEMPORALITIES: readonly string[] = ['cumulative', 'delta', 'lowmemory'];
 
 class OtelPlanner {
   constructor(
@@ -35,6 +51,13 @@ class OtelPlanner {
     const environment = new OtelEnvironment(values);
     const validBlock = otelBlockSchema.parse(block);
     const validIdentity = appIdentitySchema.parse(identity);
+    const intervalMillis =
+      environment.positiveInteger('OTEL_METRIC_EXPORT_INTERVAL') ??
+      this.durations.toMilliseconds(validBlock.metrics.interval);
+    const timeoutMillis =
+      environment.positiveInteger('OTEL_METRIC_EXPORT_TIMEOUT') ??
+      this.durations.toMilliseconds(validBlock.metrics.exporter.otlp.timeout);
+    const temporality = environment.value('OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE')?.toLowerCase() ?? '';
     return Object.freeze({
       block: validBlock,
       identity: validIdentity,
@@ -43,27 +66,24 @@ class OtelPlanner {
       resourceAttributes: this.resources.attributes(validIdentity, environment),
       resource: this.resources.resource(validIdentity, environment),
       metrics: Object.freeze({
-        intervalMillis: this.metricMillis(environment, 'OTEL_METRIC_EXPORT_INTERVAL', validBlock.metrics.interval),
-        timeoutMillis: this.metricMillis(
-          environment,
-          'OTEL_METRIC_EXPORT_TIMEOUT',
-          validBlock.metrics.exporter.otlp.timeout,
-        ),
+        intervalMillis,
+        timeoutMillis: Math.min(timeoutMillis, intervalMillis),
+        temporality: (TEMPORALITIES.includes(temporality) ? temporality : 'cumulative') as MetricTemporality,
         otlp: this.exporters.create(validBlock.metrics.exporter.otlp, 'metrics', environment),
       }),
       traces: Object.freeze({
         sampler: this.samplers.create(validBlock.traces.sampler, environment),
+        batch: Object.freeze({
+          exportTimeoutMillis: environment.positiveInteger('OTEL_BSP_EXPORT_TIMEOUT') ?? 30_000,
+          maxExportBatchSize: environment.positiveInteger('OTEL_BSP_MAX_EXPORT_BATCH_SIZE') ?? 512,
+          maxQueueSize: environment.positiveInteger('OTEL_BSP_MAX_QUEUE_SIZE') ?? 2048,
+          scheduledDelayMillis: environment.positiveInteger('OTEL_BSP_SCHEDULE_DELAY') ?? 5000,
+        }),
         otlp: this.exporters.create(validBlock.traces.exporter.otlp, 'traces', environment),
       }),
     });
   }
-
-  private metricMillis(environment: OtelEnvironment, variable: string, fallback: OtelMetrics['interval']): number {
-    const override = environment.value(variable);
-    if (override !== undefined && /^\d+$/.test(override) && Number(override) > 0) return Number(override);
-    return this.durations.toMilliseconds(fallback);
-  }
 }
 
-export type { OtelPlan };
+export type { MetricTemporality, OtelPlan, SpanBatchSettings };
 export { OtelPlanner };

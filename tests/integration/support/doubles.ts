@@ -17,6 +17,7 @@ import type { Logger } from 'pino';
 import type { MetricExporterFactories } from '../../../src/adapters/signals/metrics';
 import type { TraceProvider, TraceProviderOptions, TraceSignalFactories } from '../../../src/adapters/signals/traces';
 import type { OtlpExporterOptions } from '../../../src/lib/endpoint';
+import type { MetricTemporality, SpanBatchSettings } from '../../../src/lib/plan';
 
 class CaptureStream {
   readonly lines: Record<string, unknown>[] = [];
@@ -30,15 +31,17 @@ class RecordingMetricExporters implements MetricExporterFactories {
   readonly exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
   readonly calls: string[] = [];
   readonly otlpOptions: OtlpExporterOptions[] = [];
+  readonly temporalities: MetricTemporality[] = [];
 
   console(): PushMetricExporter {
     this.calls.push('console');
     return this.exporter;
   }
 
-  otlp(options: OtlpExporterOptions): PushMetricExporter {
+  otlp(options: OtlpExporterOptions, temporality: MetricTemporality): PushMetricExporter {
     this.calls.push('otlp');
     this.otlpOptions.push(options);
+    this.temporalities.push(temporality);
     return this.exporter;
   }
 }
@@ -47,8 +50,12 @@ class RecordingTraceFactories implements TraceSignalFactories {
   readonly exporter = new InMemorySpanExporter();
   readonly calls: string[] = [];
   readonly providers: TraceProviderOptions[] = [];
+  readonly batches: SpanBatchSettings[] = [];
 
-  constructor(private readonly failures: { readonly flush?: boolean; readonly shutdown?: boolean } = {}) {}
+  constructor(
+    private readonly failures: { readonly flush?: boolean; readonly shutdown?: boolean } = {},
+    private readonly log: string[] = [],
+  ) {}
 
   console(): SpanExporter {
     this.calls.push('console');
@@ -60,8 +67,9 @@ class RecordingTraceFactories implements TraceSignalFactories {
     return this.exporter;
   }
 
-  processor(exporter: SpanExporter): SimpleSpanProcessor {
+  processor(exporter: SpanExporter, batch: SpanBatchSettings): SimpleSpanProcessor {
     this.calls.push('processor');
+    this.batches.push(batch);
     return new SimpleSpanProcessor(exporter);
   }
 
@@ -72,14 +80,15 @@ class RecordingTraceFactories implements TraceSignalFactories {
       ...(options.sampler === undefined ? {} : { sampler: options.sampler }),
       spanProcessors: [...options.spanProcessors],
     });
-    const failures = this.failures;
+    const { failures, log } = this;
     return {
-      getTracer: (name, version) => provider.getTracer(name, version),
+      getTracer: (name: string, version?: string) => provider.getTracer(name, version),
       forceFlush: async () => {
         if (failures.flush) throw new Error('trace flush failed');
         await provider.forceFlush();
       },
       shutdown: async () => {
+        log.push('traces shutdown');
         if (failures.shutdown) throw new Error('trace shutdown failed');
         await provider.shutdown();
       },
@@ -186,3 +195,37 @@ class StackContextManager implements ContextManager {
 }
 
 export { StackContextManager };
+
+async function exporterSettings(exporter: unknown): Promise<{
+  url: string;
+  timeoutMillis: number;
+  compression: string;
+  headers: Record<string, string>;
+}> {
+  const delegate = (exporter as { _delegate: { _timeout: number; _transport: { _transport: { _parameters: never } } } })
+    ._delegate;
+  const parameters = delegate._transport._transport._parameters as {
+    url: string;
+    compression: string;
+    headers: () => Promise<Record<string, string>>;
+  };
+  return {
+    url: parameters.url,
+    timeoutMillis: delegate._timeout,
+    compression: parameters.compression,
+    headers: await parameters.headers(),
+  };
+}
+
+function withProcessEnv<T>(values: Record<string, string>, run: () => Promise<T>): Promise<T> {
+  const saved = Object.fromEntries(Object.keys(values).map(key => [key, process.env[key]]));
+  Object.assign(process.env, values);
+  return run().finally(() => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+}
+
+export { exporterSettings, withProcessEnv };

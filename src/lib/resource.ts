@@ -44,12 +44,7 @@ class ResourceIdentityMapper {
   }
 
   standard(environment: OtelEnvironment): TelemetryAttributes {
-    const entries = (environment.value('OTEL_RESOURCE_ATTRIBUTES') ?? '').split(',').flatMap(entry => {
-      const separator = entry.indexOf('=');
-      const key = entry.slice(0, separator).trim();
-      return separator <= 0 || key === '' ? [] : [[key, entry.slice(separator + 1).trim()] as const];
-    });
-    return Object.freeze(Object.fromEntries(entries));
+    return environment.pairs('OTEL_RESOURCE_ATTRIBUTES') ?? Object.freeze({});
   }
 
   attributes(identity: AppIdentity, environment: OtelEnvironment): TelemetryAttributes {

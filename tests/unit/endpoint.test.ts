@@ -55,7 +55,7 @@ describe('OtlpEndpointPolicy.signalUrl', () => {
 describe('OtlpExporterOptionsFactory', () => {
   const factory = new OtlpExporterOptionsFactory(new WireDurationConverter(), new OtlpEndpointPolicy());
 
-  it('should map the block into url, headers and timeout when no variable is set', () => {
+  it('should map the block into explicit options when no variable is set', () => {
     // Arrange
     const environment = new OtelEnvironment({});
 
@@ -67,10 +67,11 @@ describe('OtlpExporterOptionsFactory', () => {
       url: 'http://collector:4318/v1/traces',
       headers: { authorization: 'token' },
       timeoutMillis: 5000,
+      compression: 'none',
     });
   });
 
-  it('should omit the url for an empty endpoint', () => {
+  it('should fall back to the local collector for an empty endpoint', () => {
     // Arrange
     const environment = new OtelEnvironment({});
 
@@ -78,24 +79,63 @@ describe('OtlpExporterOptionsFactory', () => {
     const actual = factory.create({ ...config, endpoint: '' }, 'metrics', environment);
 
     // Assert
-    Object.keys(actual).should.eql(['headers', 'timeoutMillis']);
+    actual.url.should.eql('http://localhost:4318/v1/metrics');
   });
 
-  it.each([
-    ['signal-specific', 'OTEL_EXPORTER_OTLP_METRICS_'],
-    ['generic', 'OTEL_EXPORTER_OTLP_'],
-  ])('should leave every setting to the SDK when the %s variables are set', (_label, prefix) => {
+  it('should resolve the generic variables into explicit options', () => {
     // Arrange
     const environment = new OtelEnvironment({
-      [`${prefix}ENDPOINT`]: 'http://other:4318',
-      [`${prefix}HEADERS`]: 'a=b',
-      [`${prefix}TIMEOUT`]: '1000',
+      OTEL_EXPORTER_OTLP_ENDPOINT: 'http://generic:4318/base',
+      OTEL_EXPORTER_OTLP_HEADERS: 'tenant=a%20b,team=core',
+      OTEL_EXPORTER_OTLP_TIMEOUT: '1500',
+      OTEL_EXPORTER_OTLP_COMPRESSION: 'GZIP',
     });
 
     // Act
     const actual = factory.create(config, 'metrics', environment);
 
     // Assert
-    actual.should.eql({});
+    actual.should.eql({
+      url: 'http://generic:4318/base/v1/metrics',
+      headers: { tenant: 'a b', team: 'core' },
+      timeoutMillis: 1500,
+      compression: 'gzip',
+    });
+  });
+
+  it('should let the signal variables win over the generic ones and use the signal endpoint as-is', () => {
+    // Arrange
+    const environment = new OtelEnvironment({
+      OTEL_EXPORTER_OTLP_ENDPOINT: 'http://generic:4318',
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'http://127.0.0.1:54321/custom',
+      OTEL_EXPORTER_OTLP_HEADERS: 'tenant=generic,team=core',
+      OTEL_EXPORTER_OTLP_TRACES_HEADERS: 'tenant=review',
+      OTEL_EXPORTER_OTLP_TIMEOUT: '1500',
+      OTEL_EXPORTER_OTLP_TRACES_TIMEOUT: '1234',
+      OTEL_EXPORTER_OTLP_COMPRESSION: 'gzip',
+      OTEL_EXPORTER_OTLP_TRACES_COMPRESSION: 'none',
+    });
+
+    // Act
+    const actual = factory.create(config, 'traces', environment);
+
+    // Assert
+    actual.should.eql({
+      url: 'http://127.0.0.1:54321/custom',
+      headers: { tenant: 'review', team: 'core' },
+      timeoutMillis: 1234,
+      compression: 'none',
+    });
+  });
+
+  it('should ignore a timeout that is not a positive integer', () => {
+    // Arrange
+    const environment = new OtelEnvironment({ OTEL_EXPORTER_OTLP_TIMEOUT: '0' });
+
+    // Act
+    const actual = factory.create(config, 'traces', environment);
+
+    // Assert
+    actual.timeoutMillis.should.eql(5000);
   });
 });

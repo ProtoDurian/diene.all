@@ -1,4 +1,5 @@
 import type { LoggerSink, MetricsCollector, TelemetryAttributes } from '@atomicloud/diene.interfaces';
+import type { Result } from '@atomicloud/diene.result';
 import type { Meter, Tracer } from '@opentelemetry/api';
 import type { Resource } from '@opentelemetry/resources';
 import type { DestinationStream, Logger } from 'pino';
@@ -30,8 +31,23 @@ interface OtelBootstrapCollaborators {
   readonly traces?: TraceSignalFactory;
 }
 
+type TelemetrySignal = 'logs' | 'metrics' | 'traces';
+type LifecyclePhase = 'flush' | 'shutdown';
+
+class TelemetryLifecycleError extends Error {
+  constructor(
+    readonly signal: TelemetrySignal,
+    readonly phase: LifecyclePhase,
+    override readonly cause: unknown,
+  ) {
+    super(`${signal} ${phase} failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    this.name = 'TelemetryLifecycleError';
+  }
+}
+
 interface OtelRuntime {
   readonly active: SignalFlags;
+  readonly globalRegistered: boolean;
   readonly block: OtelBlock;
   readonly identity: AppIdentity;
   readonly logger: Logger;
@@ -47,11 +63,12 @@ interface OtelRuntime {
   shutdown(): Promise<void>;
 }
 
-type OtelSessionParts = Omit<OtelRuntime, 'flush' | 'shutdown'> &
+type OtelSessionParts = Omit<OtelRuntime, 'flush' | 'shutdown' | 'globalRegistered'> &
   Readonly<{ metricSignal: MetricSignal; traceSignal: TraceSignal }>;
 
 class OtelSession implements OtelRuntime {
   readonly active: SignalFlags;
+  readonly globalRegistered: boolean;
   readonly block: OtelBlock;
   readonly identity: AppIdentity;
   readonly logger: Logger;
@@ -81,24 +98,53 @@ class OtelSession implements OtelRuntime {
     this.tracer = parts.tracer;
     this.metricSignal = parts.metricSignal;
     this.traceSignal = parts.traceSignal;
+    this.globalRegistered = parts.traceSignal.registration.tracer;
   }
 
   async flush(): Promise<void> {
-    await Promise.all([
-      this.loggerSink.flush().unwrap(),
-      this.metricsCollector.flush().unwrap(),
-      this.traceEmitter.flush().unwrap(),
-    ]);
+    this.throwIfFailed('flush', await this.flushAll());
   }
 
   async shutdown(): Promise<void> {
-    const flushed = await Promise.allSettled([this.flush()]);
-    const stopped = await Promise.allSettled([
-      this.metricSignal.provider?.shutdown(),
-      this.traceSignal.provider?.shutdown(),
+    const flushed = await this.flushAll();
+    const stopped = await this.settle('shutdown', [
+      ['metrics', () => this.metricSignal.provider?.shutdown()],
+      ['traces', () => this.traceSignal.provider?.shutdown()],
     ]);
-    const failures = [...flushed, ...stopped].flatMap(result => (result.status === 'rejected' ? [result.reason] : []));
-    if (failures.length > 0) throw new AggregateError(failures, 'OpenTelemetry shutdown failed');
+    this.traceSignal.registration.release();
+    this.throwIfFailed('shutdown', [...flushed, ...stopped]);
+  }
+
+  private flushAll(): Promise<TelemetryLifecycleError[]> {
+    return this.settle('flush', [
+      ['logs', () => this.settled(this.loggerSink.flush())],
+      ['metrics', () => this.settled(this.metricsCollector.flush())],
+      ['traces', () => this.settled(this.traceEmitter.flush())],
+    ]);
+  }
+
+  private async settle(
+    phase: LifecyclePhase,
+    steps: readonly (readonly [TelemetrySignal, () => Promise<unknown> | undefined])[],
+  ): Promise<TelemetryLifecycleError[]> {
+    const results = await Promise.allSettled(
+      steps.map(([signal, step]) =>
+        Promise.resolve()
+          .then(step)
+          .catch((cause: unknown) => {
+            throw new TelemetryLifecycleError(signal, phase, cause);
+          }),
+      ),
+    );
+    return results.flatMap(result => (result.status === 'rejected' ? [result.reason as TelemetryLifecycleError] : []));
+  }
+
+  private async settled(result: Result<void, Error>): Promise<void> {
+    if (await result.isErr()) throw await result.unwrapErr();
+  }
+
+  private throwIfFailed(phase: LifecyclePhase, failures: readonly TelemetryLifecycleError[]): void {
+    if (failures.length > 0) throw new AggregateError(failures, `OpenTelemetry ${phase} failed`);
   }
 }
 
@@ -165,5 +211,12 @@ class OtelBootstrap {
   }
 }
 
-export type { OtelBootstrapCollaborators, OtelInitOptions, OtelRuntime, OtelSeamOverrides };
-export { OtelBootstrap };
+export type {
+  LifecyclePhase,
+  OtelBootstrapCollaborators,
+  OtelInitOptions,
+  OtelRuntime,
+  OtelSeamOverrides,
+  TelemetrySignal,
+};
+export { OtelBootstrap, TelemetryLifecycleError };

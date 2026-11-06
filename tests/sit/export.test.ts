@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, it } from 'bun:test';
-import { trace } from '@opentelemetry/api';
 import 'should';
 import { OtelBootstrap, type OtelRuntime } from '../../src/adapters/init';
 import type { OtelBlock } from '../../src/lib/schema';
@@ -14,9 +13,10 @@ const block: OtelBlock = { ...otlpOnly, logs: { ...otlpOnly.logs, enabled: false
 let runtime: OtelRuntime;
 
 beforeAll(async () => {
-  // The schema pins the block to port 4318; the standard variable sends the real exporters to the ephemeral receiver.
-  process.env.OTEL_EXPORTER_OTLP_ENDPOINT = receiver.origin;
-  runtime = new OtelBootstrap().init(block, identity);
+  // The schema pins the block to port 4318; the injected standard variable sends the real exporters to the receiver.
+  runtime = new OtelBootstrap().init(block, identity, {
+    environment: { OTEL_EXPORTER_OTLP_ENDPOINT: receiver.origin },
+  });
   await runtime.metricsCollector
     .record({ kind: 'counter', name: 'sit.jobs', value: 3, attributes: { queue: 'a' } })
     .unwrap();
@@ -25,8 +25,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
-  trace.disable();
   await receiver.stop();
 });
 

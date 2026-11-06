@@ -6,7 +6,7 @@ import {
   portError,
   type TelemetryAttributes,
 } from '@atomicloud/diene.interfaces';
-import { Err, Ok, type Result } from '@atomicloud/diene.result';
+import { Err, Ok, Res, type Result } from '@atomicloud/diene.result';
 import { context, isSpanContextValid, type SpanContext, trace } from '@opentelemetry/api';
 import pino, { type DestinationStream, type Logger } from 'pino';
 
@@ -46,12 +46,14 @@ class PinoLoggerSink implements LoggerSink {
   }
 
   flush(): Result<void, LoggingError> {
-    try {
-      this.logger.flush();
-      return Ok(undefined);
-    } catch (cause) {
-      return Err(this.failure('flush', 'Pino failed to flush', cause));
-    }
+    return Res.fromSerial<void, LoggingError>(
+      new Promise<void>((resolve, reject) => {
+        this.logger.flush(error => (error ? reject(error) : resolve()));
+      }).then(
+        () => ['ok', undefined] as const,
+        cause => ['err', this.failure('flush', 'Pino failed to flush', cause)] as const,
+      ),
+    );
   }
 
   private failure(operation: string, message: string, cause: unknown): LoggingError {

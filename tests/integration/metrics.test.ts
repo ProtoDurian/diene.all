@@ -7,6 +7,7 @@ import {
   AggregationTemporality,
   ConsoleMetricExporter,
   InMemoryMetricExporter,
+  InstrumentType,
   MeterProvider,
   PeriodicExportingMetricReader,
 } from '@opentelemetry/sdk-metrics';
@@ -16,12 +17,24 @@ import {
   SdkMetricExporterFactories,
   SdkMetricsCollector,
 } from '../../src/adapters/signals/metrics';
-import { FailingMetricExporter, RecordingMetricExporters, throwingMeter } from './support/doubles';
+import {
+  exporterSettings,
+  FailingMetricExporter,
+  RecordingMetricExporters,
+  throwingMeter,
+  withProcessEnv,
+} from './support/doubles';
 import { expectErr, expectOk } from './support/result';
 
 const resource = resourceFromAttributes({ 'service.name': 'svc' });
 const scope = { name: 'svc', version: '1.0.0' };
-const settings = { intervalMillis: 60_000, timeoutMillis: 1_000, otlp: { url: 'http://127.0.0.1:4318/v1/metrics' } };
+const otlp = {
+  url: 'http://127.0.0.1:54321/custom',
+  headers: { tenant: 'review' },
+  timeoutMillis: 1234,
+  compression: 'gzip' as const,
+};
+const settings = { intervalMillis: 60_000, timeoutMillis: 1_000, temporality: 'cumulative' as const, otlp };
 
 function realProvider(exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE)) {
   const reader = new PeriodicExportingMetricReader({ exporter, exportIntervalMillis: 60_000 });
@@ -35,12 +48,60 @@ describe('SdkMetricExporterFactories', () => {
 
     // Act
     const consoleExporter = factories.console();
-    const otlpExporter = factories.otlp(settings.otlp);
+    const otlpExporter = factories.otlp(settings.otlp, 'cumulative');
 
     // Assert
     (consoleExporter instanceof ConsoleMetricExporter).should.be.true();
     (otlpExporter instanceof OTLPMetricExporter).should.be.true();
     await Promise.all([consoleExporter.shutdown(), otlpExporter.shutdown()]);
+  });
+
+  it('should configure the real OTLP exporter from the options, not from conflicting process variables', async () => {
+    // Arrange
+    const factories = new SdkMetricExporterFactories();
+
+    // Act
+    const actual = await withProcessEnv(
+      {
+        OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: 'http://process:4318/v1/metrics',
+        OTEL_EXPORTER_OTLP_METRICS_TIMEOUT: '9999',
+        OTEL_EXPORTER_OTLP_METRICS_HEADERS: 'tenant=process',
+        OTEL_EXPORTER_OTLP_METRICS_COMPRESSION: 'none',
+        OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: 'cumulative',
+      },
+      async () => {
+        const exporter = factories.otlp(otlp, 'delta');
+        const read = await exporterSettings(exporter);
+        const temporality = exporter.selectAggregationTemporality?.(InstrumentType.COUNTER);
+        await exporter.shutdown();
+        return { ...read, temporality };
+      },
+    );
+
+    // Assert
+    actual.should.match({
+      url: otlp.url,
+      timeoutMillis: 1234,
+      compression: 'gzip',
+      headers: { tenant: 'review' },
+      temporality: AggregationTemporality.DELTA,
+    });
+  });
+
+  it.each([
+    ['cumulative', AggregationTemporality.CUMULATIVE, AggregationTemporality.CUMULATIVE],
+    ['lowmemory', AggregationTemporality.DELTA, AggregationTemporality.CUMULATIVE],
+  ] as const)('should honour the %s temporality preference', async (preference, counter, upDown) => {
+    // Arrange
+    const factories = new SdkMetricExporterFactories();
+
+    // Act
+    const exporter = factories.otlp(otlp, preference);
+
+    // Assert
+    exporter.selectAggregationTemporality?.(InstrumentType.COUNTER)?.should.eql(counter);
+    exporter.selectAggregationTemporality?.(InstrumentType.UP_DOWN_COUNTER)?.should.eql(upDown);
+    await exporter.shutdown();
   });
 });
 
@@ -164,6 +225,7 @@ describe('MetricSignalFactory', () => {
     signal.active.should.be.true();
     exporters.calls.should.eql(['console', 'otlp']);
     exporters.otlpOptions.should.eql([settings.otlp]);
+    exporters.temporalities.should.eql(['cumulative']);
     const exported = exporters.exporter.getMetrics();
     exported.length.should.eql(2);
     exported[0]?.resource.attributes.should.eql({ 'service.name': 'svc' });
