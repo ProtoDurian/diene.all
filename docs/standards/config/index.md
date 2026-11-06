@@ -51,9 +51,10 @@ incomplete as long as the merged result satisfies the root schema.
   `unknown`, an unregistered key) gets the plain scalar coercion. A value the type
   cannot take stays a string, so validation reports it.
 - **Booleans take only `true` / `false`**; anything else throws
-  `ConfigLoaderError`, unless the field has a `.catch()`, whose fallback then
-  applies. Declare them `z.boolean()` or `z.stringbool()`, never
-  `z.coerce.boolean()`, which reads any other text as `true`.
+  `ConfigLoaderError`, unless a `.catch()` can supply the fallback (on any union
+  branch, or on every side of an intersection). Declare them `z.boolean()` or
+  `z.stringbool()`, never `z.coerce.boolean()`, which reads any other text as
+  `true`.
 - **A key under a schema the loader cannot walk** (`z.custom`, `z.map`,
   `z.set`, …) throws `ConfigLoaderError` instead of being dropped.
 - **Dates come in as ISO text** (`2024-01-31T00:00:00Z`) for `z.coerce.date()`;
