@@ -9,8 +9,8 @@ import {
   type OtelExporter,
   type OtelRuntime,
   ResourceIdentityMapper,
-  type TraceError,
   type TraceEmitter,
+  type TraceError,
   type TraceRecord,
   TraceRecordValidator,
 } from '@atomicloud/diene.otel';
@@ -174,16 +174,20 @@ class OtelAssertions {
     }
   }
 
-  private nonJson(value: unknown, path: string): string | undefined {
+  private nonJson(value: unknown, path: string, ancestors: readonly object[] = []): string | undefined {
     if (value === null || typeof value === 'string' || typeof value === 'boolean') return undefined;
     if (typeof value === 'number') return Number.isFinite(value) ? undefined : `${path} (${value})`;
     if (typeof value !== 'object') return `${path} (${typeof value})`;
+    if (ancestors.includes(value)) return `${path} (cycle)`;
+    const inside = [...ancestors, value];
     if (Array.isArray(value)) {
-      return value.map((entry, index) => this.nonJson(entry, `${path}[${index}]`)).find(found => found !== undefined);
+      return Array.from({ length: value.length }, (_, index) =>
+        index in value ? this.nonJson(value[index], `${path}[${index}]`, inside) : `${path}[${index}] (hole)`,
+      ).find(found => found !== undefined);
     }
     if (![Object.prototype, null].includes(Object.getPrototypeOf(value))) return `${path} (non-plain object)`;
     return Object.entries(value)
-      .map(([key, entry]) => this.nonJson(entry, `${path}.${key}`))
+      .map(([key, entry]) => this.nonJson(entry, `${path}.${key}`, inside))
       .find(found => found !== undefined);
   }
 

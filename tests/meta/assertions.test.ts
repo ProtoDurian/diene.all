@@ -125,6 +125,12 @@ describe('OtelAssertions.identityResource', () => {
   });
 });
 
+function cyclic(): Record<string, unknown> {
+  const value: Record<string, unknown> = {};
+  value.self = value;
+  return value;
+}
+
 describe('OtelAssertions rejects values JSON cannot carry', () => {
   it.each([
     ['NaN against null', { value: Number.NaN }, { value: null }, 'Actual holds a non-JSON value at $.value (NaN)'],
@@ -144,6 +150,17 @@ describe('OtelAssertions rejects values JSON cannot carry', () => {
     ['a symbol', { s: Symbol('x') }, { s: 'x' }, 'Actual holds a non-JSON value at $.s (symbol)'],
     ['a bigint', { n: 1n }, { n: 1 }, 'Actual holds a non-JSON value at $.n (bigint)'],
     ['a Map', { m: new Map() }, { m: {} }, 'Actual holds a non-JSON value at $.m (non-plain object)'],
+    // biome-ignore lint/suspicious/noSparseArray: the hole is the case under test
+    ['an array hole against null', [, 1], [null, 1], 'Actual holds a non-JSON value at $[0] (hole)'],
+    ['a new Array hole', { a: [1] }, { a: new Array(2) }, 'Expected holds a non-JSON value at $.a[0] (hole)'],
+    ['a cycle on the actual side', cyclic(), { self: {} }, 'Actual holds a non-JSON value at $.self (cycle)'],
+    ['a cycle on the expected side', { self: {} }, cyclic(), 'Expected holds a non-JSON value at $.self (cycle)'],
+    [
+      'a cycle through an array',
+      { list: [cyclic()] },
+      { list: [{}] },
+      'Actual holds a non-JSON value at $.list[0].self (cycle)',
+    ],
   ])('should fail on %s', (_label, actual, expected, message) => {
     // Arrange
     const run = () => assertions.payload(actual, expected);
@@ -153,6 +170,17 @@ describe('OtelAssertions rejects values JSON cannot carry', () => {
 
     // Assert
     attempt.should.throw(OtelAssertionError, { label: 'Telemetry payload', message: `Telemetry payload: ${message}` });
+  });
+
+  it('should pass on a repeated reference that is not a cycle', () => {
+    // Arrange
+    const shared = { a: 1 };
+
+    // Act
+    const act = () => assertions.payload({ x: shared, y: [shared, shared] }, { x: { a: 1 }, y: [{ a: 1 }, { a: 1 }] });
+
+    // Assert
+    act.should.not.throw();
   });
 
   it('should still pass on equal null-prototype and nested JSON payloads', () => {
