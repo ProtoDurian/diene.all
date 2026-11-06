@@ -2,7 +2,7 @@ import type { ErrorPortalConfig } from './types.js';
 
 const SEGMENT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const PROBLEM_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
-const VERSION_PATTERN = /^v[0-9]+$/;
+const VERSION_PATTERN = /^v[1-9][0-9]*$/;
 const HOST_FORBIDDEN_PATTERN = /[/\\\s@?#]/;
 
 export class ProblemTypeUriBuilder {
@@ -11,6 +11,9 @@ export class ProblemTypeUriBuilder {
 
   buildProblemTypeUri(config: ErrorPortalConfig, version: string, id: string): string {
     const { scheme, host, landscape, platform, service, module } = config;
+    if (scheme !== 'http' && scheme !== 'https') {
+      throw new RangeError(`ErrorPortal scheme must be http or https; received ${JSON.stringify(scheme)}`);
+    }
     if (host === '' || HOST_FORBIDDEN_PATTERN.test(host)) {
       throw new RangeError('ErrorPortal host must be a non-empty host or host:port without URL components');
     }

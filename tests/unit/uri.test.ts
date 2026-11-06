@@ -84,6 +84,8 @@ describe('ProblemTypeUriBuilder', () => {
       ['service', () => builder.buildProblemTypeUri({ ...portal, service: '' }, 'v1', 'conflict')],
       ['module', () => builder.buildProblemTypeUri({ ...portal, module: 'a b' }, 'v1', 'conflict')],
       ['version', () => builder.buildProblemTypeUri(portal, '1', 'conflict')],
+      ['version', () => builder.buildProblemTypeUri(portal, 'v0', 'conflict')],
+      ['version', () => builder.buildProblemTypeUri(portal, 'v01', 'conflict')],
       ['id', () => builder.buildProblemTypeUri(portal, 'v1', 'EntityNotFound')],
     ];
 
@@ -92,5 +94,24 @@ describe('ProblemTypeUriBuilder', () => {
 
     // Assert
     messages.map(message => message.split(' ')[0]).should.eql(cases.map(([segment]) => segment));
+  });
+});
+
+describe('ProblemTypeUriBuilder scheme', () => {
+  it('should refuse any scheme other than http or https at runtime', () => {
+    // Arrange
+    const builder = new ProblemTypeUriBuilder();
+    const schemes = ['ftp', 'HTTPS', 'javascript', ''];
+
+    // Act
+    const errors = schemes.map(scheme =>
+      thrown(() => builder.buildProblemTypeUri({ ...portal, scheme: scheme as 'https' }, 'v1', 'conflict')),
+    );
+
+    // Assert
+    for (const error of errors) {
+      error.should.be.instanceOf(RangeError);
+      error.message.should.startWith('ErrorPortal scheme must be http or https');
+    }
   });
 });
