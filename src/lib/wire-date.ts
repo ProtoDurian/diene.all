@@ -3,7 +3,7 @@ import { Temporal } from '@js-temporal/polyfill';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^\d{2}:\d{2}:\d{2}$/;
-const INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
+const INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const OFFSET_ZONE_PATTERN = /^[+-]\d{2}:\d{2}$/;
 
 type WireForm = 'date' | 'time' | 'datetime' | 'duration' | 'timezone';
@@ -73,7 +73,7 @@ class WireDateCodec {
     if (!INSTANT_PATTERN.test(input)) {
       return this.fail(
         'datetime',
-        `wire datetime must be a canonical RFC 3339 UTC instant (YYYY-MM-DDTHH:mm:ssZ), received "${input}"`,
+        `wire datetime must be a canonical RFC 3339 UTC instant (YYYY-MM-DDTHH:mm:ss.sssZ), received "${input}"`,
       );
     }
     return this.attempt('datetime', `wire datetime "${input}" is not a valid instant`, () =>

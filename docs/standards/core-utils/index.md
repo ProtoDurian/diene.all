@@ -83,8 +83,9 @@ unrepresentable value, returns `Result<…, WireDateError>`; `formatDuration` is
 total and returns a string. `WireDateError` extends `RangeError` and names the
 `form` that failed. Parsing rejects non-canonical spellings; formatting emits the
 one canonical spelling. An instant is written with exactly three fraction digits
-(`2026-11-06T03:00:00.000Z`, the shared wire format) and read with zero to nine;
-finer precision is truncated to milliseconds. `HH:mm:ss` rejects a sub-second
+and read only that way (`2026-11-06T03:00:00.000Z`, the
+[wire format](../wire-format/index.md)); finer precision is truncated to milliseconds
+when formatting. `HH:mm:ss` rejects a sub-second
 time rather than dropping precision. Fixed offsets and
 abbreviations are not timezones. A timezone id is case-normalized only: links
 such as `Asia/Calcutta` are accepted as given, not resolved.

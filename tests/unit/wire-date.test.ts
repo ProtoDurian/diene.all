@@ -126,28 +126,15 @@ describe('WireDateCodec datetime', () => {
   });
 
   it.each([
-    { wire: '2020-01-02T03:04:05Z', expected: '2020-01-02T03:04:05.000Z', label: 'no fraction digits' },
-    { wire: '2020-01-02T03:04:05.1Z', expected: '2020-01-02T03:04:05.100Z', label: 'one fraction digit' },
-    { wire: '2020-01-02T03:04:05.123456789Z', expected: '2020-01-02T03:04:05.123Z', label: 'nine fraction digits' },
-  ])('should parse $label leniently and format exactly three digits', async ({ wire, expected }) => {
-    // Arrange
-    const domain = await expectOk(codec.parseDateTime(wire));
-
-    // Act
-    const actual = await expectOk(codec.formatDateTime(domain));
-
-    // Assert
-    actual.should.equal(expected);
-  });
-
-  it.each([
     { wire: '2020-01-02T03:04:05', message: /canonical RFC 3339 UTC instant/ },
     { wire: '2020-01-02T03:04:05+08:00', message: /canonical RFC 3339 UTC instant/ },
     { wire: '2020-01-02 03:04:05Z', message: /canonical RFC 3339 UTC instant/ },
     { wire: '2020-01-02T03:04Z', message: /canonical RFC 3339 UTC instant/ },
-    { wire: '2020-13-01T00:00:00Z', message: /not a valid instant/ },
-    { wire: '2020-01-02T03:04:05.1234567890Z', message: /canonical RFC 3339 UTC instant/ },
-    { wire: '2026-07-24T23:59:60Z', message: /not a valid instant/ },
+    { wire: '2020-01-02T03:04:05Z', message: /canonical RFC 3339 UTC instant/ },
+    { wire: '2020-01-02T03:04:05.1Z', message: /canonical RFC 3339 UTC instant/ },
+    { wire: '2020-01-02T03:04:05.123456789Z', message: /canonical RFC 3339 UTC instant/ },
+    { wire: '2020-13-01T00:00:00.000Z', message: /not a valid instant/ },
+    { wire: '2026-07-24T23:59:60.000Z', message: /not a valid instant/ },
   ])('should reject wire datetime "$wire"', async ({ wire, message }) => {
     // Arrange
     const input = wire;
@@ -162,7 +149,7 @@ describe('WireDateCodec datetime', () => {
 
   it('should keep the parse cause on an impossible instant', async () => {
     // Arrange
-    const input = '2020-13-01T00:00:00Z';
+    const input = '2020-13-01T00:00:00.000Z';
 
     // Act
     const actual = await expectErr(codec.parseDateTime(input));
@@ -248,8 +235,8 @@ describe('WireDateCodec timezone', () => {
   ])('should keep the DST rules of $wire', async ({ wire, winter, summer }) => {
     // Arrange
     const zone = await expectOk(codec.parseTimeZone(wire));
-    const january = await expectOk(codec.parseDateTime('2021-01-01T12:00:00Z'));
-    const july = await expectOk(codec.parseDateTime('2021-07-01T12:00:00Z'));
+    const january = await expectOk(codec.parseDateTime('2021-01-01T12:00:00.000Z'));
+    const july = await expectOk(codec.parseDateTime('2021-07-01T12:00:00.000Z'));
 
     // Act
     const offsets = [january, july].map(instant => new Temporal.ZonedDateTime(instant.epochNanoseconds, zone).offset);
