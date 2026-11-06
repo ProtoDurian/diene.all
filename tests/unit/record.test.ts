@@ -44,6 +44,57 @@ describe('RecordTools.stableConfig', () => {
     actual.should.equal(expected);
   });
 
+  it('should return a sorted clone and leave the input unchanged', () => {
+    // Arrange
+    const tools = new RecordTools();
+    const input = { b: 1, a: { d: 4, c: 3 } };
+
+    // Act
+    const actual = tools.stableConfig(input);
+
+    // Assert
+    (actual === input).should.be.false();
+    Object.keys(input).should.deepEqual(['b', 'a']);
+    Object.keys(input.a).should.deepEqual(['d', 'c']);
+    JSON.stringify(actual).should.equal('{"a":{"c":3,"d":4},"b":1}');
+  });
+
+  it.each([
+    { label: 'a Date', make: () => new Date(0) },
+    { label: 'a Map', make: () => new Map([[1, 2]]) },
+    { label: 'a Set', make: () => new Set([1]) },
+    {
+      label: 'a class instance',
+      make: () =>
+        new (class Point {
+          constructor(readonly x = 1) {}
+        })(),
+    },
+  ])('should pass $label through unchanged', ({ make }) => {
+    // Arrange
+    const tools = new RecordTools();
+    const value = make();
+
+    // Act
+    const actual = tools.stableConfig({ z: 0, value }) as Record<string, unknown>;
+
+    // Assert
+    (actual.value === value).should.be.true();
+    Object.keys(actual).should.deepEqual(['value', 'z']);
+  });
+
+  it('should recurse into a null-prototype object', () => {
+    // Arrange
+    const tools = new RecordTools();
+    const input = Object.assign(Object.create(null) as Record<string, unknown>, { b: 2, a: 1 });
+
+    // Act
+    const actual = JSON.stringify(tools.stableConfig(input));
+
+    // Assert
+    actual.should.equal('{"a":1,"b":2}');
+  });
+
   it('should allow a value shared across sibling branches', () => {
     // Arrange
     const shared = { z: 26, a: 1 };

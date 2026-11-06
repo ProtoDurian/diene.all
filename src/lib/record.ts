@@ -11,7 +11,7 @@ class RecordTools {
   }
 
   private normalize(value: unknown, seen: WeakSet<object>): unknown {
-    if (!Array.isArray(value) && !this.isRecord(value)) return value;
+    if (!Array.isArray(value) && !this.isPlainObject(value)) return value;
     if (seen.has(value)) throw new TypeError('stableConfig cannot process a circular structure');
     seen.add(value);
     const normalized = Array.isArray(value)
@@ -23,6 +23,12 @@ class RecordTools {
         );
     seen.delete(value);
     return normalized;
+  }
+
+  private isPlainObject(value: unknown): value is Record<string, unknown> {
+    if (!this.isRecord(value)) return false;
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
   }
 }
 
