@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # The published shape the goal fixes: zero runtime deps, the /test-helper
-# subpath with both conditions, the usage skill in the files allowlist, and no
-# sample adapter or integration tier left from the parent.
+# subpath with both conditions, the usage skill in the files allowlist, no
+# sample adapter, and the parent's integration tier kept empty (owner !A121).
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -31,13 +31,14 @@ done
 [[ "$(q '.files | index("skills") != null')" == true ]] || fail "files allowlist does not ship skills/"
 [[ -n "$(git ls-tree --name-only "${tree}" -- skills/diene-result-usage/SKILL.md)" ]] || fail "skills/diene-result-usage/SKILL.md is not tracked"
 [[ -z "$(git ls-tree -r --name-only "${tree}" -- skills | grep -v '^skills/diene-result-usage/' || true)" ]] || fail "skills/ ships a skill other than diene-result-usage"
-for p in src/adapters src/lib/sample tests/integration; do
+for p in src/adapters src/lib/sample; do
   [[ -z "$(git ls-tree --name-only "${tree}" -- "${p}")" ]] || fail "parent sample path still tracked: ${p}"
 done
-[[ "$(git show "${tree}:.github/workflows/ci.yaml" | yq '.jobs | has("int")')" == false ]] || fail "ci.yaml still runs the integration tier"
+[[ "$(git show "${tree}:.github/workflows/ci.yaml" | yq '.jobs | has("int")')" == true ]] || fail "ci.yaml dropped the integration tier"
+[[ -n "$(git ls-tree --name-only "${tree}" -- bunfig.int.toml)" ]] || fail "bunfig.int.toml is not tracked"
 
 if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ package-surface: zero runtime deps, /test-helper exported for import and require, usage skill shipped, no sample or integration tier"
+echo "✅ package-surface: zero runtime deps, /test-helper exported for import and require, usage skill shipped, no sample adapter, empty integration tier kept"

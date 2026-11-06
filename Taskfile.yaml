@@ -6,6 +6,11 @@ includes:
     vars:
       MODE: unit
       CONFIG: bunfig.unit.toml
+  int:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: int
+      CONFIG: bunfig.int.toml
   meta:
     taskfile: tasks/Taskfile.test.yaml
     vars:
@@ -39,9 +44,10 @@ tasks:
       - ./scripts/local/deadcode.sh
 
   test:
-    desc: Run unit and meta suites without coverage
+    desc: Run unit, integration, and conditional meta suites without coverage
     cmds:
       - task: unit:default
+      - task: int:default
       - task: meta:default
 
   test:unit:
@@ -50,9 +56,9 @@ tasks:
       - task: unit:default
 
   test:int:
-    desc: Confirm that this dependency-free library has no integration tier
+    desc: Run the integration suite without coverage
     cmds:
-      - echo "⏭️ No integration tier (this package has no adapters or external dependencies)"
+      - task: int:default
 
   test:meta:
     desc: Run the TestHelper meta suite when a TestHelper exists
@@ -60,9 +66,10 @@ tasks:
       - task: meta:default
 
   test:coverage:
-    desc: Run unit and meta suites with coverage
+    desc: Run unit, integration, and conditional meta suites with coverage
     cmds:
       - task: unit:coverage
+      - task: int:coverage
       - task: meta:coverage
 
   test:unit:coverage:
@@ -71,9 +78,9 @@ tasks:
       - task: unit:coverage
 
   test:int:coverage:
-    desc: Confirm that this dependency-free library has no integration coverage ledger
+    desc: Run the integration suite with coverage
     cmds:
-      - echo "⏭️ No integration coverage ledger (this package has no adapters or external dependencies)"
+      - task: int:coverage
 
   test:meta:coverage:
     desc: Run the TestHelper meta suite with coverage when a TestHelper exists
