@@ -63,8 +63,8 @@ through that port, not through this package.
 ## C0 wire-date codecs
 
 `WireDateCodec` translates between Temporal domain values and the transport forms
-of [C0 §1 Serialization](https://github.com/ProtoDurian/diene.all/blob/fe77520d591f/contracts/c0/README.md),
-the cross-language serialization contract. It follows the repository's
+of C0 §1 Serialization, the cross-language serialization contract; the table
+below is that contract's complete wire rule set. It follows the repository's
 [date/time standard](../datetime/index.md). These are wire values, not display
 formats.
 
