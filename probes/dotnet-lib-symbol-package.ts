@@ -19,7 +19,7 @@ export default defineGate({
     async run(repo: any) {
       await packPackages(repo, 'dotnet-lib-symbol-package-mutation-pack');
       await repo.exec(
-        'package="$(find artifacts/package -maxdepth 1 -name \'AtomiCloud.Diene.Note.TestHelper.*.nupkg\' -print -quit)"; symbols="${package%.nupkg}.snupkg"; cp "${package}" "${symbols}"',
+        'package="$(find artifacts/package -maxdepth 1 -name \'AtomiCloud.Diene.Result.TestHelper.*.nupkg\' -print -quit)"; symbols="${package%.nupkg}.snupkg"; cp "${package}" "${symbols}"',
       );
       await expectRedBecause(repo, `${PACKAGE_VALIDATE} symbols`, 'dotnet-lib-symbol-package', [
         'symbols package contains no portable PDB',
