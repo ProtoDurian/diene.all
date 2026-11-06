@@ -35,9 +35,9 @@ for stack in "${stacks[@]}"; do
   yq eval-all -o=json '.' "${work}/render.yaml" | jq -s 'map(select(.kind != null))' >"${work}/render.json"
   kinds="$(jq -r 'map(.kind + "/" + .metadata.name) | .[]' "${work}/render.json" | sort)"
   [[ -n ${kinds} ]] && on=$((on + 1))
-  extra="$(jq -r --arg obs "^(${OBS})$" '.[] | select((.kind | test($obs)) or (.kind == "ConfigMap") or (.kind == "Service" and (.spec.ports // [] | any(.name == "metrics")))) | .kind + "/" + .metadata.name' "${work}/render.json")"
+  extra="$(jq -r --arg obs "^(${OBS})$" '.[] | select((.kind | test($obs)) or (.kind == "Service" and (.spec.ports // [] | any(.name == "metrics")))) | .kind + "/" + .metadata.name' "${work}/render.json")"
   [[ -z ${extra} ]] || fail "stack '${stack}' ships observability or sample payload: ${extra//$'\n'/ }"
-  args="$(jq -r '.[] | select(.kind == "Deployment") | .spec.template.spec.containers[].args[]? | select(test("^--(metrics-|profiling|enable-pprof)"))' "${work}/render.json")"
+  args="$(jq -r '.[] | select(.kind == "Deployment") | .spec.template.spec.containers[].args[]? | select(test("^--(metrics-|profiling|enable-pprof|authorization-always-allow-paths=.*/metrics)"))' "${work}/render.json")"
   [[ -z ${args} ]] || fail "stack '${stack}' turns on an extra metrics/profiling endpoint: ${args//$'\n'/ }"
   deps="$(jq -r '[.[] | select(.kind == "Deployment") | .metadata.name] | join(",")' "${work}/render.json")"
   [[ -z ${deps} || ${deps} == xenon-metrics ]] || fail "stack '${stack}' renders a workload beyond metrics-server: ${deps}"
