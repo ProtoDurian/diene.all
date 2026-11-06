@@ -5,56 +5,54 @@ description: Use when consuming @atomicloud/diene.config — registering config 
 
 # Diene Config usage
 
-Use this skill when loading configuration with `@atomicloud/diene.config`,
-wiring the build-time variant, or faking config sources in tests. Import only
-the package root, `/build-time`, or `/test-helper` — never copy the
-implementation or reach into `src/`/`dist/`.
-
-Read the authoritative
+Import only the package root, `/build-time` or `/test-helper`; never copy the
+implementation or reach into `src/` or `dist/`. The full contract is the
 [config standard](https://github.com/AtomiCloud/diene.bun-config/blob/main/docs/standards/config/index.md).
 
 ## Load configuration (runtime)
 
-1. Each engine/library exports its own zod block schema; a service composes them
-   into a registry: `ConfigRegistry.create().register('server', ServerSchema)...`.
-2. Point a `YamlConfigSource` at the config directory and load — the loader runs
-   the 4-tier merge (base YAML → landscape overlay → build-time → runtime env
-   LAST) and validates the FINAL layer only, fail-fast.
-3. Read typed slices: `config('server')`, `config.get('server')`, `config.all()`.
-   Use `loader.loadResult()` for the `Result`-returning (railway) variant.
+1. Each engine library exports its own zod block schema; the service composes
+   them: `ConfigRegistry.create().register('server', ServerBlock)`.
+2. Load through `new ConfigLoader(new YamlConfigSource({ dir: 'config' }), registry, { prefix: 'ATOMI_' })`.
+   It merges base YAML → landscape overlay → build-time → runtime env (last) and
+   validates the final layer only, fail-fast.
+3. `await loader.load()` returns the typed `Config`: `config.get('server')`,
+   `config.all()`. `loader.loadResult()` returns a `Result` instead of throwing
+   on a validation failure.
 
-See `assets/consumer.ts` (ESM) and `assets/consumer.cjs` (CJS) for copyable
-package-boundary examples.
+Copyable examples: `assets/consumer.ts` (ESM), `assets/consumer.cjs` (CJS).
 
-## The dimension matrix — `/build-time` vs the runtime loader
+## Dimension matrix: `/build-time` vs the runtime loader
 
-Build-time is a dimension for ALL app types: shared/client/server crossed with
+Build-time is a dimension for every app type: shared/client/server crossed with
 build-time/runtime.
 
-- **Runtime loader** (package root): SSR/server code, keeps runtime secrets.
-- **`/build-time`** (`buildTimeValueMap`): the inlineable client/build-time
-  subset frozen into a bundle via a DefinePlugin-style injection (nextjs owns the
-  DefinePlugin wiring; this lib owns the value map). Runtime env still wins where
-  present. Fully-static frontends carry ZERO runtime env, hence no runtime
-  secrets. Build-time SECRETS (e.g. a source-map upload key) are consumed by the
-  build step only and never persisted into the artifact.
+| Need                                             | Use                                                                                              |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| Server/SSR config, runtime secrets               | runtime `ConfigLoader` (package root)                                                            |
+| Client values inlined into a bundle              | `new BuildTimeValueMapper().map(env, prefix)` (`/build-time`), fed to the bundler's DefinePlugin |
+| Build-time secret (e.g. a source-map upload key) | read by the build step only; never inlined or persisted                                          |
+| Fully-static frontend                            | build-time values only; zero runtime env, so no runtime secrets                                  |
 
-## Env-override contract (must follow)
+Runtime env still wins over a build-time value wherever both exist.
 
-- `prefix` is REQUIRED — there is no baked default (`ATOMI_` is only an example).
-- `__` separates nesting; a snake segment matches snake/Pascal/camel/kebab keys.
-- Lists use INDEXED KEYS (`FOO__0`, `FOO__1`) — **never** JSON-in-env, never
-  comma encoding.
-- **Never** hand-roll `Number(process.env.X)` — route through the loader; number
-  coercion is zod's job (M31).
-- A **blank** env value means UNSET (M33) — it is dropped, not written as `''`.
-- Secrets are blank in YAML and injected at runtime via Infisical.
+## Env-override rules
+
+- Do pass `prefix`; there is no default (`ATOMI_` is an example).
+- Do nest with `__`: `ATOMI_SERVER__MAX_RETRIES` matches `maxRetries`,
+  `MaxRetries`, `max_retries` or `max-retries`.
+- Do encode lists as indexed keys: `ATOMI_SERVER__TAGS__0`, `__1`, …
+- Don't put JSON or comma lists in env.
+- Don't hand-roll `Number(process.env.X)`; the loader coerces through zod.
+- Don't rely on an empty env value: blank means unset and keeps the file value.
+- Keep secrets blank in YAML; they arrive as runtime env.
 
 ## Testing (`/test-helper`)
 
-`@atomicloud/diene.config/test-helper` ships `InMemoryConfigSource` (plain-object
-tier providers — no files, no `process.env` mutation), `stubConfig` (a validated
-config from in-memory tiers), `withLandscape` (landscape fake), and the
-`expectValid`/`expectInvalid` asserters. Run one behavioral suite against BOTH
-`YamlConfigSource` and `InMemoryConfigSource` for real-vs-fake parity. See
-`assets/test-helper.md`.
+- `InMemoryConfigSource` — plain-object tiers, no files and no `process.env`.
+- `LandscapeConfigSource` — an in-memory source whose base names a landscape.
+- `ConfigStubBuilder` — a validated `Config` built by the real loader.
+- `ConfigAssertions` — `expectValid` / `expectInvalid` over a stub builder.
+
+Run one behavioural suite against both `YamlConfigSource` and
+`InMemoryConfigSource` for real-vs-fake parity. See `assets/test-helper.md`.

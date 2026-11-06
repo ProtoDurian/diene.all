@@ -48,46 +48,83 @@ incomplete as long as the merged result satisfies the root schema.
 ## Landscape resolution
 
 The host supplies the landscape; this lib never detects it (it does not import
-frontend-utils). `resolveLandscape` prefers an explicit landscape, then the
-service-tree `app.landscape` field in the base config, then `base` (defaults
-only). Landscape names are validated to a safe token.
+frontend-utils). `LandscapeResolver.resolve` prefers an explicit landscape, then
+the service-tree `app.landscape` field in the base config, then `base` (defaults
+only). Landscape names must be a lowercase token (`[a-z0-9][a-z0-9-]*`).
 
 ## The dimension matrix and `/build-time`
 
 Build-time is a dimension for ALL app types: shared / client / server crossed
 with build-time / runtime.
 
-- The **runtime loader** (package root) keeps SSR/server-side runtime secrets.
-- The **`/build-time` entry** (`buildTimeValueMap`) exposes the inlineable
-  client/build-time subset for a DefinePlugin-style static injection. nextjs owns
-  the DefinePlugin wiring; this lib owns the value map. Runtime env still wins
-  over frozen build-time values.
-- **Build-time secrets** (e.g. a Faro source-map upload key,
+| Config class                    | Where it lives                                    | Ends up in the bundle |
+| ------------------------------- | ------------------------------------------------- | --------------------- |
+| runtime value or runtime secret | runtime `ConfigLoader` (package root), SSR/server | no                    |
+| build-time client value         | `/build-time` `BuildTimeValueMapper`              | yes                   |
+| build-time secret               | CI env read by the build step only                | never                 |
+
+- The **runtime loader** keeps SSR/server-side runtime secrets.
+- **`BuildTimeValueMapper.map(env, prefix)`** (`/build-time`) returns the
+  prefixed, non-blank variables to inline with a DefinePlugin-style static
+  injection. nextjs owns the DefinePlugin wiring; this lib owns the value map.
+  Runtime env still wins over a frozen build-time value.
+- **Build-time secrets** (e.g. the Faro source-map upload key
   `ATOMI_CLIENT__FARO__BUILD__KEY`) are CI-injected during the build, consumed by
-  the build step only, and NEVER persisted into the artifact — distinct from
-  build-time-inlined client values (which do end up in the bundle) and from
-  runtime secrets (server-side, never build-time).
+  the build step only, and NEVER persisted into the artifact.
+- **No-runtime-env mode:** a fully-static frontend carries zero runtime env vars,
+  so it carries no secrets at runtime.
 
 ## Public surface
 
-- `ConfigRegistry.create().register(key, schema)` — immutable, typed registry of
-  named config blocks. `rootSchema()` composes them into one zod object.
-- `ConfigLoader(source, registry, { prefix, landscape })` — runs the merge and
-  validates. `load()` throws `ConfigValidationError` on failure; `loadResult()`
-  returns a `Result` (railway) instead, dogfooding `@atomicloud/diene.result`.
-- `config(key)` / `config.get(key)` / `config.all()` — the typed accessor.
-- `YamlConfigSource` — the real `ConfigSource` (base + overlay YAML + env). Fakes
-  live in `/test-helper`.
-- `generateJsonSchema(registry)` — emit a JSON Schema from the zod registry so a
-  config YAML's `$schema` first line points at a GENERATED schema (R14).
-- `deepMerge` and the env-coercion helpers live here — this lib is their only
-  consumer-facing home (moved out of core-utils).
+Every piece is a stateless class; collaborators are constructor-injected with
+working defaults.
+
+| Class                                                     | Methods                                                                                   |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `ConfigRegistry`                                          | `create()`, `register(key, schema)`, `keys`, `rootSchema()`                               |
+| `ConfigLoader(source, registry, options, collaborators?)` | `load()`, `loadResult()`                                                                  |
+| `FrozenConfig` (implements `Config`)                      | `get(key)`, `all()`                                                                       |
+| `YamlConfigSource(options)`                               | the real `ConfigSource`: `base()`, `overlay(landscape)`, `buildTimeEnv()`, `runtimeEnv()` |
+| `DeepMerger`                                              | `merge(base, override)`                                                                   |
+| `EnvOverrides(coercer?, matcher?)`                        | `apply(target, env, prefix)`                                                              |
+| `EnvKeyMatcher`                                           | `normalize(key)`, `match(keys, segment)`                                                  |
+| `ScalarCoercer`                                           | `coerce(raw)`                                                                             |
+| `LandscapeResolver`                                       | `resolve(explicit, base)`                                                                 |
+| `ConfigValidator`                                         | `validate(schema, value)`                                                                 |
+| `JsonSchemaGenerator`                                     | `generate(registry, { id? })`                                                             |
+| `BuildTimeValueMapper` (`/build-time`)                    | `map(env, prefix)`                                                                        |
+
+- `load()` throws `ConfigValidationError` (aggregated, per-path issues) on an
+  invalid final layer; `loadResult()` returns it as an `Err` instead, using
+  `@atomicloud/diene.result`. IO failures throw from both.
+- An empty `prefix` throws `ConfigLoaderError`.
+- `JsonSchemaGenerator` emits the JSON Schema a config YAML's first line points
+  at: `# yaml-language-server: $schema=./schema.json`.
+- `DeepMerger`, `EnvOverrides` and the coercion classes live here; this lib is
+  their only consumer-facing home (moved out of core-utils).
+
+```ts
+const registry = ConfigRegistry.create().register('server', ServerBlock);
+const loader = new ConfigLoader(new YamlConfigSource({ dir: 'config' }), registry, { prefix: 'ATOMI_' });
+const config = await loader.load();
+const server = config.get('server');
+```
 
 ## TestHelper (`/test-helper`)
 
-`@atomicloud/diene.config/test-helper` ships in-memory tier providers
-(`InMemoryConfigSource`), a validated `stubConfig` builder, a `withLandscape`
-fake, and the `expectValid`/`expectInvalid` asserters. The fakes feed the SAME
-loader as production, so a single behavioral suite proves real-vs-fake parity.
-Helper-only dependencies are declared as optional peerDependencies, never regular
-dependencies. The meta tier measures coverage over TestHelper code only.
+`@atomicloud/diene.config/test-helper` fakes the IO a consumer would otherwise
+rebuild:
+
+- `InMemoryConfigSource(tiers)` — base / overlays / build-time / runtime tiers
+  as plain objects; no files, no `process.env` mutation.
+- `LandscapeConfigSource(landscape, tiers)` — the landscape fake: an in-memory
+  source whose base carries `app.landscape`.
+- `ConfigStubBuilder(registry, { prefix?, landscape? })` — `build(tiers)` runs
+  the real loader, so a stub always passes the registry.
+- `ConfigAssertions(builder)` — `expectValid(tiers)` / `expectInvalid(tiers)`;
+  each throws `TestHelperError` when the expectation fails.
+
+The fakes feed the same loader as production, so one behavioural suite proves
+real-vs-fake parity. Helper-only dependencies are optional peerDependencies,
+never regular dependencies. The meta tier measures coverage over TestHelper code
+only.
