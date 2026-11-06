@@ -6,7 +6,7 @@ How this service decides what to measure, and how it keeps its Grafana dashboard
 
 Examples in these docs use a made-up service: platform `tracker`, service `zinc`, module `webhook`.
 
-- **Service tree (LPSM)**: four labels that say where something runs: `landscape` (the environment, e.g. `pichu` = development, `raichu` = production), `platform` (the product), `service` (usually one repo, like this one) and `module` (one component, e.g. `api`). Naming rules: [Service Tree](/docs/standards/service-tree/index.md).
+- **Service tree (LPSM)**: four labels that say where something runs: `landscape` (the environment, e.g. `pichu` = development, `raichu` = production), `platform` (the product), `service` (usually one repo, like this one) and `module` (one component, e.g. `api`). The linked page also has C (cluster); telemetry labels leave it out. Naming rules: [Service Tree](/docs/standards/service-tree/index.md).
 - **Platform team**: the people who run Grafana, the collectors and alert routing. Not the same thing as the `platform` label.
 - **Stamping**: adding the LPSM labels automatically (rule 1 below).
 - **Signal**: one metric, log event or trace span. Their query languages are PromQL (metrics), LogQL (logs, in Loki) and TraceQL (traces, in Tempo).
@@ -23,22 +23,22 @@ Examples in these docs use a made-up service: platform `tracker`, service `zinc`
 
 ## Values the platform team gives you
 
-This repo does not contain these values, so the docs use the placeholder shown. Ask the platform team (the repo URL you can read yourself), then record each value once, in the place the last column names. Until a value is known, keep its placeholder. A dashboard cannot merge while `{platform}` or `{service}` is unknown (its uid needs them), and an alert set cannot merge while its owner is pending ([Gate 5](/docs/standards/observability/signals.md#gate-5--alerts-default-no)).
+This repo does not contain these values, so the docs use the placeholder shown. Ask the platform team for each value except `{repo-url}`, which is your repo's web URL plus `/blob/<default branch>`. Record each value in the places the last column names. Until a value is known, keep its placeholder. A dashboard cannot merge while `{platform}` or `{service}` is unknown (its uid needs them), and an alert set cannot merge while its owner is pending ([Gate 5](/docs/standards/observability/signals.md#gate-5--alerts-default-no)).
 
-| Value                                                              | Placeholder                                                                                                       | Recorded in                                                                                            |
-| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| This service's platform, service and modules                       | `{platform}`, `{service}`, `{module}`                                                                             | `observability/SIGNALS.md` title; modules in `overview.md` (How it works)                              |
-| Kubernetes namespace and workload                                  | `{namespace}`, `{workload}` (e.g. `deployment/zinc-webhook`)                                                      | `observability/overview.md` (Common commands)                                                          |
-| Owner team and chat channel                                        | `{team}`, `{#channel}`                                                                                            | `observability/overview.md` (Links)                                                                    |
-| Grafana URL, generic dashboard uid and the query that scopes it    | `{grafana-url}`, `{generic-dashboard-uid}`, `{generic-dashboard-vars}` (its `var-…=…` URL query for this service) | `observability/overview.md` (Links)                                                                    |
-| Web URL of this repo's files on its default branch                 | `{repo-url}` (e.g. `https://github.com/example/zinc/blob/main`)                                                   | the primordial chart's values                                                                          |
-| OTLP (OpenTelemetry Protocol) collector endpoint, per landscape    | `{otlp-endpoint}`                                                                                                 | each landscape's app config ([OpenTelemetry](/docs/standards/observability/otel.md))                   |
-| Metrics and logs datasource uids, per landscape                    | `{metrics-datasource-uid}`, `{logs-datasource-uid}`                                                               | the primordial chart's values                                                                          |
-| Primordial namespace and Grafana `instanceSelector`, per landscape | `{grafana-namespace}`, `{instance-selector}`                                                                      | the primordial chart's values ([Shipping](/docs/standards/observability/shipping.md#where-things-run)) |
-| `helm-wrapper` chart repository and version                        | —                                                                                                                 | the primordial chart's `Chart.yaml`                                                                    |
-| Faro collector URL, app id and stack id                            | —                                                                                                                 | the frontend's config ([Faro](/docs/standards/observability/faro.md))                                  |
+| Value                                                                                         | Placeholder                                                                                                       | Recorded in                                                                                            |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| This service's platform, service and modules                                                  | `{platform}`, `{service}`, `{module}`                                                                             | `observability/SIGNALS.md` title; modules in `overview.md` (How it works)                              |
+| Kubernetes namespace and workload                                                             | `{namespace}`, `{workload}` (e.g. `deployment/zinc-webhook`)                                                      | `observability/overview.md` (Common commands)                                                          |
+| Owner team and chat channel                                                                   | `{team}`, `{#channel}`                                                                                            | `observability/overview.md` (Links)                                                                    |
+| Grafana URL, generic dashboard uid and the query that scopes it                               | `{grafana-url}`, `{generic-dashboard-uid}`, `{generic-dashboard-vars}` (its `var-…=…` URL query for this service) | `observability/overview.md` (Links); the uid also in dashboard text panels                             |
+| Web URL of this repo's files on its default branch                                            | `{repo-url}` (e.g. `https://github.com/example/zinc/blob/main`)                                                   | the primordial chart's values; dashboard text panels                                                   |
+| OTLP (OpenTelemetry Protocol) collector endpoint, per landscape                               | `{otlp-endpoint}`                                                                                                 | each landscape's app config ([OpenTelemetry](/docs/standards/observability/otel.md))                   |
+| Metrics and logs datasource uids, per landscape                                               | `{metrics-datasource-uid}`, `{logs-datasource-uid}`                                                               | the primordial chart's values                                                                          |
+| Primordial namespace and Grafana `instanceSelector`, per landscape                            | `{grafana-namespace}`, `{instance-selector}`                                                                      | the primordial chart's values ([Shipping](/docs/standards/observability/shipping.md#where-things-run)) |
+| `helm-wrapper` (the Helm library the primordial chart builds on) chart repository and version | —                                                                                                                 | the primordial chart's `Chart.yaml`                                                                    |
+| Faro collector URL, app id and stack id                                                       | —                                                                                                                 | the frontend's config ([Faro](/docs/standards/observability/faro.md))                                  |
 
-The platform team also owns, outside this repo: who is notified for each tier and landscape (routing), on-call, trace tail sampling, and deploying the primordial chart.
+The platform team also owns, outside this repo: who is notified for each tier and landscape (routing), on-call, [trace tail sampling](/docs/standards/observability/signals.md#gate-3--traces-default-yes-for-user-flows), and deploying the primordial chart.
 
 ## Pages
 
@@ -65,7 +65,7 @@ observability/
 ├── dashboards/         # curated dashboards; empty until Gate 4 says yes
 │   ├── README.md       # keeps the folder in git
 │   ├── overview.json
-│   ├── .lint           # dashboard-linter exclusions, each with a reason
+│   ├── .lint           # exclusions for dashboard-linter (Grafana's dashboard linter), each with a reason
 │   └── log-notes.md    # what the stored log lines look like
 └── alerts/
     ├── README.md       # keeps the folder in git

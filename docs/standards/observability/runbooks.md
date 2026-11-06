@@ -3,7 +3,7 @@
 - **Every alert set has its own runbook** at `observability/alerts/<slug>/runbook.md`.
 - **Shared context lives once** in `observability/overview.md`. Runbooks link to it instead of repeating it.
 - **Namespace, workload, team, channel and Grafana URL** come from the platform team; see [Values the platform team gives you](/docs/standards/observability/index.md#values-the-platform-team-gives-you).
-- **Commands use `kubectl`**, which is in this repo's nix shell. Cluster access comes from the platform team.
+- **Commands use `kubectl`** (from the infrautils bundle; check with `command -v kubectl`). Cluster access comes from the platform team.
 
 ## The system overview
 

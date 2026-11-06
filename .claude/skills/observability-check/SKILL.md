@@ -6,5 +6,5 @@ description: Decide which metrics, logs, traces, dashboard panels and alerts a f
 # Observability Check
 
 1. Walk the six gates in [Signal decisions](/docs/standards/observability/signals.md), in order.
-2. Append the feature's block to `observability/SIGNALS.md`: copy `.claude/skills/observability-check/templates/SIGNALS-template.md` from `## Feature:` to the end.
+2. In `observability/SIGNALS.md`, fill the title with the known platform and service, then append the feature's block: a copy of `.claude/skills/observability-check/templates/SIGNALS-template.md`.
 3. Run `pre-commit run --all-files`, then hand off what the gates approved: dashboards to `grafana-dashboards`, alerts to `grafana-alert-set`.

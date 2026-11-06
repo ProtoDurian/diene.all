@@ -19,9 +19,9 @@ Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashbo
 
 ### Layout
 
-- A row is one horizontal band of panels. Use **RED** (rate, errors, duration) for request-driven views and **USE** (utilization, saturation, errors) for resources.
+- A row is one horizontal band of panels, made with `type: row` panels. Use **RED** (rate, errors, duration) for request-driven views and **USE** (utilization, saturation, errors) for resources.
 - The first row (the **overview row**) answers "is it healthy?" in under 5 seconds, with trend panels and threshold colors. The rows below (**detail rows**) follow in the order a responder triages.
-- Open with a text panel: purpose, audience, and links to `{repo-url}/observability/overview.md` ([placeholders](/docs/standards/observability/index.md#values-the-platform-team-gives-you)) and the generic dashboard (`/d/{generic-dashboard-uid}`).
+- Open with a text panel: purpose, audience, and links to `{repo-url}/observability/overview.md` ([placeholders](/docs/standards/observability/index.md#values-the-platform-team-gives-you)) and the generic dashboard (`/d/{generic-dashboard-uid}`). The chart does not template dashboard JSON: write the real values into the JSON once you know them.
 - One dashboard, one purpose. Put deep dives on a linked dashboard, not in row 12.
 
 ### Panels
@@ -41,7 +41,7 @@ Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashbo
 
 ### Variables and links
 
-- `$landscape` is required on every dashboard, with `refresh: 2` (reload on time change). Add the datasource variable `prometheus_datasource` labeled `Prometheus data source` and, with log panels, `loki_datasource` labeled `Loki data source`; these names pass strict lint. Set `editable: false`.
+- `$landscape` is required on every dashboard, with `refresh: 2` (reload on time change), so one dashboard works whether a Grafana's datasource holds one landscape or several; in a one-landscape Grafana it has one value. Add the datasource variable `prometheus_datasource` labeled `Prometheus data source` and, with log panels, `loki_datasource` labeled `Loki data source`; these names pass strict lint. Set `editable: false`.
 - Log panels also get a `$filter` text variable, applied as `|~ "$filter"`.
 - Link panels to the next view: a log line to its trace, a service tile to `/d/<platform>-<service>-overview`. Carry the scope in the URL: `?var-landscape=${landscape}`.
 
@@ -49,7 +49,7 @@ Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashbo
 
 The log line in the store is not what the app wrote: the logging library's JSON wrapper changes it, and the collector turns some fields into labels ("label promotion"). So build log panels from real stored lines:
 
-1. **Sample** 50–100 stored lines per stream for this service, from the real landscape with Grafana Explore. Include an error window. No access? Mark the panel `UNVERIFIED` in its description and check it after the first deploy.
+1. **Sample** 50–100 stored lines per stream (a stream is the lines that share one set of log labels) for this service, from the real landscape with Grafana Explore. Include an error window. No access? Mark the panel `UNVERIFIED` in its description and check it after the first deploy.
 2. **Test the query engine.** LogQL support differs between backend versions. Compare row counts for a raw query, `|~`, `| json`, `| logfmt` and `line_format`, and use only what works. Re-test when the backend is upgraded.
 3. **Split by label first**: `sum by (module) (count_over_time({service="zinc"}[1h]))`. Parse line bodies only when labels cannot answer.
 4. **Note each stream's format and level encoding**, e.g. `level=error` (logfmt), `"level":"error"` (JSON), `"level":50` (pino numeric).
@@ -67,7 +67,7 @@ Add a slow- or error-trace table (TraceQL) only once the service emits spans. No
 
 Run this for every new or changed dashboard file. Tools and the sandbox: [Dashboard sandbox](/docs/standards/grafana-dashboards/sandbox.md).
 
-1. Parse and lint, from the repo root:
+1. Parse and lint, from the repo root. `dashboard-linter` is Grafana's dashboard linter; `--strict` also fails on warnings.
 
    ```bash
    for dashboard in observability/dashboards/*.json; do
@@ -75,7 +75,7 @@ Run this for every new or changed dashboard file. Tools and the sandbox: [Dashbo
    done
    ```
 
-   Fix every finding, or justify it in `observability/dashboards/.lint` (the linter reads `.lint` from the dashboard's folder). Start that file as a copy of `.claude/skills/grafana-dashboards/sandbox/dashboards/.lint` and keep only the exclusions your dashboards need.
+   Fix every finding, or justify it in `observability/dashboards/.lint` (the linter reads `.lint` from the dashboard's folder). Start that file as a copy of `.claude/skills/grafana-dashboards/sandbox/dashboards/.lint` and keep only the exclusions your dashboards need: drop one, lint again, and put it back only if the lint fails.
 
 2. Render in the sandbox with synthetic data and read the PNGs.
 3. Fix what the checklist below finds and repeat from step 1.
@@ -89,4 +89,4 @@ Run this for every new or changed dashboard file. Tools and the sandbox: [Dashbo
 - [ ] The overview row shows health at a glance.
 - [ ] Colors follow thresholds the same way on every panel.
 - [ ] The grid lines up at 1600 px wide with no sideways scroll.
-- [ ] Changing `$landscape` changes the data.
+- [ ] In the sandbox (two landscapes), changing `$landscape` changes the data.

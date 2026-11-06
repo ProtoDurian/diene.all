@@ -5,6 +5,6 @@ description: Write or review one alert tier file (critical.yaml, warning.yaml or
 
 # Grafana Alert
 
-1. Copy `.claude/skills/grafana-alert-set/templates/alert-template.yaml` to `observability/alerts/<slug>/<severity>.yaml`.
-2. Pick the type and fill every field following [Alerts](/docs/standards/observability/alerts.md).
+1. Copy the alert template that [Alerts](/docs/standards/observability/alerts.md#the-tier-file) names to `observability/alerts/<slug>/<severity>.yaml`.
+2. Pick the type and fill every field following that page.
 3. Run its Validation steps and `pre-commit run --all-files`; say in the PR which ones you ran.

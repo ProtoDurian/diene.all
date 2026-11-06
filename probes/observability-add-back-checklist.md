@@ -1,6 +1,6 @@
 # Observability Add-Back Checklist
 
-For the maintainers of the template this repo was generated from; in a generated service repo it is reference only. Use it when adding the observability payload to the template branches that ship with observability.
+This checklist is for the maintainers of the observability template. In a service repo, skip it. Use it when adding the observability payload to the template branches that ship with observability.
 
 - **Template branch**: a branch of the template repository that generates one kind of service repo, e.g. `bun-base-w-observability`.
 - **Parent branch / child branch**: a template branch is built by merging its parent branch into it; its child branches are built from it the same way.
@@ -24,8 +24,8 @@ For the maintainers of the template this repo was generated from; in a generated
 1. If its parent branch has moved, merge the parent first.
 2. Merge the `observability` branch with a merge commit. Never rebase, squash, cherry-pick or rewrite the payload files.
 3. Check that the merge adds exactly the payload: `git diff <parent> <merge>` shows the same changes as `git diff <base> observability`.
-4. Check that `probes/observability-*` and the `observability-standards-present` row in `probes/features.json` arrived through the merge, not by hand.
-5. Run the branch's full probe suite and CI checks; all must pass.
+4. Check that `probes/observability-*` (probes are tests under `probes/`, run with `bun test probes`, that check a feature's files exist) and the `observability-standards-present` row in `probes/features.json` arrived through the merge, not by hand.
+5. Run all the branch's probes and CI checks; all must pass.
 6. Write down the parent commit, the observability commit, the merge commit and the check results.
 
 ## After all four are green

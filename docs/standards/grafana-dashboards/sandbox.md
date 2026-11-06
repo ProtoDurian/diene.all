@@ -10,7 +10,7 @@ A local Grafana, image renderer and Prometheus, so you can render a dashboard wi
 
 ## Tools
 
-Every tool comes from this repo's nix shell. Check with `command -v jq curl file awk docker kubectl dashboard-linter promtool`: each must print a `/nix/store/…` path. `dashboard-linter` and `promtool` are declared in `nix/env.nix`; the others come from its atomiutils and infrautils bundles. You also need the Docker daemon running on the host.
+Every tool comes from this repo's nix shell. Run `command -v jq curl file awk sed docker dashboard-linter promtool`; that is the check: each must print a `/nix/store/…` path. In `nix/env.nix`, `dashboard-linter` is in the `lint` group, `promtool` comes from `prometheus.cli` in the `dev` group (default shell), and the rest come from the atomiutils and infrautils bundles. The Docker CLI comes from infrautils; the Docker daemon comes from your Docker install (`CLAUDE.md`, Prerequisites) and must be running.
 
 ## Files
 
@@ -24,17 +24,19 @@ Everything lives in `.claude/skills/grafana-dashboards/sandbox/`:
 | `dashboards/sample.json` | A small fixture dashboard that passes strict lint and renders with that data                       |
 | `dashboards/.lint`       | Example `dashboard-linter` exclusions, each with a reason                                          |
 
-After you copy the sandbox (below), edit the metric list at the top of `$sb/generate-metrics.awk`, not the skill's copy. Add one line per metric and label set your dashboard queries (type, name, labels, normal value, incident value), including error series and values near your thresholds, so threshold colors show.
+After you copy the sandbox (below), edit `identity` (your platform, service and module, as your queries select them) and the metric list at the top of `$sb/generate-metrics.awk`, not the skill's copy. Add one line per metric and label set your dashboard queries (type, name, labels, normal value, incident value), including error series and values near your thresholds, so threshold colors show.
 
 ## Run it
 
 First pass step 1 of [Check it before merge](/docs/standards/grafana-dashboards/index.md#check-it-before-merge). Then, from the repo root:
 
 ```bash
-dashboard=observability/dashboards/overview.json
+dashboard=observability/dashboards/overview.json # first try: .claude/skills/grafana-dashboards/sandbox/dashboards/sample.json
 sb="$(mktemp -d)"
 cp -r .claude/skills/grafana-dashboards/sandbox/. "$sb"
-cp "$dashboard" "$sb/dashboards/"
+board="$sb/dashboards/$(basename "$dashboard")"
+cp "$dashboard" "$board"
+sed -i 's/{platform}/sandbox/g; s/{service}/sandbox/g' "$board"
 # now edit "$sb/generate-metrics.awk"
 mkdir "$sb/prom-data"
 awk -f "$sb/generate-metrics.awk" > "$sb/metrics.om"
@@ -50,6 +52,7 @@ for _ in $(seq 60); do
 done
 ```
 
+- The `sed` line fills `{platform}` and `{service}`, if still unknown, with `sandbox` in the sandbox copy only, because Grafana uids allow only `A-Za-z0-9-_`.
 - `SANDBOX_UID`/`SANDBOX_GID` make Prometheus run as you, so it can write `prom-data`.
 - The unique project name keeps the containers and volumes apart from other stacks.
 - Grafana is anonymous admin, which is why every port is bound to `127.0.0.1`.
@@ -58,7 +61,7 @@ done
 ## Render and look
 
 ```bash
-uid="$(jq -r .uid "$dashboard")"
+uid="$(jq -r .uid "$board")"
 curl -fsS -o "$sb/board.png" \
   "http://127.0.0.1:3000/render/d/$uid/x?kiosk&width=1600&height=1200&from=now-6h&to=now&tz=UTC&var-landscape=pichu"
 file "$sb/board.png" | grep -q 'PNG image data' && test -s "$sb/board.png"

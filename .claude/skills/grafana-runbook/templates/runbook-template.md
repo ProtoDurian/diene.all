@@ -1,7 +1,7 @@
 # {Alert name}
 
 > Covers: 🚨 {critical title} · ⚠️ {warning title} (keep the tiers that exist)
-> Context: [System overview](/observability/overview.md) · [Dashboard panel]({grafana-url}/d/{platform}-{service}-overview?viewPanel={panel}), or if the tiers set no `panel`, [Generic dashboard]({grafana-url}/d/{generic-dashboard-uid}?{generic-dashboard-vars}) · Escalation: {team} in {#channel}
+> Context: [System overview](/observability/overview.md); its Links section has the owner, the channel and both dashboards. Curated dashboard panel: {panel} (delete if the tiers set no `panel`)
 
 {What this means and who is affected, in two plain sentences.}
 
@@ -35,4 +35,4 @@ Known causes: {YYYY-MM-DD — one-line incident summary}, or "none recorded yet"
 
 ## Escalation
 
-If not fixed in {30m}, or {condition}, escalate to {team} in {#channel}. Declare an incident if {user-impact condition}.
+If not fixed in {30m}, or {condition}, escalate to the owner team in its channel (System overview, Links). Declare an incident if {user-impact condition}.

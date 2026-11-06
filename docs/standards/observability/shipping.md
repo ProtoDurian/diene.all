@@ -11,7 +11,7 @@ The files in `observability/` are plain Grafana content. The service's **primord
 
 ## The chart copy
 
-Helm can only read files inside its chart folder and rejects symlinks that point outside it. This repo has no copy step yet. The chart build must copy `observability/` to `infra/primordial_chart/files/observability/` before every lint, template, package or publish, and `.gitignore` must hold `infra/primordial_chart/files/`. Never edit or commit the copy; `observability/` stays the source.
+Helm can only read files inside its chart folder and rejects symlinks that point outside it. This repo has no copy step yet. The chart build must copy `observability/` to `infra/primordial_chart/files/observability/` before every lint, template, package or publish, and `.gitignore` must hold `infra/primordial_chart/files/`. Add the copy as a `primordial_chart:copy` task in `tasks/Taskfile.helm.yaml` that the chart's other tasks depend on (a chart's tasks are named `<chart folder>:<verb>`: [Helm standard](/docs/standards/helm/index.md), [Taskfile conventions](/docs/standards/taskfile/index.md)). Never edit or commit the copy; `observability/` stays the source.
 
 ## One file → one resource
 

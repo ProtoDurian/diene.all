@@ -1,5 +1,6 @@
 # Synthetic OpenMetrics for promtool backfill. Run: awk -f generate-metrics.awk > metrics.om
 BEGIN {
+  # Your dashboard's platform, service and module, as its queries select them.
   identity = "platform=sandbox,service=sample,module=api"
   landscapes = "pichu=1 raichu=0.25"
   hours = 6; step = 30; incident_from = 2.5; incident_to = 3.5

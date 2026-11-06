@@ -68,8 +68,21 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Sandbox fixture: request rate, errors and latency of the `sample` service. For whoever checks that the sandbox renders. Next: [System overview]({repo-url}/observability/overview.md) · [Generic dashboard](/d/{generic-dashboard-uid})"
+        "content": "Sandbox fixture (its links keep their placeholders; a real dashboard holds the real values): request rate, errors and latency of the `sample` service. For whoever checks that the sandbox renders. Next: [System overview]({repo-url}/observability/overview.md) · [Generic dashboard](/d/{generic-dashboard-uid})"
       }
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "Overview",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
     },
     {
       "id": 1,
@@ -78,7 +91,7 @@
       "description": "Requests per second by outcome. Bad: a sudden drop while traffic is expected.",
       "gridPos": {
         "x": 0,
-        "y": 3,
+        "y": 4,
         "w": 8,
         "h": 9
       },
@@ -150,7 +163,7 @@
       "description": "Share of requests that failed. Over 1% needs a look; over 5% means users see errors.",
       "gridPos": {
         "x": 8,
-        "y": 3,
+        "y": 4,
         "w": 8,
         "h": 9
       },
@@ -215,7 +228,7 @@
       "description": "95th percentile request duration. Over 250 ms needs a look; over 500 ms users wait.",
       "gridPos": {
         "x": 16,
-        "y": 3,
+        "y": 4,
         "w": 8,
         "h": 9
       },
@@ -274,13 +287,26 @@
       ]
     },
     {
+      "id": 7,
+      "type": "row",
+      "title": "Errors in detail",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
       "id": 5,
       "type": "logs",
       "title": "Error log lines",
       "description": "UNVERIFIED: the sandbox has no log store. Error lines of the sample service, newest first. An empty panel on a healthy service is correct.",
       "gridPos": {
         "x": 0,
-        "y": 12,
+        "y": 14,
         "w": 24,
         "h": 8
       },

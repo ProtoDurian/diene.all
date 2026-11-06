@@ -1,6 +1,6 @@
 # OpenTelemetry Configuration
 
-Applies only if this repo has backend code (Bun, .NET or Go). That code comes from the CyanPrint template for its language (CyanPrint: see `CLAUDE.md`), which also adds its OTel library ("the library" below), its config library and the config files. This repo has none of them yet.
+Applies only if this repo has backend code (Bun, .NET or Go). That code comes from a CyanPrint template for its language (CyanPrint is the template generator this repo was made with; `.cyan_state.yaml` records its templates), which also adds its OTel library ("the library" below), its config library and the config files. This repo has none of them yet.
 
 Backend services send logs, metrics and traces with OpenTelemetry (OTel). All three languages read the same `otel:` config block and set the same resource attributes. Frontends use Grafana Faro instead; see [Faro](/docs/standards/observability/faro.md).
 
@@ -75,7 +75,7 @@ app:
 | service      | `service.name`                |
 | version      | `service.version`             |
 
-It also sets `atomi.landscape`, `atomi.platform`, `atomi.service`, `atomi.module` and `atomi.version`. `atomi.*` is the organisation's own attribute namespace: it holds the raw values (including `module`, which has no standard attribute), so queries match the LPSM labels exactly.
+It also sets `atomi.landscape`, `atomi.platform`, `atomi.service`, `atomi.module` and `atomi.version`. `atomi.*` is the organisation's own attribute namespace: it holds the raw values (including `module`, which has no standard attribute), so queries match the LPSM labels exactly. The collector (run by the platform team) turns the `atomi.*` values into the labels `landscape`, `platform`, `service` and `module` that every query in these docs uses; if a query finds nothing, check one series in Grafana Explore for the label names your collector produces.
 
 ## Standard HTTP metrics
 
@@ -91,9 +91,9 @@ Start telemetry once at startup. Call the library's flush and shutdown from the 
 
 Per language:
 
-- **Bun**: pino writes JSON logs, with the trace context, to stdout, and Grafana Alloy (the collector) reads stdout, so leave `otel.logs.exporter.otlp.enabled: false`. Metrics and traces go over OTLP.
-- **.NET**: `Microsoft.Extensions.Logging` and the OpenTelemetry hosting integration.
-- **Go**: `slog` and the OpenTelemetry Go SDK.
+- **Bun**: pino writes JSON logs to stdout, with the trace context and fixed keys `level` (a number, e.g. `50` = error), `msg` and `time`, and Grafana Alloy (the collector) reads stdout, so leave `otel.logs.exporter.otlp.enabled: false`. Metrics and traces go over OTLP.
+- **.NET**: `Microsoft.Extensions.Logging` and the OpenTelemetry hosting integration. Logs go where `otel.logs.exporter` sends them (`console` = stdout, `otlp` = the collector); sample the stored lines and record their keys in `observability/dashboards/log-notes.md`.
+- **Go**: `slog` and the OpenTelemetry Go SDK. Logs and their keys: as for .NET.
 
 ## Testing
 

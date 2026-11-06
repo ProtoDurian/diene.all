@@ -1,7 +1,3 @@
-# Signals — `{platform}`/`{service}`
-
-One block per feature. To add one, copy [the SIGNALS template](/.claude/skills/observability-check/templates/SIGNALS-template.md) from `## Feature:` to the end. Answer every gate with a reason and a cost; rules: [Signal decisions](/docs/standards/observability/signals.md).
-
 ## Feature: `{feature name}` ({PR link or date})
 
 ### Gate 1 — Metrics
@@ -9,7 +5,7 @@ One block per feature. To add one, copy [the SIGNALS template](/.claude/skills/o
 **Decision:** NO | YES
 **Why:** {who acts on the number, which SLO uses it, or which aggregate it answers}
 
-| Metric   | Type                    | Labels             | ATS (active time series)     | Why      |
+| Metric   | Type                    | Labels             | ATS                          | Why      |
 | -------- | ----------------------- | ------------------ | ---------------------------- | -------- |
 | `{name}` | counter/gauge/histogram | `{bounded labels}` | {estimate; histogram ×10–15} | {reason} |
 
@@ -27,9 +23,9 @@ One block per feature. To add one, copy [the SIGNALS template](/.claude/skills/o
 **Decision:** YES | NO
 **Why:** {which user flow; NO only if there is no per-request flow}
 
-| Span          | Attributes                 | Sampling               |
-| ------------- | -------------------------- | ---------------------- |
-| `{span name}` | LPSM + `{key ids, values}` | {head ratio, e.g. 0.1} |
+| Span          | Attributes                                  | Sampling               |
+| ------------- | ------------------------------------------- | ---------------------- |
+| `{span name}` | `{key ids, values}` (the library adds LPSM) | {head ratio, e.g. 0.1} |
 
 ### Gate 4 — Dashboard
 
@@ -43,6 +39,7 @@ One block per feature. To add one, copy [the SIGNALS template](/.claude/skills/o
 ### Gate 5 — Alerts
 
 **Decision:** NO | YES
+**Why:** {what users feel when it breaks, or why no alert is needed}
 
 | Alert name  | Type                                                        | Tiers | Thresholds                                     | SLO            | Already healed by       | Noise budget | Owner                |
 | ----------- | ----------------------------------------------------------- | ----- | ---------------------------------------------- | -------------- | ----------------------- | ------------ | -------------------- |

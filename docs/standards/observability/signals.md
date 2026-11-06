@@ -12,7 +12,7 @@ Terms such as LPSM, ATS and SLO are defined in [Observability Standards](/docs/s
 | Logs    | Lines × bytes × retention                                                        | **Liberal**, as long as logs follow events, not loops                               |
 | Traces  | Spans × traffic × retention                                                      | **Liberal.** The platform team samples traces in the collector                      |
 
-An unbounded label (user ID, URL, request ID) turns one metric into millions of ATS. Put IDs in logs and span attributes instead. If the collector keeps a per-pod label (`pod` or `instance`; check one series in Grafana Explore), multiply the ATS by the replica count. For a new metric, assume it does and use the planned replica count.
+An unbounded label (user ID, URL, request ID) turns one metric into millions of ATS. Put IDs in logs and span attributes instead. If the collector keeps a per-pod label (`pod` or `instance`; check one series in Grafana Explore), multiply the ATS by the replica count. For a new metric, assume it does and use the planned replica count. Count every landscape the service runs in, wherever its data is stored.
 
 ## The six gates
 
@@ -20,7 +20,7 @@ An unbounded label (user ID, URL, request ID) turns one metric into millions of 
 
 Say YES only if a person or automation acts on the number, an SLO uses it, or you need an aggregate logs cannot give (such as p99 latency). List only the metrics this feature adds, each with its type, labels and ATS; name an existing metric an SLO uses in the Why line. Prefer counters and gauges; use a histogram only when you need percentiles.
 
-Example: gauge `webhook_retry_queue_depth` with label `module` (2 values) in 2 landscapes → about 4 ATS.
+Example: gauge `webhook_retry_queue_depth` with label `module` (2 values) in 2 landscapes × 2 replicas → about 8 ATS.
 
 ### Gate 2 — Logs (default YES for events)
 
@@ -46,7 +46,7 @@ An alert must pass all three checks:
 
 1. **Nothing heals it already.** If an autoscaler, restart policy or retry loop fixes the condition, do not alert on it. Alert when that mechanism is exhausted.
 2. **Someone can act.** The runbook must say what to do. "Watch it" means `info` at most, or no alert.
-3. **Someone owns it.** The owner team in `observability/overview.md` agrees to receive it. Until the platform team names it, record `Owner: pending`; an alert set cannot merge while its owner is pending. Delivery is the platform team's routing; if `{platform}` has no route yet, ask them.
+3. **Someone owns it.** The owner team in `observability/overview.md` agrees to receive it. Until the platform team names it, write `pending` in the Gate 5 Owner column; an alert set cannot merge while its owner is pending. Delivery is the platform team's routing; if `{platform}` has no route yet, ask them.
 
 | Condition                             | Already healed by         | Alert?                          |
 | ------------------------------------- | ------------------------- | ------------------------------- |
@@ -60,7 +60,7 @@ For each alert that survives, record in the Gate 5 table its tiers ([how many](/
 
 ### Gate 6 — Alert-set folders
 
-Each Gate 5 alert becomes one folder, `observability/alerts/<slug>/`, with its tier files and `runbook.md`, in the same PR. Record a short slug next to each alert name, using only `a-z`, `0-9` and `-`: `Retry queue saturated` → `retry-queue`. Its length limit: [Shipping](/docs/standards/observability/shipping.md#structural-checks).
+Each Gate 5 alert becomes one folder, `observability/alerts/<slug>/`, with its tier files and `runbook.md`, in the same PR. Record a short slug next to each alert name, using only `a-z`, `0-9` and `-`: `Retry queue saturated` → `retry-queue`. Its length limit: [Shipping](/docs/standards/observability/shipping.md#structural-checks); if the platform is not known yet, keep the slug ≤ 12 characters and recheck once it is.
 
 ## Review checklist
 
@@ -68,5 +68,5 @@ Each Gate 5 alert becomes one folder, `observability/alerts/<slug>/`, with its t
 - [ ] Every answer has a one-line reason; a bare YES or NO fails review.
 - [ ] Every YES names its metric, log event, span, panel or folder, and its cost (ATS, log volume or sampling).
 - [ ] Every Gate 5 YES has its tiers, an alert type, a noise budget and an owner (or `pending`).
-- [ ] Everything named exists in the PR: the metric in the service code, each Gate 6 folder under `observability/alerts/`.
+- [ ] Everything named exists in the PR: the metric in the service code (or `planned` in its Gate 1 row while the service has no code for it yet), each Gate 6 folder under `observability/alerts/`.
 - [ ] No unbounded metric labels, no logs in hot loops, a sampling ratio for every trace.
