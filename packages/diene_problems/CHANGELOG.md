@@ -3,7 +3,7 @@
 All notable changes to this package are documented here. Releases are managed
 from conventional commits by the repository release workflow.
 
-## Unreleased
+## Unreleased (0.0.0)
 
 Breaking changes:
 
