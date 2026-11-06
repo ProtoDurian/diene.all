@@ -2,9 +2,7 @@ import { defineGate } from './lib/definition.ts';
 import { expectGreen } from './lib/dotnet.ts';
 import { expectRedBecause } from './lib/dotnet-package.ts';
 
-// The 1.0.0 baseline package only exists after the library's own first release, so the
-// baseline is conditioned off while 1.0.0 itself is being built. Pack a post-1.0.0 version
-// to exercise the compatibility gate in the state that actually ships it.
+// Version 1.0.0 skips the baseline (it is the baseline), so pack 1.0.1 to arm the gate.
 const packAgainstPublishedBaseline =
   'rm -rf artifacts/api-candidate && mkdir -p artifacts/api-candidate && dotnet pack Lib/Lib.csproj -c Release -p:Version=1.0.1 --output artifacts/api-candidate';
 
