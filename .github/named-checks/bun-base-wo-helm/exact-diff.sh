@@ -110,13 +110,10 @@ apply_H() {
   # shellcheck disable=SC2016
   edit docs/developer/bun-baseline.md sed_e '/^- `task helm:lint` and `task helm:template` retain the inherited Helm axis\.$/d;s/^- Unit, integration, build, Docker, and Helm are separate CI jobs\.$/- Unit, integration, build, and Docker are separate CI jobs./'
 
-  # nix: the aggregates carry H by content; take the axis-pure slices. Docker
-  # (D) keeps its slices. kubectl and k3d ship only in infrautils-k8s, beside
-  # helm, so they leave with the aggregate and their declared smokes go too.
-  edit nix/packages.nix sed_e 's/^          infralint$/          # Axis-pure slices: the infralint\/infrautils aggregates ship helm, helm-docs and helmlint.\n          infralint-core\n          infralint-docker/;s/^          infrautils$/          infrautils-core\n          infrautils-docker/'
-  edit nix/env.nix sed_e 's/^    infralint$/    infralint-core\n    infralint-docker/;s/^    infrautils$/    infrautils-core\n    infrautils-docker/'
-  edit dlint.yaml sed_e '/^      - k3d$/d;/^      - kubectl version --client$/d'
-  edit probes/binary-smoke.ts drop_lines '^k3d version' '^printf .* kyverno jp query'
+  # owner !A103: nix keeps the whole infralint + infrautils bundles; only prose loses its Helm words.
+  edit docs/standards/ci-cd/index.md sed_z 's#The Docker and Helm scripts build#The Docker scripts build#;s#Docker and Helm callers pass per-repository image or chart values#Docker callers pass per-repository image values#;s#Add another image or chart as another caller job#Add another image as another caller job#'
+  edit README.md sed_e 's/split CI\/CD, Docker, Helm, secrets,/split CI\/CD, Docker, secrets,/'
+  edit docs/standards/taskfile/index.md sed_e 's/^5\. Put repository-specific image and chart values in Taskfile/5. Put repository-specific image values in Taskfile/'
 }
 
 # --- recompute from the parent ------------------------------------------------
