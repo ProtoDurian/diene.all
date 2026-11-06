@@ -35,6 +35,8 @@ class TraceError extends Error {
 
   // The ESM and CJS builds each carry this class; the brand makes instanceof hold across them.
   static override [Symbol.hasInstance](value: unknown): boolean {
+    // biome-ignore lint/complexity/noThisInStatic: this is the class instanceof was called on; subclasses keep the prototype check
+    if (this !== TraceError) return Function.prototype[Symbol.hasInstance].call(this, value);
     return typeof value === 'object' && value !== null && TRACE_ERROR_BRAND in value;
   }
 

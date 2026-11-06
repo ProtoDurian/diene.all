@@ -31,6 +31,8 @@ interface OtelHarnessRun {
   readonly traces: InMemoryTraceEmitter;
 }
 
+const ASSERTION_ERROR_BRAND = Symbol.for('AtomiCloud.Diene.Otel.OtelAssertionError');
+
 const DEFAULT_IDENTITY: AppIdentity = Object.freeze({
   landscape: 'lapras',
   platform: 'atomi',
@@ -40,6 +42,12 @@ const DEFAULT_IDENTITY: AppIdentity = Object.freeze({
 });
 
 class OtelAssertionError extends Error {
+  static override [Symbol.hasInstance](value: unknown): boolean {
+    // biome-ignore lint/complexity/noThisInStatic: this is the class instanceof was called on; subclasses keep the prototype check
+    if (this !== OtelAssertionError) return Function.prototype[Symbol.hasInstance].call(this, value);
+    return typeof value === 'object' && value !== null && ASSERTION_ERROR_BRAND in value;
+  }
+
   constructor(
     readonly label: string,
     readonly expected: unknown,
@@ -48,6 +56,7 @@ class OtelAssertionError extends Error {
   ) {
     super(message);
     this.name = 'OtelAssertionError';
+    Object.defineProperty(this, ASSERTION_ERROR_BRAND, { value: true });
   }
 }
 
@@ -144,6 +153,15 @@ class OtelAssertions {
   }
 
   private equal(label: string, actual: unknown, expected: unknown): void {
+    for (const [side, value] of [
+      ['Actual', actual],
+      ['Expected', expected],
+    ] as const) {
+      const invalid = this.nonJson(value, '$');
+      if (invalid !== undefined) {
+        throw new OtelAssertionError(label, expected, actual, `${label}: ${side} holds a non-JSON value at ${invalid}`);
+      }
+    }
     const actualText = JSON.stringify(this.comparable(actual));
     const expectedText = JSON.stringify(this.comparable(expected));
     if (actualText !== expectedText) {
@@ -154,6 +172,19 @@ class OtelAssertions {
         `${label} mismatch\nExpected: ${expectedText}\nActual: ${actualText}`,
       );
     }
+  }
+
+  private nonJson(value: unknown, path: string): string | undefined {
+    if (value === null || typeof value === 'string' || typeof value === 'boolean') return undefined;
+    if (typeof value === 'number') return Number.isFinite(value) ? undefined : `${path} (${value})`;
+    if (typeof value !== 'object') return `${path} (${typeof value})`;
+    if (Array.isArray(value)) {
+      return value.map((entry, index) => this.nonJson(entry, `${path}[${index}]`)).find(found => found !== undefined);
+    }
+    if (![Object.prototype, null].includes(Object.getPrototypeOf(value))) return `${path} (non-plain object)`;
+    return Object.entries(value)
+      .map(([key, entry]) => this.nonJson(entry, `${path}.${key}`))
+      .find(found => found !== undefined);
   }
 
   private comparable(value: unknown): unknown {

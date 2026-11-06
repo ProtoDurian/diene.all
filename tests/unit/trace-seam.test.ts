@@ -51,6 +51,25 @@ describe('TraceError', () => {
   });
 });
 
+describe('TraceError subclasses', () => {
+  class SpecificTraceError extends TraceError {}
+
+  it.each([
+    ['a base error', new TraceError('io', 'emit', 'base'), false],
+    ['a subclass error', new SpecificTraceError('io', 'emit', 'specific'), true],
+  ])('should match %s against the subclass only by prototype', (_label, value, expected) => {
+    // Arrange
+    const candidate: unknown = value;
+
+    // Act
+    const actual = candidate instanceof SpecificTraceError;
+
+    // Assert
+    actual.should.eql(expected);
+    (candidate instanceof TraceError).should.be.true();
+  });
+});
+
 describe('TraceRecordValidator.record', () => {
   it('should normalise a valid record with sorted, frozen attributes', () => {
     // Arrange

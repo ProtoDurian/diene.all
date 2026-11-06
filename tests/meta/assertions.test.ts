@@ -124,3 +124,72 @@ describe('OtelAssertions.identityResource', () => {
     act.should.throw(OtelAssertionError, { label: 'Identity resource attributes' });
   });
 });
+
+describe('OtelAssertions rejects values JSON cannot carry', () => {
+  it.each([
+    ['NaN against null', { value: Number.NaN }, { value: null }, 'Actual holds a non-JSON value at $.value (NaN)'],
+    [
+      'an explicit undefined against omission',
+      { value: undefined },
+      {},
+      'Actual holds a non-JSON value at $.value (undefined)',
+    ],
+    [
+      'Infinity on the expected side',
+      { value: 1 },
+      { value: Number.POSITIVE_INFINITY },
+      'Expected holds a non-JSON value at $.value (Infinity)',
+    ],
+    ['a function inside an array', [() => 1], [null], 'Actual holds a non-JSON value at $[0] (function)'],
+    ['a symbol', { s: Symbol('x') }, { s: 'x' }, 'Actual holds a non-JSON value at $.s (symbol)'],
+    ['a bigint', { n: 1n }, { n: 1 }, 'Actual holds a non-JSON value at $.n (bigint)'],
+    ['a Map', { m: new Map() }, { m: {} }, 'Actual holds a non-JSON value at $.m (non-plain object)'],
+  ])('should fail on %s', (_label, actual, expected, message) => {
+    // Arrange
+    const run = () => assertions.payload(actual, expected);
+
+    // Act
+    const attempt = () => run();
+
+    // Assert
+    attempt.should.throw(OtelAssertionError, { label: 'Telemetry payload', message: `Telemetry payload: ${message}` });
+  });
+
+  it('should still pass on equal null-prototype and nested JSON payloads', () => {
+    // Arrange
+    const actual = Object.assign(Object.create(null), { a: [true, 'x', null, { b: 1.5 }] });
+
+    // Act
+    const act = () => assertions.payload(actual, { a: [true, 'x', null, { b: 1.5 }] });
+
+    // Assert
+    act.should.not.throw();
+  });
+});
+
+describe('OtelAssertionError identity', () => {
+  class NarrowAssertionError extends OtelAssertionError {}
+
+  it.each([
+    ['an OtelAssertionError', new OtelAssertionError('l', 1, 2, 'm'), OtelAssertionError, true],
+    [
+      'a branded look-alike from the other build',
+      { [Symbol.for('AtomiCloud.Diene.Otel.OtelAssertionError')]: true },
+      OtelAssertionError,
+      true,
+    ],
+    ['a plain Error', new Error('m'), OtelAssertionError, false],
+    ['null', null, OtelAssertionError, false],
+    ['a base error against a subclass', new OtelAssertionError('l', 1, 2, 'm'), NarrowAssertionError, false],
+    ['a subclass error against the subclass', new NarrowAssertionError('l', 1, 2, 'm'), NarrowAssertionError, true],
+  ])('should judge %s', (_label, value, type, expected) => {
+    // Arrange
+    const candidate: unknown = value;
+
+    // Act
+    const actual = candidate instanceof (type as typeof OtelAssertionError);
+
+    // Assert
+    actual.should.eql(expected);
+  });
+});
