@@ -20,6 +20,7 @@ pre-commit-lib.run {
     treefmt = {
       enable = true;
       package = formatter;
+      require_serial = true;
       excludes = [
         "^\\.claude/skills/vendor/"
         "^Changelog\\.md$"
