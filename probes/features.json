@@ -175,6 +175,11 @@
     "class": "presence"
   },
   {
+    "template": "diene/shared",
+    "name": "rule-ids",
+    "class": "gate"
+  },
+  {
     "template": "diene/bun-base",
     "name": "bun-unit-tests",
     "class": "gate"

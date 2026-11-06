@@ -19,7 +19,7 @@ A specific point on the global timeline. Instants are timezone-agnostic—they r
 - Scheduling future events
 - Measuring elapsed time
 
-**Example:** `2024-03-15T14:30:00Z` is the same instant whether you're in New York or Tokyo.
+**Example:** `2024-03-15T14:30:00.000Z` is the same instant whether you're in New York or Tokyo.
 
 ### Date
 
@@ -215,11 +215,8 @@ var nextDay = DateTimeOffset.UtcNow.AddDays(1);
 If a user's birthday is March 15, it should remain March 15 regardless of timezone.
 
 ```go
-// Go has NO true DateOnly type. Use time.Time at UTC midnight with convention.
-birthday := time.Date(1990, 3, 15, 0, 0, 0, 0, time.UTC)
+birthday := civil.Date{Year: 1990, Month: time.March, Day: 15}
 ```
-
-> ⚠️ **Go Limitation**: Unlike C# (`DateOnly`) and TypeScript (`Temporal.PlainDate`), Go has no true date-only type. Always use `time.Time` at midnight UTC.
 
 ### 4. Ambiguous `DateTime.Now`
 
@@ -262,13 +259,13 @@ This ensures:
 
 **For Dates (birthdays, holidays):**
 
-- [ ] Use Date-only type (PlainDate, DateOnly) — or `time.Time` at UTC midnight for Go
-- [ ] No time component (or midnight UTC convention for Go)
+- [ ] Use Date-only type (PlainDate, DateOnly, civil.Date)
+- [ ] No time component
 - [ ] No timezone component
 
 **For Times (daily schedules):**
 
-- [ ] Use Time-only type (PlainTime, TimeOnly) — or string/duration convention for Go
+- [ ] Use Time-only type (PlainTime, TimeOnly, civil.Time)
 - [ ] Consider timezone for display
 
 **For Durations:**
@@ -278,7 +275,20 @@ This ensures:
 
 ---
 
+## Wire Format
+
+Instants, dates, times, zoned values and durations cross the wire in the forms set by
+[Wire Format](../wire-format/index.md).
+
+---
+
 ## Language Implementations
+
+| Language   | Dates library                                                   |
+| ---------- | --------------------------------------------------------------- |
+| TypeScript | Temporal                                                        |
+| C#         | built-ins: `DateOnly`, `TimeOnly`, `DateTimeOffset`, `TimeSpan` |
+| Go         | `time` + `civil`                                                |
 
 Language bases add their implementation guides in their own branch deltas. This
 shared standard defines only the language-agnostic contract.
@@ -287,3 +297,4 @@ shared standard defines only the language-agnostic contract.
 
 - [Domain Modeling](../domain-driven-design/index.md) — Date/time as domain types
 - [Validation](../validation/index.md) — Validating date inputs
+- [Wire Format](../wire-format/index.md) — Date and time values in JSON

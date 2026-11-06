@@ -211,10 +211,13 @@ type Registration struct {
 
 ## Error Messages
 
-Return meaningful, actionable errors:
+Return meaningful, actionable errors as an RFC 9457 Problem (see [Wire Format](../wire-format/index.md)):
 
 ```json
 {
+  "type": "validation_error",
+  "title": "The request is invalid",
+  "status": 400,
   "errors": {
     "email": ["Must be a valid email address"],
     "age": ["Must be at least 18"],
@@ -261,6 +264,12 @@ Return meaningful, actionable errors:
 
 ## Language Implementations
 
+| Language   | Validation library             |
+| ---------- | ------------------------------ |
+| TypeScript | Zod                            |
+| C#         | FluentValidation (the default) |
+| Go         | go-playground/validator v10    |
+
 Language bases add their implementation guides in their own branch deltas. This
 shared standard defines only the language-agnostic contract.
 
@@ -269,3 +278,4 @@ shared standard defines only the language-agnostic contract.
 - [Three-Layer Architecture](../three-layer-architecture/index.md) — Where validation happens
 - [Error Handling](../functional-practices/index.md) — Returning validation errors
 - [Domain Modeling](../domain-driven-design/index.md) — Domain invariants
+- [Wire Format](../wire-format/index.md) — Error responses in JSON
