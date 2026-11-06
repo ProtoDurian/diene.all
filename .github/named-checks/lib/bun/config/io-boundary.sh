@@ -3,8 +3,8 @@ set -euo pipefail
 
 # Effects live only in src/adapters/: there the YAML parser, node:fs/promises,
 # node:path and process are allowed. Everything else under src/ imports only
-# literal relative paths, zod and the published Result and core-utils packages,
-# and names no effectful global (config never detects the landscape itself).
+# literal relative paths, zod and the published Result and core-utils packages
+# (src/test-helper/ may also name this package root), and names no effectful global.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -21,6 +21,9 @@ for path in "${files[@]}"; do
   fi
   allowed='^(\.{1,2}/|@atomicloud/diene\.(result|core-utils)$|zod$)'
   allow_global='^$'
+  if [[ ${path} == src/test-helper/* ]]; then
+    allowed='^(\.{1,2}/|@atomicloud/diene\.(result|core-utils|config)$|zod$)'
+  fi
   if [[ ${path} == src/adapters/* ]]; then
     allowed='^(\.{1,2}/|@atomicloud/diene\.(result|core-utils)$|zod$|yaml$|node:fs/promises$|node:path$)'
     allow_global='^process$'
