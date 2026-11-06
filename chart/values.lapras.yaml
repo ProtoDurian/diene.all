@@ -1,12 +1,14 @@
 serviceTree:
   cluster: lapras
 
-# Disabled: their CRDs are not installed in k3d.
-secret:
-  enabled: false
-
-webhookRoute:
-  enabled: false
-
-primordial:
-  enabled: false
+upstream:
+  reloader:
+    deployment:
+      labels:
+        atomi.cloud/cluster: lapras
+    serviceAccount:
+      labels:
+        atomi.cloud/cluster: lapras
+    rbac:
+      labels:
+        atomi.cloud/cluster: lapras

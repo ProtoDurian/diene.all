@@ -31,7 +31,7 @@ while IFS= read -r url; do
 done < <(yq -r '[(.dependencies // [])[].repository // "" | select(test("^https?://"))] | unique | .[]' chart/Chart.yaml)
 helm dependency build chart
 helm package chart --destination "${output_dir}" --version "${version}"
-package="${output_dir}/diene-helm-wrapper-${version}.tgz"
+package="${output_dir}/chlorine-${version}.tgz"
 [ ! -s "${package}" ] && echo "❌ chart package was not created" >&2 && exit 1
 
 if [ "${mode}" = "git" ]; then

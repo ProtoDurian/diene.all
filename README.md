@@ -48,12 +48,12 @@ checks that it names every surface.
 
 This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, Docker, Helm, secrets, release configuration, validators, and standards.
 
-# Helm wrapper
+# Chlorine
 
-This branch adds the wrapper chart, stacked values, generated schema, rendered-manifest validation, k3d proof, and dual publish modes.
+This branch materializes the Helm wrapper as `chlorine`: a pure passthrough of stakater/reloader 2.2.19 (app v1.4.23). Reloader restarts a workload when a Secret or ConfigMap it references changes, only for workloads that opt in by annotation.
 
-- `task build` — vendor external config and build pinned chart dependencies.
-- `task test:unit` — run schema, lint, render, contracts, VAP, and publish dry-runs.
-- `task test:int` — install on ephemeral k3d and round-trip the chart through a local OCI registry.
+- `task build` — build the pinned chart dependency.
+- `task test:unit` — run schema, lint, render, LPSM, reload-stance, pin, VAP, and publish dry-runs.
+- `task test:int` — install on ephemeral k3d, check Reloader health, prove a Secret change restarts an annotated Deployment and not an un-annotated one, and round-trip the chart through a local OCI registry.
 - `task example:lapras:template` — render the independent landscape + cluster stack.
-- [Helm wrapper baseline](docs/developer/helm-wrapper-baseline.md)
+- [Chlorine baseline](docs/developer/chlorine-baseline.md)

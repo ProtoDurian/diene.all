@@ -5,8 +5,8 @@ includes:
   example:lapras:
     taskfile: tasks/Taskfile.cluster.yaml
     vars:
-      RELEASE_NAME: helm-wrapper
-      NAMESPACE: sample
+      RELEASE_NAME: chlorine
+      NAMESPACE: reloader
       LANDSCAPE: example
       CLUSTER: lapras
 
@@ -22,9 +22,8 @@ tasks:
       - pre-commit run --all-files
 
   build:
-    desc: Vendor config and build chart dependencies
+    desc: Build chart dependencies
     cmds:
-      - ./scripts/local/vendor-chart-config.sh
       - helm dependency build chart
 
   update:
@@ -40,12 +39,12 @@ tasks:
   test:unit:
     desc: Run schema, lint, render, policy, and contract validation
     cmds:
-      - ./scripts/ci/helm-wrapper.sh
+      - ./scripts/ci/chlorine.sh
 
   test:int:
     desc: Run the local k3d installation proof
     cmds:
-      - ./scripts/validate/helm-wrapper-k3d.sh
+      - ./scripts/validate/chlorine-k3d.sh
 
   start:cluster:
     desc: Start the local k3d lapras proof cluster

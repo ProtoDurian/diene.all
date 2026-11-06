@@ -1,5 +1,14 @@
 serviceTree:
   landscape: example
 
-primordial:
-  targetLandscape: example
+upstream:
+  reloader:
+    deployment:
+      labels:
+        atomi.cloud/landscape: example
+    serviceAccount:
+      labels:
+        atomi.cloud/landscape: example
+    rbac:
+      labels:
+        atomi.cloud/landscape: example
