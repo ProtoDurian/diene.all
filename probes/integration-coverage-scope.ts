@@ -20,7 +20,7 @@ export default {
       description: 'An adapter source the profile never measures must turn the integration ledger red.',
       kind: 'mutation',
       async run(repo: any) {
-        // A statement-free declaration keeps the percentage at 100 and never reaches the profile, so only a derived source set sees it.
+        // No statements: only the derived source set can catch it.
         const planted = await plantGoFile(
           repo,
           'adapters/**/*.go',

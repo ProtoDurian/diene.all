@@ -56,8 +56,8 @@ Every `*_test.go` file must declare a package ending in `_test`, and
 `export_test.go` is forbidden. Unit coverage includes only `lib/**` and must be
 100%. Integration coverage includes only `adapters/**` and must be 100% in this
 minimal base. The checked-in ledger is `.config/go-base.coverage.yaml`. Each tier
-writes its own profile: `coverage/unit/coverage.out`,
-`coverage/int/coverage.out` and `coverage/meta/coverage.out`.
+writes its own profile: `reports/unit/coverage.out`,
+`reports/integration/coverage.out` and `reports/meta/coverage.out`.
 
 ## Deadcode and vulnerability law
 

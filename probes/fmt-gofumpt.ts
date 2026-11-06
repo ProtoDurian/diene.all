@@ -3,7 +3,6 @@ import { expectGreen, expectRedWithDiagnostic, unformatGo } from './lib/go.ts';
 
 const gate = 'nix fmt --no-write-lock-file -- --ci --formatters gofumpt';
 
-// Accept treefmt's path-after-verb diagnostic, gofumpt's reformat diagnostic, and the older path-before-verb shape.
 const goFormatting = /(file has changed path=|would reformat )\S+[.]go|[.]go.*(formatted|changed)/i;
 
 export default {

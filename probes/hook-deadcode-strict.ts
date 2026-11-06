@@ -4,7 +4,6 @@ import { expectGreen, expectRedWithDiagnostic, plantProductionOnlySymbol } from 
 const gate = 'nix develop .#ci -c pre-commit run a-deadcode --all-files';
 const gateTimeoutMs = 600000;
 
-// A test-only symbol clears the first three strict components so only the hook's final production deadcode pass can red.
 const productionOnlyFinding = /"Name": "ProbeProductionOnly",[\s\S]*?"File": "[^"]*probe_production_only\.go"/;
 
 export default {
