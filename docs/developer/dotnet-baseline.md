@@ -85,8 +85,9 @@ C# variants accompany the shared standards:
 [SOLID](../standards/solid-principles/languages/csharp.md),
 [stateless OOP/DI](../standards/stateless-oop-di/languages/csharp.md),
 [testing](../standards/testing/languages/csharp.md),
-[utilities](../standards/utilities/languages/csharp.md), and
-[validation](../standards/validation/languages/csharp.md).
+[utilities](../standards/utilities/languages/csharp.md),
+[validation](../standards/validation/languages/csharp.md), and
+[wire format](../standards/wire-format/languages/csharp.md).
 
 ## Template-maintenance boundary
 
