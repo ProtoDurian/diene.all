@@ -1,9 +1,5 @@
 {
-  "ignores": [
-    ".claude/skills/vendor/**",
-    "Changelog.md",
-    "docs/developer/CommitConventions.md",
-  ],
+  "ignores": [".claude/skills/vendor/**", "Changelog.md", "docs/developer/CommitConventions.md"],
   "config": {
     "MD009": false,
     "MD010": false,
