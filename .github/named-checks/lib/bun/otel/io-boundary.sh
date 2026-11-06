@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Effects live only in src/adapters/: there pino, every @opentelemetry/* package and
+# Effects live only in src/adapters/: there pino, node:fs, every @opentelemetry/* package and
 # process are allowed. Elsewhere src/ imports only literal relative paths, zod, the
 # published Result, interfaces and core-utils packages, @opentelemetry/api,
 # semantic-conventions, resources (no detectors) and the samplers of sdk-trace-base,
 # and names no effectful global. src/test-helper/ may also name this package root and
-# @atomicloud/diene.interfaces/test-helper, which no module republishes.
+# @atomicloud/diene.interfaces/test-helper, which no module republishes, directly or through an alias.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -26,16 +26,18 @@ for path in "${files[@]}"; do
   allowed="^(${pure})"
   allow_global='^$'
   restrict=1
+  types_only='^$'
   if [[ ${path} == src/test-helper/* ]]; then
     allowed="^(${pure}|@atomicloud/diene\.otel$|@atomicloud/diene\.interfaces/test-helper$)"
   fi
   if [[ ${path} == src/adapters/* ]]; then
-    allowed='^(\.{1,2}/|@atomicloud/diene\.(result|interfaces|core-utils)$|zod$|pino$|@opentelemetry/[a-z0-9-]+$)'
+    allowed='^(\.{1,2}/|@atomicloud/diene\.(result|interfaces|core-utils)$|zod$|pino$|node:fs$|@opentelemetry/[a-z0-9-]+$)'
     allow_global='^process$'
     restrict=0
+    types_only='^node:https$'
   fi
   # shellcheck disable=SC2016
-  report="$(git show "${tree}:${path}" | ALLOWED="${allowed}" ALLOW_GLOBAL="${allow_global}" RESTRICT="${restrict}" FILE="${path}" bun -e '
+  report="$(git show "${tree}:${path}" | ALLOWED="${allowed}" ALLOW_GLOBAL="${allow_global}" TYPES_ONLY="${types_only}" RESTRICT="${restrict}" FILE="${path}" bun -e '
     const ts = require(`${process.cwd()}/node_modules/typescript`);
     const { dirname, join } = require("node:path/posix");
     const file = process.env.FILE;
@@ -55,7 +57,7 @@ for path in "${files[@]}"; do
       return undefined;
     };
     const importOf = (spec, n) => {
-      if (!allowed.test(spec)) say(`import ${spec}`);
+      if (!allowed.test(spec) && !(new RegExp(process.env.TYPES_ONLY).test(spec) && ts.isImportDeclaration(n) && !!n.importClause?.isTypeOnly)) say(`import ${spec}`);
       const target = join(dirname(file), spec), relative = /^\.{1,2}\//.test(spec);
       if (relative && !file.startsWith("src/adapters/") && file !== "src/index.ts" && (/^src\/adapters(\/|$)/.test(target) || /^src(\/index(\.[jt]s)?)?\/?$/.test(target))) say(`import ${spec} (the domain reaches into src/adapters/ or the root barrel)`);
       if (relative && file.startsWith("src/test-helper/") && !target.startsWith("src/test-helper/") && !typeOnly(n)) say(`import ${spec} (the TestHelper reaches the package only through @atomicloud/diene.otel)`);
@@ -139,14 +141,62 @@ for path in "${files[@]}"; do
       return e && ts.isIdentifier(e) ? e.text : undefined;
     };
     const exported = st => !!st.modifiers?.some(m => m.kind === S.ExportKeyword);
+    const heritage = n => !!n.heritageClauses?.some(h => h.types.some(t => carries(t.expression)));
+    const carries = e => {
+      while (e && (ts.isParenthesizedExpression(e) || ts.isAsExpression(e) || ts.isNonNullExpression(e) || ts.isSatisfiesExpression(e) || ts.isTypeAssertionExpression(e))) e = e.expression;
+      if (!e) return false;
+      if (ts.isAwaitExpression(e)) return carries(e.expression);
+      if (ts.isCallExpression(e) && (e.expression.kind === S.ImportKeyword || (ts.isIdentifier(e.expression) && e.expression.text === "require")) && e.arguments[0] && ts.isStringLiteralLike(e.arguments[0]) && e.arguments[0].text === SHARED) return true;
+      if (shared.has(rootName(e))) return true;
+      if (ts.isObjectLiteralExpression(e)) return e.properties.some(p => ts.isPropertyAssignment(p) ? carries(p.initializer) : ts.isShorthandPropertyAssignment(p) ? shared.has(p.name.text) : ts.isSpreadAssignment(p) && carries(p.expression));
+      if (ts.isArrayLiteralExpression(e)) return e.elements.some(x => carries(ts.isSpreadElement(x) ? x.expression : x));
+      if (ts.isCallExpression(e) && /^Object\.(freeze|assign)$/.test(e.expression.getText(sf))) return e.arguments.some(carries);
+      if (ts.isConditionalExpression(e)) return carries(e.whenTrue) || carries(e.whenFalse);
+      if (ts.isBinaryExpression(e)) return carries(e.left) || carries(e.right);
+      return ts.isClassExpression(e) && heritage(e);
+    };
+    const typeCarries = t => !!t && ((ts.isTypeReferenceNode(t) && shared.has(rootName(t.typeName))) || (ts.isTypeQueryNode(t) && shared.has(rootName(t.exprName))) || ((ts.isUnionTypeNode(t) || ts.isIntersectionTypeNode(t)) && t.types.some(typeCarries)) || (ts.isParenthesizedTypeNode(t) && typeCarries(t.type)));
+    const bound = b => ts.isIdentifier(b) ? [b.text] : (b.elements ?? []).flatMap(el => ts.isOmittedExpression(el) ? [] : bound(el.name));
+    const tops = [];
+    const collect = list => { for (const st of list) { tops.push(st); if (ts.isModuleDeclaration(st) && st.body && ts.isModuleBlock(st.body)) collect(st.body.statements); } };
+    collect(sf.statements);
+    for (let before = -1; before !== shared.size; ) {
+      before = shared.size;
+      for (const st of tops) {
+        const names = [];
+        if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) { if (d.initializer && carries(d.initializer)) names.push(...bound(d.name)); }
+        if (ts.isExpressionStatement(st) && ts.isBinaryExpression(st.expression) && st.expression.operatorToken.kind === S.EqualsToken && carries(st.expression.right)) names.push(...bound(st.expression.left.kind === S.Identifier ? st.expression.left : { elements: [] }));
+        if (ts.isImportEqualsDeclaration(st) && !ts.isExternalModuleReference(st.moduleReference) && shared.has(rootName(st.moduleReference))) names.push(st.name.text);
+        if ((ts.isClassDeclaration(st) || ts.isInterfaceDeclaration(st)) && st.name && heritage(st)) names.push(st.name.text);
+        if (ts.isTypeAliasDeclaration(st) && typeCarries(st.type)) names.push(st.name.text);
+        names.forEach(x => shared.add(x));
+      }
+    }
+    const refers = e => {
+      while (e && (ts.isParenthesizedExpression(e) || ts.isAsExpression(e) || ts.isNonNullExpression(e) || ts.isSatisfiesExpression(e) || ts.isTypeAssertionExpression(e) || ts.isPropertyAccessExpression(e) || ts.isElementAccessExpression(e))) e = e.expression;
+      return !!e && ts.isIdentifier(e) && shared.has(e.text);
+    };
+    const exposes = e => {
+      while (e && (ts.isParenthesizedExpression(e) || ts.isAsExpression(e) || ts.isNonNullExpression(e) || ts.isSatisfiesExpression(e) || ts.isTypeAssertionExpression(e))) e = e.expression;
+      if (!e) return false;
+      if (refers(e) || (ts.isAwaitExpression(e) && carries(e))) return true;
+      if (ts.isObjectLiteralExpression(e)) return e.properties.some(p => ts.isPropertyAssignment(p) ? exposes(p.initializer) : ts.isShorthandPropertyAssignment(p) ? shared.has(p.name.text) : ts.isSpreadAssignment(p) && exposes(p.expression));
+      if (ts.isArrayLiteralExpression(e)) return e.elements.some(x => exposes(ts.isSpreadElement(x) ? x.expression : x));
+      if (ts.isCallExpression(e) && /^Object\.(freeze|assign)$/.test(e.expression.getText(sf))) return e.arguments.some(exposes);
+      return ts.isConditionalExpression(e) ? exposes(e.whenTrue) || exposes(e.whenFalse) : ts.isBinaryExpression(e) && (exposes(e.left) || exposes(e.right));
+    };
+    const hidden = m => ts.isPrivateIdentifier(m.name) || !!m.modifiers?.some(x => x.kind === S.PrivateKeyword || x.kind === S.ProtectedKeyword);
+    const publicField = n => ts.isPropertyDeclaration(n) && !hidden(n) && !!n.initializer && ts.isClassLike(n.parent) && exposes(n.initializer);
     const republished = n =>
       (ts.isExportDeclaration(n) && !n.moduleSpecifier && !!n.exportClause && ts.isNamedExports(n.exportClause) && n.exportClause.elements.some(e => shared.has((e.propertyName ?? e.name).text)))
-      || (ts.isExportAssignment(n) && shared.has(rootName(n.expression)))
-      || (ts.isVariableStatement(n) && exported(n) && n.declarationList.declarations.some(d => d.initializer && shared.has(rootName(d.initializer))))
-      || ((ts.isClassDeclaration(n) || ts.isInterfaceDeclaration(n)) && exported(n) && !!n.heritageClauses?.some(h => h.types.some(t => shared.has(rootName(t.expression)))))
-      || (ts.isTypeAliasDeclaration(n) && exported(n) && ts.isTypeReferenceNode(n.type) && shared.has(rootName(n.type.typeName)));
+      || (ts.isExportAssignment(n) && carries(n.expression))
+      || (ts.isVariableStatement(n) && exported(n) && n.declarationList.declarations.some(d => d.initializer && carries(d.initializer)))
+      || ((ts.isClassDeclaration(n) || ts.isInterfaceDeclaration(n)) && exported(n) && heritage(n))
+      || (ts.isTypeAliasDeclaration(n) && exported(n) && typeCarries(n.type))
+      || (ts.isImportEqualsDeclaration(n) && exported(n) && !ts.isExternalModuleReference(n.moduleReference) && shared.has(rootName(n.moduleReference)));
     const visit = n => {
       if (republished(n)) say(`republishes ${SHARED}`);
+      if (publicField(n)) say(`republishes ${SHARED} (a public class field holds it)`);
       if (ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) { if (n.moduleSpecifier && ts.isStringLiteralLike(n.moduleSpecifier)) importOf(n.moduleSpecifier.text, n); }
       else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference)) { const e = n.moduleReference.expression; if (ts.isStringLiteralLike(e)) importOf(e.text, n); else say("non-literal require()"); }
       else if (ts.isCallExpression(n) && (n.expression.kind === S.ImportKeyword || (ts.isIdentifier(n.expression) && n.expression.text === "require"))) {
@@ -181,4 +231,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ io-boundary: ${#files[@]} src/ modules keep effects in src/adapters/ (pino, @opentelemetry/*, process); the rest import only relative paths, zod, result, interfaces, core-utils and the pure OpenTelemetry surface"
+echo "✅ io-boundary: ${#files[@]} src/ modules keep effects in src/adapters/ (pino, node:fs, @opentelemetry/*, process); the rest import only relative paths, zod, result, interfaces, core-utils and the pure OpenTelemetry surface"

@@ -3,8 +3,9 @@ set -euo pipefail
 
 # src/ is stateless OOP + DI: every function, arrow and method body lives inside a
 # class body; classes keep only readonly fields set in the constructor (injected
-# collaborators; src/test-helper/ doubles may record calls), and modules bind no
-# let/var or mutable collection (parsed with TypeScript).
+# collaborators; src/test-helper/ doubles may record calls) and own no mutable
+# collection; nothing mutates an owned or module-level collection, aliases included;
+# modules bind no let/var (parsed with TypeScript).
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -41,12 +42,112 @@ for path in "${files[@]}"; do
       return [e];
     };
     const MUTATORS = /^(Object\.(assign|defineProperty|defineProperties|setPrototypeOf)|Reflect\.(set|defineProperty|deleteProperty|setPrototypeOf))$/;
+    const MUTATING = new Set(["push", "pop", "shift", "unshift", "splice", "sort", "reverse", "fill", "copyWithin", "set", "delete", "clear", "add"]);
+    const OWNABLE = new Set(["Array", "Object", "Map", "Set", "WeakMap", "WeakSet", "Int8Array", "Uint8Array", "Uint8ClampedArray", "Int16Array", "Uint16Array", "Int32Array", "Uint32Array", "Float32Array", "Float64Array", "BigInt64Array", "BigUint64Array", "ArrayBuffer"]);
+    const frozen = e => { e = strip(e); return !!e && ts.isCallExpression(e) && strip(e.expression).getText(sf) === "Object.freeze"; };
+    const nested = e => {
+      e = strip(e);
+      if (!e) return false;
+      if (ts.isObjectLiteralExpression(e)) return e.properties.some(p => ts.isPropertyAssignment(p) ? structure(p.initializer) : ts.isSpreadAssignment(p) && structure(p.expression));
+      if (ts.isArrayLiteralExpression(e)) return e.elements.some(x => structure(ts.isSpreadElement(x) ? x.expression : x));
+      return false;
+    };
+    // Object.freeze is shallow: a frozen literal still owns any mutable member
+    const structure = e => {
+      e = strip(e);
+      if (!e) return false;
+      if (frozen(e)) return e.arguments.some(nested);
+      if (ts.isArrayLiteralExpression(e) || ts.isObjectLiteralExpression(e)) return true;
+      if ((ts.isNewExpression(e) || ts.isCallExpression(e)) && ts.isIdentifier(e.expression) && OWNABLE.has(e.expression.text)) return true;
+      return ts.isCallExpression(e) && /^(Array\.(from|of)|Object\.(create|fromEntries|assign))$/.test(strip(e.expression).getText(sf));
+    };
+    const mutableType = t => {
+      if (!t) return false;
+      if (ts.isParenthesizedTypeNode(t)) return mutableType(t.type);
+      if (ts.isTypeOperatorNode(t)) return t.operator !== S.ReadonlyKeyword && mutableType(t.type);
+      if (ts.isUnionTypeNode(t) || ts.isIntersectionTypeNode(t)) return t.types.some(mutableType);
+      if (ts.isArrayTypeNode(t) || ts.isTupleTypeNode(t)) return true;
+      if (ts.isTypeReferenceNode(t)) return /^(Array|Map|Set|WeakMap|WeakSet|Record)$/.test(t.typeName.getText(sf));
+      return ts.isTypeLiteralNode(t) && t.members.some(m => ts.isIndexSignatureDeclaration(m) && !has(m, S.ReadonlyKeyword));
+    };
+    const owns = (init, type) => structure(init) || (mutableType(type) && !frozen(init));
+    const ownedFields = new Set(), ownedModule = new Set(), aliasThis = new Set(), aliasOwned = new Set(), aliasModule = new Set();
+    const keyText = k => ts.isIdentifier(k) || ts.isPrivateIdentifier(k) || ts.isStringLiteralLike(k) || ts.isNumericLiteral(k) ? k.text : undefined;
+    const ownerOf = e => {
+      e = strip(e);
+      let first;
+      while (e && (ts.isPropertyAccessExpression(e) || ts.isElementAccessExpression(e))) {
+        first = ts.isPropertyAccessExpression(e) ? e.name.text : ts.isStringLiteralLike(e.argumentExpression) ? e.argumentExpression.text : "*";
+        e = strip(e.expression);
+      }
+      if (isThis(e)) return { self: first !== undefined, owned: first !== undefined && (ownedFields.has(first) || (first === "*" && ownedFields.size > 0)) };
+      if (e && ts.isIdentifier(e)) return { alias: aliasThis.has(e.text), owned: aliasOwned.has(e.text), module: ownedModule.has(e.text) || aliasModule.has(e.text) };
+      return {};
+    };
+    const prepass = () => {
+      const decls = [];
+      const walk = n => {
+        if (ts.isPropertyDeclaration(n) && owns(n.initializer, n.type)) ownedFields.add(keyText(n.name));
+        if (ts.isParameter(n) && ts.isConstructorDeclaration(n.parent) && n.modifiers?.length && ts.isIdentifier(n.name) && owns(n.initializer, n.type)) ownedFields.add(n.name.text);
+        if (ts.isBinaryExpression(n) && n.operatorToken.kind === S.EqualsToken && ts.isPropertyAccessExpression(strip(n.left)) && isThis(strip(n.left).expression) && structure(n.right)) ownedFields.add(strip(n.left).name.text);
+        if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && ts.isVariableDeclarationList(n.parent) && ts.isVariableStatement(n.parent.parent) && (ts.isSourceFile(n.parent.parent.parent) || ts.isModuleBlock(n.parent.parent.parent)) && owns(n.initializer, n.type)) ownedModule.add(n.name.text);
+        if (ts.isVariableDeclaration(n) && n.initializer) decls.push([n.name, n.initializer]);
+        if (ts.isBinaryExpression(n) && n.operatorToken.kind === S.EqualsToken && ts.isIdentifier(n.left)) decls.push([n.left, n.right]);
+        ts.forEachChild(n, walk);
+      };
+      walk(sf);
+      for (let before = -1; before !== aliasThis.size + aliasOwned.size + aliasModule.size; ) {
+        before = aliasThis.size + aliasOwned.size + aliasModule.size;
+        for (const [name, init] of decls) {
+          const source = strip(init);
+          if (ts.isIdentifier(name)) {
+            const o = ownerOf(source);
+            if (o.self || o.alias) aliasThis.add(name.text);
+            if (o.owned) aliasOwned.add(name.text);
+            if (o.module) aliasModule.add(name.text);
+          } else if (ts.isObjectBindingPattern(name)) {
+            const o = isThis(source) ? { self: true } : ownerOf(source);
+            for (const el of name.elements) {
+              if (!ts.isIdentifier(el.name)) continue;
+              const key = el.propertyName ? keyText(el.propertyName) : el.name.text;
+              if (o.self || o.alias) aliasThis.add(el.name.text);
+              if (o.owned || (isThis(source) && ownedFields.has(key))) aliasOwned.add(el.name.text);
+              if (o.module) aliasModule.add(el.name.text);
+            }
+          }
+        }
+      }
+    };
+    const through = e => { e = strip(e); return !!e && (ts.isPropertyAccessExpression(e) || ts.isElementAccessExpression(e)) ? ownerOf(e) : {}; };
     const writes = (n, ctor) => {
-      if (process.env.STATE === "0") return;
+      const instance = process.env.STATE !== "0";
+      const touched = es => {
+        for (const t of es) {
+          const o = through(t);
+          if (o.module) say(n, "module-level state mutated");
+          if (instance && !o.self && (o.alias || o.owned)) say(n, "instance state written outside the constructor");
+        }
+      };
+      if (ts.isBinaryExpression(n) && n.operatorToken.kind >= S.FirstAssignment && n.operatorToken.kind <= S.LastAssignment) touched(targets(n.left));
+      if ((ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n)) && (n.operator === S.PlusPlusToken || n.operator === S.MinusMinusToken)) touched([n.operand]);
+      if (ts.isDeleteExpression(n)) touched([n.expression]);
+      if ((ts.isForInStatement(n) || ts.isForOfStatement(n)) && !ts.isVariableDeclarationList(n.initializer)) touched(targets(n.initializer));
+      if (ts.isCallExpression(n) && MUTATORS.test(strip(n.expression).getText(sf)) && n.arguments[0]) { const o = ownerOf(n.arguments[0]); if (o.module) say(n, "module-level state mutated"); if (instance && !o.self && (o.alias || o.owned)) say(n, "instance state written outside the constructor"); }
+      if (ts.isCallExpression(n)) {
+        const callee = strip(n.expression);
+        const method = ts.isPropertyAccessExpression(callee) ? callee.name.text : ts.isElementAccessExpression(callee) && ts.isStringLiteralLike(callee.argumentExpression) ? callee.argumentExpression.text : undefined;
+        if (method && MUTATING.has(method)) {
+          const o = ownerOf(callee.expression);
+          if (o.module) say(n, `module-level state mutated (.${method})`);
+          if (instance && o.owned) say(n, `a collection the instance owns is mutated (.${method})`);
+        }
+      }
+      if (!instance) return;
       if (ts.isBinaryExpression(n) && n.operatorToken.kind >= S.FirstAssignment && n.operatorToken.kind <= S.LastAssignment) {
         const plainField = ctor && n.operatorToken.kind === S.EqualsToken && ts.isPropertyAccessExpression(strip(n.left)) && isThis(strip(n.left).expression);
         if (!plainField && targets(n.left).some(rooted)) say(n, "instance state written outside the constructor");
         if (n.operatorToken.kind === S.EqualsToken && isThis(n.right)) say(n, "this aliased to a binding");
+        if (plainField && structure(n.right)) say(n, "mutable collection held in state");
       }
       if ((ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n)) && (n.operator === S.PlusPlusToken || n.operator === S.MinusMinusToken) && rooted(n.operand)) say(n, "instance state written outside the constructor");
       if (ts.isDeleteExpression(n) && rooted(n.expression)) say(n, "instance state written outside the constructor");
@@ -64,7 +165,7 @@ for path in "${files[@]}"; do
       if (ts.isPropertyDeclaration(m)) {
         if (has(m, S.AccessorKeyword)) say(m, `mutable field ${nameOf(m)} (auto-accessor)`);
         else if (!has(m, S.ReadonlyKeyword)) say(m, `mutable field ${nameOf(m)} (fields must be readonly)`);
-        if (m.initializer && collection(m.initializer)) say(m, "mutable collection held in state");
+        if (m.initializer && structure(m.initializer)) say(m, "mutable collection held in state");
       }
       if (ts.isIndexSignatureDeclaration(m) && !has(m, S.ReadonlyKeyword)) say(m, "mutable field (index) (fields must be readonly)");
       if (ts.isSetAccessorDeclaration(m)) say(m, `setter ${nameOf(m)} on a stateless class`);
@@ -72,6 +173,7 @@ for path in "${files[@]}"; do
         for (const p of m.parameters) {
           const property = p.modifiers?.some(x => [S.PublicKeyword, S.PrivateKeyword, S.ProtectedKeyword, S.OverrideKeyword].includes(x.kind));
           if (property && !has(p, S.ReadonlyKeyword)) say(p, `mutable parameter property ${p.name.getText(sf)} (must be readonly)`);
+          if (property && p.initializer && structure(p.initializer)) say(p, "mutable collection held in state");
           visit(p, true, false);
         }
         if (m.body) for (const st of m.body.statements) visit(st, true, true);
@@ -92,6 +194,7 @@ for path in "${files[@]}"; do
       const inner = ctor && !ts.isFunctionLike(n);
       ts.forEachChild(n, c => visit(c, cls, inner));
     };
+    prepass();
     visit(sf, false, false);
   ')"
   if [[ -n ${report} ]]; then
