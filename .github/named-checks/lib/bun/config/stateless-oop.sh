@@ -54,7 +54,7 @@ for path in "${files[@]}"; do
       const open = m.index + m[0].length - 1;
       if (out[open] === "{") wipe(open, matchBrace(open));
     }
-    for (const m of text.matchAll(/(^|[\s;}])(?:export\s+)?(?:declare\s+)?type\s+[A-Za-z_$][\w$]*\s*(<[^=]*>)?\s*=/g)) {
+    for (const m of text.matchAll(/(^|[\s;}])(?:export\s+)?(?:declare\s+)?type\s+[A-Za-z_$][\w$]*(?=\s*[<=])/g)) {
       let depth = 0, k = m.index + m[0].length;
       for (; k < text.length; k++) {
         const c = text[k];
@@ -66,6 +66,8 @@ for path in "${files[@]}"; do
     }
     const rest = out.join("");
     for (const m of rest.matchAll(/=>|\bfunction\b/g)) console.log(`${lineOf(m.index)}:${m[0] === "=>" ? "arrow" : "function"}`);
+    const method = /[{,]\s*(?:async\s+|get\s+|set\s+|\*\s*)?(?:[A-Za-z_$][\w$]*|\[[^\]]*\])\s*(?:<[^>]*>)?\s*\([^)]*\)\s*(?::[^{;]*)?\{/g;
+    for (const m of rest.matchAll(method)) console.log(`${lineOf(m.index + m[0].search(/[^\s{,]/))}:method`);
   ')"
   if [[ -n ${report} ]]; then
     while IFS=: read -r line name; do echo "❌ ${path}:${line}: free ${name} outside a class body" >&2; done <<<"${report}"
