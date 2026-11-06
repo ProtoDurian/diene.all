@@ -13,6 +13,7 @@ let
           cyanprint
           dlint
           go
+          gorelease
           # Axis-pure slices: the infralint/infrautils aggregates ship helm, helm-docs and helmlint.
           infralint-core
           infrautils-core

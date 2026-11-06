@@ -26,6 +26,7 @@ with packages;
     cyanprint
     git
     go
+    gorelease
     go-task
     gotestsum
     govulncheck
