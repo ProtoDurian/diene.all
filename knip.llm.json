@@ -1,6 +1,18 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["tests/**/*.test.ts", "tests/support/*-ledger.ts"],
-  "project": ["src/**/*.ts", "tests/**/*.ts"],
+  "entry": [
+    "tests/**/*.test.ts",
+    "tests/support/*-ledger.ts",
+    "src/index.ts",
+    "cli/index.ts",
+    "web/src/main.tsx",
+    "web/vite.config.ts"
+  ],
+  "project": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "cli/**/*.ts",
+    "web/**/*.{ts,tsx}"
+  ],
   "includeEntryExports": true
 }
