@@ -462,3 +462,35 @@ describe('OtelBootstrap global registration ownership', () => {
     trace.disable();
   });
 });
+
+describe('TelemetryLifecycleError identity', () => {
+  class NarrowLifecycleError extends TelemetryLifecycleError {}
+
+  it.each([
+    ['a lifecycle error', new TelemetryLifecycleError('logs', 'flush', 'x'), TelemetryLifecycleError, true],
+    [
+      'a branded look-alike from the other build',
+      { [Symbol.for('AtomiCloud.Diene.Otel.TelemetryLifecycleError')]: true },
+      TelemetryLifecycleError,
+      true,
+    ],
+    ['a plain Error', new Error('m'), TelemetryLifecycleError, false],
+    ['null', null, TelemetryLifecycleError, false],
+    ['a base error against a subclass', new TelemetryLifecycleError('logs', 'flush', 'x'), NarrowLifecycleError, false],
+    [
+      'a subclass error against the subclass',
+      new NarrowLifecycleError('traces', 'shutdown', 'x'),
+      NarrowLifecycleError,
+      true,
+    ],
+  ])('should judge %s', (_label, value, type, expected) => {
+    // Arrange
+    const candidate: unknown = value;
+
+    // Act
+    const actual = candidate instanceof (type as typeof TelemetryLifecycleError);
+
+    // Assert
+    actual.should.eql(expected);
+  });
+});

@@ -34,7 +34,15 @@ interface OtelBootstrapCollaborators {
 type TelemetrySignal = 'logs' | 'metrics' | 'traces';
 type LifecyclePhase = 'flush' | 'shutdown';
 
+const LIFECYCLE_ERROR_BRAND = Symbol.for('AtomiCloud.Diene.Otel.TelemetryLifecycleError');
+
 class TelemetryLifecycleError extends Error {
+  static override [Symbol.hasInstance](value: unknown): boolean {
+    // biome-ignore lint/complexity/noThisInStatic: this is the class instanceof was called on; subclasses keep the prototype check
+    if (this !== TelemetryLifecycleError) return Function.prototype[Symbol.hasInstance].call(this, value);
+    return typeof value === 'object' && value !== null && LIFECYCLE_ERROR_BRAND in value;
+  }
+
   constructor(
     readonly signal: TelemetrySignal,
     readonly phase: LifecyclePhase,
@@ -42,6 +50,7 @@ class TelemetryLifecycleError extends Error {
   ) {
     super(`${signal} ${phase} failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
     this.name = 'TelemetryLifecycleError';
+    Object.defineProperty(this, LIFECYCLE_ERROR_BRAND, { value: true });
   }
 }
 
