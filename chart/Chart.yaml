@@ -3,10 +3,10 @@ name: xenon
 description: AtomiCloud Resource Metrics API - conditional passthrough of kubernetes-sigs/metrics-server, ON only where no built-in provider exists
 type: application
 version: 0.1.0
-appVersion: '0.9.0'
+appVersion: '0.8.1'
 dependencies:
   - name: metrics-server
     alias: upstream
-    version: 3.14.0
+    version: 3.13.1
     repository: https://kubernetes-sigs.github.io/metrics-server
     condition: upstream.enabled

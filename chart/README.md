@@ -1,6 +1,6 @@
 # xenon
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.9.0](https://img.shields.io/badge/AppVersion-0.9.0-informational?style=flat-square)
+![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.8.1](https://img.shields.io/badge/AppVersion-0.8.1-informational?style=flat-square)
 
 AtomiCloud Resource Metrics API - conditional passthrough of kubernetes-sigs/metrics-server, ON only where no built-in provider exists
 
@@ -9,7 +9,7 @@ AtomiCloud Resource Metrics API - conditional passthrough of kubernetes-sigs/met
 Xenon provides the Resource Metrics API (`v1beta1.metrics.k8s.io`) for HPA and `kubectl top`. It is needed only where
 the cluster has no built-in provider. Each overlay declares that fact as `builtInMetricsProvider`; the chart refuses an
 overlay whose `upstream.enabled` is not its opposite. OFF renders nothing, so the chart installs everywhere. ON needs
-Kubernetes 1.34+ (metrics-server 0.9). `toggle-map.yaml` is the machine-readable form of this table.
+Kubernetes 1.31+ (metrics-server 0.8). `toggle-map.yaml` is the machine-readable form of this table.
 
 | Landscape | Substrate | Built-in provider | Xenon | Kubelet TLS |
 | --- | --- | --- | --- | --- |
@@ -36,7 +36,7 @@ substrate bundles a provider must set it `true` and xenon OFF.
 
 | Repository | Name | Version |
 |------------|------|---------|
-| https://kubernetes-sigs.github.io/metrics-server | upstream(metrics-server) | 3.14.0 |
+| https://kubernetes-sigs.github.io/metrics-server | upstream(metrics-server) | 3.13.1 |
 
 ## Values
 
@@ -45,7 +45,7 @@ substrate bundles a provider must set it `true` and xenon OFF.
 | builtInMetricsProvider | bool | `false` | The declared fact the toggle derives from: true when the cluster already serves `v1beta1.metrics.k8s.io` (k3s bundles metrics-server). Then `upstream.enabled` must be false; otherwise it must be true. |
 | labelPrefix | string | `"atomi.cloud"` | Prefix used by every service-tree label. |
 | serviceTree | object | `{"layer":"1","module":"metrics","platform":"metrics","service":"xenon"}` | Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays. |
-| upstream | object | `{"commonLabels":{"atomi.cloud/layer":"1","atomi.cloud/module":"metrics","atomi.cloud/platform":"metrics","atomi.cloud/service":"xenon"},"deploymentAnnotations":{"reloader.stakater.com/auto":"true"},"enabled":true,"fullnameOverride":"xenon-metrics","nameOverride":"metrics-server","podLabels":{"atomi.cloud/layer":"1","atomi.cloud/module":"metrics","atomi.cloud/platform":"metrics","atomi.cloud/service":"xenon"},"podSecurityContext":{"runAsNonRoot":true},"resources":{"limits":{"cpu":"500m","memory":"400Mi"},"requests":{"cpu":"100m","memory":"200Mi"}}}` | metrics-server 3.14.0 (app 0.9.0, Kubernetes 1.34+) values: upstream defaults plus the toggle, LPSM labels, Reloader, pod non-root and limits. No ServiceMonitor, no metrics endpoint (upstream defaults stay off). |
+| upstream | object | `{"commonLabels":{"atomi.cloud/layer":"1","atomi.cloud/module":"metrics","atomi.cloud/platform":"metrics","atomi.cloud/service":"xenon"},"deploymentAnnotations":{"reloader.stakater.com/auto":"true"},"enabled":true,"fullnameOverride":"xenon-metrics","nameOverride":"metrics-server","podLabels":{"atomi.cloud/layer":"1","atomi.cloud/module":"metrics","atomi.cloud/platform":"metrics","atomi.cloud/service":"xenon"},"podSecurityContext":{"runAsNonRoot":true},"resources":{"limits":{"cpu":"500m","memory":"400Mi"},"requests":{"cpu":"100m","memory":"200Mi"}}}` | metrics-server 3.13.1 (app 0.8.1, Kubernetes 1.31+) values: upstream defaults plus the toggle, LPSM labels, Reloader, pod non-root and limits. No ServiceMonitor, no metrics endpoint (upstream defaults stay off). |
 | upstream.enabled | bool | `true` | The xenon toggle (Helm dependency condition). ON exactly when `builtInMetricsProvider` is false. |
 | upstream.fullnameOverride | string | `"xenon-metrics"` | Conforming `<service>-<token>` name for every upstream object. |
 | upstream.nameOverride | string | `"metrics-server"` | Standard `app.kubernetes.io/name` (and selector) value; the `upstream` alias would leak in otherwise. |

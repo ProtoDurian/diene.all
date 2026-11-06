@@ -50,7 +50,7 @@ This tree is the all-features workspace baseline inherited by every downstream s
 
 # Xenon
 
-This branch materializes the Helm wrapper as `xenon`: the Resource Metrics API (`kubectl top`, HPA) as a passthrough of kubernetes-sigs/metrics-server 3.14.0. It is ON only where the cluster has no built-in provider; the per-landscape toggle map is in the [chart README](chart/README.md).
+This branch materializes the Helm wrapper as `xenon`: the Resource Metrics API (`kubectl top`, HPA) as a passthrough of kubernetes-sigs/metrics-server 3.13.1. It is ON only where the cluster has no built-in provider; the per-landscape toggle map is in the [chart README](chart/README.md).
 
 - `task build` — build the pinned chart dependency.
 - `task test:unit` — run schema, lint, render, toggle map, LPSM, Reloader, VAP, and publish dry-runs.

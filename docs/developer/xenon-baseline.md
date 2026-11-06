@@ -1,7 +1,7 @@
 # Xenon baseline
 
 `xenon` is the Resource Metrics API (`v1beta1.metrics.k8s.io`) for HPA and `kubectl top`: a passthrough of the vendored
-`kubernetes-sigs/metrics-server` chart (3.14.0, app 0.9.0). It is a materialized helm-wrapper instance and an edge
+`kubernetes-sigs/metrics-server` chart (3.13.1, app 0.8.1). It is a materialized helm-wrapper instance and an edge
 chart: an ordinary unit + integration testing pyramid, no `probes/`.
 
 ## The toggle is the surface
@@ -35,7 +35,7 @@ any drift from `labelPrefix` + `serviceTree`. Release namespace = `serviceTree.p
 Reloader: `upstream.deploymentAnnotations` opts the Deployment in (`reloader.stakater.com/auto: "true"`). Set the key to
 `"false"` to opt out.
 
-Kubernetes floor: metrics-server 0.9 supports Kubernetes 1.34+. The chart refuses an ON render below 1.34; OFF renders
+Kubernetes floor: metrics-server 0.8 supports Kubernetes 1.31+. The chart refuses an ON render below 1.31; OFF renders
 have no floor.
 
 ## Version bumps
@@ -51,7 +51,7 @@ have no floor.
   mode, and they must fail for the expected reason.
   - `toggle-map`: map == expected baseline == the real render of every overlay == README matrix.
   - `rendered-manifests` is the inherited stage: `helm template` → kubeconform → `kyverno apply policies/vap`.
-- Integration: `scripts/ci/xenon-k3d.sh` creates `canary-xenon` (`infra/k3d.canary-xenon.yaml`: k3s 1.34 with
+- Integration: `scripts/ci/xenon-k3d.sh` creates `canary-xenon` (`infra/k3d.canary-xenon.yaml`: k3s 1.31 with
   `--disable=metrics-server`). It proves the metrics API is absent, runs one plain `helm install --wait`, waits (bounded)
   until `kubectl top nodes` answers, then round-trips the chart through a local OCI registry.
 - The parent `start:cluster` profile is lapras (k3s bundles metrics-server, xenon OFF). Use `task test:int` for an ON

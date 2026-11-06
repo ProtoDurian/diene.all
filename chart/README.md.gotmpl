@@ -9,7 +9,7 @@
 Xenon provides the Resource Metrics API (`v1beta1.metrics.k8s.io`) for HPA and `kubectl top`. It is needed only where
 the cluster has no built-in provider. Each overlay declares that fact as `builtInMetricsProvider`; the chart refuses an
 overlay whose `upstream.enabled` is not its opposite. OFF renders nothing, so the chart installs everywhere. ON needs
-Kubernetes 1.34+ (metrics-server 0.9). `toggle-map.yaml` is the machine-readable form of this table.
+Kubernetes 1.31+ (metrics-server 0.8). `toggle-map.yaml` is the machine-readable form of this table.
 
 | Landscape | Substrate | Built-in provider | Xenon | Kubelet TLS |
 | --- | --- | --- | --- | --- |

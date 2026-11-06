@@ -4,7 +4,7 @@ metadata:
   name: canary-xenon
 servers: 1
 agents: 0
-image: rancher/k3s:v1.34.13-k3s1
+image: rancher/k3s:v1.31.5-k3s1
 registries:
   create:
     name: canary-xenon-registry
