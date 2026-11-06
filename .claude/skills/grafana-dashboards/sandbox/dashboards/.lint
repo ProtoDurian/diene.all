@@ -1,0 +1,9 @@
+exclusions:
+  template-job-rule:
+    reason: Service identity comes from LPSM labels, not the scrape job.
+  template-instance-rule:
+    reason: Panels aggregate across instances; LPSM labels identify the service.
+  target-job-rule:
+    reason: Queries select by LPSM labels, not the scrape job.
+  target-instance-rule:
+    reason: Queries aggregate across instances on purpose.
