@@ -197,10 +197,12 @@ const deadline = Temporal.Now.instant().add(timeout);
 
 ## JSON Serialization
 
+Every value crosses the wire as [Wire Format: TypeScript](../../wire-format/languages/typescript.md) shows.
+
 ```typescript
 // Instant -> string
 const instant = Temporal.Now.instant();
-const json = JSON.stringify({ timestamp: instant.toString() });
+const json = JSON.stringify({ timestamp: instant.toString({ fractionalSecondDigits: 3 }) });
 
 // String -> Instant
 const parsed = JSON.parse(json);

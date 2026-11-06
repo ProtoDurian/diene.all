@@ -235,6 +235,11 @@
     "class": "smoke"
   },
   {
+    "template": "diene/bun-base",
+    "name": "bun-biome-format",
+    "class": "gate"
+  },
+  {
     "template": "diene/observability",
     "name": "observability-standards-present",
     "class": "presence"
