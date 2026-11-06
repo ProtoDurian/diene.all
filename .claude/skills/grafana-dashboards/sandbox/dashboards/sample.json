@@ -47,6 +47,12 @@
         "query": "loki"
       },
       {
+        "name": "tempo_datasource",
+        "label": "Tempo data source",
+        "type": "datasource",
+        "query": "tempo"
+      },
+      {
         "name": "filter",
         "label": "Filter",
         "type": "textbox",
@@ -303,7 +309,7 @@
       "id": 5,
       "type": "logs",
       "title": "Error log lines",
-      "description": "UNVERIFIED: the sandbox has no log store. Error lines of the sample service, newest first. An empty panel on a healthy service is correct.",
+      "description": "Error lines (pino level 50) of the sample service, newest first, as message and trace id; the trace id links to the trace. An empty panel on a healthy service is correct.",
       "gridPos": {
         "x": 0,
         "y": 14,
@@ -327,8 +333,64 @@
             "type": "loki",
             "uid": "$loki_datasource"
           },
-          "expr": "{service=\"sample\",landscape=\"$landscape\"} |= \"error\" |~ \"$filter\"",
+          "expr": "{service=\"sample\",landscape=\"$landscape\"} |= `\"level\":50` |~ \"$filter\" | json | line_format \"{{.msg}}: {{.err_message}} trace_id={{.trace_id}}\"",
           "maxLines": 100
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Error traces",
+      "description": "Traces of the sample service with an error span, newest first. The link on a trace ID filters the error log lines above to that trace. An empty table on a healthy service is correct.",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 7
+      },
+      "datasource": {
+        "type": "tempo",
+        "uid": "$tempo_datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "traceID"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Error log lines of this trace",
+                    "url": "/d/sandbox-sample-overview/x?var-landscape=${landscape}&var-filter=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "$tempo_datasource"
+          },
+          "queryType": "traceql",
+          "query": "{ resource.service.name = \"sample\" && resource.atomi.landscape = \"$landscape\" && status = error }",
+          "tableType": "traces",
+          "limit": 20
         }
       ]
     }
