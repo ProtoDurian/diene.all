@@ -18,11 +18,11 @@ export default defineGate({
     description: 'A TestHelper assertion that never rejects reddens the unit tier.',
     expectedImpact: ['dotnet-lib-testhelper-meta-ledger'],
     async run(repo: any) {
-      await repo.patch('TestHelper/Note/NoteAssertions.cs', {
-        find: 'if (!string.Equals(actual, expected, StringComparison.Ordinal))',
-        replace: 'if (actual is null)',
+      await repo.patch('TestHelper/SeamAssertions.cs', {
+        find: '.ForCondition(error.Seam == seam && string.Equals(error.Id, id, StringComparison.Ordinal))',
+        replace: '.ForCondition(true)',
       });
-      await expectRedBecause(repo, UNIT, 'dotnet-lib-testhelper-contract', ['NoteAssertions_AssertSummary']);
+      await expectRedBecause(repo, UNIT, 'dotnet-lib-testhelper-contract', ['BeSeamErr_should_fail_on_a_different_id']);
     },
   },
 });

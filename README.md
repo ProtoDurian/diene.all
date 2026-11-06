@@ -2,7 +2,7 @@
 
 See the [.NET baseline](docs/developer/dotnet-baseline.md) for the
 language-specific toolchain, task surface, test tiers, coverage ledgers, dead-code
-passes, and the illustrative Note domain ([docs/domain/note.md](docs/domain/note.md)).
+passes, and the shared seam contract ([docs/domain/interfaces.md](docs/domain/interfaces.md)).
 C# variants accompany the shared standards for
 [date/time](docs/standards/datetime/languages/csharp.md),
 [domain-driven design](docs/standards/domain-driven-design/languages/csharp.md),
@@ -64,26 +64,38 @@ This tree is the all-features workspace baseline inherited by every downstream s
 
 # Publishable library packages
 
-[![NuGet version](https://img.shields.io/nuget/v/AtomiCloud.Diene.Note)](https://www.nuget.org/packages/AtomiCloud.Diene.Note)
-[![NuGet downloads](https://img.shields.io/nuget/dt/AtomiCloud.Diene.Note)](https://www.nuget.org/packages/AtomiCloud.Diene.Note)
+[![NuGet version](https://img.shields.io/nuget/v/AtomiCloud.Diene.Interfaces)](https://www.nuget.org/packages/AtomiCloud.Diene.Interfaces)
+[![NuGet downloads](https://img.shields.io/nuget/dt/AtomiCloud.Diene.Interfaces)](https://www.nuget.org/packages/AtomiCloud.Diene.Interfaces)
 
-This template publishes `AtomiCloud.Diene.Note` and the companion
-`AtomiCloud.Diene.Note.TestHelper` package at one committed version. The Note
-domain is illustrative; the package lifecycle is the reusable product.
+This repository publishes `AtomiCloud.Diene.Interfaces` and the companion
+`AtomiCloud.Diene.Interfaces.TestHelper` package at one committed version. It
+owns the shared seams `ISystem`, `IVfs`, `ITerminal`, `ILoggerSink`, and
+`IMetricsCollector`; every fallible method returns `Result<T, SeamError>` and
+never throws. The `otel` package implements the telemetry seams; it does not
+own them.
 
 ```bash
-dotnet add package AtomiCloud.Diene.Note
-dotnet add package AtomiCloud.Diene.Note.TestHelper
+dotnet add package AtomiCloud.Diene.Interfaces
+dotnet add package AtomiCloud.Diene.Interfaces.TestHelper
 ```
 
 ```csharp
-using AtomiCloud.Diene.Note;
-using AtomiCloud.Diene.Note.TestHelper.Note;
+using AtomiCloud.Diene.Interfaces;
+using AtomiCloud.Diene.Interfaces.TestHelper;
+using AtomiCloud.Diene.Results.TestHelper;
 
-var summariser = new NoteSummariser();
-var note = new NoteRecord { Title = "Hello", Body = "world" };
-summariser.AssertSummary(note, 80, "Hello — world");
+var vfs = new InMemoryVfs();
+(await vfs.WriteText("/etc/app.yaml", "key: value", new VfsWriteOptions(true))).Should().BeOk();
+(await vfs.ReadText("/etc/app.yaml")).Should().BeOk("key: value");
+(await vfs.ReadText("/absent")).Should().BeSeamErr(SeamKind.Vfs, "not_found");
+
+(await SeamContracts.Vfs(new MyVfs(), "/tmp/scratch")).Should().BeConformant();
 ```
+
+Run one `SeamContracts` suite against your real adapter and against the
+in-memory mock: a conformant pair is substitutable. Wire values follow the C0
+contract: RFC 3339 UTC instants, ISO 8601 durations, IANA timezone ids, and one
+lowercase wire name per enumeration.
 
 `nix develop .#ci -c ./scripts/ci/pkg-validate.sh` packs both packages, validates
 metadata and symbols, and restores them into a scratch consumer. See [the library baseline](docs/developer/dotnet-lib-baseline.md)

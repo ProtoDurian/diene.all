@@ -30,8 +30,8 @@
   <PropertyGroup>
     <Authors>AtomiCloud</Authors>
     <Company>AtomiCloud</Company>
-    <RepositoryUrl>https://github.com/ProtoDurian/diene.dotnet-lib</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/ProtoDurian/diene.dotnet-lib</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ProtoDurian/diene.dotnet-interfaces</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/ProtoDurian/diene.dotnet-interfaces</PackageProjectUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIcon>logo.png</PackageIcon>

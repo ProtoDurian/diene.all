@@ -25,8 +25,16 @@ export default defineGate({
       'Removing a public member the published 1.0.0 package ships, and nothing in Lib reads, turns PackageValidation red.',
     expectedImpact: [],
     async run(repo: any) {
-      await repo.patch('Lib/NotePrincipal.cs', {
-        find: '    public required string Id { get; init; }\n',
+      await repo.patch('Lib/SeamErrors.cs', {
+        find:
+          '    /// <summary>The environment variable could not be read.</summary>\n' +
+          '    public static SeamError EnvironmentUnavailable(string name, string detail) =>\n' +
+          '        new(\n' +
+          '            SeamKind.System,\n' +
+          '            "environment_unavailable",\n' +
+          '            "Environment variable unavailable",\n' +
+          '            detail,\n' +
+          '            [new("variable", name)]);\n\n',
         replace: '',
       });
       await expectRedBecause(
