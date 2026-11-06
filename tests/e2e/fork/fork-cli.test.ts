@@ -35,10 +35,10 @@ class CliRunner {
     return { code, stdout, stderr };
   }
 
-  async json(...args: string[]): Promise<unknown> {
+  async json(...args: string[]): Promise<object> {
     const result = await this.run(...args, '--json');
     if (result.code !== 0) throw new Error(`aseity ${args.join(' ')} exited ${result.code}: ${result.stderr}`);
-    return JSON.parse(result.stdout);
+    return JSON.parse(result.stdout) as object;
   }
 }
 
