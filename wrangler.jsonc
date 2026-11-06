@@ -1,0 +1,30 @@
+{
+  "name": "aseity",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "dist/web",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/mcp*", "/.well-known/*"]
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "00000000000000000000000000000000",
+      // Local dev only: the compose.dev.yaml Postgres; wrangler dev never reads the remote id.
+      "localConnectionString": "postgres://aseity:aseity@127.0.0.1:5432/aseity"
+    }
+  ],
+  "vars": {
+    "APP_URL": "http://localhost:8787",
+    "OAUTH_PROXY_URL": "",
+    "TENANT_APPROVAL": "manual",
+    "S3_ENDPOINT": "http://127.0.0.1:9000",
+    "S3_BUCKET": "aseity",
+    "S3_REGION": "auto",
+    "MAIL_FROM": "Aseity <no-reply@localhost>"
+  },
+  "triggers": { "crons": ["* * * * *"] }
+}

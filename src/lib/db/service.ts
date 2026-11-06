@@ -3,6 +3,9 @@ import type { IMigrationLedger, IMigrationSource } from './interfaces';
 import type { AppliedMigration, Migration, MigrationDrift } from './structures';
 
 export class MigrationPlanner {
+  /** Out-of-order files are refused by default: a lower version landing late means a merge went wrong. */
+  constructor(private readonly allowOutOfOrder = false) {}
+
   plan(available: readonly Migration[], applied: readonly AppliedMigration[]): Result<readonly Migration[], MigrationDrift> {
     const byVersion = new Map<number, Migration>();
     for (const migration of available) {
@@ -24,7 +27,7 @@ export class MigrationPlanner {
       .filter(migration => !appliedVersions.has(migration.version))
       .sort((left, right) => left.version - right.version);
     const early = pending.find(migration => migration.version < highestApplied);
-    if (early !== undefined) return Err(this.drift('out_of_order', early));
+    if (early !== undefined && !this.allowOutOfOrder) return Err(this.drift('out_of_order', early));
     return Ok(pending);
   }
 
