@@ -85,6 +85,10 @@ export class CliConfig {
     return this.load(ConfigRegistry.create().register('database', MigrateDatabaseSchema));
   }
 
+  admin() {
+    return this.migrate();
+  }
+
   fork() {
     return this.load(
       ConfigRegistry.create().register('database', ForkDatabaseSchema).register('storage', StorageSchema),

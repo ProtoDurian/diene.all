@@ -11,6 +11,7 @@ const cli = new AseityCli({
   stderr: process.stderr,
   migrate: directory => wiring.migrate(directory),
   forkService: () => wiring.forkService(),
+  adminService: () => wiring.adminService(),
 });
 
 process.exitCode = await cli.run(process.argv.slice(2));

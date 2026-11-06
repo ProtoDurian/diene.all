@@ -1,3 +1,4 @@
+import { PgUserRoleStore } from '../src/adapters/admin/pg-user-role-store';
 import { PgMigrator } from '../src/adapters/db/migrator';
 import { CopyBucketForker } from '../src/adapters/fork/copy-bucket-forker';
 import { LocalPostgresBrancher } from '../src/adapters/fork/local-postgres-brancher';
@@ -7,6 +8,7 @@ import { RandomSecretGenerator } from '../src/adapters/fork/random-secret-genera
 import { S3Client } from '../src/adapters/fork/s3-client';
 import { S3ForkBuckets } from '../src/adapters/fork/s3-fork-buckets';
 import { TigrisBucketForker } from '../src/adapters/fork/tigris-bucket-forker';
+import { AdminGrantService } from '../src/lib/admin/service';
 import { ForkNaming } from '../src/lib/fork/naming';
 import { ForkService } from '../src/lib/fork/service';
 import type { CliConfig } from './config';
@@ -17,6 +19,11 @@ export class Wiring {
   async migrate(directory: string): Promise<readonly string[]> {
     const config = await this.config.migrate();
     return new PgMigrator({ connectionString: config('database').url }).migrate(directory);
+  }
+
+  async adminService(): Promise<AdminGrantService> {
+    const config = await this.config.admin();
+    return new AdminGrantService(new PgUserRoleStore(config('database').url));
   }
 
   async forkService(): Promise<ForkService> {

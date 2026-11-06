@@ -1,6 +1,8 @@
 import { parseArgs } from 'node:util';
 import { ConfigValidationError } from '@atomicloud/diene.config';
+import type { AdminGrantService } from '../src/lib/admin/service';
 import type { ForkService } from '../src/lib/fork/service';
+import { AdminCommand } from './admin-command';
 import { ForkCommand } from './fork-command';
 import { Output, type Stream } from './output';
 import { SecretFile } from './secret-file';
@@ -11,6 +13,7 @@ interface CliDependencies {
   readonly stderr: Stream;
   migrate(directory: string): Promise<readonly string[]>;
   forkService(): Promise<ForkService>;
+  adminService(): Promise<AdminGrantService>;
 }
 
 const HELP = `Usage: aseity <command> [options]
@@ -20,6 +23,7 @@ Commands:
   fork create <name> [--secret-file <path>]    Copy the database and bucket, then sanitize the copy
   fork list                                    List forks
   fork delete <name>                           Delete a fork's database and bucket
+  admin grant <email>                          Give a signed-up user the admin role (approves tenants)
 
 Options:
   --json           Print machine-readable JSON
@@ -27,7 +31,7 @@ Options:
   -v, --version    Show the version
 
 Environment (prefix ASEITY_, nesting with __):
-  ASEITY_DATABASE__URL                         Source database URL (database owner role)
+  ASEITY_DATABASE__URL                         Database URL as the owner role (migrate, admin, local forks)
   ASEITY_DATABASE__PROVIDER                    local (CREATE DATABASE ... TEMPLATE) or neon
   ASEITY_DATABASE__NEON__API_KEY, __PROJECT_ID, __PARENT_BRANCH_ID, __DATABASE_NAME, __ROLE_NAME
   ASEITY_STORAGE__PROVIDER                     copy (any S3 store) or tigris (native fork)
@@ -81,6 +85,9 @@ export class AseityCli {
       const applied = await this.deps.migrate(values.dir ?? 'db/migrations');
       output.result(applied.length ? `applied ${applied.join(', ')}` : 'database is up to date', { applied });
       return 0;
+    }
+    if (command === 'admin' && action === 'grant' && name !== undefined && rest.length === 0) {
+      return new AdminCommand(await this.deps.adminService(), output).grant(name);
     }
     if (command === 'fork' && rest.length === 0) {
       if (action === 'list' && name === undefined) return this.fork(output).then(fork => fork.list());
