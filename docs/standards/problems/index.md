@@ -43,7 +43,7 @@ place that formats a type URI:
 - `version` is `v1`, `v2`, … (no `v0`, no leading zeros). A version bump
   deliberately mints a new Problem type; never change what a published
   version means.
-- `id` is snake_case.
+- `id` is snake_case, at most 63 characters.
 - The host must be a canonical lowercase `host` or `host:port`.
 
 Consumers never format a type URI themselves. `ProblemRegistry` calls the
@@ -65,12 +65,17 @@ refused at registration. `register` throws a `ProblemRegistryError`;
 
 `ProblemTransformer` turns unknown failures into Problems:
 
+- The options follow the fallback entry: a fallback with a data schema needs a
+  `fallbackData` mapper typed by that schema, and a fallback without one takes
+  none. The constructor refuses a mismatch for JavaScript callers.
 - `fromError(unknown)` walks nested `problem`, `error` and `cause` members
-  (stopping on cycles) only to find a Problem. With none, it mints the
-  configured fallback from the original thrown value: its message is the
-  `detail`, and it is what `fallbackData` and `instance` receive.
+  (stopping on cycles) to find a Problem. With none, it mints the configured
+  fallback from the original thrown value, which is what `fallbackData` and
+  `instance` receive. The `detail` is the first message found walking the
+  chain from that value (its own message first), else a generic detail.
 - `fromHttpError(response)` keeps a direct or nested Problem body, and
-  otherwise mints the fallback from the JSON, text or empty body. The response
+  otherwise mints the fallback from the JSON, text or empty body, with the
+  first message found in it as the `detail`. The response
   status replaces the Problem's status only when it is an error status;
   otherwise the body's or the entry's status stays.
 - A found Problem is rebuilt from `type`, `title`, `status`, `detail` and
@@ -130,8 +135,11 @@ The resource identity must be valid Kubernetes:
 - `metadata.namespace` is the platform. `metadata.name` is
   `service.module.landscape.version`, at most 253 characters. Labels carry no
   dot, so two rows never share a name.
-- The emitter refuses an empty catalog and any entry whose type URI does not
-  belong to the row.
+- The registry portal must be `https`: the published resource only admits
+  `https` type URIs. `http` stays legal for in-process type URIs.
+- The four segments must equal the registry portal's, and every entry's type
+  URI must belong to the row.
+- A catalog that declares nothing emits a valid empty row (`problems: []`).
 
 Commit the emitted rows to the service's primordial chart and drift-check them
 in CI. erbium merges the rows and publishes the edge catalog; frontends read

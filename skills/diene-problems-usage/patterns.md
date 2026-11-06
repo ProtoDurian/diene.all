@@ -8,7 +8,10 @@
 - Type URIs are
   `{scheme}://{host}/docs/{landscape}/{platform}/{service}/{module}/{version}/{id}`,
   built only by the registry from `ErrorPortalConfig`. `scheme` is `http` or
-  `https`, `version` is `v1`, `v2`, …, `id` is snake_case.
+  `https`, `version` is `v1`, `v2`, …, `id` is snake_case (at most 63
+  characters).
+- Service-tree values (`host`, `landscape`, `platform`, `service`, `module`)
+  come from the service's loaded config, never from literals in code.
 - A published `version` never changes meaning; bump it to mint a new type.
 - The generics are fixed: `validation_error` 400 recoverable
   `{ issues: [{ path, message, code? }] }`; `entity_not_found` 404 fatal and
@@ -17,27 +20,25 @@
   all three without data. They register at your row's version.
 - One `Problem` resource per `(platform, service, module, landscape, version)`
   row. The four identity segments must be DNS-1123 labels (lowercase, digits,
-  `-`, at most 63 characters).
+  `-`, at most 63 characters) and the registry portal must be `https`; `http`
+  is for in-process type URIs only. A catalog that declares nothing emits an
+  empty row.
+- A fallback with a data schema needs `fallbackData`; one without takes none.
 - `instance` only comes from your `instance` mapper; the transformer never
   copies an upstream URL into it.
 
 ## Registry with generics and a domain problem
 
 ```ts
+// problems.ts
 import { type ErrorPortalConfig, GenericProblemCatalog } from '@atomicloud/diene.problems';
 import { z } from 'zod';
+import { config } from './config.js'; // the service's loaded configuration
 
-const portal: ErrorPortalConfig = {
-  scheme: 'https',
-  host: 'errors.example.com',
-  landscape: 'raichu',
-  platform: 'nitroso',
-  service: 'zinc',
-  module: 'api',
-};
+const portal: ErrorPortalConfig = config.errorPortal;
 
-const registry = new GenericProblemCatalog().createGenericProblemRegistry(portal, 'v1');
-const NoteLocked = registry.register({
+export const registry = new GenericProblemCatalog().createGenericProblemRegistry(portal, 'v1');
+export const NoteLocked = registry.register({
   id: 'note_locked',
   title: 'Note Locked',
   status: 423,
@@ -45,7 +46,7 @@ const NoteLocked = registry.register({
   version: 'v1',
   dataSchema: z.object({ noteId: z.string() }).strict(),
 });
-const Unexpected = registry.register({
+export const Unexpected = registry.register({
   id: 'unexpected_error',
   title: 'Unexpected Error',
   status: 500,
@@ -105,11 +106,14 @@ const resource = new ProblemResourceEmitter().emitProblemResource(catalog, {
 ```ts
 import { it } from 'bun:test';
 import { ProblemTestHelper } from '@atomicloud/diene.problems/test-helper';
+import { NoteService } from './note-service.js'; // the service under test
+import { registry } from './problems.js';
 
 const helper = new ProblemTestHelper();
 
 it('returns entity_not_found for a missing note', async () => {
   // Arrange
+  const notes = new NoteService(registry);
   const expected = registry.require('entity_not_found');
 
   // Act
