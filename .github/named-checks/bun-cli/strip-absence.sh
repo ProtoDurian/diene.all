@@ -57,6 +57,8 @@ show() { git show "${tree}:$1"; }
 deps="$(show package.json | jq -r '[(.dependencies // {}), (.devDependencies // {}), (.peerDependencies // {})] | add | keys[] | select(test("^@opentelemetry/|^@atomicloud/diene\\."))')"
 [[ -z ${deps} ]] || fail "package.json declares observability dependencies: ${deps//$'\n'/, }"
 
+[[ "$(show dlint.yaml | yq '[.checks["toolchain-smoke"].binaries[] | select(test("^(helm|helm-docs|helmlint|kubeconform|kyverno)( |$)"))] | length')" == 0 ]] || fail "dlint.yaml smokes an H binary"
+if show CLAUDE.md | grep -qi '^# helm'; then fail "CLAUDE.md has a Helm section"; fi
 if show probes/binary-smoke.ts | grep -Eq '^(helm|helm-docs|helmlint) '; then fail "binary-smoke.ts smokes an H binary"; fi
 if git grep -n -i -E 'helm|image or chart' "${tree}" -- docs/standards/ci-cd/index.md; then fail "ci-cd publishing prose names Helm"; fi
 if git grep -n -F 'Docker, Helm, secrets' "${tree}" -- README.md; then fail "README.md lists Helm"; fi
