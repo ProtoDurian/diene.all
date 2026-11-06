@@ -74,7 +74,7 @@ formats.
 | `Temporal.PlainTime` | `HH:mm:ss`                         | `parseTime` / `formatTime`         |
 | `Temporal.Instant`   | RFC 3339 UTC instant ending in `Z` | `parseDateTime` / `formatDateTime` |
 | `Temporal.Duration`  | ISO 8601 duration                  | `parseDuration` / `formatDuration` |
-| `WireTimeZone`       | canonical IANA identifier          | `parseTimeZone` / `formatTimeZone` |
+| `WireTimeZone`       | case-normalized IANA id            | `parseTimeZone` / `formatTimeZone` |
 
 Every `parse*` method, and every `format*` method that can meet an
 unrepresentable value, returns `Result<…, WireDateError>`; `formatDuration` is
@@ -82,7 +82,8 @@ total and returns a string. `WireDateError` extends `RangeError` and names the
 `form` that failed. Parsing rejects non-canonical spellings; formatting emits the
 one canonical spelling. Fractional instant seconds are kept, while `HH:mm:ss`
 rejects a sub-second time rather than dropping precision. Fixed offsets and
-abbreviations are not timezones.
+abbreviations are not timezones. A timezone id is case-normalized only: links
+such as `Asia/Calcutta` are accepted as given, not resolved.
 
 ## TestHelper and the meta tier
 

@@ -103,7 +103,7 @@ class WireDateCodec {
     return duration.toString();
   }
 
-  // Polyfill 0.5.1 has no Temporal.TimeZone: a ZonedDateTime validates and canonicalizes the id.
+  // Polyfill 0.5.1 has no Temporal.TimeZone: a ZonedDateTime validates and case-normalizes the id (links stay as given).
   parseTimeZone(input: string): Result<WireTimeZone, WireDateError> {
     return this.attempt(
       'timezone',
@@ -119,7 +119,7 @@ class WireDateCodec {
       if (canonical !== input) {
         return this.fail<WireTimeZone>(
           'timezone',
-          `wire timezone must be the canonical IANA id "${canonical}", received "${input}"`,
+          `wire timezone must be the case-normalized IANA id "${canonical}", received "${input}"`,
         );
       }
       return Ok(canonical as WireTimeZone);

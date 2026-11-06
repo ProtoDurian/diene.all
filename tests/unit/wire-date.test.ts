@@ -240,7 +240,7 @@ describe('WireDateCodec timezone', () => {
     { wire: 'Not/AZone', message: /not a known IANA time zone/ },
     { wire: '', message: /not a known IANA time zone/ },
     { wire: '+01:00', message: /not a fixed offset/ },
-    { wire: 'asia/singapore', message: /canonical IANA id "Asia\/Singapore"/ },
+    { wire: 'asia/singapore', message: /case-normalized IANA id "Asia\/Singapore"/ },
   ])('should reject wire timezone "$wire"', async ({ wire, message }) => {
     // Arrange
     const input = wire;
