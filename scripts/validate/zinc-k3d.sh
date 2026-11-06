@@ -12,6 +12,7 @@ fi
 cluster_name="${K3D_CLUSTER_NAME:-diene-zinc}"
 registry_port="${K3D_REGISTRY_PORT:-5001}"
 sulfur_sha="${SULFUR_SHA:-dbeed3c7915065e34896a313006870e579591394}"
+sulfur_repo="${SULFUR_REPO:-https://github.com/ProtoDurian/diene.all.git}"
 namespace=certs
 fixture_ns=zinc-fixture
 prod=https://acme-v02.api.letsencrypt.org/directory
@@ -57,7 +58,7 @@ expect_release_owns_no_certificate() {
 if [ -n "${SULFUR_DIR:-}" ]; then
   sulfur="${SULFUR_DIR}"
 else
-  git rev-parse --verify --quiet "${sulfur_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${sulfur_sha}"
+  git rev-parse --verify --quiet "${sulfur_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags "${sulfur_repo}" "${sulfur_sha}"
   sulfur="${tmp}/sulfur"
   mkdir -p "${sulfur}"
   git archive "${sulfur_sha}" chart tests/fixtures | tar -x -C "${sulfur}"
