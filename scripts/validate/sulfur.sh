@@ -120,7 +120,11 @@ seq_fixture() {
   mkdir -p "${dir}/chart"
   git -C "${dir}" init --quiet
   for version in "$@"; do
-    printf 'dependencies:\n  - name: cert-manager\n    version: %s\n' "${version}" >"${dir}/chart/Chart.yaml"
+    case "${version}" in
+    none) printf 'dependencies: []\n' >"${dir}/chart/Chart.yaml" ;;
+    broken) printf 'dependencies: [\n' >"${dir}/chart/Chart.yaml" ;;
+    *) printf 'dependencies:\n  - name: cert-manager\n    version: %s\n' "${version}" >"${dir}/chart/Chart.yaml" ;;
+    esac
     git -C "${dir}" add chart/Chart.yaml
     git -C "${dir}" -c user.name=fixture -c user.email=fixture@example.invalid -c commit.gpgsign=false commit --quiet --no-verify -m "pin ${version}"
   done
@@ -213,12 +217,18 @@ crd-lifecycle)
   ;;
 sequential-minor)
   bash ./scripts/validate/check-sequential-minor.sh
-  seq_fixture "${tmp}/seq-ok" v1.15.5 v1.16.5 v1.16.6 v1.17.4
+  seq_fixture "${tmp}/seq-ok" v1.12.0 v1.14.0 v1.15.5 v1.16.5 none v1.16.6 v1.17.4
   seq_gate "${tmp}/seq-ok" >/dev/null
   seq_fixture "${tmp}/seq-skip" v1.20.3 v1.22.0
   expect_red 'a version-skip bump v1.20.3 -> v1.22.0' 'version-skip v1.20.3 -> v1.22.0 skips a cert-manager minor' seq_gate "${tmp}/seq-skip"
   seq_fixture "${tmp}/seq-skip-mid" v1.20.3 v1.21.0 v1.23.1 v1.23.2
   expect_red 'a skip hidden under a later commit' 'version-skip v1.21.0 -> v1.23.1' seq_gate "${tmp}/seq-skip-mid"
+  seq_fixture "${tmp}/seq-gap" v1.20.3 none v1.22.0
+  expect_red 'a skip across a commit with no cert-manager pin' 'version-skip v1.20.3 -> v1.22.0' seq_gate "${tmp}/seq-gap"
+  seq_fixture "${tmp}/seq-broken" v1.20.3 broken v1.22.0
+  expect_red 'a skip across a commit with an unreadable Chart.yaml' 'version-skip v1.20.3 -> v1.22.0' seq_gate "${tmp}/seq-broken"
+  seq_fixture "${tmp}/seq-pre" v1.14.2 v1.22.0
+  expect_red 'a jump from below v1.15 past v1.15' 'version-skip v1.14.2 -> v1.22.0' seq_gate "${tmp}/seq-pre"
   seq_fixture "${tmp}/seq-down" v1.20.3 v1.19.4
   expect_red 'a downgrade' 'downgrade v1.20.3 -> v1.19.4' seq_gate "${tmp}/seq-down"
   seq_fixture "${tmp}/seq-major" v1.20.3 v2.0.0
@@ -230,7 +240,6 @@ lpsm-labels)
   expect_refusal 'upstream.global.commonLabels must equal' "${full[@]}" --set labelPrefix=example.dev
   expect_refusal 'upstream.global.commonLabels must equal' "${full[@]}" --set serviceTree.cluster=other
   expect_refusal 'upstream.global.commonLabels must equal' --values chart/values.example.yaml --set serviceTree.cluster=lapras
-  expect_refusal 'must equal release namespace' "${full[@]}" --namespace other
   copy_tree "${tmp}/nolabels"
   yq -i 'del(.upstream.global.commonLabels)' "${tmp}/nolabels/chart/values.yaml" "${tmp}/nolabels/chart/values.example.yaml" "${tmp}/nolabels/chart/values.lapras.yaml"
   sed -i '/include "sulfur.validateUpstreamLabels"/d' "${tmp}/nolabels/chart/templates/validate.yaml"

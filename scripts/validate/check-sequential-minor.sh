@@ -20,16 +20,19 @@ head_pin="$(pin_at HEAD)"
 [[ ${head_pin} =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "❌ HEAD pins cert-manager '${head_pin}', not an exact vX.Y.Z" >&2 && exit 1; }
 
 steps=0
+last="$(pin_at "${base}")"
 while read -r commit; do
-  parent="$(git rev-parse --verify --quiet "${commit}^1" || true)"
-  [ -n "${parent}" ] || continue
-  from="$(pin_at "${parent}")" to="$(pin_at "${commit}")"
-  [ -n "${from}" ] && [ -n "${to}" ] || continue
+  to="$(pin_at "${commit}")"
+  [ -n "${to}" ] || continue
+  short="$(git rev-parse --short "${commit}")"
+  [[ ${to} =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "❌ ${short}: cert-manager pin '${to}' is not an exact vX.Y.Z" >&2 && exit 1; }
+  from="${last}"
+  last="${to}"
+  [ -n "${from}" ] || continue
   IFS=. read -r from_major from_minor _ <<<"${from#v}"
   IFS=. read -r to_major to_minor _ <<<"${to#v}"
-  [ "${from_major}" -eq 1 ] && [ "${from_minor}" -lt 15 ] && continue
+  [ "${from_major}" -eq 1 ] && [ "${from_minor}" -lt 15 ] && [ "${to_major}" -eq 1 ] && [ "${to_minor}" -lt 15 ] && continue
   steps=$((steps + 1))
-  short="$(git rev-parse --short "${commit}")"
   [ "${to_major}" = "${from_major}" ] || { echo "❌ ${short}: cert-manager major change ${from} -> ${to} is not a sequential-minor bump" >&2 && exit 1; }
   delta=$((to_minor - from_minor))
   [ "${delta}" -ge 0 ] || { echo "❌ ${short}: cert-manager downgrade ${from} -> ${to}" >&2 && exit 1; }

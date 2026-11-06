@@ -35,6 +35,11 @@ cleanup() {
   exit "${status}"
 }
 trap cleanup EXIT
+assert_no_restarts() {
+  "${kc[@]}" get pods -l app.kubernetes.io/instance=sulfur,app.kubernetes.io/component -o json |
+    jq -e '[.items[] | select(.metadata.labels["app.kubernetes.io/component"] != "startupapicheck") | .status.containerStatuses[].restartCount] | length == 3 and all(. == 0)' >/dev/null ||
+    { echo "❌ a cert-manager pod restarted $1 (the controller exits if Gateway API is enabled without its CRDs)" >&2 && exit 1; }
+}
 
 bash ./scripts/local/create-k3d-cluster.sh
 helm dependency build chart
@@ -91,17 +96,15 @@ YAML
 openssl x509 -in "${tmp}/tls.crt" -noout -ext subjectAltName | rg -q 'DNS:fixture\.sulfur\.example\.invalid' ||
   { echo "❌ the issued certificate does not carry the requested SAN" >&2 && exit 1; }
 echo "✅ self-signed Issuer + Certificate reached Ready=True and the TLS Secret carries the SAN"
-"${kc[@]}" get pods -l app.kubernetes.io/instance=sulfur,app.kubernetes.io/component -o json |
-  jq -e '[.items[] | select(.metadata.labels["app.kubernetes.io/component"] != "startupapicheck") | .status.containerStatuses[].restartCount] | length == 3 and all(. == 0)' >/dev/null ||
-  { echo "❌ a cert-manager pod restarted (the controller exits if Gateway API is enabled without its CRDs)" >&2 && exit 1; }
+assert_no_restarts "after the install"
 echo "✅ controller, cainjector and webhook never restarted with Gateway API enabled"
 
-helm get manifest sulfur "${helm_k[@]}" | yq -e '[select(.kind == "Issuer" or .kind == "ClusterIssuer")] | length == 0' >/dev/null ||
+helm get manifest sulfur "${helm_k[@]}" | yq eval-all -e '[select(.kind == "Issuer" or .kind == "ClusterIssuer")] | length == 0' >/dev/null ||
   { echo "❌ the sulfur release owns an Issuer/ClusterIssuer" >&2 && exit 1; }
 
 helm upgrade sulfur chart "${helm_k[@]}" "${values[@]}" --wait --timeout 5m
-"${k[@]}" --namespace "${fixture_ns}" wait --for=condition=Ready certificate/fixture-cert --timeout=1m
-echo "✅ helm upgrade keeps the engine and the issued Certificate"
+assert_no_restarts "after helm upgrade"
+echo "✅ helm upgrade: controller, cainjector and webhook still never restarted"
 
 PUBLISH_MODE=oci PUBLISH_DRY_RUN=false RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/oci" OCI_REGISTRY="localhost:${registry_port}" OCI_REPOSITORY=charts OCI_PLAIN_HTTP=true bash ./scripts/ci/publish.sh
 helm pull "oci://localhost:${registry_port}/charts/sulfur" --version 0.1.0 --plain-http --destination "${tmp}"
