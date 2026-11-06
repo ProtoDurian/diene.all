@@ -1,376 +1,204 @@
-import { describe, it } from 'bun:test';
-// The int tier dogfoods the SHIPPED mocks and assertion helpers from
-// @atomicloud/diene.otel/test-helper (which re-exports the registry logging and
-// metrics mocks). bunfig.int.toml excludes src/test-helper/** so the meta code
-// never enters the adapters coverage ledger.
+import { afterEach, describe, it } from 'bun:test';
+import { portError } from '@atomicloud/diene.interfaces';
 import {
   assertLogRecords,
   assertMetricRecords,
-  assertResourceAttributes,
-  assertTraceRecords,
   InMemoryLoggerSink,
   InMemoryMetricsCollector,
-  InMemoryTraceEmitter,
-} from '@atomicloud/diene.otel/test-helper';
+} from '@atomicloud/diene.interfaces/test-helper';
+import { trace } from '@opentelemetry/api';
 import 'should';
-import { initOtel, selectedExporters } from '../../src/adapters/init';
+import { OtelBootstrap } from '../../src/adapters/init';
+import { LoggerSignalFactory } from '../../src/adapters/signals/logs';
+import { MetricSignalFactory } from '../../src/adapters/signals/metrics';
+import { TraceSignalFactory } from '../../src/adapters/signals/traces';
 import type { AppIdentity } from '../../src/lib/resource';
 import { defaultOtelBlock, type OtelBlock } from '../../src/lib/schema';
-import { makeCaptureStream, makeTracer } from './support/doubles';
-import { makeFailingFlushTraceEmitter, makeMetricFactories, makeTraceFactories } from './support/factories';
+import { TraceError } from '../../src/lib/trace-seam';
+import { InMemoryTraceEmitter } from '../../src/test-helper/helper';
+import { CaptureStream, RecordingMetricExporters, RecordingTraceFactories } from './support/doubles';
 import { expectOk } from './support/result';
 
 const identity: AppIdentity = {
   landscape: 'lapras',
   platform: 'atomi',
-  service: 'diene',
-  module: 'otel',
-  version: '1.0.0',
+  service: 'svc',
+  module: 'api',
+  version: '2.0.0',
+};
+const semantic = {
+  'deployment.environment.name': 'lapras',
+  'service.namespace': 'atomi',
+  'service.name': 'svc',
+  'service.version': '2.0.0',
+  'atomi.landscape': 'lapras',
+  'atomi.module': 'api',
+  'atomi.platform': 'atomi',
+  'atomi.service': 'svc',
+  'atomi.version': '2.0.0',
+};
+const on = {
+  console: { enabled: true },
+  otlp: { ...defaultOtelBlock.logs.exporter.otlp, enabled: true, endpoint: 'http://127.0.0.1:4318' },
+};
+const liveBlock: OtelBlock = {
+  logs: { enabled: true, exporter: on },
+  metrics: { ...defaultOtelBlock.metrics, exporter: on },
+  traces: { ...defaultOtelBlock.traces, exporter: on },
 };
 
-function baseBlock(): OtelBlock {
-  return { ...defaultOtelBlock };
+function recordingBootstrap(failures: { flush?: boolean; shutdown?: boolean } = {}) {
+  const metricExporters = new RecordingMetricExporters();
+  const traceFactories = new RecordingTraceFactories(failures);
+  const bootstrap = new OtelBootstrap({
+    logs: new LoggerSignalFactory(),
+    metrics: new MetricSignalFactory(metricExporters),
+    traces: new TraceSignalFactory(traceFactories),
+  });
+  return { bootstrap, metricExporters, traceFactories };
 }
 
-function tracesActiveBlock(): OtelBlock {
-  return {
-    ...defaultOtelBlock,
-    traces: {
-      ...defaultOtelBlock.traces,
-      exporter: { ...defaultOtelBlock.traces.exporter, console: { enabled: true } },
-    },
-  };
-}
+afterEach(() => trace.disable());
 
-// Every signal ships an enabled OTLP exporter with a valid endpoint. Injecting
-// seams over this block proves the SDK pipeline is never built for a signal an
-// injected double owns, even when its exporter would otherwise be selected.
-function otlpEnabledBlock(): OtelBlock {
-  const otlp = {
-    enabled: true,
-    endpoint: 'http://otel-collector:4318',
-    protocol: 'http/protobuf' as const,
-    headers: {},
-    timeout: 'PT10S',
-  };
-  return {
-    ...defaultOtelBlock,
-    logs: { ...defaultOtelBlock.logs, exporter: { ...defaultOtelBlock.logs.exporter, otlp } },
-    metrics: { ...defaultOtelBlock.metrics, exporter: { ...defaultOtelBlock.metrics.exporter, otlp } },
-    traces: { ...defaultOtelBlock.traces, exporter: { ...defaultOtelBlock.traces.exporter, otlp } },
-  };
-}
+describe('OtelBootstrap off by default', () => {
+  it('should build no provider and stay inactive for the canonical block', async () => {
+    // Arrange
+    const { bootstrap, metricExporters, traceFactories } = recordingBootstrap();
 
-function injected() {
-  return {
-    trace: makeTraceFactories(makeTracer().tracer),
-    metric: makeMetricFactories(),
-  };
-}
-
-describe('selectedExporters', () => {
-  it('should force every signal to no exporters when the SDK is disabled', () => {
     // Act
-    const actual = selectedExporters(true, defaultOtelBlock, {});
+    const runtime = bootstrap.init(defaultOtelBlock, identity, { environment: {} });
+    await runtime.flush();
+    await runtime.shutdown();
 
     // Assert
-    actual.logs.should.eql({ console: false, otlp: false });
-    actual.metrics.should.eql({ console: false, otlp: false });
-    actual.traces.should.eql({ console: false, otlp: false });
+    runtime.active.should.eql({ logs: false, metrics: false, traces: false });
+    metricExporters.calls.should.eql([]);
+    traceFactories.calls.should.eql([]);
+    runtime.otlpLogsBridge.should.eql('stubbed');
+    runtime.resourceAttributes.should.eql(semantic);
   });
 
-  it('should resolve per-signal selections from the block when enabled', () => {
-    // Arrange - traces console enabled in the block
-    const block: OtelBlock = {
-      ...defaultOtelBlock,
-      traces: {
-        ...defaultOtelBlock.traces,
-        exporter: { ...defaultOtelBlock.traces.exporter, console: { enabled: true } },
-      },
-    };
+  it('should read process.env when no environment is given', () => {
+    // Arrange
+    const bootstrap = new OtelBootstrap();
 
     // Act
-    const actual = selectedExporters(false, block, {});
+    const runtime = bootstrap.init(defaultOtelBlock, identity);
 
     // Assert
-    actual.traces.should.eql({ console: true, otlp: false });
-    actual.logs.should.eql({ console: false, otlp: false });
+    runtime.block.should.eql(defaultOtelBlock);
+    runtime.identity.should.eql(identity);
+  });
+
+  it('should build nothing when OTEL_SDK_DISABLED is true, even with seams', async () => {
+    // Arrange
+    const { bootstrap, metricExporters, traceFactories } = recordingBootstrap();
+    const logger = new InMemoryLoggerSink();
+
+    // Act
+    const runtime = bootstrap.init(liveBlock, identity, {
+      environment: { OTEL_SDK_DISABLED: 'true' },
+      seams: { logger },
+    });
+    await expectOk(runtime.loggerSink.emit({ level: 'info', message: 'dropped' }));
+
+    // Assert
+    runtime.active.should.eql({ logs: false, metrics: false, traces: false });
+    metricExporters.calls.should.eql([]);
+    traceFactories.calls.should.eql([]);
+    logger.records.should.eql([]);
   });
 });
 
-describe('initOtel', () => {
-  it('should construct no exporters and report inactive signals when every exporter is off (G1)', async () => {
+describe('OtelBootstrap with the shared interfaces mocks', () => {
+  it('should route every signal into the injected seams and build no SDK pipeline', async () => {
     // Arrange
-    const { trace, metric } = injected();
-
-    // Act - the canonical block: signals enabled, all exporters off
-    const runtime = initOtel(baseBlock(), identity, {
-      environment: {},
-      traceSignalFactories: trace.factories,
-      metricExporterFactories: metric.factories,
-    });
-
-    // Assert - nothing built a client, reader, processor or provider
-    runtime.active.should.eql({ logs: false, metrics: false, traces: false });
-    trace.consoleCalls.should.eql(0);
-    trace.otlpCalls.should.eql(0);
-    trace.processorCalls.should.eql(0);
-    trace.providerCalls.should.eql(0);
-    trace.registerCalls.should.eql(0);
-    metric.consoleCalls.should.eql(0);
-    metric.otlpCalls.should.eql(0);
-    runtime.resourceAttributes.should.containEql({ 'service.name': 'diene', 'atomi.module': 'otel' });
-    runtime.otlpLogsBridge.should.eql('stubbed');
-
-    // Cleanup
-    await runtime.shutdown();
-  });
-
-  it('should adopt injected seams and route payloads through them', async () => {
-    // Arrange - the shipped in-memory seams capture what the runtime emits
-    const { trace, metric } = injected();
+    const { bootstrap, metricExporters, traceFactories } = recordingBootstrap();
     const logger = new InMemoryLoggerSink();
     const metrics = new InMemoryMetricsCollector();
     const traces = new InMemoryTraceEmitter();
+    const runtime = bootstrap.init(liveBlock, identity, { environment: {}, seams: { logger, metrics, traces } });
 
     // Act
-    const runtime = initOtel(baseBlock(), identity, {
-      environment: {},
-      seams: { logger, metrics, traces },
-      traceSignalFactories: trace.factories,
-      metricExporterFactories: metric.factories,
-    });
-
-    // Assert - the runtime exposes the injected seams, not the SDK-backed ones
-    (runtime.loggerSink === logger).should.be.true();
-    (runtime.metricsCollector === metrics).should.be.true();
-    (runtime.traceEmitter === traces).should.be.true();
-
-    // Act - emit one payload per signal through the runtime seams
-    await expectOk(runtime.loggerSink.emit({ level: 'info', message: 'ready' }));
-    await expectOk(runtime.metricsCollector.record({ kind: 'counter', name: 'starts', value: 1 }));
-    await expectOk(runtime.traceEmitter.emit({ name: 'boot' }));
-
-    // Assert - captured by the mocks and cross-checked with the shipped helpers
-    assertLogRecords(logger, [{ level: 'info', message: 'ready' }]);
-    assertMetricRecords(metrics, [{ kind: 'counter', name: 'starts', value: 1 }]);
-    assertTraceRecords(traces, [{ name: 'boot' }]);
-
-    // Assert - the mapped resource attributes match the fixed R14 mapping
-    assertResourceAttributes(runtime.resourceAttributes, {
-      'deployment.environment.name': 'lapras',
-      'service.namespace': 'atomi',
-      'service.name': 'diene',
-      'service.version': '1.0.0',
-      'atomi.landscape': 'lapras',
-      'atomi.module': 'otel',
-      'atomi.platform': 'atomi',
-      'atomi.service': 'diene',
-      'atomi.version': '1.0.0',
-    });
-
-    // Cleanup
+    await expectOk(runtime.loggerSink.emit({ level: 'info', message: 'hi', attributes: { a: 1 } }));
+    await expectOk(runtime.metricsCollector.record({ kind: 'counter', name: 'jobs', value: 1 }));
+    await expectOk(runtime.traceEmitter.emit({ name: 'work' }));
     await runtime.shutdown();
-  });
 
-  it('should select injected seams before SDK construction even with OTLP enabled', async () => {
-    // Arrange - every signal ships an enabled OTLP exporter, yet all three seams
-    // are injected. The reconciliation must happen before any SDK construction.
-    const { trace, metric } = injected();
-    const logger = new InMemoryLoggerSink();
-    const metrics = new InMemoryMetricsCollector();
-    const traces = new InMemoryTraceEmitter();
-    const capture = makeCaptureStream();
-
-    // Act
-    const runtime = initOtel(otlpEnabledBlock(), identity, {
-      environment: {},
-      destination: capture,
-      seams: { logger, metrics, traces },
-      traceSignalFactories: trace.factories,
-      metricExporterFactories: metric.factories,
-    });
-
-    // Assert - no exporter, reader, processor, provider or registration was built
-    trace.consoleCalls.should.eql(0);
-    trace.otlpCalls.should.eql(0);
-    trace.processorCalls.should.eql(0);
-    trace.providerCalls.should.eql(0);
-    trace.registerCalls.should.eql(0);
-    metric.consoleCalls.should.eql(0);
-    metric.otlpCalls.should.eql(0);
+    // Assert
+    assertLogRecords(logger, [{ level: 'info', message: 'hi', attributes: { a: 1 } }]);
+    assertMetricRecords(metrics, [{ kind: 'counter', name: 'jobs', value: 1 }]);
+    traces.records.should.eql([{ name: 'work' }]);
     runtime.active.should.eql({ logs: false, metrics: false, traces: false });
-
-    // Assert - the runtime exposes the injected seams, not SDK-backed ones
-    (runtime.loggerSink === logger).should.be.true();
-    (runtime.metricsCollector === metrics).should.be.true();
-    (runtime.traceEmitter === traces).should.be.true();
-
-    // Act - emissions still reach the injected seams
-    await expectOk(runtime.loggerSink.emit({ level: 'info', message: 'ready' }));
-    await expectOk(runtime.metricsCollector.record({ kind: 'counter', name: 'starts', value: 1 }));
-    await expectOk(runtime.traceEmitter.emit({ name: 'boot' }));
-
-    // Assert - captured by the mocks; no active pino output reached the stream
-    assertLogRecords(logger, [{ level: 'info', message: 'ready' }]);
-    assertMetricRecords(metrics, [{ kind: 'counter', name: 'starts', value: 1 }]);
-    assertTraceRecords(traces, [{ name: 'boot' }]);
-    capture.lines.should.eql([]);
-
-    // Cleanup
-    await runtime.shutdown();
+    metricExporters.calls.should.eql([]);
+    traceFactories.calls.should.eql([]);
+    runtime.resourceAttributes.should.eql(semantic);
   });
 
-  it('should ignore seams and stay inactive when OTEL_SDK_DISABLED is set', async () => {
+  it('should keep a flush failure from a seam as a shutdown failure', async () => {
     // Arrange
-    const { trace, metric } = injected();
-    const logger = new InMemoryLoggerSink();
     const traces = new InMemoryTraceEmitter();
+    const runtime = new OtelBootstrap().init(liveBlock, identity, { environment: {}, seams: { traces } });
+    traces.failNext(new TraceError('io', 'flush', 'trace flush failed'));
 
     // Act
-    const runtime = initOtel(baseBlock(), identity, {
-      environment: { OTEL_SDK_DISABLED: 'true' },
-      seams: { logger, traces },
-      traceSignalFactories: trace.factories,
-      metricExporterFactories: metric.factories,
-    });
-
-    // Assert - disabled init falls back to the (no-op) signal seams
-    runtime.active.should.eql({ logs: false, metrics: false, traces: false });
-    (runtime.loggerSink === logger).should.be.false();
-    (runtime.traceEmitter === traces).should.be.false();
-
-    // Cleanup
-    await runtime.shutdown();
-  });
-
-  it('should no-op flush after shutdown', async () => {
-    // Arrange - the shipped mock records every flush call it receives
-    const { trace, metric } = injected();
-    const traces = new InMemoryTraceEmitter();
-    const runtime = initOtel(baseBlock(), identity, {
-      environment: {},
-      seams: { logger: new InMemoryLoggerSink(), metrics: new InMemoryMetricsCollector(), traces },
-      traceSignalFactories: trace.factories,
-      metricExporterFactories: metric.factories,
-    });
-    const flushes = (): number => traces.calls.filter(call => call.method === 'flush').length;
-
-    // Act
-    await runtime.flush();
-    await runtime.shutdown();
-    const flushesBeforeReflush = flushes();
-    await runtime.flush();
-
-    // Assert - the post-shutdown flush is a no-op
-    flushes().should.eql(flushesBeforeReflush);
-  });
-
-  it('should shut down providers exactly once across repeated calls', async () => {
-    // Arrange - an active trace exporter builds a real (faked) provider to shut down
-    const { trace, metric } = injected();
-    const runtime = initOtel(tracesActiveBlock(), identity, {
-      environment: {},
-      traceSignalFactories: trace.factories,
-      metricExporterFactories: metric.factories,
-    });
-
-    // Act
-    await Promise.all([runtime.shutdown(), runtime.shutdown()]);
+    const failure = await runtime.shutdown().catch((error: unknown) => error);
 
     // Assert
-    trace.provider.shutdownCalls.should.eql(1);
+    (failure instanceof AggregateError).should.be.true();
+    (failure as AggregateError).errors.length.should.eql(1);
+    await runtime.shutdown();
+    trace.disable();
   });
+});
 
-  it('should aggregate flush and shutdown failures into an AggregateError', async () => {
-    // Arrange - an injected trace seam whose flush errors. The seam owns the
-    // signal, so no SDK provider is built; the flush failure alone must surface.
-    const trace = makeTraceFactories(makeTracer().tracer, { shutdown: true });
-    const metric = makeMetricFactories();
-    const runtime = initOtel(baseBlock(), identity, {
-      environment: {},
-      seams: {
-        logger: new InMemoryLoggerSink(),
-        metrics: new InMemoryMetricsCollector(),
-        traces: makeFailingFlushTraceEmitter(),
-      },
-      traceSignalFactories: trace.factories,
-      metricExporterFactories: metric.factories,
+describe('OtelBootstrap with SDK pipelines', () => {
+  it('should export metrics and spans on the mapped resource and log with the resource', async () => {
+    // Arrange
+    const { metricExporters, traceFactories } = recordingBootstrap();
+    const stream = new CaptureStream();
+    const bootstrap = new OtelBootstrap({
+      metrics: new MetricSignalFactory(metricExporters),
+      traces: new TraceSignalFactory(traceFactories),
     });
+    const runtime = bootstrap.init(liveBlock, identity, { environment: {}, destination: stream });
 
     // Act
-    let caught: unknown;
-    try {
-      await runtime.shutdown();
-    } catch (error) {
-      caught = error;
-    }
+    await expectOk(runtime.loggerSink.emit({ level: 'info', message: 'hello' }));
+    await expectOk(runtime.metricsCollector.record({ kind: 'counter', name: 'jobs', value: 2 }));
+    await expectOk(runtime.traceEmitter.emit({ name: 'work' }));
+    await runtime.flush();
 
     // Assert
-    (caught instanceof AggregateError).should.be.true();
-  });
-
-  it('should aggregate an active provider shutdown rejection', async () => {
-    // Arrange - an active trace pipeline whose provider rejects shutdown
-    const trace = makeTraceFactories(makeTracer().tracer, { shutdown: true });
-    const metric = makeMetricFactories();
-    const runtime = initOtel(tracesActiveBlock(), identity, {
-      environment: {},
-      traceSignalFactories: trace.factories,
-      metricExporterFactories: metric.factories,
+    runtime.active.should.eql({ logs: true, metrics: true, traces: true });
+    stream.lines[0]?.should.match({ ...semantic, msg: 'hello' });
+    metricExporters.exporter.getMetrics()[0]?.resource.attributes.should.eql(semantic);
+    traceFactories.exporter.getFinishedSpans()[0]?.resource.attributes.should.eql(semantic);
+    metricExporters.otlpOptions[0]?.should.eql({
+      url: 'http://127.0.0.1:4318/v1/metrics',
+      headers: {},
+      timeoutMillis: 10_000,
     });
-
-    // Act
-    let caught: unknown;
-    try {
-      await runtime.shutdown();
-    } catch (error) {
-      caught = error;
-    }
-
-    // Assert - the allSettled rejection is retained in the aggregate
-    (caught instanceof AggregateError).should.be.true();
-  });
-
-  it('should tolerate a missing metrics provider on shutdown', async () => {
-    // Arrange - metrics disabled means createMetricSignal builds no provider
-    const { trace, metric } = injected();
-    const block: OtelBlock = { ...defaultOtelBlock, metrics: { ...defaultOtelBlock.metrics, enabled: false } };
-    const runtime = initOtel(block, identity, {
-      environment: {},
-      traceSignalFactories: trace.factories,
-      metricExporterFactories: metric.factories,
-    });
-
-    // Act / Assert
-    runtime.active.metrics.should.be.false();
+    runtime.tracer.should.not.be.undefined();
+    runtime.meter.should.not.be.undefined();
+    runtime.logger.should.not.be.undefined();
+    runtime.resource.attributes.should.eql(semantic);
     await runtime.shutdown();
   });
 
-  it('should default the environment to process.env and use real providers', async () => {
-    // Arrange - isolate the OTEL_* keys init reads so the run is deterministic
-    const keys = [
-      'OTEL_SDK_DISABLED',
-      'OTEL_LOGS_EXPORTER',
-      'OTEL_METRICS_EXPORTER',
-      'OTEL_TRACES_EXPORTER',
-      'OTEL_TRACES_SAMPLER',
-    ];
-    const saved = new Map(keys.map(key => [key, process.env[key]]));
-    for (const key of keys) delete process.env[key];
-    const capture = makeCaptureStream();
+  it('should collect every provider shutdown failure into one AggregateError', async () => {
+    // Arrange
+    const { bootstrap } = recordingBootstrap({ flush: true, shutdown: true });
+    const metrics = new InMemoryMetricsCollector();
+    metrics.failNext(portError('metrics', 'io', 'flush', 'metric flush failed'));
+    const runtime = bootstrap.init(liveBlock, identity, { environment: {}, seams: { metrics } });
 
-    try {
-      // Act - no options.environment and no injected factories: real SDK, exporters off
-      const runtime = initOtel(baseBlock(), identity, { destination: capture });
+    // Act
+    const failure = await runtime.shutdown().catch((error: unknown) => error);
 
-      // Assert - exporters off means no active signal and no leaked timers
-      runtime.active.should.eql({ logs: false, metrics: false, traces: false });
-
-      // Cleanup
-      await runtime.shutdown();
-    } finally {
-      for (const [key, value] of saved) if (value !== undefined) process.env[key] = value;
-    }
+    // Assert
+    (failure instanceof AggregateError).should.be.true();
+    (failure as AggregateError).message.should.eql('OpenTelemetry shutdown failed');
+    (failure as AggregateError).errors.length.should.eql(2);
   });
 });

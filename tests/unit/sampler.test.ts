@@ -1,92 +1,69 @@
 import { describe, it } from 'bun:test';
-import {
-  AlwaysOffSampler,
-  AlwaysOnSampler,
-  ParentBasedSampler,
-  TraceIdRatioBasedSampler,
-} from '@opentelemetry/sdk-trace-base';
-import 'should';
-import type { Environment } from '../../src/lib/environment';
+import { context, ROOT_CONTEXT, SpanKind, trace } from '@opentelemetry/api';
+import { AlwaysOffSampler, AlwaysOnSampler, ParentBasedSampler, SamplingDecision } from '@opentelemetry/sdk-trace-base';
+import should from 'should';
+import { OtelEnvironment } from '../../src/lib/environment';
+import { TraceSamplerFactory } from '../../src/lib/sampler';
 import type { OtelSampler } from '../../src/lib/schema';
-import { createTraceSampler } from '../../src/lib/sampler';
 
-const noEnv: Environment = {};
+const factory = new TraceSamplerFactory();
+const none = new OtelEnvironment({});
 
-describe('createTraceSampler', () => {
-  it('should map parentbased_traceidratio to a ParentBased(TraceIdRatioBased) sampler', () => {
+describe('TraceSamplerFactory', () => {
+  it.each([
+    ['always_on', AlwaysOnSampler],
+    ['always_off', AlwaysOffSampler],
+    ['parentbased_traceidratio', ParentBasedSampler],
+  ] as const)('should map %s to its native sampler', (type, expected) => {
     // Arrange
-    const config: OtelSampler = { type: 'parentbased_traceidratio', ratio: 0.25 };
+    const config: OtelSampler = { type, ratio: 1 };
 
     // Act
-    const actual = createTraceSampler(config, noEnv);
-
-    // Assert - Q-I46: the parent-based ratio sampler wraps a ratio root
-    (actual instanceof ParentBasedSampler).should.be.true();
-  });
-
-  it('should map always_on to an AlwaysOnSampler', () => {
-    // Arrange
-    const config: OtelSampler = { type: 'always_on', ratio: 1 };
-
-    // Act
-    const actual = createTraceSampler(config, noEnv);
+    const actual = factory.create(config, none);
 
     // Assert
-    (actual instanceof AlwaysOnSampler).should.be.true();
-  });
-
-  it('should map always_off to an AlwaysOffSampler', () => {
-    // Arrange
-    const config: OtelSampler = { type: 'always_off', ratio: 0 };
-
-    // Act
-    const actual = createTraceSampler(config, noEnv);
-
-    // Assert
-    (actual instanceof AlwaysOffSampler).should.be.true();
+    (actual instanceof expected).should.be.true();
   });
 
   it.each([
-    ['the inclusive lower bound', 0],
-    ['the inclusive upper bound', 1],
-  ])('should accept a ratio at %s', (_label, ratio) => {
+    [0, SamplingDecision.NOT_RECORD],
+    [1, SamplingDecision.RECORD_AND_SAMPLED],
+  ])('should sample a root span by the ratio %d', (ratio, expected) => {
     // Arrange
-    const config: OtelSampler = { type: 'parentbased_traceidratio', ratio };
+    const sampler = factory.create({ type: 'parentbased_traceidratio', ratio }, none);
 
     // Act
-    const actual = createTraceSampler(config, noEnv);
-
-    // Assert - a ratio root is still constructed at either bound
-    (actual instanceof ParentBasedSampler).should.be.true();
-    (new TraceIdRatioBasedSampler(ratio) instanceof TraceIdRatioBasedSampler).should.be.true();
-  });
-
-  it('should defer to the SDK by omitting the programmatic sampler when OTEL_TRACES_SAMPLER is set', () => {
-    // Arrange - Q-I46: a set OTEL_TRACES_SAMPLER wins; the lib must not clobber it
-    const config: OtelSampler = { type: 'always_on', ratio: 1 };
-    const environment: Environment = { OTEL_TRACES_SAMPLER: 'traceidratio' };
-
-    // Act
-    const actual = createTraceSampler(config, environment);
+    const actual = sampler?.shouldSample(ROOT_CONTEXT, 'ab'.repeat(16), 'root', SpanKind.INTERNAL, {}, []);
 
     // Assert
-    (actual === undefined).should.be.true();
+    (actual?.decision ?? 'none').should.eql(expected);
   });
 
-  it('should read OTEL_TRACES_SAMPLER from process.env when no environment is supplied', () => {
+  it('should follow a sampled parent even at ratio 0', () => {
     // Arrange
-    const config: OtelSampler = { type: 'always_on', ratio: 1 };
-    const saved = process.env.OTEL_TRACES_SAMPLER;
-    delete process.env.OTEL_TRACES_SAMPLER;
+    const sampler = factory.create({ type: 'parentbased_traceidratio', ratio: 0 }, none);
+    const parent = trace.setSpanContext(context.active(), {
+      traceId: 'ab'.repeat(16),
+      spanId: 'cd'.repeat(8),
+      traceFlags: 1,
+      isRemote: true,
+    });
 
-    try {
-      // Act
-      const actual = createTraceSampler(config);
+    // Act
+    const actual = sampler?.shouldSample(parent, 'ab'.repeat(16), 'child', SpanKind.INTERNAL, {}, []);
 
-      // Assert - unset env means the programmatic sampler is built
-      (actual instanceof AlwaysOnSampler).should.be.true();
-    } finally {
-      if (saved !== undefined) process.env.OTEL_TRACES_SAMPLER = saved;
-    }
+    // Assert
+    (actual?.decision ?? 'none').should.eql(SamplingDecision.RECORD_AND_SAMPLED);
+  });
+
+  it('should leave the sampler to the SDK when OTEL_TRACES_SAMPLER is set', () => {
+    // Arrange
+    const environment = new OtelEnvironment({ OTEL_TRACES_SAMPLER: 'traceidratio' });
+
+    // Act
+    const actual = factory.create({ type: 'always_on', ratio: 1 }, environment);
+
+    // Assert
+    should(actual).be.undefined();
   });
 });

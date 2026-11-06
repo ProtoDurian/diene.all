@@ -2,25 +2,14 @@ import type { LoggerSink, MetricsCollector, TelemetryAttributes } from '@atomicl
 import type { Meter, Tracer } from '@opentelemetry/api';
 import type { Resource } from '@opentelemetry/resources';
 import type { DestinationStream, Logger } from 'pino';
-import { exporterSelection, type Environment, type ExporterSelection, isOtelSdkDisabled } from '../lib/environment.js';
-import { appIdentitySchema, createOtelResource, type AppIdentity, resourceAttributes } from '../lib/resource.js';
+import type { OtelEnvironmentRecord, SignalFlags } from '../lib/environment.js';
+import { OtelPlanner } from '../lib/plan.js';
+import type { AppIdentity } from '../lib/resource.js';
+import type { OtelBlock } from '../lib/schema.js';
 import type { TraceEmitter } from '../lib/trace-seam.js';
-import { otelBlockSchema, type OtelBlock } from '../lib/schema.js';
-import { createLoggerSignal, type LoggerSignal } from './signals/logs.js';
-import {
-  createMetricSignal,
-  inactiveMetricSignal,
-  type MetricExporterFactories,
-  type MetricSignal,
-} from './signals/metrics.js';
-import {
-  createTraceSignal,
-  inactiveTraceSignal,
-  type TraceSignal,
-  type TraceSignalFactories,
-} from './signals/traces.js';
-
-const NO_EXPORTERS: ExporterSelection = Object.freeze({ console: false, otlp: false });
+import { LoggerSignalFactory, type OTLP_LOGS_BRIDGE_STATUS } from './signals/logs.js';
+import { type MetricSignal, MetricSignalFactory } from './signals/metrics.js';
+import { type TraceSignal, TraceSignalFactory } from './signals/traces.js';
 
 interface OtelSeamOverrides {
   readonly logger?: LoggerSink;
@@ -30,32 +19,26 @@ interface OtelSeamOverrides {
 
 interface OtelInitOptions {
   readonly destination?: DestinationStream;
-  /**
-   * Overrides this library's environment decisions for deterministic tests.
-   * SDK-native parsing still reads `process.env`; production callers should
-   * omit this option (or pass `process.env`) when relying on standard OTEL_* vars.
-   */
-  readonly environment?: Environment;
-  readonly metricExporterFactories?: MetricExporterFactories;
+  readonly environment?: OtelEnvironmentRecord;
   readonly seams?: OtelSeamOverrides;
-  readonly traceSignalFactories?: TraceSignalFactories;
 }
 
-interface OtelActiveSignals {
-  readonly logs: boolean;
-  readonly metrics: boolean;
-  readonly traces: boolean;
+interface OtelBootstrapCollaborators {
+  readonly planner?: OtelPlanner;
+  readonly logs?: LoggerSignalFactory;
+  readonly metrics?: MetricSignalFactory;
+  readonly traces?: TraceSignalFactory;
 }
 
 interface OtelRuntime {
-  readonly active: OtelActiveSignals;
+  readonly active: SignalFlags;
   readonly block: OtelBlock;
   readonly identity: AppIdentity;
   readonly logger: Logger;
   readonly loggerSink: LoggerSink;
   readonly meter: Meter;
   readonly metricsCollector: MetricsCollector;
-  readonly otlpLogsBridge: LoggerSignal['otlpBridge'];
+  readonly otlpLogsBridge: typeof OTLP_LOGS_BRIDGE_STATUS;
   readonly resource: Resource;
   readonly resourceAttributes: TelemetryAttributes;
   readonly traceEmitter: TraceEmitter;
@@ -64,130 +47,123 @@ interface OtelRuntime {
   shutdown(): Promise<void>;
 }
 
-function selectedExporters(
-  disabled: boolean,
-  block: OtelBlock,
-  environment: Environment,
-): Readonly<{ logs: ExporterSelection; metrics: ExporterSelection; traces: ExporterSelection }> {
-  if (disabled) return Object.freeze({ logs: NO_EXPORTERS, metrics: NO_EXPORTERS, traces: NO_EXPORTERS });
-  return Object.freeze({
-    logs: exporterSelection(block.logs.exporter, 'OTEL_LOGS_EXPORTER', environment),
-    metrics: exporterSelection(block.metrics.exporter, 'OTEL_METRICS_EXPORTER', environment),
-    traces: exporterSelection(block.traces.exporter, 'OTEL_TRACES_EXPORTER', environment),
-  });
+type OtelSessionParts = Omit<OtelRuntime, 'flush' | 'shutdown'> &
+  Readonly<{ metricSignal: MetricSignal; traceSignal: TraceSignal }>;
+
+class OtelSession implements OtelRuntime {
+  readonly active: SignalFlags;
+  readonly block: OtelBlock;
+  readonly identity: AppIdentity;
+  readonly logger: Logger;
+  readonly loggerSink: LoggerSink;
+  readonly meter: Meter;
+  readonly metricsCollector: MetricsCollector;
+  readonly otlpLogsBridge: typeof OTLP_LOGS_BRIDGE_STATUS;
+  readonly resource: Resource;
+  readonly resourceAttributes: TelemetryAttributes;
+  readonly traceEmitter: TraceEmitter;
+  readonly tracer: Tracer;
+  private readonly metricSignal: MetricSignal;
+  private readonly traceSignal: TraceSignal;
+
+  constructor(parts: OtelSessionParts) {
+    this.active = parts.active;
+    this.block = parts.block;
+    this.identity = parts.identity;
+    this.logger = parts.logger;
+    this.loggerSink = parts.loggerSink;
+    this.meter = parts.meter;
+    this.metricsCollector = parts.metricsCollector;
+    this.otlpLogsBridge = parts.otlpLogsBridge;
+    this.resource = parts.resource;
+    this.resourceAttributes = parts.resourceAttributes;
+    this.traceEmitter = parts.traceEmitter;
+    this.tracer = parts.tracer;
+    this.metricSignal = parts.metricSignal;
+    this.traceSignal = parts.traceSignal;
+  }
+
+  async flush(): Promise<void> {
+    await Promise.all([
+      this.loggerSink.flush().unwrap(),
+      this.metricsCollector.flush().unwrap(),
+      this.traceEmitter.flush().unwrap(),
+    ]);
+  }
+
+  async shutdown(): Promise<void> {
+    const flushed = await Promise.allSettled([this.flush()]);
+    const stopped = await Promise.allSettled([
+      this.metricSignal.provider?.shutdown(),
+      this.traceSignal.provider?.shutdown(),
+    ]);
+    const failures = [...flushed, ...stopped].flatMap(result => (result.status === 'rejected' ? [result.reason] : []));
+    if (failures.length > 0) throw new AggregateError(failures, 'OpenTelemetry shutdown failed');
+  }
 }
 
-function initOtel(block: OtelBlock, identity: AppIdentity, options: OtelInitOptions = {}): OtelRuntime {
-  const validatedBlock = otelBlockSchema.parse(block);
-  const validatedIdentity = appIdentitySchema.parse(identity);
-  const environment = options.environment ?? process.env;
-  const disabled = isOtelSdkDisabled(environment);
-  const selections = selectedExporters(disabled, validatedBlock, environment);
-  const attributes = resourceAttributes(validatedIdentity, environment);
-  const resource = createOtelResource(validatedIdentity, environment);
-  const scopeName = validatedIdentity.service;
-  const scopeVersion = validatedIdentity.version;
+class OtelBootstrap {
+  private readonly planner: OtelPlanner;
+  private readonly logs: LoggerSignalFactory;
+  private readonly metrics: MetricSignalFactory;
+  private readonly traces: TraceSignalFactory;
 
-  // Reconcile injected seams BEFORE any SDK construction. An injected seam owns
-  // emit/record/flush for an enabled, non-disabled signal, so its SDK pipeline
-  // (exporter/reader/processor/provider/registration) must never be built and
-  // the accessor becomes a provider-free no-op. Disabled signals ignore seams.
-  const loggerSeam = !disabled && validatedBlock.logs.enabled ? options.seams?.logger : undefined;
-  const metricSeam = !disabled && validatedBlock.metrics.enabled ? options.seams?.metrics : undefined;
-  const traceSeam = !disabled && validatedBlock.traces.enabled ? options.seams?.traces : undefined;
-
-  const loggerSignal = createLoggerSignal(
-    validatedBlock.logs.enabled && !disabled && loggerSeam === undefined,
-    selections.logs,
-    attributes,
-    options.destination,
-  );
-  const metricSignal: MetricSignal =
-    metricSeam === undefined
-      ? createMetricSignal(
-          validatedBlock.metrics,
-          selections.metrics,
-          resource,
-          scopeName,
-          scopeVersion,
-          environment,
-          options.metricExporterFactories,
-        )
-      : inactiveMetricSignal();
-  const traceSignal: TraceSignal =
-    traceSeam === undefined
-      ? createTraceSignal(
-          validatedBlock.traces,
-          selections.traces,
-          resource,
-          scopeName,
-          scopeVersion,
-          environment,
-          options.traceSignalFactories,
-        )
-      : inactiveTraceSignal(scopeName, scopeVersion);
-
-  const loggerSink = loggerSeam ?? loggerSignal.sink;
-  const metricsCollector = metricSeam ?? metricSignal.collector;
-  const traceEmitter = traceSeam ?? traceSignal.emitter;
-
-  let closed = false;
-  let shutdownPromise: Promise<void> | undefined;
-
-  async function flushSignals(): Promise<void> {
-    await Promise.all([loggerSink.flush().unwrap(), metricsCollector.flush().unwrap(), traceEmitter.flush().unwrap()]);
+  constructor(collaborators: OtelBootstrapCollaborators = {}) {
+    this.planner = collaborators.planner ?? new OtelPlanner();
+    this.logs = collaborators.logs ?? new LoggerSignalFactory();
+    this.metrics = collaborators.metrics ?? new MetricSignalFactory();
+    this.traces = collaborators.traces ?? new TraceSignalFactory();
   }
 
-  async function flush(): Promise<void> {
-    if (closed) return;
-    await flushSignals();
+  init(block: OtelBlock, identity: AppIdentity, options: OtelInitOptions = {}): OtelRuntime {
+    const plan = this.planner.plan(block, identity, options.environment ?? process.env);
+    const scope = Object.freeze({ name: plan.identity.service, version: plan.identity.version });
+    const seams = {
+      logger: plan.live.logs ? options.seams?.logger : undefined,
+      metrics: plan.live.metrics ? options.seams?.metrics : undefined,
+      traces: plan.live.traces ? options.seams?.traces : undefined,
+    };
+    const loggerSignal = this.logs.create(
+      seams.logger === undefined && plan.selections.logs.console,
+      plan.resourceAttributes,
+      options.destination,
+    );
+    const metricSignal =
+      seams.metrics === undefined
+        ? this.metrics.create({
+            selection: plan.selections.metrics,
+            resource: plan.resource,
+            scope,
+            settings: plan.metrics,
+          })
+        : this.metrics.inactive();
+    const traceSignal =
+      seams.traces === undefined
+        ? this.traces.create({
+            selection: plan.selections.traces,
+            resource: plan.resource,
+            scope,
+            settings: plan.traces,
+          })
+        : this.traces.inactive(scope);
+    return new OtelSession({
+      active: Object.freeze({ logs: loggerSignal.active, metrics: metricSignal.active, traces: traceSignal.active }),
+      block: plan.block,
+      identity: plan.identity,
+      logger: loggerSignal.logger,
+      loggerSink: seams.logger ?? loggerSignal.sink,
+      meter: metricSignal.meter,
+      metricSignal,
+      metricsCollector: seams.metrics ?? metricSignal.collector,
+      otlpLogsBridge: loggerSignal.otlpBridge,
+      resource: plan.resource,
+      resourceAttributes: plan.resourceAttributes,
+      traceEmitter: seams.traces ?? traceSignal.emitter,
+      traceSignal,
+      tracer: traceSignal.tracer,
+    });
   }
-
-  function shutdown(): Promise<void> {
-    if (shutdownPromise !== undefined) return shutdownPromise;
-    closed = true;
-    shutdownPromise = (async () => {
-      const failures: unknown[] = [];
-      try {
-        await flushSignals();
-      } catch (error) {
-        failures.push(error);
-      }
-      const shutdownResults = await Promise.allSettled([
-        metricSignal.provider?.shutdown(),
-        traceSignal.provider?.shutdown(),
-      ]);
-      failures.push(
-        ...shutdownResults
-          .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-          .map(result => result.reason),
-      );
-      if (failures.length > 0) throw new AggregateError(failures, 'OpenTelemetry shutdown failed');
-    })();
-    return shutdownPromise;
-  }
-
-  return Object.freeze({
-    active: Object.freeze({
-      logs: loggerSignal.active,
-      metrics: metricSignal.active,
-      traces: traceSignal.active,
-    }),
-    block: validatedBlock,
-    flush,
-    identity: validatedIdentity,
-    logger: loggerSignal.logger,
-    loggerSink,
-    meter: metricSignal.meter,
-    metricsCollector,
-    otlpLogsBridge: loggerSignal.otlpBridge,
-    resource,
-    resourceAttributes: attributes,
-    shutdown,
-    traceEmitter,
-    tracer: traceSignal.tracer,
-  });
 }
 
-export type { OtelActiveSignals, OtelInitOptions, OtelRuntime, OtelSeamOverrides };
-export { initOtel, selectedExporters };
+export type { OtelBootstrapCollaborators, OtelInitOptions, OtelRuntime, OtelSeamOverrides };
+export { OtelBootstrap };

@@ -1,118 +1,100 @@
 import { describe, it } from 'bun:test';
 import 'should';
-import type { Environment } from '../../src/lib/environment';
-import { exporterSelection, hasEnvironmentValue, isOtelSdkDisabled } from '../../src/lib/environment';
-import type { OtelExporter } from '../../src/lib/schema';
+import { ExporterSelector, OtelEnvironment } from '../../src/lib/environment';
+import { defaultOtelBlock, type OtelBlock, type OtelExporter } from '../../src/lib/schema';
 
 const bothOn: OtelExporter = {
   console: { enabled: true },
   otlp: { enabled: true, endpoint: 'http://c:4318', protocol: 'http/protobuf', headers: {}, timeout: 'PT10S' },
 };
-const bothOff: OtelExporter = {
-  console: { enabled: false },
-  otlp: { enabled: false, endpoint: '', protocol: 'http/protobuf', headers: {}, timeout: 'PT10S' },
+const allOn: OtelBlock = {
+  logs: { enabled: true, exporter: bothOn },
+  metrics: { ...defaultOtelBlock.metrics, exporter: bothOn },
+  traces: { ...defaultOtelBlock.traces, enabled: false, exporter: bothOn },
 };
+const selector = new ExporterSelector();
 
-describe('hasEnvironmentValue', () => {
+describe('OtelEnvironment', () => {
   it.each([
-    ['a populated value', { NAME: 'value' }, true],
-    ['a whitespace value', { NAME: '   ' }, false],
-    ['an empty value', { NAME: '' }, false],
-    ['an absent value', {}, false],
-  ])('should report %s', (_label, environment, expected) => {
+    ['a populated value', { NAME: ' value ' }, 'value'],
+    ['a whitespace value', { NAME: '   ' }, undefined],
+    ['an absent value', {}, undefined],
+  ])('should read %s', (_label, values, expected) => {
+    // Arrange
+    const environment = new OtelEnvironment(values);
+
     // Act
-    const actual = hasEnvironmentValue(environment as Environment, 'NAME');
+    const actual = environment.value('NAME');
 
     // Assert
-    actual.should.eql(expected);
+    (actual ?? 'absent').should.eql(expected ?? 'absent');
+    environment.has('NAME').should.eql(expected !== undefined);
   });
-});
 
-describe('isOtelSdkDisabled', () => {
   it.each([
     ['lowercase true', { OTEL_SDK_DISABLED: 'true' }, true],
-    ['mixed case with padding', { OTEL_SDK_DISABLED: '  TRUE ' }, true],
-    ['the string false', { OTEL_SDK_DISABLED: 'false' }, false],
-    ['an unset flag', {}, false],
-  ])('should report %s', (_label, environment, expected) => {
+    ['padded upper case', { OTEL_SDK_DISABLED: '  TRUE ' }, true],
+    ['false', { OTEL_SDK_DISABLED: 'false' }, false],
+    ['unset', {}, false],
+  ])('should report the SDK disabled flag when %s', (_label, values, expected) => {
+    // Arrange
+    const environment = new OtelEnvironment(values);
+
     // Act
-    const actual = isOtelSdkDisabled(environment as Environment);
+    const actual = environment.sdkDisabled();
 
     // Assert
     actual.should.eql(expected);
   });
+});
 
-  it('should default to process.env when no environment is supplied', () => {
+describe('ExporterSelector.select', () => {
+  it.each([
+    ['absent', {}, { console: true, otlp: true }],
+    ['none', { OTEL_TRACES_EXPORTER: 'none' }, { console: false, otlp: false }],
+    ['console alone', { OTEL_TRACES_EXPORTER: 'console' }, { console: true, otlp: false }],
+    ['padded console and otlp', { OTEL_TRACES_EXPORTER: ' Console , OTLP ' }, { console: true, otlp: true }],
+  ])('should honour an override that is %s', (_label, values, expected) => {
     // Arrange
-    const saved = process.env.OTEL_SDK_DISABLED;
-    delete process.env.OTEL_SDK_DISABLED;
+    const environment = new OtelEnvironment(values);
 
-    try {
-      // Act
-      const actual = isOtelSdkDisabled();
+    // Act
+    const actual = selector.select(bothOn, 'OTEL_TRACES_EXPORTER', environment);
 
-      // Assert
-      actual.should.be.false();
-    } finally {
-      if (saved !== undefined) process.env.OTEL_SDK_DISABLED = saved;
-    }
+    // Assert
+    actual.should.eql(expected);
   });
 });
 
-describe('exporterSelection', () => {
-  it('should fall back to the configured booleans when the override is absent', () => {
-    // Act
-    const actual = exporterSelection(bothOn, 'OTEL_TRACES_EXPORTER', {});
-
-    // Assert
-    actual.should.eql({ console: true, otlp: true });
-  });
-
-  it('should treat a blank override as absent', () => {
-    // Act
-    const actual = exporterSelection(bothOff, 'OTEL_METRICS_EXPORTER', { OTEL_METRICS_EXPORTER: '   ' });
-
-    // Assert - the configured (disabled) booleans win
-    actual.should.eql({ console: false, otlp: false });
-  });
-
-  it('should disable every exporter when the override lists none', () => {
-    // Act
-    const actual = exporterSelection(bothOn, 'OTEL_LOGS_EXPORTER', { OTEL_LOGS_EXPORTER: 'none' });
-
-    // Assert
-    actual.should.eql({ console: false, otlp: false });
-  });
-
-  it('should select exactly the exporters named in the override', () => {
-    // Act
-    const actual = exporterSelection(bothOff, 'OTEL_TRACES_EXPORTER', { OTEL_TRACES_EXPORTER: ' console , otlp ' });
-
-    // Assert - the override wins over the configured off booleans
-    actual.should.eql({ console: true, otlp: true });
-  });
-
-  it('should select only console when the override names console alone', () => {
-    // Act
-    const actual = exporterSelection(bothOn, 'OTEL_TRACES_EXPORTER', { OTEL_TRACES_EXPORTER: 'console' });
-
-    // Assert
-    actual.should.eql({ console: true, otlp: false });
-  });
-
-  it('should default to process.env when no environment is supplied', () => {
+describe('ExporterSelector.selectAll', () => {
+  it('should select per signal and switch off disabled signals', () => {
     // Arrange
-    const saved = process.env.OTEL_TRACES_EXPORTER;
-    delete process.env.OTEL_TRACES_EXPORTER;
+    const environment = new OtelEnvironment({ OTEL_METRICS_EXPORTER: 'otlp' });
 
-    try {
-      // Act
-      const actual = exporterSelection(bothOn, 'OTEL_TRACES_EXPORTER');
+    // Act
+    const actual = selector.selectAll(allOn, environment);
 
-      // Assert - no override means the configured booleans are used
-      actual.should.eql({ console: true, otlp: true });
-    } finally {
-      if (saved !== undefined) process.env.OTEL_TRACES_EXPORTER = saved;
-    }
+    // Assert
+    actual.should.eql({
+      logs: { console: true, otlp: true },
+      metrics: { console: false, otlp: true },
+      traces: { console: false, otlp: false },
+    });
+  });
+
+  it('should switch every signal off when the SDK is disabled', () => {
+    // Arrange
+    const environment = new OtelEnvironment({ OTEL_SDK_DISABLED: 'true' });
+
+    // Act
+    const actual = selector.selectAll(allOn, environment);
+
+    // Assert
+    actual.should.eql({
+      logs: { console: false, otlp: false },
+      metrics: { console: false, otlp: false },
+      traces: { console: false, otlp: false },
+    });
+    selector.live(allOn, environment).should.eql({ logs: false, metrics: false, traces: false });
   });
 });

@@ -1,30 +1,62 @@
-import type { OtelExporter } from './schema.js';
+import type { OtelBlock, OtelExporter } from './schema.js';
 
+type OtelEnvironmentRecord = Readonly<Record<string, string | undefined>>;
 type ExporterSelection = Readonly<{ console: boolean; otlp: boolean }>;
-type Environment = Readonly<Record<string, string | undefined>>;
+type ExporterVariable = 'OTEL_LOGS_EXPORTER' | 'OTEL_METRICS_EXPORTER' | 'OTEL_TRACES_EXPORTER';
+type SignalFlags = Readonly<{ logs: boolean; metrics: boolean; traces: boolean }>;
+type SignalSelections = Readonly<{ logs: ExporterSelection; metrics: ExporterSelection; traces: ExporterSelection }>;
 
-function hasEnvironmentValue(environment: Environment, name: string): boolean {
-  const value = environment[name];
-  return value !== undefined && value.trim() !== '';
-}
+const NO_EXPORTERS: ExporterSelection = Object.freeze({ console: false, otlp: false });
 
-function isOtelSdkDisabled(environment: Environment = process.env): boolean {
-  return environment.OTEL_SDK_DISABLED?.trim().toLowerCase() === 'true';
-}
+class OtelEnvironment {
+  constructor(private readonly values: OtelEnvironmentRecord) {}
 
-function exporterSelection(
-  configured: OtelExporter,
-  environmentName: 'OTEL_LOGS_EXPORTER' | 'OTEL_METRICS_EXPORTER' | 'OTEL_TRACES_EXPORTER',
-  environment: Environment = process.env,
-): ExporterSelection {
-  const override = environment[environmentName];
-  if (override === undefined || override.trim() === '') {
-    return Object.freeze({ console: configured.console.enabled, otlp: configured.otlp.enabled });
+  value(name: string): string | undefined {
+    const value = this.values[name]?.trim();
+    return value === undefined || value === '' ? undefined : value;
   }
-  const exporters = new Set(override.split(',').map(value => value.trim().toLowerCase()));
-  if (exporters.has('none')) return Object.freeze({ console: false, otlp: false });
-  return Object.freeze({ console: exporters.has('console'), otlp: exporters.has('otlp') });
+
+  has(name: string): boolean {
+    return this.value(name) !== undefined;
+  }
+
+  sdkDisabled(): boolean {
+    return this.value('OTEL_SDK_DISABLED')?.toLowerCase() === 'true';
+  }
 }
 
-export type { Environment, ExporterSelection };
-export { exporterSelection, hasEnvironmentValue, isOtelSdkDisabled };
+class ExporterSelector {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor() {}
+
+  live(block: OtelBlock, environment: OtelEnvironment): SignalFlags {
+    const disabled = environment.sdkDisabled();
+    return Object.freeze({
+      logs: !disabled && block.logs.enabled,
+      metrics: !disabled && block.metrics.enabled,
+      traces: !disabled && block.traces.enabled,
+    });
+  }
+
+  select(configured: OtelExporter, variable: ExporterVariable, environment: OtelEnvironment): ExporterSelection {
+    const override = environment.value(variable);
+    if (override === undefined) {
+      return Object.freeze({ console: configured.console.enabled, otlp: configured.otlp.enabled });
+    }
+    const names = new Set(override.split(',').map(name => name.trim().toLowerCase()));
+    if (names.has('none')) return NO_EXPORTERS;
+    return Object.freeze({ console: names.has('console'), otlp: names.has('otlp') });
+  }
+
+  selectAll(block: OtelBlock, environment: OtelEnvironment): SignalSelections {
+    const live = this.live(block, environment);
+    return Object.freeze({
+      logs: live.logs ? this.select(block.logs.exporter, 'OTEL_LOGS_EXPORTER', environment) : NO_EXPORTERS,
+      metrics: live.metrics ? this.select(block.metrics.exporter, 'OTEL_METRICS_EXPORTER', environment) : NO_EXPORTERS,
+      traces: live.traces ? this.select(block.traces.exporter, 'OTEL_TRACES_EXPORTER', environment) : NO_EXPORTERS,
+    });
+  }
+}
+
+export type { ExporterSelection, ExporterVariable, OtelEnvironmentRecord, SignalFlags, SignalSelections };
+export { ExporterSelector, OtelEnvironment };

@@ -1,100 +1,79 @@
-import { describe } from 'bun:test';
-import type { LogRecord, MetricRecord } from '@atomicloud/diene.interfaces';
-import { InMemoryLoggerSink, InMemoryMetricsCollector, InMemoryTraceEmitter } from '@atomicloud/diene.otel/test-helper';
-import type { Tracer } from '@opentelemetry/api';
-import { MeterProvider } from '@opentelemetry/sdk-metrics';
-import { createLoggerSignal } from '../../src/adapters/signals/logs';
-import { SdkMetricsCollector } from '../../src/adapters/signals/metrics';
+import { afterAll, describe, it } from 'bun:test';
+import { InMemoryLoggerSink, InMemoryMetricsCollector } from '@atomicloud/diene.interfaces/test-helper';
+import { resourceFromAttributes } from '@opentelemetry/resources';
+import { AggregationTemporality, InMemoryMetricExporter } from '@opentelemetry/sdk-metrics';
+import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
+import 'should';
+import { LoggerSignalFactory } from '../../src/adapters/signals/logs';
+import { MetricSignalFactory } from '../../src/adapters/signals/metrics';
 import { SdkTraceEmitter } from '../../src/adapters/signals/traces';
-import type { SeamContract } from './contract/behaviours';
-import { runSeamContract } from './contract/behaviours';
+import { InMemoryTraceEmitter } from '../../src/test-helper';
+import { runSeamScenarios, type Seams } from './contract/behaviours';
 
-function captureStream(): { write(chunk: string): void } {
-  const lines: string[] = [];
-  return { write: (chunk: string) => void lines.push(chunk) };
-}
+const resource = resourceFromAttributes({ 'service.name': 'svc' });
+const metricExporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
+const spanExporter = new InMemorySpanExporter();
+const traceProvider = new BasicTracerProvider({ resource, spanProcessors: [new SimpleSpanProcessor(spanExporter)] });
+const metricSignal = new MetricSignalFactory({
+  console: () => metricExporter,
+  otlp: () => metricExporter,
+}).create({
+  selection: { console: true, otlp: false },
+  resource,
+  scope: { name: 'svc', version: '1.0.0' },
+  settings: { intervalMillis: 60_000, timeoutMillis: 1_000, otlp: {} },
+});
 
-function fakeTracer(): Tracer {
-  const span = {
-    addEvent: () => span,
-    setStatus: () => span,
-    end: () => undefined,
+function realSeams(): Seams {
+  return {
+    logger: new LoggerSignalFactory().create(true, {}, { write: () => undefined }).sink,
+    metrics: metricSignal.collector,
+    traces: new SdkTraceEmitter(traceProvider.getTracer('svc'), traceProvider),
   };
-  return { startSpan: () => span } as unknown as Tracer;
 }
 
-const invalidLog = { level: 'nope', message: 'hi' } as unknown as LogRecord;
-const invalidMetric: MetricRecord = { kind: 'counter', name: '', value: 1 };
+function mockSeams(): Seams {
+  return {
+    logger: new InMemoryLoggerSink(),
+    metrics: new InMemoryMetricsCollector(),
+    traces: new InMemoryTraceEmitter(),
+  };
+}
 
-describe('LoggerSink contract parity', () => {
-  describe('PinoLoggerSink (real adapter)', () => {
-    runSeamContract((): SeamContract => {
-      const sink = createLoggerSignal(true, { console: true, otlp: false }, {}, captureStream()).sink;
-      return {
-        validOperation: () => sink.emit({ level: 'info', message: 'hi' }),
-        invalidOperation: () => sink.emit(invalidLog),
-        flush: () => sink.flush(),
-      };
-    });
-  });
-
-  describe('InMemoryLoggerSink (mock)', () => {
-    runSeamContract((): SeamContract => {
-      const sink = new InMemoryLoggerSink();
-      return {
-        validOperation: () => sink.emit({ level: 'info', message: 'hi' }),
-        invalidOperation: () => sink.emit(invalidLog),
-        flush: () => sink.flush(),
-      };
-    });
-  });
+afterAll(async () => {
+  await Promise.all([metricSignal.provider?.shutdown(), traceProvider.shutdown()]);
 });
 
-describe('MetricsCollector contract parity', () => {
-  describe('SdkMetricsCollector (real adapter)', () => {
-    runSeamContract((): SeamContract => {
-      // A reader-less MeterProvider gives a real meter with no background timer.
-      const collector = new SdkMetricsCollector(new MeterProvider().getMeter('parity'));
-      return {
-        validOperation: () => collector.record({ kind: 'counter', name: 'hits', value: 1 }),
-        invalidOperation: () => collector.record(invalidMetric),
-        flush: () => collector.flush(),
-      };
-    });
+describe('seam contract parity', () => {
+  it('should give the same outcomes from the SDK-backed seams and the in-memory doubles', async () => {
+    // Arrange
+    const real = realSeams();
+    const mock = mockSeams();
+
+    // Act
+    const actual = await runSeamScenarios(real);
+    const expected = await runSeamScenarios(mock);
+
+    // Assert
+    actual.should.eql(expected);
+    actual
+      .map(entry => (entry === 'ok' ? 'ok' : entry.code))
+      .should.eql(['ok', 'invalid-input', 'ok', 'ok', 'invalid-input', 'ok', 'ok', 'invalid-input', 'ok']);
   });
 
-  describe('InMemoryMetricsCollector (mock)', () => {
-    runSeamContract((): SeamContract => {
-      const collector = new InMemoryMetricsCollector();
-      return {
-        validOperation: () => collector.record({ kind: 'counter', name: 'hits', value: 1 }),
-        invalidOperation: () => collector.record(invalidMetric),
-        flush: () => collector.flush(),
-      };
-    });
-  });
-});
+  it('should record the same accepted trace on both sides', async () => {
+    // Arrange
+    const real = realSeams();
+    const mock = new InMemoryTraceEmitter();
+    const record = { name: 'checkout', attributes: { order: 1 }, events: [{ name: 'paid' }] };
 
-describe('TraceEmitter contract parity', () => {
-  describe('SdkTraceEmitter (real adapter)', () => {
-    runSeamContract((): SeamContract => {
-      const emitter = new SdkTraceEmitter(fakeTracer());
-      return {
-        validOperation: () => emitter.emit({ name: 'span' }),
-        invalidOperation: () => emitter.emit({ name: '' }),
-        flush: () => emitter.flush(),
-      };
-    });
-  });
+    // Act
+    await real.traces.emit(record).unwrap();
+    await mock.emit(record).unwrap();
 
-  describe('InMemoryTraceEmitter (mock)', () => {
-    runSeamContract((): SeamContract => {
-      const emitter = new InMemoryTraceEmitter();
-      return {
-        validOperation: () => emitter.emit({ name: 'span' }),
-        invalidOperation: () => emitter.emit({ name: '' }),
-        flush: () => emitter.flush(),
-      };
-    });
+    // Assert
+    const span = spanExporter.getFinishedSpans().find(finished => finished.name === 'checkout');
+    span?.attributes.should.eql(mock.records[0]?.attributes);
+    span?.events.map(event => event.name).should.eql(mock.records[0]?.events?.map(event => event.name));
   });
 });

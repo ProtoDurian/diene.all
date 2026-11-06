@@ -1,109 +1,188 @@
-import type { Span, SpanContext, Tracer } from '@opentelemetry/api';
+import {
+  type Context,
+  type ContextManager,
+  type Meter,
+  ROOT_CONTEXT,
+  type Span,
+  type Tracer,
+} from '@opentelemetry/api';
+import { AggregationTemporality, InMemoryMetricExporter, type PushMetricExporter } from '@opentelemetry/sdk-metrics';
+import {
+  BasicTracerProvider,
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  type SpanExporter,
+} from '@opentelemetry/sdk-trace-base';
 import type { Logger } from 'pino';
+import type { MetricExporterFactories } from '../../../src/adapters/signals/metrics';
+import type { TraceProvider, TraceProviderOptions, TraceSignalFactories } from '../../../src/adapters/signals/traces';
+import type { OtlpExporterOptions } from '../../../src/lib/endpoint';
 
-// White-box integration doubles. Every SDK-touching seam is exercised in
-// process with injected fakes so no collector, container, network client, or
-// background timer is ever created. Fakes record their interactions so tests
-// can assert the adapter's behaviour by capture rather than by side effect.
+class CaptureStream {
+  readonly lines: Record<string, unknown>[] = [];
 
-// A frozen, well-formed span context for the trace-correlation branch.
-const VALID_SPAN_CONTEXT: SpanContext = {
-  traceId: '0af7651916cd43dd8448eb211c80319c',
-  spanId: 'b7ad6b7169203331',
-  traceFlags: 1,
-};
-
-interface SpanControls {
-  readonly endThrows?: boolean;
+  write(chunk: string): void {
+    for (const line of chunk.split('\n')) if (line.trim() !== '') this.lines.push(JSON.parse(line));
+  }
 }
 
-interface RecordedSpan {
-  readonly events: { name: string; attributes?: unknown }[];
-  readonly statuses: unknown[];
-  ends: number;
+class RecordingMetricExporters implements MetricExporterFactories {
+  readonly exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
+  readonly calls: string[] = [];
+  readonly otlpOptions: OtlpExporterOptions[] = [];
+
+  console(): PushMetricExporter {
+    this.calls.push('console');
+    return this.exporter;
+  }
+
+  otlp(options: OtlpExporterOptions): PushMetricExporter {
+    this.calls.push('otlp');
+    this.otlpOptions.push(options);
+    return this.exporter;
+  }
 }
 
-function makeSpan(controls: SpanControls = {}): { span: Span; recorded: RecordedSpan } {
-  const recorded: RecordedSpan = { events: [], statuses: [], ends: 0 };
-  const span = {
-    addEvent(name: string, attributes?: unknown) {
-      recorded.events.push({ name, attributes });
-      return span;
-    },
-    setStatus(status: unknown) {
-      recorded.statuses.push(status);
-      return span;
-    },
-    end() {
-      recorded.ends += 1;
-      if (controls.endThrows) throw new Error('span end failed');
+class RecordingTraceFactories implements TraceSignalFactories {
+  readonly exporter = new InMemorySpanExporter();
+  readonly calls: string[] = [];
+  readonly providers: TraceProviderOptions[] = [];
+
+  constructor(private readonly failures: { readonly flush?: boolean; readonly shutdown?: boolean } = {}) {}
+
+  console(): SpanExporter {
+    this.calls.push('console');
+    return this.exporter;
+  }
+
+  otlp(): SpanExporter {
+    this.calls.push('otlp');
+    return this.exporter;
+  }
+
+  processor(exporter: SpanExporter): SimpleSpanProcessor {
+    this.calls.push('processor');
+    return new SimpleSpanProcessor(exporter);
+  }
+
+  provider(options: TraceProviderOptions): TraceProvider {
+    this.providers.push(options);
+    const provider = new BasicTracerProvider({
+      resource: options.resource,
+      ...(options.sampler === undefined ? {} : { sampler: options.sampler }),
+      spanProcessors: [...options.spanProcessors],
+    });
+    const failures = this.failures;
+    return {
+      getTracer: (name, version) => provider.getTracer(name, version),
+      forceFlush: async () => {
+        if (failures.flush) throw new Error('trace flush failed');
+        await provider.forceFlush();
+      },
+      shutdown: async () => {
+        if (failures.shutdown) throw new Error('trace shutdown failed');
+        await provider.shutdown();
+      },
+    };
+  }
+}
+
+class FailingMetricExporter implements PushMetricExporter {
+  export(_metrics: unknown, done: (result: { code: number; error?: Error }) => void): void {
+    done({ code: 1, error: new Error('export failed') });
+  }
+
+  async forceFlush(): Promise<void> {
+    throw new Error('exporter flush failed');
+  }
+
+  async shutdown(): Promise<void> {
+    throw new Error('exporter shutdown failed');
+  }
+}
+
+function throwingMeter(): Meter {
+  const fail = () => {
+    throw new Error('instrument creation failed');
+  };
+  return { createCounter: fail, createGauge: fail, createHistogram: fail } as unknown as Meter;
+}
+
+function scriptedTracer(
+  span: Partial<Record<'end' | 'addEvent' | 'setStatus', () => unknown>>,
+  startThrows = false,
+): {
+  tracer: Tracer;
+  ends: () => number;
+} {
+  let ends = 0;
+  const handle = {
+    addEvent: span.addEvent ?? (() => handle),
+    setStatus: span.setStatus ?? (() => handle),
+    end: () => {
+      ends += 1;
+      span.end?.();
     },
   } as unknown as Span;
-  return { span, recorded };
-}
-
-interface TracerControls {
-  readonly startThrows?: boolean;
-  readonly span?: { span: Span; recorded: RecordedSpan };
-}
-
-function makeTracer(controls: TracerControls = {}): { tracer: Tracer; started: string[]; span?: RecordedSpan } {
-  const started: string[] = [];
-  const held = controls.span;
   const tracer = {
-    startSpan(name: string) {
-      started.push(name);
-      if (controls.startThrows) throw new Error('startSpan failed');
-      return (held ?? makeSpan()).span;
+    startSpan: () => {
+      if (startThrows) throw new Error('startSpan failed');
+      return handle;
     },
   } as unknown as Tracer;
-  return { tracer, started, span: held?.recorded };
+  return { tracer, ends: () => ends };
 }
 
-interface LoggerControls {
-  readonly emitThrows?: boolean;
-  readonly flushThrows?: boolean;
-}
-
-function makeLogger(controls: LoggerControls = {}): { logger: Logger; levels: string[]; flushes: number } {
-  const levels: string[] = [];
-  const state = { flushes: 0 };
-  const logger = {
-    trace() {
-      throw new Error('unused');
-    },
-    info() {
-      levels.push('info');
-      if (controls.emitThrows) throw new Error('emit failed');
-    },
-    flush() {
-      state.flushes += 1;
-      if (controls.flushThrows) throw new Error('flush failed');
-    },
-  } as unknown as Logger;
-  return {
-    logger,
-    levels,
-    get flushes() {
-      return state.flushes;
-    },
+function throwingLogger(): Logger {
+  const fail = () => {
+    throw new Error('pino failed');
   };
+  return { info: fail, flush: fail } as unknown as Logger;
 }
 
-interface CaptureStream {
-  readonly lines: string[];
-  write(chunk: string): void;
+export {
+  CaptureStream,
+  FailingMetricExporter,
+  RecordingMetricExporters,
+  RecordingTraceFactories,
+  scriptedTracer,
+  throwingLogger,
+  throwingMeter,
+};
+
+class StackContextManager implements ContextManager {
+  private current: Context = ROOT_CONTEXT;
+
+  active(): Context {
+    return this.current;
+  }
+
+  with<A extends unknown[], F extends (...args: A) => ReturnType<F>>(
+    target: Context,
+    fn: F,
+    thisArg?: ThisParameterType<F>,
+    ...args: A
+  ): ReturnType<F> {
+    const previous = this.current;
+    this.current = target;
+    try {
+      return fn.call(thisArg, ...args);
+    } finally {
+      this.current = previous;
+    }
+  }
+
+  bind<T>(_context: Context, target: T): T {
+    return target;
+  }
+
+  enable(): this {
+    return this;
+  }
+
+  disable(): this {
+    return this;
+  }
 }
 
-function makeCaptureStream(): CaptureStream {
-  const lines: string[] = [];
-  return {
-    lines,
-    write(chunk: string) {
-      for (const line of chunk.split('\n')) if (line.trim().length > 0) lines.push(line);
-    },
-  };
-}
-
-export type { CaptureStream, RecordedSpan };
-export { makeCaptureStream, makeLogger, makeSpan, makeTracer, VALID_SPAN_CONTEXT };
+export { StackContextManager };

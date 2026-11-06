@@ -1,5 +1,5 @@
 import type { TelemetryAttributes } from '@atomicloud/diene.interfaces';
-import { resourceFromAttributes, type Resource } from '@opentelemetry/resources';
+import { type Resource, resourceFromAttributes } from '@opentelemetry/resources';
 import {
   ATTR_DEPLOYMENT_ENVIRONMENT_NAME,
   ATTR_SERVICE_NAME,
@@ -7,6 +7,7 @@ import {
   ATTR_SERVICE_VERSION,
 } from '@opentelemetry/semantic-conventions';
 import { z } from 'zod';
+import type { OtelEnvironment } from './environment.js';
 
 const identityValueSchema = z.string().trim().min(1);
 
@@ -22,61 +23,48 @@ const appIdentitySchema = z
   .readonly();
 
 type AppIdentity = z.infer<typeof appIdentitySchema>;
-type OtelEnvironment = Readonly<Record<string, string | undefined>>;
 
-function mapResourceAttributes(identity: AppIdentity): TelemetryAttributes {
-  const app = appIdentitySchema.parse(identity);
-  return Object.freeze({
-    [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: app.landscape,
-    [ATTR_SERVICE_NAMESPACE]: app.platform,
-    [ATTR_SERVICE_NAME]: app.service,
-    [ATTR_SERVICE_VERSION]: app.version,
-    'atomi.landscape': app.landscape,
-    'atomi.module': app.module,
-    'atomi.platform': app.platform,
-    'atomi.service': app.service,
-    'atomi.version': app.version,
-  });
-}
+class ResourceIdentityMapper {
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor() {}
 
-function parseOtelResourceAttributes(value: string | undefined): TelemetryAttributes {
-  if (value === undefined || value.trim() === '') return Object.freeze({});
-  const entries = value
-    .split(',')
-    .map(entry => entry.trim())
-    .filter(entry => entry.length > 0)
-    .map(entry => {
+  semantic(identity: AppIdentity): TelemetryAttributes {
+    const app = appIdentitySchema.parse(identity);
+    return Object.freeze({
+      [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: app.landscape,
+      [ATTR_SERVICE_NAMESPACE]: app.platform,
+      [ATTR_SERVICE_NAME]: app.service,
+      [ATTR_SERVICE_VERSION]: app.version,
+      'atomi.landscape': app.landscape,
+      'atomi.module': app.module,
+      'atomi.platform': app.platform,
+      'atomi.service': app.service,
+      'atomi.version': app.version,
+    });
+  }
+
+  standard(environment: OtelEnvironment): TelemetryAttributes {
+    const entries = (environment.value('OTEL_RESOURCE_ATTRIBUTES') ?? '').split(',').flatMap(entry => {
       const separator = entry.indexOf('=');
-      if (separator <= 0) return undefined;
       const key = entry.slice(0, separator).trim();
-      const attributeValue = entry.slice(separator + 1).trim();
-      return key.length === 0 ? undefined : ([key, attributeValue] as const);
-    })
-    .filter((entry): entry is readonly [string, string] => entry !== undefined);
-  return Object.freeze(Object.fromEntries(entries));
+      return separator <= 0 || key === '' ? [] : [[key, entry.slice(separator + 1).trim()] as const];
+    });
+    return Object.freeze(Object.fromEntries(entries));
+  }
+
+  attributes(identity: AppIdentity, environment: OtelEnvironment): TelemetryAttributes {
+    const serviceName = environment.value('OTEL_SERVICE_NAME');
+    return Object.freeze({
+      ...this.semantic(identity),
+      ...this.standard(environment),
+      ...(serviceName === undefined ? {} : { [ATTR_SERVICE_NAME]: serviceName }),
+    });
+  }
+
+  resource(identity: AppIdentity, environment: OtelEnvironment): Resource {
+    return resourceFromAttributes(this.attributes(identity, environment));
+  }
 }
 
-function resourceAttributes(identity: AppIdentity, environment: OtelEnvironment = process.env): TelemetryAttributes {
-  const configured = mapResourceAttributes(identity);
-  const standard = parseOtelResourceAttributes(environment.OTEL_RESOURCE_ATTRIBUTES);
-  return Object.freeze({
-    ...configured,
-    ...standard,
-    ...(environment.OTEL_SERVICE_NAME === undefined || environment.OTEL_SERVICE_NAME.trim() === ''
-      ? {}
-      : { [ATTR_SERVICE_NAME]: environment.OTEL_SERVICE_NAME.trim() }),
-  });
-}
-
-function createOtelResource(identity: AppIdentity, environment: OtelEnvironment = process.env): Resource {
-  return resourceFromAttributes(resourceAttributes(identity, environment));
-}
-
-export type { AppIdentity, OtelEnvironment };
-export {
-  appIdentitySchema,
-  createOtelResource,
-  mapResourceAttributes,
-  parseOtelResourceAttributes,
-  resourceAttributes,
-};
+export type { AppIdentity };
+export { appIdentitySchema, ResourceIdentityMapper };

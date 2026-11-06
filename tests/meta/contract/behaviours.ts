@@ -1,38 +1,34 @@
-import { it } from 'bun:test';
+import type { LoggerSink, MetricsCollector } from '@atomicloud/diene.interfaces';
 import type { Result } from '@atomicloud/diene.result';
-import 'should';
-import { expectErr, expectOk } from '../support/capture';
+import type { TraceEmitter } from '../../../src/lib/trace-seam';
 
-// A single behavioural contract run against BOTH the real adapter seam and its
-// in-memory mock (LSP parity, G1-bounded: in-process, no network). Each seam is
-// reduced to a valid operation, a shared-validator-rejected operation, and a
-// flush — the three behaviours every emit seam must agree on.
-
-interface SeamContract {
-  validOperation(): Result<void, unknown>;
-  invalidOperation(): Result<void, unknown>;
-  flush(): Result<void, unknown>;
+interface Seams {
+  readonly logger: LoggerSink;
+  readonly metrics: MetricsCollector;
+  readonly traces: TraceEmitter;
 }
 
-function runSeamContract(make: () => SeamContract): void {
-  it('should accept a valid operation', async () => {
-    // Act / Assert
-    await expectOk(make().validOperation());
-  });
+type Outcome = 'ok' | Readonly<{ code: string; message: string }>;
 
-  it('should reject an invalid operation through the shared validator', async () => {
-    // Act
-    const error = await expectErr(make().invalidOperation());
-
-    // Assert - every seam runs the shared check* validator first
-    (error as { readonly code: string }).code.should.eql('invalid-input');
-  });
-
-  it('should flush successfully', async () => {
-    // Act / Assert
-    await expectOk(make().flush());
-  });
+async function outcome(result: Result<void, { code: string; message: string }>): Promise<Outcome> {
+  if (await result.isOk()) return 'ok';
+  const error = await result.unwrapErr();
+  return { code: error.code, message: error.message };
 }
 
-export type { SeamContract };
-export { runSeamContract };
+async function runSeamScenarios(seams: Seams): Promise<readonly Outcome[]> {
+  return [
+    await outcome(seams.logger.emit({ level: 'info', message: 'ok', attributes: { a: 1 } })),
+    await outcome(seams.logger.emit({ level: 'info', message: 'bad', attributes: { a: Number.NaN } })),
+    await outcome(seams.logger.flush()),
+    await outcome(seams.metrics.record({ kind: 'histogram', name: 'latency', value: 3, unit: 'ms' })),
+    await outcome(seams.metrics.record({ kind: 'counter', name: 'jobs', value: Number.POSITIVE_INFINITY })),
+    await outcome(seams.metrics.flush()),
+    await outcome(seams.traces.emit({ name: 'work', events: [{ name: 'step' }], status: 'ok' })),
+    await outcome(seams.traces.emit({ name: 'work', status: 'fine' as never })),
+    await outcome(seams.traces.flush()),
+  ];
+}
+
+export type { Seams };
+export { runSeamScenarios };

@@ -1,9 +1,10 @@
 import { describe, it } from 'bun:test';
 import 'should';
+import { WireDurationConverter } from '../../src/lib/duration';
+import { OtlpEndpointPolicy } from '../../src/lib/endpoint';
 import {
   defaultOtelBlock,
-  durationToMilliseconds,
-  isOtlpHttpEndpoint,
+  OtelSchemaFactory,
   otelBlockSchema,
   otelOtlpExporterSchema,
   otelSamplerSchema,
@@ -11,114 +12,107 @@ import {
 } from '../../src/lib/schema';
 import { acceptCases, canonicalOtelBlock, rejectCases } from './fixtures/otel-block';
 
-// The OTel config block schema is the engine-owned contract. There is no shared
-// C0 otel fixture release, so the accept/reject corpus is transcribed from the
-// frozen `goals/c0-contracts.md` §4 block (see tests/unit/fixtures/otel-block.ts).
-
 describe('otelBlockSchema', () => {
   it.each([...acceptCases])('should accept $name', ({ block }) => {
+    // Arrange
+    const input = block;
+
     // Act
-    const actual = otelBlockSchema.safeParse(block);
+    const actual = otelBlockSchema.safeParse(input);
 
     // Assert
     actual.success.should.be.true();
   });
 
   it.each([...rejectCases])('should reject $name ($violates)', ({ block }) => {
+    // Arrange
+    const input = block;
+
     // Act
-    const actual = otelBlockSchema.safeParse(block);
+    const actual = otelBlockSchema.safeParse(input);
 
     // Assert
     actual.success.should.be.false();
   });
 
-  it('should freeze the parsed block into the canonical default shape', () => {
-    // Arrange - the frozen canonical block verbatim
+  it('should keep the canonical defaults when parsing the canonical block', () => {
+    // Arrange
     const input = canonicalOtelBlock;
 
     // Act
     const parsed = otelBlockSchema.parse(input);
 
-    // Assert - signals and their frozen defaults survive parsing
-    parsed.logs.enabled.should.be.true();
+    // Assert
     parsed.metrics.interval.should.eql('PT60S');
     parsed.traces.sampler.should.eql({ type: 'parentbased_traceidratio', ratio: 1 });
     parsed.traces.exporter.otlp.protocol.should.eql('http/protobuf');
   });
 
-  it('should accept the exported defaultOtelBlock', () => {
+  it('should accept defaultOtelBlock and match the canonical block', () => {
+    // Arrange
+    const input = defaultOtelBlock;
+
     // Act
-    const actual = otelBlockSchema.safeParse(defaultOtelBlock);
+    const actual = otelBlockSchema.parse(input);
 
     // Assert
-    actual.success.should.be.true();
-  });
-});
-
-describe('durationToMilliseconds', () => {
-  it.each([
-    ['PT10S', 10_000],
-    ['PT60S', 60_000],
-    ['PT1M', 60_000],
-    ['PT0.5S', 500],
-  ])('should convert %s to %d milliseconds', (input, expected) => {
-    // Act
-    const actual = durationToMilliseconds(input);
-
-    // Assert
-    actual.should.eql(expected);
-  });
-
-  it.each([
-    ['a zero duration', 'PT0S'],
-    ['a non-ISO string', '10s'],
-    ['a negative duration', '-PT1S'],
-  ])('should throw a RangeError on %s', (_label, input) => {
-    // Act / Assert
-    (() => durationToMilliseconds(input)).should.throw(RangeError);
-  });
-});
-
-describe('isOtlpHttpEndpoint', () => {
-  it.each([
-    ['http on 4318', 'http://otel-collector:4318', true],
-    ['https on 4318', 'https://otel-collector:4318', true],
-    ['http on the wrong port', 'http://otel-collector:4317', false],
-    ['no explicit port', 'http://otel-collector', false],
-    ['non-http scheme', 'ftp://otel-collector:4318', false],
-    ['a non-URL string', 'not a url', false],
-    ['an empty string', '', false],
-  ])('should classify %s', (_label, input, expected) => {
-    // Act
-    const actual = isOtlpHttpEndpoint(input);
-
-    // Assert
-    actual.should.eql(expected);
+    actual.should.eql(otelBlockSchema.parse(canonicalOtelBlock));
   });
 });
 
 describe('wireDurationSchema', () => {
-  it('should accept a canonical ISO-8601 duration', () => {
+  it.each([
+    ['PT30S', true],
+    ['30 seconds', false],
+    ['P1M', false],
+  ])('should classify %s as %s', (input, expected) => {
+    // Arrange
+    const value = input;
+
     // Act
-    const actual = wireDurationSchema.safeParse('PT30S');
+    const actual = wireDurationSchema.safeParse(value);
 
     // Assert
-    actual.success.should.be.true();
+    actual.success.should.eql(expected);
   });
 
-  it('should reject a non-canonical duration string', () => {
+  it('should report the converter message on a bad duration', () => {
+    // Arrange
+    const value = 'PT0S';
+
     // Act
-    const actual = wireDurationSchema.safeParse('30 seconds');
+    const actual = wireDurationSchema.safeParse(value);
 
     // Assert
-    actual.success.should.be.false();
+    actual.error?.issues[0]?.message.should.eql(
+      'Duration must be a positive, fixed-length canonical ISO 8601 duration',
+    );
+  });
+
+  it('should fall back to the fixed message when the converter throws a non-Error', () => {
+    // Arrange
+    const converter = new WireDurationConverter(() => {
+      throw 'boom';
+    });
+    const schema = new OtelSchemaFactory(converter, new OtlpEndpointPolicy()).duration();
+
+    // Act
+    const actual = schema.safeParse('PT1S');
+
+    // Assert
+    actual.error?.issues[0]?.message.should.eql(
+      'Duration must be a positive, fixed-length canonical ISO 8601 duration',
+    );
   });
 });
 
 describe('otelSamplerSchema', () => {
   it('should reject an out-of-range ratio', () => {
+    // Arrange
+    const sampler = { type: 'always_on', ratio: 2 };
+
     // Act
-    const actual = otelSamplerSchema.safeParse({ type: 'always_on', ratio: 2 });
+    const actual = otelSamplerSchema.safeParse(sampler);
 
     // Assert
     actual.success.should.be.false();
@@ -126,17 +120,32 @@ describe('otelSamplerSchema', () => {
 });
 
 describe('otelOtlpExporterSchema', () => {
-  it('should accept a disabled exporter with an empty endpoint', () => {
+  it('should name the endpoint path on an enabled exporter without an endpoint', () => {
+    // Arrange
+    const exporter = { enabled: true, endpoint: '', protocol: 'http/protobuf', headers: {}, timeout: 'PT10S' };
+
     // Act
-    const actual = otelOtlpExporterSchema.safeParse({
-      enabled: false,
-      endpoint: '',
+    const actual = otelOtlpExporterSchema.safeParse(exporter);
+
+    // Assert
+    actual.error?.issues.map(issue => issue.path.join('.')).should.eql(['endpoint']);
+  });
+
+  it('should enforce the injected endpoint port', () => {
+    // Arrange
+    const schema = new OtelSchemaFactory(new WireDurationConverter(), new OtlpEndpointPolicy('9999')).otlpExporter();
+    const exporter = {
+      enabled: true,
+      endpoint: 'http://c:4318',
       protocol: 'http/protobuf',
       headers: {},
       timeout: 'PT10S',
-    });
+    };
+
+    // Act
+    const actual = schema.safeParse(exporter);
 
     // Assert
-    actual.success.should.be.true();
+    actual.success.should.be.false();
   });
 });

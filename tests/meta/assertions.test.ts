@@ -1,189 +1,126 @@
 import { describe, it } from 'bun:test';
-import type { LogRecord, MetricRecord } from '@atomicloud/diene.interfaces';
-import {
-  assertLoggerCalls,
-  assertLogRecords,
-  assertMetricRecords,
-  assertMetricsCalls,
-  assertResourceAttributes,
-  assertTelemetryPayload,
-  assertTraceCalls,
-  assertTraceRecords,
-  InMemoryLoggerSink,
-  InMemoryMetricsCollector,
-  InMemoryTraceEmitter,
-  InterfaceAssertionError,
-  type LoggerCall,
-  type MetricsCall,
-  OtelAssertionError,
-  type TraceCall,
-} from '@atomicloud/diene.otel/test-helper';
 import 'should';
-import { expectNoThrow, expectOk, expectThrow } from './support/capture';
+import { AppIdentityBuilder, InMemoryTraceEmitter, OtelAssertionError, OtelAssertions } from '../../src/test-helper';
 
-// Assert-the-asserter: every shipped helper must pass on a known-good
-// interaction and throw a described assertion error on a known-bad one. The
-// owned trace/resource/payload asserters raise OtelAssertionError; the
-// re-exported interface asserters raise InterfaceAssertionError (parity).
+const assertions = new OtelAssertions();
 
-function otelError(fn: () => void): OtelAssertionError {
-  const error = expectThrow(fn);
-  (error instanceof OtelAssertionError).should.be.true();
-  return error as OtelAssertionError;
+async function emitted(): Promise<InMemoryTraceEmitter> {
+  const emitter = new InMemoryTraceEmitter();
+  await emitter.emit({ name: 'work', attributes: { b: 2, a: 1 } }).unwrap();
+  await emitter.flush().unwrap();
+  return emitter;
 }
 
-function interfaceError(fn: () => void): InterfaceAssertionError {
-  const error = expectThrow(fn);
-  (error instanceof InterfaceAssertionError).should.be.true();
-  return error as InterfaceAssertionError;
-}
+describe('OtelAssertions.traceRecords', () => {
+  it('should pass on the recorded traces whatever the key order', async () => {
+    // Arrange
+    const emitter = await emitted();
 
-async function emitter(): Promise<InMemoryTraceEmitter> {
-  const subject = new InMemoryTraceEmitter();
-  await expectOk(subject.emit({ name: 'span', attributes: { ok: true } }));
-  await expectOk(subject.flush());
-  return subject;
-}
+    // Act
+    const act = () => assertions.traceRecords(emitter, [{ attributes: { a: 1, b: 2 }, name: 'work' }]);
 
-describe('assertTraceRecords', () => {
-  it('should pass on matching records', async () => {
-    const subject = await emitter();
-    expectNoThrow(() => assertTraceRecords(subject, [{ name: 'span', attributes: { ok: true } }]));
+    // Assert
+    act.should.not.throw();
   });
 
-  it('should throw a described OtelAssertionError on a mismatch', async () => {
-    const subject = await emitter();
-    const error = otelError(() => assertTraceRecords(subject, [{ name: 'other' }]));
-    error.label.should.eql('Trace records');
-    error.message.should.match(/mismatch/);
+  it('should fail with both sides on a known-bad trace', async () => {
+    // Arrange
+    const emitter = await emitted();
+
+    // Act
+    const act = () => assertions.traceRecords(emitter, [{ name: 'other' }]);
+
+    // Assert
+    act.should.throw(OtelAssertionError, { label: 'Trace records', expected: [{ name: 'other' }] });
+    act.should.throw(
+      /Trace records mismatch\nExpected: \[\{"name":"other"\}\]\nActual: \[\{"attributes":\{"a":1,"b":2\},"name":"work"\}\]/,
+    );
   });
 });
 
-describe('assertTraceCalls', () => {
-  it('should pass on a matching call log', async () => {
-    const subject = await emitter();
-    const expected: readonly TraceCall[] = [
-      { method: 'emit', record: { name: 'span', attributes: { ok: true } }, sequence: 0 },
-      { method: 'flush', sequence: 1 },
-    ];
-    expectNoThrow(() => assertTraceCalls(subject, expected));
+describe('OtelAssertions.traceCalls', () => {
+  it('should pass on the recorded call sequence', async () => {
+    // Arrange
+    const emitter = await emitted();
+
+    // Act
+    const act = () =>
+      assertions.traceCalls(emitter, [
+        { method: 'emit', record: { name: 'work', attributes: { a: 1, b: 2 } }, sequence: 0 },
+        { method: 'flush', sequence: 1 },
+      ]);
+
+    // Assert
+    act.should.not.throw();
   });
 
-  it('should throw on a mismatch', async () => {
-    const subject = await emitter();
-    const error = otelError(() => assertTraceCalls(subject, [{ method: 'flush', sequence: 0 }]));
-    error.label.should.eql('Trace calls');
+  it('should fail when a flush is missing', async () => {
+    // Arrange
+    const emitter = await emitted();
+
+    // Act
+    const act = () =>
+      assertions.traceCalls(emitter, [
+        { method: 'emit', record: { name: 'work', attributes: { a: 1, b: 2 } }, sequence: 0 },
+      ]);
+
+    // Assert
+    act.should.throw(OtelAssertionError, { label: 'Trace calls' });
   });
 });
 
-describe('assertResourceAttributes', () => {
-  it('should pass on equal attributes regardless of key order', () => {
-    // Arrange - unordered keys prove the comparable normalisation
-    expectNoThrow(() => assertResourceAttributes({ b: 2, a: 1 }, { a: 1, b: 2 }));
+describe('OtelAssertions.resourceAttributes and payload', () => {
+  it('should pass on equal attributes and payloads', () => {
+    // Arrange
+    const attributes = { 'service.name': 'svc', 'atomi.module': 'api' };
+
+    // Act
+    const act = () => {
+      assertions.resourceAttributes(attributes, { 'atomi.module': 'api', 'service.name': 'svc' });
+      assertions.payload([{ x: [1, { y: null }] }], [{ x: [1, { y: null }] }]);
+    };
+
+    // Assert
+    act.should.not.throw();
   });
 
-  it('should throw on differing attributes', () => {
-    const error = otelError(() => assertResourceAttributes({ a: 1 }, { a: 2 }));
-    error.label.should.eql('Resource attributes');
-  });
-});
-
-describe('assertTelemetryPayload', () => {
   it.each([
-    ['a nested object', { a: { b: 1 } }, { a: { b: 1 } }],
-    ['an array', [1, 2, 3], [1, 2, 3]],
-    ['a null payload', null, null],
-  ])('should pass on an equal payload (%s)', (_label, actual, expected) => {
-    expectNoThrow(() => assertTelemetryPayload(actual, expected));
-  });
+    ['a changed attribute', () => assertions.resourceAttributes({ a: 'x' }, { a: 'y' }), 'Resource attributes'],
+    ['a payload of another shape', () => assertions.payload({ a: [1] }, { a: [2] }), 'Telemetry payload'],
+  ])('should fail on %s', (_label, act, label) => {
+    // Arrange
+    const run = act;
 
-  it('should throw on a differing payload', () => {
-    const error = otelError(() => assertTelemetryPayload({ a: 1 }, { a: 2 }));
-    error.label.should.eql('Telemetry payload');
-  });
-});
+    // Act
+    const attempt = () => run();
 
-describe('assertLogRecords (re-exported)', () => {
-  const arrange = async (): Promise<InMemoryLoggerSink> => {
-    const subject = new InMemoryLoggerSink();
-    await expectOk(subject.emit({ level: 'info', message: 'hi' }));
-    return subject;
-  };
-  const expected: readonly LogRecord[] = [{ level: 'info', message: 'hi' }];
-
-  it('should pass on matching records', async () => {
-    const subject = await arrange();
-    expectNoThrow(() => assertLogRecords(subject, expected));
-  });
-
-  it('should throw an InterfaceAssertionError on a mismatch', async () => {
-    const subject = await arrange();
-    const error = interfaceError(() => assertLogRecords(subject, [{ level: 'warn', message: 'hi' }]));
-    error.label.should.eql('Log records');
+    // Assert
+    attempt.should.throw(OtelAssertionError, { label });
   });
 });
 
-describe('assertLoggerCalls (re-exported)', () => {
-  const arrange = async (): Promise<InMemoryLoggerSink> => {
-    const subject = new InMemoryLoggerSink();
-    await expectOk(subject.emit({ level: 'info', message: 'hi' }));
-    await expectOk(subject.flush());
-    return subject;
-  };
-  const expected: readonly LoggerCall[] = [
-    { method: 'emit', record: { level: 'info', message: 'hi' }, sequence: 0 },
-    { method: 'flush', sequence: 1 },
-  ];
+describe('OtelAssertions.identityResource', () => {
+  const identity = new AppIdentityBuilder().with({ service: 'checkout' });
 
-  it('should pass on a matching call log', async () => {
-    const subject = await arrange();
-    expectNoThrow(() => assertLoggerCalls(subject, expected));
+  it('should pass when the resource carries the identity, extra attributes allowed', () => {
+    // Arrange
+    const actual = { ...identity.attributes(), 'host.name': 'box' };
+
+    // Act
+    const act = () => assertions.identityResource(actual, identity.build());
+
+    // Assert
+    act.should.not.throw();
   });
 
-  it('should throw on a mismatch', async () => {
-    const subject = await arrange();
-    interfaceError(() => assertLoggerCalls(subject, [{ method: 'flush', sequence: 0 }]));
-  });
-});
+  it('should fail when an identity attribute is missing', () => {
+    // Arrange
+    const { 'atomi.module': _dropped, ...actual } = identity.attributes();
 
-describe('assertMetricRecords (re-exported)', () => {
-  const arrange = async (): Promise<InMemoryMetricsCollector> => {
-    const subject = new InMemoryMetricsCollector();
-    await expectOk(subject.record({ kind: 'counter', name: 'hits', value: 1 }));
-    return subject;
-  };
-  const expected: readonly MetricRecord[] = [{ kind: 'counter', name: 'hits', value: 1 }];
+    // Act
+    const act = () => assertions.identityResource(actual, identity.build());
 
-  it('should pass on matching metrics', async () => {
-    const subject = await arrange();
-    expectNoThrow(() => assertMetricRecords(subject, expected));
-  });
-
-  it('should throw on a mismatch', async () => {
-    const subject = await arrange();
-    interfaceError(() => assertMetricRecords(subject, [{ kind: 'gauge', name: 'hits', value: 1 }]));
-  });
-});
-
-describe('assertMetricsCalls (re-exported)', () => {
-  const arrange = async (): Promise<InMemoryMetricsCollector> => {
-    const subject = new InMemoryMetricsCollector();
-    await expectOk(subject.record({ kind: 'counter', name: 'hits', value: 1 }));
-    await expectOk(subject.flush());
-    return subject;
-  };
-  const expected: readonly MetricsCall[] = [
-    { method: 'record', metric: { kind: 'counter', name: 'hits', value: 1 }, sequence: 0 },
-    { method: 'flush', sequence: 1 },
-  ];
-
-  it('should pass on a matching call log', async () => {
-    const subject = await arrange();
-    expectNoThrow(() => assertMetricsCalls(subject, expected));
-  });
-
-  it('should throw on a mismatch', async () => {
-    const subject = await arrange();
-    interfaceError(() => assertMetricsCalls(subject, [{ method: 'flush', sequence: 0 }]));
+    // Assert
+    act.should.throw(OtelAssertionError, { label: 'Identity resource attributes' });
   });
 });

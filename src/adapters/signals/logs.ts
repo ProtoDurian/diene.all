@@ -7,9 +7,8 @@ import {
   type TelemetryAttributes,
 } from '@atomicloud/diene.interfaces';
 import { Err, Ok, type Result } from '@atomicloud/diene.result';
-import { context, isSpanContextValid, trace, type SpanContext } from '@opentelemetry/api';
+import { context, isSpanContextValid, type SpanContext, trace } from '@opentelemetry/api';
 import pino, { type DestinationStream, type Logger } from 'pino';
-import type { ExporterSelection } from '../../lib/environment.js';
 
 const OTLP_LOGS_BRIDGE_STATUS = 'stubbed' as const;
 
@@ -20,17 +19,16 @@ interface LoggerSignal {
   readonly otlpBridge: typeof OTLP_LOGS_BRIDGE_STATUS;
 }
 
-function activeSpanContext(): SpanContext | undefined {
-  return trace.getSpan(context.active())?.spanContext();
-}
+class TraceContextFields {
+  constructor(
+    private readonly current: () => SpanContext | undefined = () => trace.getSpan(context.active())?.spanContext(),
+  ) {}
 
-function traceContextFields(spanContext: SpanContext | undefined): Readonly<Record<string, number | string>> {
-  if (spanContext === undefined || !isSpanContextValid(spanContext)) return Object.freeze({});
-  return Object.freeze({
-    span_id: spanContext.spanId,
-    trace_flags: spanContext.traceFlags,
-    trace_id: spanContext.traceId,
-  });
+  fields(): Record<string, number | string> {
+    const spanContext = this.current();
+    if (spanContext === undefined || !isSpanContextValid(spanContext)) return {};
+    return { span_id: spanContext.spanId, trace_flags: spanContext.traceFlags, trace_id: spanContext.traceId };
+  }
 }
 
 class PinoLoggerSink implements LoggerSink {
@@ -40,15 +38,10 @@ class PinoLoggerSink implements LoggerSink {
     const checked = checkLogRecord(record);
     if (!checked.ok) return Err(checked.error);
     try {
-      const valid = checked.value;
-      this.logger[valid.level](valid.attributes ?? {}, valid.message);
+      this.logger[checked.value.level](checked.value.attributes ?? {}, checked.value.message);
       return Ok(undefined);
     } catch (cause) {
-      return Err(
-        portError('logging', 'io', 'emit', 'Pino failed to emit the log record', {
-          cause: cause instanceof Error ? cause.message : String(cause),
-        }),
-      );
+      return Err(this.failure('emit', 'Pino failed to emit the log record', cause));
     }
   }
 
@@ -57,39 +50,31 @@ class PinoLoggerSink implements LoggerSink {
       this.logger.flush();
       return Ok(undefined);
     } catch (cause) {
-      return Err(
-        portError('logging', 'io', 'flush', 'Pino failed to flush', {
-          cause: cause instanceof Error ? cause.message : String(cause),
-        }),
-      );
+      return Err(this.failure('flush', 'Pino failed to flush', cause));
     }
+  }
+
+  private failure(operation: string, message: string, cause: unknown): LoggingError {
+    return portError('logging', 'io', operation, message, {
+      cause: cause instanceof Error ? cause.message : String(cause),
+    });
   }
 }
 
-function createLoggerSignal(
-  enabled: boolean,
-  selection: ExporterSelection,
-  resource: TelemetryAttributes,
-  destination?: DestinationStream,
-  spanContext: () => SpanContext | undefined = activeSpanContext,
-): LoggerSignal {
-  const active = enabled && selection.console;
-  const options: pino.LoggerOptions = {
-    base: { ...resource },
-    enabled: active,
-    level: 'trace',
-    // Pino decorates the mixin result while merging a log record, so hand it a
-    // mutable copy of our frozen, deterministic trace-context value.
-    mixin: () => ({ ...traceContextFields(spanContext()) }),
-  };
-  const logger = destination === undefined ? pino(options) : pino(options, destination);
-  return Object.freeze({
-    active,
-    logger,
-    otlpBridge: OTLP_LOGS_BRIDGE_STATUS,
-    sink: new PinoLoggerSink(logger),
-  });
+class LoggerSignalFactory {
+  constructor(private readonly traceContext: TraceContextFields = new TraceContextFields()) {}
+
+  create(active: boolean, resource: TelemetryAttributes, destination?: DestinationStream): LoggerSignal {
+    const options: pino.LoggerOptions = {
+      base: { ...resource },
+      enabled: active,
+      level: 'trace',
+      mixin: () => this.traceContext.fields(),
+    };
+    const logger = destination === undefined ? pino(options) : pino(options, destination);
+    return Object.freeze({ active, logger, otlpBridge: OTLP_LOGS_BRIDGE_STATUS, sink: new PinoLoggerSink(logger) });
+  }
 }
 
 export type { LoggerSignal };
-export { activeSpanContext, createLoggerSignal, OTLP_LOGS_BRIDGE_STATUS, PinoLoggerSink, traceContextFields };
+export { LoggerSignalFactory, OTLP_LOGS_BRIDGE_STATUS, PinoLoggerSink, TraceContextFields };
