@@ -41,11 +41,6 @@
   },
   {
     "template": "diene/workspace",
-    "name": "direnv",
-    "class": "smoke"
-  },
-  {
-    "template": "diene/workspace",
     "name": "fmt-actionlint",
     "class": "gate"
   },
@@ -68,11 +63,6 @@
     "template": "diene/workspace",
     "name": "binary-smoke",
     "class": "smoke"
-  },
-  {
-    "template": "diene/workspace",
-    "name": "skills-sync",
-    "class": "gate"
   },
   {
     "template": "diene/workspace",

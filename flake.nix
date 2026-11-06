@@ -52,31 +52,25 @@
             env
             ;
         };
-        pre-commit-offline = import ./nix/pre-commit.nix {
-          inherit
-            packages
-            pkgs
-            pre-commit-lib
-            formatter
-            env
-            ;
-          offline = true;
-        };
         formatter = import ./nix/fmt.nix {
           inherit treefmt-nix pkgs;
         };
         packages = import ./nix/packages.nix {
-          inherit pkgs-2605 pkgs-unstable atomi;
+          inherit
+            pkgs-2605
+            pkgs-unstable
+            atomi
+            ;
         };
         env = import ./nix/env.nix {
           inherit pkgs packages;
         };
         devShells = import ./nix/shells.nix {
           inherit pkgs env packages;
-          shellHook = pre-commit.shellHook;
+          shellHook = checks.pre-commit-check.shellHook;
         };
         checks = {
-          pre-commit-check = pre-commit-offline;
+          pre-commit-check = pre-commit;
           format = formatter;
         };
       };
