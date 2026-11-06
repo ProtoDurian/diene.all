@@ -277,15 +277,11 @@ public static class SeamContracts
 
     private static async Task<ContractCase> Case(string name, Func<Task<string?>> check)
     {
-        try
-        {
-            return new ContractCase(name, Option.FromNullable(await check().ConfigureAwait(false)));
-        }
-#pragma warning disable CA1031 // An implementation that THROWS violates the seam contract; reporting it as a failed case is the point.
-        catch (Exception exception)
-        {
-            return new ContractCase(name, Option.Some($"threw {exception.GetType().Name}: {exception.Message}"));
-        }
-#pragma warning restore CA1031
+        var outcome = await Result.TryAsync(check, Errors.MapAll).ConfigureAwait(false);
+        return new ContractCase(
+            name,
+            outcome.Match(
+                Option.FromNullable,
+                exception => Option.Some($"threw {exception.GetType().Name}: {exception.Message}")));
     }
 }
