@@ -15,7 +15,8 @@ export default {
   probes: [
     {
       name: 'baseline-aseity-job-runner-green',
-      description: 'Two concurrent runners run each job exactly once, and a fork holds outside-effect jobs.',
+      description:
+        'A job claimed by one runner is never handed to a second, concurrent runner, and a fork holds outside-effect jobs.',
       kind: 'baseline',
       async run(repo: ProbeRepo) {
         await expectBunGreen(repo, command, 'aseity-job-runner');
@@ -24,7 +25,7 @@ export default {
     {
       name: 'mutation-aseity-job-runner-caught',
       description:
-        'A claim without FOR UPDATE SKIP LOCKED lets both runners take the same job and turns the check red.',
+        'A claim without FOR UPDATE SKIP LOCKED hands a held job to a second runner and turns the check red.',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: ProbeRepo) {
@@ -37,7 +38,7 @@ export default {
           repo,
           command,
           'aseity-job-runner',
-          ['should run each job exactly once under two concurrent runners'],
+          ['should never hand a job another runner holds to a second runner'],
           { timeoutMs: 600_000 },
         );
       },

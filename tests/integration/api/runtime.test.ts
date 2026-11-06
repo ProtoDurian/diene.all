@@ -339,6 +339,23 @@ describe('WorkerRuntime over HTTP (Testcontainers Postgres + MinIO)', () => {
     (log.errors[0]?.fields.reason as string).should.containEql('invalid storage settings: S3_BUCKET');
   });
 
+  it('should answer a plain internal problem when the Hyperdrive binding is missing', async () => {
+    // Arrange
+    const { HYPERDRIVE: _binding, ...target } = env;
+    log.errors.length = 0;
+    const background = new BackgroundWork();
+
+    // Act
+    const response = await runtime.fetch(new Request(`${APP_URL}/api/health`), target as WorkerEnv, background);
+    await runtime.scheduled(target as WorkerEnv, background);
+    await background.settle();
+
+    // Assert
+    response.status.should.equal(500);
+    (response.headers.get('content-type') as string).should.equal('application/problem+json');
+    log.errors.map(entry => entry.message).should.deepEqual(['request setup failed', 'scheduled setup failed']);
+  });
+
   it('should drain due jobs and purge expired cache on the cron tick', async () => {
     // Arrange
     delivered.length = 0;

@@ -26,7 +26,8 @@ export default {
       description:
         'Renaming the Hyperdrive binding in wrangler.jsonc breaks the database path and turns the check red.',
       kind: 'mutation',
-      expectedImpact: [],
+      // The same rename is what the wrangler config check refuses.
+      expectedImpact: ['aseity-wrangler-config'],
       async run(repo: ProbeRepo) {
         const path = 'wrangler.jsonc';
         const source = await repo.read(path);

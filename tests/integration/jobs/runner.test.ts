@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, it } from 'bun:test';
 import 'should';
 import { PgJobQueue, PgJobStore } from '../../../src/adapters/data/jobs/repo';
 import { PgDatabase } from '../../../src/adapters/db/database';
+import type { IDatabase, ISqlExecutor } from '../../../src/lib/db/interfaces';
 import type { IJobHandler } from '../../../src/lib/jobs/interfaces';
 import { JobRunner, JobScheduler, RetryPolicy } from '../../../src/lib/jobs/service';
 import type { Job } from '../../../src/lib/jobs/structures';
@@ -17,6 +18,35 @@ class CountingHandler implements IJobHandler {
   async handle(job: Job): Promise<void> {
     this.runs.set(job.id, (this.runs.get(job.id) ?? 0) + 1);
     await Bun.sleep(2);
+  }
+}
+
+class HeldClaimDatabase implements IDatabase {
+  private held = true;
+
+  constructor(
+    private readonly inner: IDatabase,
+    private readonly claimed: () => void,
+    private readonly release: Promise<void>,
+  ) {}
+
+  withTenant<T>(tenantId: string, work: (sql: ISqlExecutor) => Promise<T>): Promise<T> {
+    return this.inner.withTenant(tenantId, work);
+  }
+
+  withSystem<T>(work: (sql: ISqlExecutor) => Promise<T>): Promise<T> {
+    if (!this.held) return this.inner.withSystem(work);
+    this.held = false;
+    return this.inner.withSystem(async sql => {
+      const result = await work(sql);
+      this.claimed();
+      await this.release;
+      return result;
+    });
+  }
+
+  close(): Promise<void> {
+    return this.inner.close();
   }
 }
 
@@ -53,6 +83,14 @@ describe('JobRunner against Postgres (Testcontainers)', () => {
       return jobs;
     });
 
+  const waitingOnLock = () =>
+    postgres.admin(async client => {
+      const result = await client.query<{ waiting: number }>(
+        "SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()",
+      );
+      return (result.rows[0]?.waiting ?? 0) > 0;
+    });
+
   const options = { batchSize: 3, maxBatches: 100, leaseSeconds: 60 };
 
   it('should run each job exactly once under two concurrent runners', async () => {
@@ -70,6 +108,37 @@ describe('JobRunner against Postgres (Testcontainers)', () => {
     [...handler.runs.values()].filter(count => count > 1).should.deepEqual([]);
     handler.runs.size.should.equal(jobs.length);
     summaries.reduce((total, summary) => total + summary.done, 0).should.equal(JOBS);
+  }, 60_000);
+
+  it('should never hand a job another runner holds to a second runner', async () => {
+    // Arrange
+    const jobs = await enqueue(4, false);
+    const handler = new CountingHandler('count');
+    const firstClaim = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const holding = new HeldClaimDatabase(left, firstClaim.resolve, release.promise);
+    const first = new JobRunner(new PgJobStore(holding), [handler], new RetryPolicy(), false, {
+      ...options,
+      batchSize: 4,
+    });
+    const second = new JobRunner(new PgJobStore(right), [handler], new RetryPolicy(), false, {
+      ...options,
+      batchSize: 4,
+    });
+
+    // Act
+    const firstDrain = first.drain();
+    await firstClaim.promise;
+    let secondDone = false;
+    const secondDrain = second.drain().finally(() => {
+      secondDone = true;
+    });
+    while (!secondDone && !(await waitingOnLock())) await Bun.sleep(20);
+    release.resolve();
+    await Promise.all([firstDrain, secondDrain]);
+
+    // Assert
+    [...handler.runs.values()].should.deepEqual(jobs.map(() => 1));
   }, 60_000);
 
   it('should hold outside-effect jobs in a fork and never run them', async () => {

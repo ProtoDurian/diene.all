@@ -25,7 +25,8 @@ export default {
       name: 'mutation-aseity-worker-safe-caught',
       description: 'A Bun.version call in a domain module the Worker reaches turns the worker-safe check red.',
       kind: 'mutation',
-      expectedImpact: [],
+      // A Bun global also stops workerd from starting the Worker.
+      expectedImpact: ['aseity-local-worker'],
       async run(repo: ProbeRepo) {
         const path = 'src/lib/notes/service.ts';
         const source = await repo.read(path);

@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import type { Subprocess } from 'bun';
 
 const REPOSITORY_ROOT = resolve(import.meta.dir, '../..');
+const READY_LINE = /Ready on (http:\/\/127\.0\.0\.1:\d+)/;
 
 export interface WranglerDevOptions {
   readonly entry?: string;
@@ -11,7 +12,6 @@ export interface WranglerDevOptions {
   readonly vars: Readonly<Record<string, string>>;
 }
 
-/** Runs the Worker in local workerd through `wrangler dev`, the way a developer does. */
 export class WranglerDev {
   private constructor(
     private readonly process: Subprocess<'ignore', 'pipe', 'pipe'>,
@@ -21,14 +21,15 @@ export class WranglerDev {
   ) {}
 
   static async start(options: WranglerDevOptions): Promise<WranglerDev> {
-    // The assets directory is the web build; an empty one is enough to serve the API.
     await mkdir(join(REPOSITORY_ROOT, 'dist/web'), { recursive: true });
     const stateDir = await mkdtemp(join(tmpdir(), 'aseity-wrangler-'));
-    const port = await WranglerDev.freePort();
+    const name = `aseity-e2e-${crypto.randomUUID().slice(0, 8)}`;
     const args = ['wrangler', 'dev', ...(options.entry ? [options.entry] : [])];
-    args.push('--config', 'wrangler.jsonc', '--ip', '127.0.0.1', '--port', String(port));
-    args.push('--persist-to', stateDir, '--show-interactive-dev-session=false', '--log-level', 'info');
-    for (const [name, value] of Object.entries(options.vars)) args.push('--var', `${name}:${value}`);
+    args.push('--config', 'wrangler.jsonc', '--name', name, '--ip', '127.0.0.1');
+    // Port 0: wrangler binds free ports itself, so parallel runs never collide.
+    args.push('--port', '0', '--inspector-port', '0');
+    args.push('--persist-to', join(stateDir, 'state'), '--show-interactive-dev-session=false', '--log-level', 'info');
+    for (const [key, value] of Object.entries(options.vars)) args.push('--var', `${key}:${value}`);
     const child = Bun.spawn(args, {
       cwd: REPOSITORY_ROOT,
       stdin: 'ignore',
@@ -38,6 +39,8 @@ export class WranglerDev {
         ...process.env,
         CI: '1',
         WRANGLER_SEND_METRICS: 'false',
+        WRANGLER_REGISTRY_PATH: join(stateDir, 'registry'),
+        WRANGLER_LOG_PATH: join(stateDir, 'logs'),
         CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: options.connectionString,
       },
     });
@@ -47,9 +50,14 @@ export class WranglerDev {
         for await (const chunk of stream) log += new TextDecoder().decode(chunk);
       })();
     }
-    const dev = new WranglerDev(child, stateDir, `http://127.0.0.1:${port}`, () => log);
-    await dev.ready();
-    return dev;
+    try {
+      const url = await WranglerDev.ready(child, () => log);
+      return new WranglerDev(child, stateDir, url, () => log);
+    } catch (error) {
+      child.kill('SIGKILL');
+      await rm(stateDir, { recursive: true, force: true });
+      throw error;
+    }
   }
 
   get logs(): string {
@@ -67,24 +75,20 @@ export class WranglerDev {
     await rm(this.stateDir, { recursive: true, force: true });
   }
 
-  private async ready(): Promise<void> {
-    const deadline = Date.now() + 90_000;
+  private static async ready(child: Subprocess, logs: () => string): Promise<string> {
+    const deadline = Date.now() + 120_000;
     while (Date.now() < deadline) {
-      if (this.process.exitCode !== null) throw new Error(`wrangler dev exited early:\n${this.logs}`);
-      const response = await fetch(`${this.url}/api/health`).catch(() => undefined);
-      if (response !== undefined) {
-        await response.body?.cancel();
-        return;
+      if (child.exitCode !== null) throw new Error(`wrangler dev exited early:\n${logs()}`);
+      const url = READY_LINE.exec(logs())?.[1];
+      if (url !== undefined) {
+        const response = await fetch(`${url}/api/health`).catch(() => undefined);
+        if (response !== undefined) {
+          await response.body?.cancel();
+          return url;
+        }
       }
-      await Bun.sleep(500);
+      await Bun.sleep(250);
     }
-    throw new Error(`wrangler dev did not start in time:\n${this.logs}`);
-  }
-
-  private static async freePort(): Promise<number> {
-    const server = Bun.serve({ port: 0, fetch: () => new Response() });
-    const port = server.port as number;
-    server.stop(true);
-    return port;
+    throw new Error(`wrangler dev did not start in time:\n${logs()}`);
   }
 }

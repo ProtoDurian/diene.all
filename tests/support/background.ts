@@ -1,6 +1,5 @@
 import type { RuntimeLog, WaitUntil } from '../../src/adapters/api/runtime';
 
-/** Collects `waitUntil` work so a test can await what the Worker would finish after responding. */
 export class BackgroundWork implements WaitUntil {
   private readonly pending: Promise<unknown>[] = [];
 

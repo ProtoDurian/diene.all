@@ -27,7 +27,8 @@ export default {
       name: 'mutation-aseity-wrangler-config-caught',
       description: 'Renaming the HYPERDRIVE binding turns the contract check red.',
       kind: 'mutation',
-      expectedImpact: [],
+      // Without the HYPERDRIVE binding the Worker cannot reach its database either.
+      expectedImpact: ['aseity-local-worker'],
       async run(repo: ProbeRepo) {
         const path = 'wrangler.jsonc';
         const config = await repo.read(path);

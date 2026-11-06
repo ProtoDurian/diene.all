@@ -33,7 +33,6 @@ export interface WorkerEnv {
 
 export type WaitUntil = Pick<ExecutionContext, 'waitUntil'>;
 
-/** Everything one request or cron tick shares; built fresh each time because Worker I/O is per request. */
 export interface RuntimeScope {
   readonly env: WorkerEnv;
   readonly db: PgDatabase;
@@ -43,7 +42,6 @@ export interface RuntimeScope {
   readonly fork: IForkMarkerReader;
 }
 
-/** The auth seam: resolves who is calling and which tenant they act in. */
 export interface AuthProvider {
   create(scope: RuntimeScope): Promise<{ readonly gate: IdentityGate; readonly modules: readonly RouteModule[] }>;
 }
@@ -82,10 +80,11 @@ export class WorkerRuntime {
   }
 
   async fetch(request: Request, env: WorkerEnv, ctx: WaitUntil): Promise<Response> {
-    const db = new PgDatabase(env.HYPERDRIVE);
     const kicker = new DeferredKicker();
+    let db: PgDatabase | undefined;
     let scope: RuntimeScope | undefined;
     try {
+      db = new PgDatabase(env.HYPERDRIVE);
       scope = await this.scope(env, db);
       const problems = new ApiProblems(scope.registry);
       const { gate, modules } = await this.auth.create(scope);
@@ -105,18 +104,19 @@ export class WorkerRuntime {
       this.log.error('request setup failed', { reason: String(error) });
       return new Response(SETUP_FAILURE, { status: 500, headers: { 'content-type': 'application/problem+json' } });
     } finally {
-      ctx.waitUntil(this.afterResponse(db, kicker.wanted ? scope : undefined, false));
+      if (db !== undefined) ctx.waitUntil(this.afterResponse(db, kicker.wanted ? scope : undefined, false));
     }
   }
 
   async scheduled(env: WorkerEnv, ctx: WaitUntil): Promise<void> {
-    const db = new PgDatabase(env.HYPERDRIVE);
+    let db: PgDatabase | undefined;
     try {
+      db = new PgDatabase(env.HYPERDRIVE);
       const scope = await this.scope(env, db);
       ctx.waitUntil(this.afterResponse(db, scope, true));
     } catch (error) {
       this.log.error('scheduled setup failed', { reason: String(error) });
-      ctx.waitUntil(db.close());
+      if (db !== undefined) ctx.waitUntil(db.close());
     }
   }
 

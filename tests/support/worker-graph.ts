@@ -5,15 +5,11 @@ export const REPOSITORY_ROOT = resolve(import.meta.dir, '../..');
 const WORKER_ENTRY = 'src/index.ts';
 
 export interface WorkerModule {
-  /** Repository-relative path. */
   readonly path: string;
-  /** Transpiled JavaScript: types, type-only imports and comments are gone. */
   readonly code: string;
-  /** Bare (package) specifiers this module imports at runtime. */
   readonly packages: readonly string[];
 }
 
-/** Every first-party module the Worker entry reaches at runtime. */
 export class WorkerGraph {
   private readonly transpiler = new Bun.Transpiler({ loader: 'ts' });
 
