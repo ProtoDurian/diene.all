@@ -14,6 +14,18 @@ describe('Timing.sleep', () => {
     should(actual).be.undefined();
   });
 
+  it('should wait at least the requested seconds', async () => {
+    // Arrange
+    const timing = new Timing();
+    const start = performance.now();
+
+    // Act
+    await timing.sleep(0.01);
+
+    // Assert
+    (performance.now() - start).should.be.aboveOrEqual(9);
+  });
+
   it.each([
     { seconds: -1, label: 'negative' },
     { seconds: Number.NaN, label: 'NaN' },
