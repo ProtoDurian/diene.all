@@ -115,3 +115,19 @@ describe('ProblemTypeUriBuilder scheme', () => {
     }
   });
 });
+
+describe('ProblemTypeUriBuilder id length', () => {
+  it('should accept an id of 63 characters and refuse one of 64', () => {
+    // Arrange
+    const builder = new ProblemTypeUriBuilder();
+    const longest = `a${'b'.repeat(62)}`;
+
+    // Act
+    const accepted = builder.buildProblemTypeUri(portal, 'v1', longest);
+    const refused = thrown(() => builder.buildProblemTypeUri(portal, 'v1', `${longest}c`));
+
+    // Assert
+    accepted.should.endWith(`/v1/${longest}`);
+    refused.message.should.startWith('id must match');
+  });
+});

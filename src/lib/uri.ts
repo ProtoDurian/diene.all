@@ -1,7 +1,7 @@
 import type { ErrorPortalConfig } from './types.js';
 
 const SEGMENT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const PROBLEM_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
+const PROBLEM_ID_PATTERN = /^[a-z][a-z0-9_]{0,62}$/;
 const VERSION_PATTERN = /^v[1-9][0-9]*$/;
 const HOST_FORBIDDEN_PATTERN = /[/\\\s@?#]/;
 

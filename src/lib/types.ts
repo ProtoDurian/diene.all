@@ -44,7 +44,9 @@ export type ProblemDataMember<TData> = unknown extends TData
   ? { readonly data?: unknown }
   : [TData] extends [undefined]
     ? { readonly data?: undefined }
-    : { readonly data: TData };
+    : undefined extends TData
+      ? { readonly data?: TData }
+      : { readonly data: TData };
 
 interface ProblemEnvelope {
   readonly type: string;

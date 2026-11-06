@@ -53,13 +53,14 @@ export class ProblemFactory {
     if (definition.dataSchema === undefined && init.data !== undefined) {
       throw new ProblemRegistryError('invalid', `Problem ${definition.id} carries no data`);
     }
+    const data = definition.dataSchema?.parse(init.data);
     return {
       type: definition.type,
       title: definition.title,
       status,
       ...(init.detail === undefined ? {} : { detail: init.detail }),
       ...(init.instance === undefined ? {} : { instance: init.instance }),
-      ...(definition.dataSchema === undefined ? {} : { data: definition.dataSchema.parse(init.data) }),
+      ...(data === undefined ? {} : { data }),
     } as Problem<ProblemDataOf<TSchema>>;
   }
 }

@@ -209,6 +209,30 @@ describe('ProblemFactory', () => {
   });
 });
 
+describe('ProblemFactory with an optional data schema', () => {
+  it('should allow omitting data when the schema output may be undefined, and then omit the member', () => {
+    // Arrange
+    const registered = new ProblemRegistry(portal).register({
+      ...definition,
+      id: 'note_hint',
+      dataSchema: z.object({ hint: z.string() }).strict().optional(),
+    });
+    const required = new ProblemRegistry(portal).register(definition);
+    const factory = new ProblemFactory();
+
+    // Act
+    const bare = factory.createProblem(registered, {});
+    const hinted = factory.createProblem(registered, { data: { hint: 'retry' } });
+    // @ts-expect-error data is required when the schema output cannot be undefined
+    const missing = thrown(() => factory.createProblem(required, {}));
+
+    // Assert
+    bare.should.not.have.property('data');
+    hinted.data!.should.eql({ hint: 'retry' });
+    missing.should.be.instanceOf(z.ZodError);
+  });
+});
+
 describe('ProblemStatusPolicy', () => {
   it('should accept only integer error statuses from 400 through 599', () => {
     // Arrange
