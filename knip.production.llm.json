@@ -1,11 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["src/index.ts", "src/test-helper/index.ts"],
-  "project": ["src/**/*.ts"],
-  "bun": false,
-  "github-actions": false,
-  "node": false,
-  "taskfile": false,
-  "typescript": false,
+  "entry": ["src/index.ts!"],
+  "project": ["src/**/*.ts!"],
   "includeEntryExports": true
 }

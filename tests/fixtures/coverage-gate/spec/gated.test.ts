@@ -1,8 +1,7 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
+import 'should';
 import { alwaysMeasured, measuredOnlyWhileTheSuiteRuns } from '../src/gated';
 
-// The sabotage skips one path so the fixture threshold must turn the run red.
 const sabotaged = process.env.COVERAGE_GATE_SABOTAGE === '1';
 const gated = sabotaged ? it.skip : it;
 
@@ -16,7 +15,7 @@ describe('coverage gate fixture', () => {
     const actual = alwaysMeasured(input);
 
     // Assert
-    should(actual).equal(expected);
+    actual.should.equal(expected);
   });
 
   gated('should cover the gated function unless the run is sabotaged', () => {
@@ -28,6 +27,6 @@ describe('coverage gate fixture', () => {
     const actual = measuredOnlyWhileTheSuiteRuns(input);
 
     // Assert
-    should(actual).equal(expected);
+    actual.should.equal(expected);
   });
 });

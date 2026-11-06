@@ -12,7 +12,7 @@ export default {
       kind: 'baseline',
       async run(repo: any) {
         await expectBunGreen(repo, command, 'bun-meta-conditional');
-        if ((await repo.glob('coverage/meta/lcov.info')).length !== 0) {
+        if ((await repo.glob('reports/meta/lcov.info')).length !== 0) {
           throw new Error('no-op meta tier must not emit a coverage artifact');
         }
       },
