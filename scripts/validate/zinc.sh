@@ -149,6 +149,8 @@ check_lpsm() {
       all(.[]; (.metadata.labels | lpsm) and (.metadata.annotations | lpsm)) and
       all(.[] | select(.kind == "ExternalSecret"); (.spec.target.template.metadata.labels | lpsm) and (.spec.target.template.metadata.annotations | lpsm)) and
       ($p == "atomi.cloud" or all(.[]; [.metadata.labels, .metadata.annotations | keys[] | select(startswith("atomi.cloud/"))] | length == 0))' || return 1
+    json "${tmp}/lpsm.yaml" | need_jq "the ExternalSecret target Secret carries a non-LPSM (Helm/Argo ownership) key (${l})" --arg p "${prefix}" '
+      all(.[] | select(.kind == "ExternalSecret"); .spec.target.template.metadata | [.labels, .annotations | keys[]] | all(startswith($p + "/")))' || return 1
   done
 }
 
@@ -227,6 +229,9 @@ lpsm-labels)
   copy_root "${tmp}/nolabels"
   sed -i '/include "zinc.serviceTreeLabels"/d' "${tmp}/nolabels/chart/templates/_helpers.tpl"
   expect_red 'LPSM labels dropped' 'LPSM labels/annotations differ' check_lpsm "${tmp}/nolabels" atomi.cloud
+  copy_root "${tmp}/owned"
+  sed -i '27s|include "zinc.serviceTreeLabels" . \| trim|include "zinc.labels" .|' "${tmp}/owned/chart/templates/externalsecret.yaml"
+  expect_red 'Helm/Argo ownership labels on the ESO-owned Secret' 'carries a non-LPSM \(Helm/Argo ownership\) key' check_lpsm "${tmp}/owned" atomi.cloud
   ;;
 secret)
   check_secret .

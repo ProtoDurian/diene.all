@@ -45,8 +45,8 @@ expect_issuer() {
     { echo "❌ ClusterIssuer $1 read back differs: $(issuer "$1")" >&2 && exit 1; }
 }
 expect_absent() {
-  "${k[@]}" get clusterissuer "$1" >/dev/null 2>"${tmp}/absent.txt" && { echo "❌ ClusterIssuer $1 still exists" >&2 && exit 1; }
-  rg -q 'NotFound' "${tmp}/absent.txt" || { cat "${tmp}/absent.txt" >&2 && echo "❌ reading ClusterIssuer $1 failed for a reason other than NotFound" >&2 && exit 1; }
+  "${k[@]}" get "$@" >/dev/null 2>"${tmp}/absent.txt" && { echo "❌ $* still exists" >&2 && exit 1; }
+  rg -q 'NotFound' "${tmp}/absent.txt" || { cat "${tmp}/absent.txt" >&2 && echo "❌ reading $* failed for a reason other than NotFound" >&2 && exit 1; }
 }
 expect_release_owns_no_certificate() {
   helm get manifest zinc "${helm_k[@]}" | yq eval-all -e '[select(.kind == "Certificate" or .kind == "CertificateRequest")] | length == 0' >/dev/null ||
@@ -70,8 +70,15 @@ echo "4e2602c4cbe1afbc394d86f4ac6522e1a5263b01133bba1e40a6d1a549e753a1  ${tmp}/g
 "${k[@]}" apply --server-side -f "${tmp}/gateway-api.yaml" >/dev/null
 helm install sulfur "${sulfur}/chart" "${helm_k[@]}" --create-namespace --values "${sulfur}/chart/values.example.yaml" --values "${sulfur}/chart/values.lapras.yaml" --wait --wait-for-jobs --timeout 5m
 "${k[@]}" wait --for=condition=Established crd/clusterissuers.cert-manager.io crd/certificates.cert-manager.io --timeout=1m
+controller=(--namespace "${namespace}" get pods -l 'app.kubernetes.io/instance=sulfur,app.kubernetes.io/component=controller' -o name)
+[ "$("${k[@]}" "${controller[@]}" | wc -l)" = 1 ] || { echo "❌ the cert-manager controller pod selector does not match exactly one pod" >&2 && exit 1; }
 # A stopped controller never contacts Let's Encrypt; the webhook still validates every apply.
 "${k[@]}" --namespace "${namespace}" scale deployment/sulfur-cert-manager --replicas=0
+for _ in $(seq 90); do
+  [ -z "$("${k[@]}" "${controller[@]}")" ] && break
+  sleep 2
+done
+[ -z "$("${k[@]}" "${controller[@]}")" ] || { echo "❌ the cert-manager controller pod is still running" >&2 && exit 1; }
 "${k[@]}" --namespace "${namespace}" rollout status deployment/sulfur-cert-manager-webhook --timeout=2m
 echo "✅ sulfur at ${sulfur_sha} installed: cert-manager CRDs + webhook"
 
@@ -95,22 +102,23 @@ echo "✅ pichu: zinc-letsencrypt on LE staging"
 helm upgrade zinc chart "${helm_k[@]}" --values chart/values.entei.yaml --wait --timeout 3m
 expect_issuer zinc-staging "${staging}" "${zones}"
 expect_issuer zinc-production "${prod}" "${zones}"
-expect_absent zinc-letsencrypt
+expect_absent clusterissuer zinc-letsencrypt
 expect_release_owns_no_certificate
 echo "✅ ENTEI: zinc-staging + zinc-production with the hosted-zone restriction"
 
 "${k[@]}" create namespace "${fixture_ns}"
 "${k[@]}" apply -f tests/fixtures/certificates/instance-intents.yaml
-"${k[@]}" --namespace "${fixture_ns}" get certificates -o json |
-  jq -r '.items[].spec.issuerRef.name' | sort | paste -sd' ' | rg -qx 'zinc-production zinc-staging' ||
-  { echo "❌ the fixture Certificates do not reference both ENTEI refs" >&2 && exit 1; }
-for ref in zinc-staging zinc-production; do "${k[@]}" get clusterissuer "${ref}" >/dev/null; done
+refs="$(yq eval-all -N '.spec.issuerRef.name' tests/fixtures/certificates/instance-intents.yaml | sort -u)"
+[ "$(paste -sd' ' <<<"${refs}")" = 'zinc-production zinc-staging' ] || { echo "❌ the fixture Certificates do not reference both ENTEI refs" >&2 && exit 1; }
+for ref in ${refs}; do "${k[@]}" get clusterissuer "${ref}" >/dev/null; done
 [ "$("${k[@]}" get certificates -A -o json | jq '[.items[] | select(.metadata.namespace != "zinc-fixture")] | length')" = 0 ] ||
   { echo "❌ a Certificate exists outside the test fixture" >&2 && exit 1; }
-echo "✅ a materializer-owned instance Certificate references either ENTEI ref; zinc owns none"
+echo "✅ materializer-owned instance Certificates apply against either ENTEI ref; zinc owns none"
+for account in zinc-letsencrypt-account zinc-staging-account zinc-production-account; do expect_absent --namespace "${namespace}" secret "${account}"; done
+echo "✅ no ACME account Secret exists: nothing registered with Let's Encrypt"
 
 PUBLISH_MODE=oci PUBLISH_DRY_RUN=false RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/oci" OCI_REGISTRY="localhost:${registry_port}" OCI_REPOSITORY=charts OCI_PLAIN_HTTP=true bash ./scripts/ci/publish.sh
 helm pull "oci://localhost:${registry_port}/charts/zinc" --version 0.1.0 --plain-http --destination "${tmp}"
 test -s "${tmp}/zinc-0.1.0.tgz"
 
-echo "✅ k3d: sulfur then zinc installed, ClusterIssuers read back, fixture Certificates bind, OCI round-trip passed"
+echo "✅ k3d: sulfur then zinc installed, ClusterIssuers read back, fixture Certificates applied, OCI round-trip passed"

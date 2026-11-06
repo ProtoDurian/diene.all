@@ -12,7 +12,6 @@ metadata:
   name: {{ $name }}
   labels:
     {{- include "zinc.labels" $root | nindent 4 }}
-    {{ include "zinc.labelPrefix" $root }}/acme-directory: {{ $ref.directory | quote }}
   annotations:
     {{- include "zinc.annotations" $root | nindent 4 }}
 spec:
