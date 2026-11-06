@@ -46,8 +46,8 @@ uses strict no-emit typechecking. Knip has four dead-code modes, none with ignor
 ## Test and coverage tiers
 
 - `.config/bun-base.coverage.yaml` lists the tiers (`unit`, `int`, `meta`,
-  `sit`), each with its test folder and coverage scope; `scripts/ci/test.sh
-<tier>` reads it.
+  `sit`), each with its test folder and coverage scope;
+  `scripts/ci/test.sh <tier>` reads it.
   A tier with no test files passes and writes no coverage file.
 - Unit tests live under `tests/unit/` and cover only `src/lib/**`.
 - Integration tests live under `tests/integration/`, use Testcontainers Redis,
