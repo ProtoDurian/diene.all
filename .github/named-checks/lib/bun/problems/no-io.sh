@@ -5,6 +5,8 @@ set -euo pipefail
 # Every module specifier under src/ is a string literal: relative, the Result or
 # core-utils package, or zod (and zod/* subpaths). No runtime global with an
 # effect: fromHttpError takes a response-like object and never fetches.
+# src/test-helper/ may also import the root package by name (never a subpath);
+# src/lib/ and src/index.ts may not.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -19,7 +21,10 @@ for path in "${files[@]}"; do
     failed=1
     continue
   fi
-  allowed='^(\.{1,2}/|@atomicloud/diene\.(result|core-utils)$|zod(/[a-z0-9-]+)*$)'
+  packages='result|core-utils'
+  # the TestHelper imports the root package by name so one copy of the registry and error classes exists
+  [[ ${path} == src/test-helper/* ]] && packages='result|core-utils|problems'
+  allowed="^(\\.{1,2}/|@atomicloud/diene\\.(${packages})\$|zod(/[a-z0-9-]+)*\$)"
   # shellcheck disable=SC2016
   report="$(git show "${tree}:${path}" | ALLOWED="${allowed}" bun -e '
     const src = await Bun.stdin.text();
@@ -77,4 +82,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ no-io: ${#files[@]} src/ modules import only literal relative paths, result, core-utils and zod, and name no effectful global"
+echo "✅ no-io: ${#files[@]} src/ modules import only literal relative paths, result, core-utils and zod (the TestHelper also the root package), and name no effectful global"
