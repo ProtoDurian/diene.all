@@ -1,6 +1,6 @@
-using AtomiCloud.Diene.Interfaces.App.Adapters;
+using AtomiCloud.DotnetBase.App.Adapters;
 
-namespace AtomiCloud.Diene.Interfaces.App;
+namespace AtomiCloud.DotnetBase.App;
 
 /// <summary>
 /// Exercises the full published surface of <c>AtomiCloud.Diene.Interfaces</c> as an

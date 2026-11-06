@@ -1,4 +1,4 @@
-namespace AtomiCloud.Diene.Interfaces.UnitTest.Meta;
+namespace AtomiCloud.DotnetBase.UnitTest.Meta;
 
 /// <summary>
 /// META tier — the published path policy of the in-memory filesystem. Consumers

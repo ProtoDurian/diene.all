@@ -1,4 +1,4 @@
-namespace AtomiCloud.Diene.Interfaces.UnitTest.Meta;
+namespace AtomiCloud.DotnetBase.UnitTest.Meta;
 
 /// <summary>
 /// META tier — ASSERT THE ASSERTER. Every assertion helper and every contract suite

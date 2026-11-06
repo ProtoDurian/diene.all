@@ -5,14 +5,12 @@ title: .NET Library Baseline
 
 # .NET library baseline
 
-This Interfaces materialization keeps `App` as a non-packable consumer holding the
-host-backed reference adapters, and publishes two lockstep packages from one
-solution:
+This branch turns the `.NET 10` base into a publishable library template. It
+keeps the base `App` as a non-packable consumer and publishes two lockstep
+packages from one solution:
 
-- `AtomiCloud.Diene.Interfaces` contains the shared System/VFS/Terminal/logging/
-  metrics seams, their value types, the `SeamError` catalog, and the C0 wire codecs;
-- `AtomiCloud.Diene.Interfaces.TestHelper` contains the in-memory seam mocks, the
-  shared contract suites, and FluentAssertions steps, and references
+- `AtomiCloud.Diene.Interfaces` contains the shared seams, the `SeamError` catalog and the C0 wire codecs;
+- `AtomiCloud.Diene.Interfaces.TestHelper` contains the in-memory mocks, contract suites and assertions, and references
   the main package.
 
 Both package ids and assembly names are consumer-visible, real identities.
@@ -55,20 +53,19 @@ stays at `1.0.0` in-branch, `probes/dotnet-lib-api-compatibility.ts` packs with
 
 ## Testing tiers
 
-- `pls test:unit` measures the real `AtomiCloud.Diene.Interfaces` assembly plus the
+- `task test:unit` measures the real `AtomiCloud.Diene.Interfaces` assembly plus the
   inherited `[Lib*]*` scaling wildcard at 100%, and explicitly excludes
   `*.TestHelper` assemblies. The scope guard in
   `scripts/local/dotnet-test.sh` reads the allowed assembly names from the
   `AssemblyName` each `Lib*` project declares, so it scales with a renamed
   library instead of naming one.
-- `pls test:int` runs the shipped contract suites against the host-backed reference
-  adapters in `App*`, without a container or network service, and measures only
-  `[App*]*`.
-- `pls test:meta` independently measures `[*.TestHelper]*` at 100%. Its tests
+- `task test:int` runs the shipped contract suites against the host-backed
+  adapters in `App`, without a container, and measures only `[App*]*`.
+- `task test:meta` independently measures `[*.TestHelper]*` at 100%. Its tests
   include known-good and known-bad assertion cases.
 
-Codecov uploads the `unit`, `int`, and `meta` ledgers as informational flags;
-the local merged thresholds remain authoritative.
+CI uploads each tier's Cobertura report as a build artifact; the local merged
+thresholds are authoritative.
 
 ## Release and publish
 
@@ -92,7 +89,7 @@ A materialized library changes only these owned surfaces:
 - shared author/company/repository URLs in `Directory.Build.props`;
 - README badges, install snippet, icon, and illustrative source/tests;
 - unit/meta thresholds when the shipped surface justifies a stricter value;
-- `skills/diene-dotnet-interfaces-usage/` to the materialized library's namespaced
+- `skills/diene-dotnet-note-usage/` to the materialized library's namespaced
   usage skill.
 
 `scripts/local/dotnet-test.sh`, `scripts/validate/dotnet-package.sh`, and the

@@ -1,4 +1,4 @@
-namespace AtomiCloud.Diene.Interfaces.App.Adapters;
+namespace AtomiCloud.DotnetBase.App.Adapters;
 
 /// <summary>
 /// A host-backed reference <see cref="ILoggerSink"/> writing rendered records to a

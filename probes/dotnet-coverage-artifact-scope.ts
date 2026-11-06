@@ -2,13 +2,17 @@ import { defineGate } from './lib/definition.ts';
 import { addEscapingUnitProject } from './lib/dotnet.ts';
 
 const COVERAGE_COMMAND = 'nix develop .#ci -c task test:unit:coverage';
-const REPORT = 'TestResults/unit/coverage/coverage.cobertura.xml';
+const REPORT = 'reports/unit/coverage.cobertura.xml';
 const PARSE_MARKER = 'Parsed unit Cobertura package scope and per-package line rates';
 const ESCAPE_MESSAGE = 'unit coverage escaped its [Lib*]* ledger: Escape';
 
-async function output(repo: any, command: string, timeoutMs: number): Promise<{ code: number; text: string }> {
+async function output(
+  repo: any,
+  command: string,
+  timeoutMs: number,
+): Promise<{ code: number; text: string; stdout: string }> {
   const result = await repo.exec(command, { timeoutMs });
-  return { code: result.exitCode, text: `${result.stdout}\n${result.stderr}` };
+  return { code: result.exitCode, text: `${result.stdout}\n${result.stderr}`, stdout: result.stdout };
 }
 
 export default defineGate({
@@ -34,7 +38,8 @@ export default defineGate({
         throw new Error(`the merged unit Cobertura artifact is unreadable: ${parsed.text}`);
       }
 
-      const [valid, ...packages] = parsed.text
+      // stdout only: the shell writes its own warnings to stderr, which are not report rows.
+      const [valid, ...packages] = parsed.stdout
         .split('\n')
         .map(line => line.trim())
         .filter(line => line.length > 0);
@@ -44,9 +49,14 @@ export default defineGate({
       if (packages.length === 0) {
         throw new Error(`the merged unit Cobertura artifact declares no packages: ${parsed.text}`);
       }
+      const ledger = new Set<string>();
+      for (const project of await repo.glob('Lib*/*.csproj')) {
+        const name = /<AssemblyName>([^<]+)<\/AssemblyName>/.exec(await repo.read(project))?.[1];
+        if (name) ledger.add(name);
+      }
       for (const entry of packages) {
         const [assembly, rate] = entry.split(' ');
-        if (!/^Lib/.test(assembly ?? '')) {
+        if (!/^Lib/.test(assembly ?? '') && !ledger.has(assembly ?? '')) {
           throw new Error(`the merged unit Cobertura artifact escaped its [Lib*]* ledger: ${assembly}`);
         }
         if (Number(rate) * 100 + 0.0000001 < 100) {

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace AtomiCloud.Diene.Interfaces.App.Adapters;
+namespace AtomiCloud.DotnetBase.App.Adapters;
 
 /// <summary>
 /// The host-backed reference <see cref="IVfs"/> over <c>System.IO</c>. It converts

@@ -1,21 +1,14 @@
 using System.Globalization;
-using AtomiCloud.Diene.Interfaces.App.Adapters;
+using AtomiCloud.DotnetBase.App.Adapters;
 
-namespace AtomiCloud.Diene.Interfaces.App;
+namespace AtomiCloud.DotnetBase.App;
 
-/// <summary>
-/// Composition root: explicit wiring of the shared seams to host-backed adapters.
-/// A real service swaps these adapters for its own without changing a single
-/// consumer, which is the whole point of the seam library.
-/// </summary>
 public static class Program
 {
-    /// <summary>Runs the demonstration and prints one railway-composed line.</summary>
     public static async Task Main()
     {
         Samples.RunAll();
 
-        // ── Seam wiring (illustrative) — a service substitutes its own adapters here ──
         ISystem system = new HostSystem();
         IVfs vfs = new HostVfs();
         ILoggerSink logger = new TextWriterLoggerSink(Console.Out);
@@ -27,7 +20,6 @@ public static class Program
         var message = await Doubled(system, vfs, logger, metrics, scratch, file).ConfigureAwait(false);
         _ = await vfs.Delete(scratch, new VfsDirectoryOptions(true)).ConfigureAwait(false);
         Console.WriteLine(message);
-        // ── End seam wiring ──
     }
 
     private static async Task<string> Doubled(

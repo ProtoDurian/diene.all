@@ -1,4 +1,4 @@
-namespace AtomiCloud.Diene.Interfaces.UnitTest.Meta;
+namespace AtomiCloud.DotnetBase.UnitTest.Meta;
 
 /// <summary>
 /// META tier — subject is the shipped TestHelper. This is the CONTRACT PARITY half:

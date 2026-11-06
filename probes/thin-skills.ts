@@ -1,9 +1,6 @@
 import { topics } from './standards-inventory.ts';
 
-// The probe runtime is Bun, which ships a YAML parser as Bun.YAML.parse. A regex
-// over the frontmatter would report a malformed document as proven — an
-// unterminated flow value still yields a `name:` line that matches — so the row
-// only means "parseable" if something actually parses it.
+// Parse, never regex: malformed frontmatter can still match `name:`.
 function parseYaml(source: string): unknown {
   const runtime = (globalThis as any).Bun;
   if (typeof runtime?.YAML?.parse !== 'function') {

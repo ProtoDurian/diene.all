@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace AtomiCloud.Diene.Interfaces.IntTest;
+namespace AtomiCloud.DotnetBase.IntTest;
 
 /// <summary>
 /// INT tier — the source-owned C0 wire fixture is round-tripped through a REAL

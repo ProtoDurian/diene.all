@@ -1,6 +1,6 @@
 using System.Security;
 
-namespace AtomiCloud.Diene.Interfaces.App.Adapters;
+namespace AtomiCloud.DotnetBase.App.Adapters;
 
 /// <summary>
 /// The host-backed reference <see cref="ISystem"/>. It lives in the non-packable

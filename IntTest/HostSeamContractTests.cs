@@ -1,7 +1,7 @@
-using AtomiCloud.Diene.Interfaces.App;
-using AtomiCloud.Diene.Interfaces.App.Adapters;
+using AtomiCloud.DotnetBase.App;
+using AtomiCloud.DotnetBase.App.Adapters;
 
-namespace AtomiCloud.Diene.Interfaces.IntTest;
+namespace AtomiCloud.DotnetBase.IntTest;
 
 /// <summary>
 /// INT tier — CONTRACT PARITY, real-implementation half. The SAME

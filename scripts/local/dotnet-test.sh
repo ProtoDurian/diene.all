@@ -4,12 +4,6 @@ set -euo pipefail
 kind="${1:-}"
 mode="${2:-normal}"
 
-# This is the ONE place the tier list lives. scripts/ci/test.sh used to keep a
-# second copy; it passes the mode straight through now, so the refusal has to name
-# the value it rejected or a caller two scripts up cannot tell what it sent.
-# The `meta` tier is this node's own: it holds a TestHelper project, which the
-# parent does not, so the parent's list is narrower by one. Taking the parent's
-# list wholesale would leave the meta handler below unreachable.
 [ "${kind}" != "unit" ] && [ "${kind}" != "int" ] && [ "${kind}" != "meta" ] && echo "❌ test tier '${kind}' is not one of unit|int|meta (usage: dotnet-test.sh <unit|int|meta> [--watch|--coverage])" >&2 && exit 1
 [ "${mode}" != "normal" ] && [ "${mode}" != "--watch" ] && [ "${mode}" != "--coverage" ] && echo "❌ Unknown mode '${mode}'" >&2 && exit 1
 
@@ -17,7 +11,6 @@ root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 config="${DOTNET_TEST_CONFIG:-$(find "${root}/.config" -maxdepth 1 -name '*.test.yaml' 2>/dev/null | head -n 1)}"
 [ ! -f "${config:-/nonexistent}" ] && echo "❌ Test config not found (.config/*.test.yaml)" >&2 && exit 1
 ! command -v yq >/dev/null && echo "❌ yq is required to read ${config}" >&2 && exit 1
-[ "${kind}" = "meta" ] && [ -z "$(find "${root}" -maxdepth 2 -type f -path '*/TestHelper*.csproj' -print -quit)" ] && echo "✅ No TestHelper project; meta tier is inactive" && exit 0
 
 mapfile -t projects < <(yq -r ".coverage.${kind}.projects[]?" "${config}")
 minimum="$(yq -er ".coverage.${kind}.minimum // \"\"" "${config}")"
@@ -25,6 +18,9 @@ include="$(yq -er ".coverage.${kind}.include // [] | join(\"%2c\")" "${config}")
 exclude="$(yq -er ".coverage.${kind}.exclude // [] | join(\"%2c\")" "${config}")"
 results="${root}/TestResults/${kind}"
 coverage="${results}/coverage"
+type="${kind}"
+[ "${kind}" = "int" ] && type="integration"
+report_dir="${root}/reports/${type}"
 
 [ "${#projects[@]}" -eq 0 ] && echo "❌ Missing .coverage.${kind}.projects entries in ${config}" >&2 && exit 1
 [ -z "${minimum}" ] && echo "❌ Missing .coverage.${kind}.minimum in ${config}" >&2 && exit 1
@@ -41,7 +37,7 @@ if [ "${mode}" = "--watch" ]; then
   exec dotnet watch --project "${root}/${projects[0]}" test -c Release
 fi
 
-rm -rf "${results}"
+rm -rf "${results}" "${report_dir}"
 mkdir -p "${results}"
 failed=0
 
@@ -62,14 +58,11 @@ if [ "${mode}" = "normal" ]; then
   exit 0
 fi
 
-mkdir -p "${coverage}"
+mkdir -p "${coverage}" "${report_dir}"
 accumulator="${coverage}/coverage.json"
 last_index=$((${#projects[@]} - 1))
 
-# Build every registered project before measuring. Coverlet instruments assemblies after
-# the build that `dotnet test` performs implicitly; on a clean tree that ordering can hand
-# the test host an uninstrumented copy and report a fully exercised assembly as 0 covered
-# lines. Building first makes the instrumented output deterministic.
+# Build first: the implicit `dotnet test` build can hand Coverlet an uninstrumented copy.
 for project_rel in "${projects[@]}"; do
   echo "🏗️ Building ${kind} coverage project: ${project_rel}"
   dotnet build "${root}/${project_rel}" -c Release
@@ -79,8 +72,9 @@ for index in "${!projects[@]}"; do
   project_rel="${projects[${index}]}"
   project_name="$(basename "${project_rel}" .csproj)"
   format="json"
+  output="${coverage}/coverage"
   threshold_args=()
-  [ "${index}" -eq "${last_index}" ] && format="json%2ccobertura" && threshold_args=(/p:Threshold="${minimum}" /p:ThresholdType=line /p:ThresholdStat=total)
+  [ "${index}" -eq "${last_index}" ] && format="cobertura" && output="${report_dir}/coverage" && threshold_args=(/p:Threshold="${minimum}" /p:ThresholdType=line /p:ThresholdStat=total)
   merge_args=()
   [ -f "${accumulator}" ] && merge_args=(/p:MergeWith="${accumulator}")
 
@@ -90,7 +84,7 @@ for index in "${!projects[@]}"; do
     --logger "trx;LogFileName=${kind}-${project_name}.trx" \
     --results-directory "${results}" \
     /p:CollectCoverage=true \
-    /p:CoverletOutput="${coverage}/coverage" \
+    /p:CoverletOutput="${output}" \
     /p:CoverletOutputFormat="${format}" \
     /p:Include="${include}" \
     /p:Exclude="${exclude}" \
@@ -101,7 +95,7 @@ for index in "${!projects[@]}"; do
   [ "${code}" -ne 0 ] && failed=1
 done
 
-report="${coverage}/coverage.cobertura.xml"
+report="${report_dir}/coverage.cobertura.xml"
 [ "${failed}" -ne 0 ] && echo "❌ ${kind} tests or merged coverage failed" >&2 && exit 1
 [ ! -f "${report}" ] && echo "❌ No merged ${kind} coverage report produced" >&2 && exit 1
 ! command -v xmlstarlet >/dev/null && echo "❌ xmlstarlet is required to validate ${kind} Cobertura coverage" >&2 && exit 1
@@ -112,9 +106,7 @@ valid="$(xmlstarlet sel -t -v '/coverage/@lines-valid' "${report}")"
 packages="$(xmlstarlet sel -t -m '/coverage/packages/package' -v '@name' -o $'\t' -v '@line-rate' -n "${report}")"
 [ -z "${packages}" ] && echo "❌ ${kind} coverage contains no packages" >&2 && exit 1
 
-# The unit ledger is read from the library projects themselves: the inherited [Lib*]*
-# wildcard plus whatever assembly names those projects declare, never a literal package name.
-unit_ledger="$(find "${root}" -mindepth 2 -maxdepth 2 -type f -name '*.csproj' -path "${root}/Lib*/*" -exec xmlstarlet sel -t -m '/Project/PropertyGroup/AssemblyName' -v . -n {} +)"
+unit_ledger="$(find "${root}" -mindepth 2 -maxdepth 2 -type f -name '*.csproj' -path "${root}/Lib*/*" -exec xmlstarlet sel -t -m '/Project/PropertyGroup/AssemblyName' -v . -n {} + || true)"
 
 while IFS=$'\t' read -r assembly line_rate; do
   if [ "${kind}" = "unit" ]; then

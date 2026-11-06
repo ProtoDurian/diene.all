@@ -1,4 +1,4 @@
-namespace AtomiCloud.Diene.Interfaces.UnitTest.Meta;
+namespace AtomiCloud.DotnetBase.UnitTest.Meta;
 
 /// <summary>Every operation fails, so no contract case can pass.</summary>
 internal sealed class AlwaysFailingVfs : IVfs

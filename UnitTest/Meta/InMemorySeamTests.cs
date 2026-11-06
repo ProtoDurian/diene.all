@@ -1,4 +1,4 @@
-namespace AtomiCloud.Diene.Interfaces.UnitTest.Meta;
+namespace AtomiCloud.DotnetBase.UnitTest.Meta;
 
 /// <summary>
 /// META tier — the fixture/builder invariants of the shipped mocks: settable state,

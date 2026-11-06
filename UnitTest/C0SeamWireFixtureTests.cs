@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace AtomiCloud.Diene.Interfaces.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 /// <summary>
 /// Pins the C0 wire contract (R14) to a versioned, source-owned fixture:

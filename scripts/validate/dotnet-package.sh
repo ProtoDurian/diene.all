@@ -39,7 +39,7 @@ if [ "${mode}" = "metadata" ]; then
     package="${artifacts}/${package_id}.${version}.nupkg"
     nuspec="$(mktemp)"
     trap 'rm -f "${nuspec}"' EXIT
-    unzip -p "${package}" "${package_id}.nuspec" >"${nuspec}"
+    bsdtar -xOf "${package}" "${package_id}.nuspec" >"${nuspec}"
     namespace="$(xmlstarlet sel -t -v 'namespace-uri(/*)' "${nuspec}")"
     [ "$(xmlstarlet sel -N n="${namespace}" -t -v '/n:package/n:metadata/n:id' "${nuspec}")" != "${package_id}" ] && echo "❌ ${package_id} metadata id mismatch" >&2 && exit 1
     [ "$(xmlstarlet sel -N n="${namespace}" -t -v '/n:package/n:metadata/n:version' "${nuspec}")" != "${version}" ] && echo "❌ ${package_id} metadata version mismatch" >&2 && exit 1
@@ -50,7 +50,7 @@ if [ "${mode}" = "metadata" ]; then
     [ -z "$(xmlstarlet sel -N n="${namespace}" -t -v '/n:package/n:metadata/n:description' "${nuspec}")" ] && echo "❌ ${package_id} description metadata missing" >&2 && exit 1
     [ "$(xmlstarlet sel -N n="${namespace}" -t -v '/n:package/n:metadata/n:projectUrl' "${nuspec}")" != "${project_url}" ] && echo "❌ ${package_id} project URL metadata missing" >&2 && exit 1
     [ "$(xmlstarlet sel -N n="${namespace}" -t -v '/n:package/n:metadata/n:repository/@url' "${nuspec}")" != "${repository_url}" ] && echo "❌ ${package_id} repository metadata missing" >&2 && exit 1
-    contents="$(unzip -Z1 "${package}")"
+    contents="$(bsdtar -tf "${package}")"
     for required in "${required_assets[@]}"; do
       ! echo "${contents}" | rg -Fxq "${required}" && echo "❌ ${package_id} package is missing ${required}" >&2 && exit 1
     done
@@ -63,7 +63,7 @@ fi
 
 for package_id in "${package_ids[@]}"; do
   package="${artifacts}/${package_id}.${version}.snupkg"
-  contents="$(unzip -Z1 "${package}")"
+  contents="$(bsdtar -tf "${package}")"
   ! echo "${contents}" | rg -q '^lib/net10[.]0/.+[.]pdb$' && echo "❌ ${package_id} symbols package contains no portable PDB" >&2 && exit 1
   ! echo "${contents}" | rg -Fxq "${package_id}.nuspec" && echo "❌ ${package_id} symbols package contains no nuspec" >&2 && exit 1
 done

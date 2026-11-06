@@ -1,4 +1,4 @@
-namespace AtomiCloud.Diene.Interfaces.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 public class SeamWireTests
 {
