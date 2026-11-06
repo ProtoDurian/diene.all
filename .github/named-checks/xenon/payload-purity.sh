@@ -28,7 +28,7 @@ stacks+=("--values chart/values.serving.yaml --values chart/values.canary.yaml")
 on=0
 for stack in "${stacks[@]}"; do
   # shellcheck disable=SC2086
-  if ! (cd "${work}" && helm template xenon chart --namespace metrics ${stack}) >"${work}/render.yaml" 2>"${work}/render.err"; then
+  if ! (cd "${work}" && helm template xenon chart --namespace metrics --kube-version 1.34.0 ${stack}) >"${work}/render.yaml" 2>"${work}/render.err"; then
     fail "stack '${stack}' does not render: $(head -3 "${work}/render.err")"
     continue
   fi

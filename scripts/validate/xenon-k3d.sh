@@ -16,7 +16,6 @@ k=(kubectl --context "k3d-${cluster_name}")
 kc=("${k[@]}" --namespace "${namespace}")
 top_timeout="${TOP_TIMEOUT_SECONDS:-240}"
 tmp="$(mktemp -d)"
-export HELM_REPOSITORY_CONFIG="${tmp}/repositories.yaml" HELM_REPOSITORY_CACHE="${tmp}/repository-cache"
 diagnose() {
   "${kc[@]}" get deployments,pods,services -o wide || true
   "${k[@]}" get apiservice v1beta1.metrics.k8s.io -o yaml || true
@@ -47,8 +46,7 @@ rg -q 'NotFound' "${tmp}/pre.txt" || { cat "${tmp}/pre.txt" >&2 && echo "❌ cou
 if "${k[@]}" top nodes >/dev/null 2>&1; then echo "❌ kubectl top answers before xenon is installed" >&2 && exit 1; fi
 echo "✅ no Resource Metrics API before install"
 
-helm repo add metrics-server "$(yq -r '.dependencies[] | select(.name == "metrics-server") | .repository' chart/Chart.yaml)" >/dev/null
-helm dependency build chart
+bash ./scripts/local/with-chart-repos.sh helm dependency build chart
 helm install xenon chart --kube-context "k3d-${cluster_name}" --namespace "${namespace}" --create-namespace "${values[@]}" --wait --timeout 5m
 "${kc[@]}" rollout status deployment/xenon-metrics --timeout=3m
 "${k[@]}" get apiservice v1beta1.metrics.k8s.io -o json |

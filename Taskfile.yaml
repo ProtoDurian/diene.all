@@ -24,8 +24,7 @@ tasks:
   build:
     desc: Build chart dependencies
     cmds:
-      - helm repo add --force-update metrics-server https://kubernetes-sigs.github.io/metrics-server
-      - helm dependency build chart
+      - ./scripts/local/with-chart-repos.sh helm dependency build chart
 
   update:
     desc: Refresh the pinned upstream chart dependency

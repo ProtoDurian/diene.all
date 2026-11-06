@@ -25,6 +25,8 @@ upstream:
   enabled: true
   # -- Conforming `<service>-<token>` name for every upstream object.
   fullnameOverride: xenon-metrics
+  # -- Standard `app.kubernetes.io/name` (and selector) value; the `upstream` alias would leak in otherwise.
+  nameOverride: metrics-server
   commonLabels:
     atomi.cloud/platform: metrics
     atomi.cloud/service: xenon

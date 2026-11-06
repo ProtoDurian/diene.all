@@ -82,6 +82,10 @@
                     "description": "Conforming `\u003cservice\u003e-\u003ctoken\u003e` name for every upstream object.",
                     "type": "string"
                 },
+                "nameOverride": {
+                    "description": "Standard `app.kubernetes.io/name` (and selector) value; the `upstream` alias would leak in otherwise.",
+                    "type": "string"
+                },
                 "podLabels": {
                     "type": "object",
                     "properties": {

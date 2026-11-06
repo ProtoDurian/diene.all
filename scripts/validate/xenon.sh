@@ -7,11 +7,16 @@ release="${RELEASE:-xenon}"
 namespace="${NAMESPACE:-metrics}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
+# Start from an empty Helm repo config, as the CD publish job does.
+export HELM_REPOSITORY_CONFIG="${tmp}/repositories.yaml" HELM_REPOSITORY_CACHE="${tmp}/repository-cache"
 
 [ -z "${mode}" ] && echo "❌ validation mode not set" >&2 && exit 1
 
 landscapes='["primordial","lapras","ditto","rotom","absol","eevee","castform","serving"]'
 expected='{"primordial":"ON","lapras":"OFF","ditto":"OFF","rotom":"OFF","absol":"OFF","eevee":"ON","castform":"ON","serving":"per-cluster"}'
+substrates='[{"substrate":"EKS classic","builtInMetricsProvider":false,"xenon":"ON"},{"substrate":"EKS Auto","builtInMetricsProvider":false,"xenon":"ON"},{"substrate":"DOKS","builtInMetricsProvider":false,"xenon":"ON"},{"substrate":"on-prem","builtInMetricsProvider":false,"xenon":"ON"}]'
+# Pinned so ON renders never depend on the helm build's default Kubernetes version.
+kube_version=1.34.0
 stacks=("")
 for l in $(jq -r '.[]' <<<"${landscapes}"); do stacks+=("--values chart/values.${l}.yaml"); done
 full=(--values chart/values.serving.yaml --values chart/values.canary.yaml)
@@ -21,7 +26,7 @@ objects='["APIService/v1beta1.metrics.k8s.io","ClusterRole/system:xenon-metrics"
 render() {
   local chart="$1"
   shift
-  helm template "${release}" "${chart}" --namespace "${namespace}" "$@"
+  helm template "${release}" "${chart}" --namespace "${namespace}" --kube-version "${kube_version}" "$@"
 }
 
 json() { yq eval-all -o=json '.' "$1" | jq -s 'map(select(.kind != null))'; }
@@ -76,6 +81,7 @@ toggle_check() {
   need_jq 'an enabled serving substrate declares a built-in provider (duplicate provider)' '
     (.servingSubstrates | length) > 0 and
     all(.servingSubstrates[]; (.builtInMetricsProvider | type) == "boolean" and .xenon == (if .builtInMetricsProvider then "OFF" else "ON" end))' <<<"${map}" || return 1
+  need_jq 'toggle map serving substrates differ from the expected baseline (EKS classic, EKS Auto, DOKS, on-prem: no built-in provider, ON)' --argjson want "${substrates}" '.servingSubstrates == $want' <<<"${map}" || return 1
   overlays="$(for f in "${dir}"/values.*.yaml; do yq -r '.serviceTree.landscape // ""' "${f}"; done | rg -v '^$' | jq -Rsc 'split("\n") | map(select(. != "")) | sort')"
   [ "${overlays}" = "$(jq -c sort <<<"${landscapes}")" ] || { echo "❌ landscape overlays ${overlays} are not exactly the eight defined landscapes" >&2 && return 1; }
   for l in $(jq -r '.[]' <<<"${landscapes}"); do
@@ -83,8 +89,8 @@ toggle_check() {
     [ "$(jq -r --arg l "${l}" '.landscapes[] | select(.landscape == $l) | .overlay' <<<"${map}")" = "values.${l}.yaml" ] || { echo "❌ toggle map row ${l} does not name values.${l}.yaml" >&2 && return 1; }
     if [ "${l}" = serving ]; then
       while IFS=$'\t' read -r sub fact want; do
-        enabled=true
-        [ "${fact}" = true ] && enabled=false
+        enabled=false
+        [ "${want}" = ON ] && enabled=true
         render "${dir}" --values "${dir}/values.serving.yaml" --set "builtInMetricsProvider=${fact}" --set "upstream.enabled=${enabled}" >"${tmp}/toggle.yaml" || return 1
         state="$(state_of "${tmp}/toggle.yaml")" || return 1
         [ "${state}" = "${want}" ] || { echo "❌ serving substrate ${sub} renders ${state}, expected ${want}" >&2 && return 1; }
@@ -131,17 +137,11 @@ vap_stage() {
   rg -q '^pass: [1-9][0-9]*, fail: 0, warn: 0, error: 0' "$1.vap.txt" || { cat "$1.vap.txt" >&2 && echo "❌ the VAP stage evaluated nothing ($2)" >&2 && return 1; }
 }
 
-# publish.sh runs `helm dependency build`, which needs a repo entry for the https upstream.
-helm_repos() {
-  export HELM_REPOSITORY_CONFIG="${tmp}/repositories.yaml" HELM_REPOSITORY_CACHE="${tmp}/repository-cache"
-  helm repo add metrics-server "$(yq -r '.dependencies[] | select(.name == "metrics-server") | .repository' chart/Chart.yaml)" >/dev/null
-}
-
 case "${mode}" in
 schema)
-  expect_red 'layer is not numeric' "serviceTree/layer.*does not match pattern|at '/serviceTree/layer'" helm lint chart --namespace "${namespace}" --set-string serviceTree.layer=one
-  expect_red 'dashed platform' "serviceTree/platform.*does not match pattern|at '/serviceTree/platform'" helm lint chart --namespace metrics-server --set serviceTree.platform=metrics-server
-  expect_red 'non-boolean provider fact' "builtInMetricsProvider" helm lint chart --namespace "${namespace}" --set-string builtInMetricsProvider=maybe
+  expect_red 'layer is not numeric' "serviceTree/layer.*does not match pattern|at '/serviceTree/layer'" helm lint chart --kube-version "${kube_version}" --namespace "${namespace}" --set-string serviceTree.layer=one
+  expect_red 'dashed platform' "serviceTree/platform.*does not match pattern|at '/serviceTree/platform'" helm lint chart --kube-version "${kube_version}" --namespace metrics-server --set serviceTree.platform=metrics-server
+  expect_red 'non-boolean provider fact' "builtInMetricsProvider" helm lint chart --kube-version "${kube_version}" --namespace "${namespace}" --set-string builtInMetricsProvider=maybe
   ;;
 schema-drift)
   bash ./scripts/local/generate-chart-schema.sh "${tmp}/values.schema.json" >/dev/null
@@ -150,7 +150,7 @@ schema-drift)
 lint)
   for stack in "${stacks[@]}"; do
     # shellcheck disable=SC2086
-    helm lint chart --namespace "${namespace}" ${stack} >"${tmp}/schema.txt" 2>&1 ||
+    helm lint chart --kube-version "${kube_version}" --namespace "${namespace}" ${stack} >"${tmp}/schema.txt" 2>&1 ||
       { echo "❌ schema rejected the stack '${stack:-values.yaml}'" >&2 && cat "${tmp}/schema.txt" >&2 && exit 1; }
   done
   ;;
@@ -172,6 +172,9 @@ toggle-map)
   copy_tree "${tmp}/serving-dup"
   yq -i '.servingSubstrates += [{"substrate": "k3s", "builtInMetricsProvider": true, "xenon": "ON"}]' "${tmp}/serving-dup/chart/toggle-map.yaml"
   expect_red 'an enabled serving substrate with a built-in provider' 'enabled serving substrate declares a built-in provider' toggle_check "${tmp}/serving-dup/chart"
+  copy_tree "${tmp}/serving-drift"
+  yq -i '(.servingSubstrates[] | select(.substrate == "DOKS")) |= (.builtInMetricsProvider = true | .xenon = "OFF")' "${tmp}/serving-drift/chart/toggle-map.yaml"
+  expect_red 'a serving substrate fact and toggle flipped together' 'serving substrates differ from the expected baseline' toggle_check "${tmp}/serving-drift/chart"
   expect_refusal 'duplicate provider' --values chart/values.serving.yaml --set builtInMetricsProvider=true
   expect_refusal 'duplicate provider' --values chart/values.lapras.yaml --set upstream.enabled=true
   expect_refusal 'missing provider' --values chart/values.eevee.yaml --set upstream.enabled=false
@@ -256,19 +259,20 @@ task-surface)
   rg -q 'atomi.cloud/cluster: canary' "${tmp}/task-template.yaml" || { echo "❌ serving:canary:template did not stack values.canary.yaml" >&2 && exit 1; }
   ;;
 publish-git)
-  helm_repos
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/git" bash ./scripts/ci/publish.sh >/dev/null
   [ ! -s "${tmp}/git/xenon-0.1.0.tgz" ] && echo "❌ git chart package missing" >&2 && exit 1
   [ ! -s "${tmp}/git/index.yaml" ] && echo "❌ git chart index missing" >&2 && exit 1
   ;;
 publish-oci)
-  helm_repos
   PUBLISH_MODE=oci PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/oci" bash ./scripts/ci/publish.sh >/dev/null
   [ ! -s "${tmp}/oci/xenon-0.1.0.tgz" ] && echo "❌ OCI chart package missing" >&2 && exit 1
   rg -q '^oci://registry.example.invalid/charts$' "${tmp}/oci/oci-ref.txt"
+  mkdir -p "${tmp}/norepo"
+  cp -a chart scripts "${tmp}/norepo/"
+  sed -i 's|^bash ./scripts/local/with-chart-repos.sh helm dependency build chart$|helm dependency build chart|' "${tmp}/norepo/scripts/ci/publish.sh"
+  expect_red 'publish.sh without the repo registration' 'no repository definition for https://' env -C "${tmp}/norepo" PUBLISH_MODE=oci PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/norepo-out" bash ./scripts/ci/publish.sh
   ;;
 version)
-  helm_repos
   PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v0.1.0 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh >/dev/null
   expect_red 'a tag that differs from Chart.yaml' 'does not match tag 9.9.9' env PUBLISH_MODE=git PUBLISH_DRY_RUN=true RELEASE_VERSION=v9.9.9 PUBLISH_OUTPUT_DIR="${tmp}/version" bash ./scripts/ci/publish.sh
   ;;
