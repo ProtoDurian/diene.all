@@ -17,7 +17,6 @@ resolution: workspace
 environment:
   sdk: '>=3.12.0 <4.0.0'
 
-# No runtime dependencies: the replaceable sample is pure Dart.
 dependencies: {}
 
 dev_dependencies:
