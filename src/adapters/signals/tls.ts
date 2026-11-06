@@ -15,7 +15,15 @@ class NodeTlsFileReader implements TlsFileReader {
   }
 }
 
+const TLS_FILE_ERROR_BRAND = Symbol.for('AtomiCloud.Diene.Otel.OtlpTlsFileError');
+
 class OtlpTlsFileError extends Error {
+  static override [Symbol.hasInstance](value: unknown): boolean {
+    // biome-ignore lint/complexity/noThisInStatic: this is the class instanceof was called on; subclasses keep the prototype check
+    if (this !== OtlpTlsFileError) return Function.prototype[Symbol.hasInstance].call(this, value);
+    return typeof value === 'object' && value !== null && TLS_FILE_ERROR_BRAND in value;
+  }
+
   constructor(
     readonly variable: string,
     readonly path: string,
@@ -25,6 +33,7 @@ class OtlpTlsFileError extends Error {
       cause,
     });
     this.name = 'OtlpTlsFileError';
+    Object.defineProperty(this, TLS_FILE_ERROR_BRAND, { value: true });
   }
 }
 

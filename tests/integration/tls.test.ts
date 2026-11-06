@@ -91,3 +91,30 @@ describe('OtlpAgentOptionsFactory', () => {
     (actual?.cause ?? '').should.eql('denied');
   });
 });
+
+describe('OtlpTlsFileError identity', () => {
+  class NarrowTlsFileError extends OtlpTlsFileError {}
+
+  it.each([
+    ['a TLS file error', new OtlpTlsFileError('V', 'p', 'x'), OtlpTlsFileError, true],
+    [
+      'a branded look-alike from the other build',
+      { [Symbol.for('AtomiCloud.Diene.Otel.OtlpTlsFileError')]: true },
+      OtlpTlsFileError,
+      true,
+    ],
+    ['a plain Error', new Error('m'), OtlpTlsFileError, false],
+    ['null', null, OtlpTlsFileError, false],
+    ['a base error against a subclass', new OtlpTlsFileError('V', 'p', 'x'), NarrowTlsFileError, false],
+    ['a subclass error against the subclass', new NarrowTlsFileError('V', 'p', 'x'), NarrowTlsFileError, true],
+  ])('should judge %s', (_label, value, type, expected) => {
+    // Arrange
+    const candidate: unknown = value;
+
+    // Act
+    const actual = candidate instanceof (type as typeof OtlpTlsFileError);
+
+    // Assert
+    actual.should.eql(expected);
+  });
+});
