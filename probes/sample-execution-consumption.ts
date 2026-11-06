@@ -6,14 +6,14 @@ const CONSUMER_PUBSPEC =
   'dependencies:\n  diene_result:\n    path: @ROOT@/packages/diene_result\n';
 const CONSUMER_MAIN =
   "import 'package:diene_result/diene_result.dart';\n\n" +
-  "void main() {\n  print(summarizeNote(const Note(title: 'Probe', body: 'consumer')));\n}\n";
+  'void main() {\n  print(const Ok<int>(41).map((int value) => value + 1).serial());\n}\n';
 
 // The consumer is copied outside the workspace so pub resolves it as a stranger would.
 const RUN =
   "nix develop .#ci -c bash -c 'set -euo pipefail; root=$(pwd -P); " +
   '(cd packages/diene_result && for example in example/*.dart; do dart run "$example"; done); ' +
   `consumer=$(mktemp -d); cp -R ${CONSUMER}/. "$consumer"/; sed -i "s|@ROOT@|$root|" "$consumer/pubspec.yaml"; ` +
-  'cd "$consumer"; dart pub get --offline; dart run bin/main.dart | grep -F "Probe"\'';
+  'cd "$consumer"; dart pub get --offline; dart run bin/main.dart | grep -F "[ok, 42]"\'';
 
 export default {
   contractVersion: 1,
