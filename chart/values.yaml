@@ -13,8 +13,7 @@ serviceTree:
   # @schema pattern:^[0-9]+$;required:true
   layer: '1'
 
-# -- stakater/reloader values: upstream defaults plus the annotation opt-in stance (never auto-reload-all), LPSM labels,
-# the Reloader self opt-in, container hardening and limits. ServiceMonitor/PodMonitor stay upstream-default off.
+# -- stakater/reloader overrides: annotation opt-in (never auto-reload-all), LPSM labels, self opt-in, hardening, limits.
 upstream:
   nameOverride: reloader
   fullnameOverride: chlorine-reloader

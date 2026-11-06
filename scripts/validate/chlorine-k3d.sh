@@ -115,8 +115,8 @@ for _ in $(seq 1 60); do
 done
 [ "${restarted}" = true ] || { echo "❌ Reloader did not restart the annotated Deployment within 180s of its Secret change (${annotated_before} -> $(state annotated))" >&2 && exit 1; }
 "${kf[@]}" get deployment annotated -o json |
-  jq -e '.spec.template.metadata.annotations // {} | keys | any(startswith("reloader.stakater.com/"))' >/dev/null ||
-  { echo "❌ the annotated Deployment rolled without a Reloader pod-template annotation" >&2 && exit 1; }
+  jq -e '[.spec.template.spec.containers[].env // [] | .[].name] | any(startswith("STAKATER_ANNOTATED_SECRET"))' >/dev/null ||
+  { echo "❌ the annotated Deployment rolled without the Reloader STAKATER_ env marker" >&2 && exit 1; }
 echo "✅ Secret change -> annotated Deployment restarted (new ReplicaSet, new pod UID)"
 
 sleep 15

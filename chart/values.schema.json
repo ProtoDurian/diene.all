@@ -39,7 +39,7 @@
             }
         },
         "upstream": {
-            "description": "stakater/reloader values: upstream defaults plus the annotation opt-in stance (never auto-reload-all), LPSM labels, the Reloader self opt-in, container hardening and limits. ServiceMonitor/PodMonitor stay upstream-default off.",
+            "description": "stakater/reloader overrides: annotation opt-in (never auto-reload-all), LPSM labels, self opt-in, hardening, limits.",
             "type": "object",
             "properties": {
                 "fullnameOverride": {

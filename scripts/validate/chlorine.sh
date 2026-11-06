@@ -48,7 +48,6 @@ copy_tree() {
   cp -a chart "$1/"
 }
 
-# The wanted LPSM set is the merged serviceTree of the stack, under labelPrefix.
 want_lpsm() {
   local chart="$1"
   shift
@@ -163,7 +162,7 @@ lpsm-labels)
 reload-stance)
   [ "$(yq -r '.upstream.reloader.autoReloadAll' chart/values.yaml)" = false ] || { echo "❌ values.yaml does not pin autoReloadAll: false" >&2 && exit 1; }
   for f in chart/values.*.yaml; do
-    [ "$(yq -r '.upstream.reloader.autoReloadAll // "unset"' "${f}")" = unset ] || { echo "❌ ${f} overrides autoReloadAll" >&2 && exit 1; }
+    [ "$(yq -r '.upstream.reloader.autoReloadAll == null' "${f}")" = true ] || { echo "❌ ${f} overrides autoReloadAll" >&2 && exit 1; }
   done
   for stack in "${stacks[@]}"; do
     # shellcheck disable=SC2086
@@ -173,7 +172,7 @@ reload-stance)
   done
   render chart "${full[@]}" --set upstream.reloader.autoReloadAll=true >"${tmp}/all.yaml"
   expect_red 'a values flip to auto-reload-all' 'not annotation opt-in' assert_opt_in "${tmp}/all.yaml"
-  render chart "${full[@]}" --set upstream.reloader.reloadStrategy=env-vars >"${tmp}/env.yaml"
+  render chart "${full[@]}" --set upstream.reloader.reloadStrategy=annotations >"${tmp}/env.yaml"
   expect_red 'a non-default reload strategy' 'default rolling-restart strategy' assert_opt_in "${tmp}/env.yaml"
   render chart "${full[@]}" --set-string 'upstream.reloader.deployment.annotations.reloader\.stakater\.com/auto=false' >"${tmp}/optout.yaml"
   assert_self_opt_in "${tmp}/optout.yaml" false
