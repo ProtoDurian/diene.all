@@ -40,21 +40,21 @@ cat >"${work}/tsconfig.json" <<JSON
 }
 JSON
 cat >"${work}/esm.mjs" <<JS
-import { KeyComposer } from '${name}';
-if (new KeyComposer('Consumer Proof').compose('ESM') !== 'consumer-proof:esm') throw new Error('ESM import returned the wrong key');
+import { Slugger } from '${name}';
+if (new Slugger().slugify('Consumer Proof') !== 'consumer-proof') throw new Error('ESM import returned the wrong slug');
 JS
 cat >"${work}/cjs.cjs" <<JS
-const { KeyComposer } = require('${name}');
-if (new KeyComposer('Consumer Proof').compose('CJS') !== 'consumer-proof:cjs') throw new Error('CJS require returned the wrong key');
+const { Slugger } = require('${name}');
+if (new Slugger().slugify('Consumer Proof') !== 'consumer-proof') throw new Error('CJS require returned the wrong slug');
 JS
 cat >"${work}/types-esm.mts" <<TS
-import { KeyComposer } from '${name}';
-const key: string = new KeyComposer('Consumer Proof').compose('ESM');
+import { Slugger } from '${name}';
+const key: string = new Slugger().slugify('Consumer Proof');
 export { key };
 TS
 cat >"${work}/types-cjs.cts" <<TS
-import { KeyComposer } from '${name}';
-const key: string = new KeyComposer('Consumer Proof').compose('CJS');
+import { Slugger } from '${name}';
+const key: string = new Slugger().slugify('Consumer Proof');
 export { key };
 TS
 

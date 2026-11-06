@@ -26,7 +26,7 @@ for artifact in dist/index.js dist/index.cjs dist/index.d.ts dist/index.d.cts; d
 done
 
 echo "🏃 Verifying ESM and CJS runtime exports..."
-node --input-type=module -e "import { KeyComposer } from './dist/index.js'; if (new KeyComposer('Build Proof').compose('ESM') !== 'build-proof:esm') process.exit(1)"
-node -e "const { KeyComposer } = require('./dist/index.cjs'); if (new KeyComposer('Build Proof').compose('CJS') !== 'build-proof:cjs') process.exit(1)"
+node --input-type=module -e "import { Slugger } from './dist/index.js'; const s = new Slugger(); if (s.slugify('Build Proof') !== 'build-proof' || (await s.namespacedKey('Build Proof', 'ESM').unwrap()) !== 'build-proof:esm') process.exit(1)"
+node -e "const { Slugger } = require('./dist/index.cjs'); const s = new Slugger(); if (s.slugify('Build Proof') !== 'build-proof') process.exit(1); s.namespacedKey('Build Proof', 'CJS').unwrap().then((k) => { if (k !== 'build-proof:cjs') process.exit(1) }).catch(() => process.exit(1))"
 
 echo "✅ Built dist/index.{js,cjs,d.ts,d.cts}"
