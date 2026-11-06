@@ -1,6 +1,6 @@
 # OpenTelemetry Configuration
 
-Applies only if this repo has backend code (Bun, .NET or Go). The language template that adds the code also adds its OTel library, its config library and the config files; this repo has none of them yet.
+Applies only if this repo has backend code (Bun, .NET or Go). That code comes from the CyanPrint template for its language (CyanPrint: see `CLAUDE.md`), which also adds its OTel library ("the library" below), its config library and the config files. This repo has none of them yet.
 
 Backend services send logs, metrics and traces with OpenTelemetry (OTel). All three languages read the same `otel:` config block and set the same resource attributes. Frontends use Grafana Faro instead; see [Faro](/docs/standards/observability/faro.md).
 
@@ -50,7 +50,7 @@ Rules:
 
 - The signal keys are exactly `logs`, `metrics` and `traces`.
 - Each exporter is switched by its own `enabled` boolean, not by a string such as `exporter: otlp`.
-- OTLP is always HTTP/protobuf (port 4318 by default); there is no protocol setting.
+- OTLP (the OpenTelemetry Protocol) is always HTTP/protobuf (port 4318 by default); there is no protocol setting.
 - Durations are ISO 8601 strings: `PT10S` is 10 seconds.
 - The sampler `type` is `parentbased_traceidratio`, `always_on` or `always_off`; `ratio` (0 to 1) is the share of new traces kept.
 - An enabled exporter with an empty `endpoint` fails config validation before startup.
@@ -77,9 +77,13 @@ app:
 
 It also sets `atomi.landscape`, `atomi.platform`, `atomi.service`, `atomi.module` and `atomi.version`. `atomi.*` is the organisation's own attribute namespace: it holds the raw values (including `module`, which has no standard attribute), so queries match the LPSM labels exactly.
 
+## Standard HTTP metrics
+
+HTTP servers report OTel's standard HTTP metric. Exported to Prometheus it is the histogram `http_server_request_duration_seconds`; its `_count` series counts requests. Its labels include `http_response_status_code` and `http_route`. Check one series in Grafana Explore before you use it.
+
 ## Standard `OTEL_*` environment variables win
 
-If a standard `OTEL_*` variable is set (endpoint, headers, resource attributes, propagators, sampler, `OTEL_SDK_DISABLED`), the library uses it instead of the config block. Operators can then change telemetry without a new release.
+If a standard `OTEL_*` variable is set (endpoint, headers, resource attributes, propagators, sampler, `OTEL_SDK_DISABLED`), the library uses it instead of the config block. Whoever deploys the service can then change telemetry without a new release.
 
 ## Start and shutdown
 

@@ -4,43 +4,40 @@ A local Grafana, image renderer and Prometheus, so you can render a dashboard wi
 
 ## What it checks, and what it does not
 
-- **Metrics only.** The sandbox has Prometheus, but no log store (Loki) or trace store (Tempo). Log and trace panels show "No data" or a datasource error here. Mark them `UNVERIFIED` in their description and check them in Grafana Explore against the real landscape after deploy.
+- **Metrics only.** The sandbox has Prometheus, but no log store (Loki) or trace store (Tempo). Log and trace panels show "No data" or a datasource error here; they are the [`UNVERIFIED`](/docs/standards/grafana-dashboards/index.md#log-and-trace-panels) ones.
 - **No folders.** Dashboards land in Grafana's General folder. The service folder (`<platform>-<service>-folder`, see [Shipping](/docs/standards/observability/shipping.md)) is checked after deploy.
 - **One sandbox at a time.** Ports 3000 (Grafana) and 9090 (Prometheus) are fixed.
 
 ## Tools
 
-From this repo's nix shell: `dashboard-linter` and `promtool` (declared in `nix/env.nix`), `jq`, `curl` and `file` (from its atomiutils bundle), and the `docker` CLI with `docker compose` (from its infrautils bundle). You also need the Docker daemon running on the host, and `bun`: Bun-based repos have it in their shell; otherwise install it.
+Every tool comes from this repo's nix shell. Check with `command -v jq curl file awk docker kubectl dashboard-linter promtool`: each must print a `/nix/store/…` path. `dashboard-linter` and `promtool` are declared in `nix/env.nix`; the others come from its atomiutils and infrautils bundles. You also need the Docker daemon running on the host.
 
 ## Files
 
 Everything lives in `.claude/skills/grafana-dashboards/sandbox/`:
 
-| File                     | What it is                                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------------------------- |
-| `compose.yaml`           | The three containers, pinned by digest, bound to `127.0.0.1` only                                 |
-| `provisioning/`          | Adds the Prometheus datasource (uid `prometheus`) and loads `dashboards/`                         |
-| `generate-metrics.ts`    | Writes 6 hours of a counter by outcome, a histogram and a gauge, two landscapes, with an incident |
-| `dashboards/sample.json` | A small dashboard that passes strict lint and renders with that data                              |
-| `dashboards/.lint`       | Example `dashboard-linter` exclusions, each with a reason                                         |
+| File                     | What it is                                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------------- |
+| `compose.yaml`           | The three containers, pinned by digest, bound to `127.0.0.1` only                                  |
+| `provisioning/`          | Adds the Prometheus datasource (uid `prometheus`) and loads `dashboards/`                          |
+| `generate-metrics.awk`   | Writes 6 hours of synthetic metrics for two landscapes, with an incident, from the list at its top |
+| `dashboards/sample.json` | A small fixture dashboard that passes strict lint and renders with that data                       |
+| `dashboards/.lint`       | Example `dashboard-linter` exclusions, each with a reason                                          |
 
-After you copy the sandbox (below), edit the config block at the top of `$sb/generate-metrics.ts`, not the skill's copy: metric names, label values and outcomes, so it covers every metric and label value your dashboard queries, including error series, so threshold colors show.
+After you copy the sandbox (below), edit the metric list at the top of `$sb/generate-metrics.awk`, not the skill's copy. Add one line per metric and label set your dashboard queries (type, name, labels, normal value, incident value), including error series and values near your thresholds, so threshold colors show.
 
 ## Run it
 
-From the repo root:
+First pass step 1 of [Check it before merge](/docs/standards/grafana-dashboards/index.md#check-it-before-merge). Then, from the repo root:
 
 ```bash
 dashboard=observability/dashboards/overview.json
-jq empty "$dashboard"
-dashboard-linter lint "$dashboard" --strict
-
 sb="$(mktemp -d)"
 cp -r .claude/skills/grafana-dashboards/sandbox/. "$sb"
 cp "$dashboard" "$sb/dashboards/"
-# now edit "$sb/generate-metrics.ts"
+# now edit "$sb/generate-metrics.awk"
 mkdir "$sb/prom-data"
-bun "$sb/generate-metrics.ts" > "$sb/metrics.om"
+awk -f "$sb/generate-metrics.awk" > "$sb/metrics.om"
 promtool tsdb create-blocks-from openmetrics "$sb/metrics.om" "$sb/prom-data"
 
 export SANDBOX_UID="$(id -u)" SANDBOX_GID="$(id -g)"
@@ -53,9 +50,8 @@ for _ in $(seq 60); do
 done
 ```
 
-- `dashboard-linter` reads `.lint` from the dashboard's own folder, so justified exclusions go in `observability/dashboards/.lint`.
 - `SANDBOX_UID`/`SANDBOX_GID` make Prometheus run as you, so it can write `prom-data`.
-- The unique project name keeps the containers and volumes apart from other stacks; the ports are still shared.
+- The unique project name keeps the containers and volumes apart from other stacks.
 - Grafana is anonymous admin, which is why every port is bound to `127.0.0.1`.
 - Grafana re-reads `$sb/dashboards/` about every 10 seconds: copy an edited JSON there and render again.
 

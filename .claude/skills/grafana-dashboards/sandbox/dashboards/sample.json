@@ -1,7 +1,7 @@
 {
   "uid": "sandbox-sample-overview",
   "title": "Sample — Requests overview",
-  "description": "Sandbox fixture: proves the stack renders before you add your own dashboard.",
+  "description": "Sandbox fixture only: proves the stack renders. Its request panels are generic ones, which never belong on a curated dashboard.",
   "editable": false,
   "schemaVersion": 41,
   "time": {
@@ -12,8 +12,8 @@
   "templating": {
     "list": [
       {
-        "name": "datasource",
-        "label": "Data source",
+        "name": "prometheus_datasource",
+        "label": "Prometheus data source",
         "type": "datasource",
         "query": "prometheus",
         "current": {
@@ -27,7 +27,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "$datasource"
+          "uid": "$prometheus_datasource"
         },
         "definition": "label_values(sample_requests_total, landscape)",
         "query": {
@@ -39,6 +39,18 @@
           "text": "pichu",
           "value": "pichu"
         }
+      },
+      {
+        "name": "loki_datasource",
+        "label": "Loki data source",
+        "type": "datasource",
+        "query": "loki"
+      },
+      {
+        "name": "filter",
+        "label": "Filter",
+        "type": "textbox",
+        "query": ""
       }
     ]
   },
@@ -56,7 +68,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Sandbox fixture: request rate, errors and latency of the `sample` service. For whoever checks that the sandbox renders. Next: [System overview]({repo-url}/blob/main/observability/overview.md) · [Generic dashboard](/d/{generic-dashboard-uid})"
+        "content": "Sandbox fixture: request rate, errors and latency of the `sample` service. For whoever checks that the sandbox renders. Next: [System overview]({repo-url}/observability/overview.md) · [Generic dashboard](/d/{generic-dashboard-uid})"
       }
     },
     {
@@ -72,7 +84,7 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "$prometheus_datasource"
       },
       "fieldConfig": {
         "defaults": {
@@ -124,7 +136,7 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "$prometheus_datasource"
           },
           "expr": "sum by (outcome) (rate(sample_requests_total{service=\"sample\",landscape=\"$landscape\"}[$__rate_interval]))",
           "legendFormat": "{{outcome}}"
@@ -144,7 +156,7 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "$prometheus_datasource"
       },
       "fieldConfig": {
         "defaults": {
@@ -189,7 +201,7 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "$prometheus_datasource"
           },
           "expr": "sum by (service) (rate(sample_requests_total{service=\"sample\",landscape=\"$landscape\",outcome=\"error\"}[$__rate_interval])) / sum by (service) (rate(sample_requests_total{service=\"sample\",landscape=\"$landscape\"}[$__rate_interval]))",
           "legendFormat": "{{service}}"
@@ -209,7 +221,7 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "$prometheus_datasource"
       },
       "fieldConfig": {
         "defaults": {
@@ -254,10 +266,43 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "$prometheus_datasource"
           },
           "expr": "histogram_quantile(0.95, sum by (le) (rate(sample_request_duration_seconds_bucket{service=\"sample\",landscape=\"$landscape\"}[$__rate_interval])))",
           "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "logs",
+      "title": "Error log lines",
+      "description": "UNVERIFIED: the sandbox has no log store. Error lines of the sample service, newest first. An empty panel on a healthy service is correct.",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "$loki_datasource"
+      },
+      "options": {
+        "sortOrder": "Descending",
+        "dedupStrategy": "exact",
+        "showTime": true,
+        "prettifyLogMessage": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "$loki_datasource"
+          },
+          "expr": "{service=\"sample\",landscape=\"$landscape\"} |= \"error\" |~ \"$filter\"",
+          "maxLines": 100
         }
       ]
     }

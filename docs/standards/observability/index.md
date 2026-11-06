@@ -11,7 +11,8 @@ Examples in these docs use a made-up service: platform `tracker`, service `zinc`
 - **Stamping**: adding the LPSM labels automatically (rule 1 below).
 - **Signal**: one metric, log event or trace span. Their query languages are PromQL (metrics), LogQL (logs, in Loki) and TraceQL (traces, in Tempo).
 - **Active time series (ATS)**: one metric name with one set of label values. Metrics storage costs grow with the ATS count.
-- **SLO** (service level objective): the target share of good events, e.g. 99.9% of requests succeed. The **error budget** is 1 − SLO, here 0.001. A service writes its SLOs in its `SIGNALS.md` answers.
+- **SLO** (service level objective): the target share of good events over a 30-day window, e.g. 99.9% of requests succeed. The **error budget** is 1 − SLO, here 0.001. A service writes its SLOs in its `SIGNALS.md` answers (Gate 5).
+- **Burn rate**: how many times faster than allowed the error budget is being spent. 14.4× for 1 hour spends about 2% of the 30-day budget; 6× for 6 hours spends about 5%.
 - **The six gates**: six questions you answer for each feature to decide its signals. See [Signal decisions](/docs/standards/observability/signals.md).
 - **Severity tier**: `critical` (act now; usually pages on-call), `warning` (act in working hours; usually the team channel) or `info` (worth recording; nobody acts). An alert's tier is its file name.
 - **Alert set**: one folder under `observability/alerts/` holding one to three tier files and their runbook. See [Alerts](/docs/standards/observability/alerts.md).
@@ -22,18 +23,20 @@ Examples in these docs use a made-up service: platform `tracker`, service `zinc`
 
 ## Values the platform team gives you
 
-This repo does not contain these values, so the docs use the placeholder shown. Ask the platform team, then record each value once, in the place the last column names.
+This repo does not contain these values, so the docs use the placeholder shown. Ask the platform team (the repo URL you can read yourself), then record each value once, in the place the last column names. Until a value is known, keep its placeholder. A dashboard cannot merge while `{platform}` or `{service}` is unknown (its uid needs them), and an alert set cannot merge while its owner is pending ([Gate 5](/docs/standards/observability/signals.md#gate-5--alerts-default-no)).
 
-| Value                                                | Placeholder                                                  | Recorded in                                                                          |
-| ---------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| This service's platform, service and modules         | `{platform}`, `{service}`, `{module}`                        | `observability/SIGNALS.md` title; modules in `overview.md` (How it works)            |
-| Kubernetes namespace and workload                    | `{namespace}`, `{workload}` (e.g. `deployment/zinc-webhook`) | `observability/overview.md` (Common commands)                                        |
-| Owner team and chat channel                          | `{team}`, `{#channel}`                                       | `observability/overview.md` (Links)                                                  |
-| Grafana URL, generic dashboard uid and its variables | `{grafana-url}`, `{generic-dashboard-uid}`                   | `observability/overview.md` (Links)                                                  |
-| OTLP collector endpoint, per landscape               | `{otlp-endpoint}`                                            | each landscape's app config ([OpenTelemetry](/docs/standards/observability/otel.md)) |
-| Metrics and logs datasource uids, per landscape      | `{metrics-datasource-uid}`, `{logs-datasource-uid}`          | the primordial chart's values                                                        |
-| `helm-wrapper` chart repository and version          | —                                                            | the primordial chart's `Chart.yaml`                                                  |
-| Faro collector URL, app id and stack id              | —                                                            | the frontend's config ([Faro](/docs/standards/observability/faro.md))                |
+| Value                                                              | Placeholder                                                                                                       | Recorded in                                                                                            |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| This service's platform, service and modules                       | `{platform}`, `{service}`, `{module}`                                                                             | `observability/SIGNALS.md` title; modules in `overview.md` (How it works)                              |
+| Kubernetes namespace and workload                                  | `{namespace}`, `{workload}` (e.g. `deployment/zinc-webhook`)                                                      | `observability/overview.md` (Common commands)                                                          |
+| Owner team and chat channel                                        | `{team}`, `{#channel}`                                                                                            | `observability/overview.md` (Links)                                                                    |
+| Grafana URL, generic dashboard uid and the query that scopes it    | `{grafana-url}`, `{generic-dashboard-uid}`, `{generic-dashboard-vars}` (its `var-…=…` URL query for this service) | `observability/overview.md` (Links)                                                                    |
+| Web URL of this repo's files on its default branch                 | `{repo-url}` (e.g. `https://github.com/example/zinc/blob/main`)                                                   | the primordial chart's values                                                                          |
+| OTLP (OpenTelemetry Protocol) collector endpoint, per landscape    | `{otlp-endpoint}`                                                                                                 | each landscape's app config ([OpenTelemetry](/docs/standards/observability/otel.md))                   |
+| Metrics and logs datasource uids, per landscape                    | `{metrics-datasource-uid}`, `{logs-datasource-uid}`                                                               | the primordial chart's values                                                                          |
+| Primordial namespace and Grafana `instanceSelector`, per landscape | `{grafana-namespace}`, `{instance-selector}`                                                                      | the primordial chart's values ([Shipping](/docs/standards/observability/shipping.md#where-things-run)) |
+| `helm-wrapper` chart repository and version                        | —                                                                                                                 | the primordial chart's `Chart.yaml`                                                                    |
+| Faro collector URL, app id and stack id                            | —                                                                                                                 | the frontend's config ([Faro](/docs/standards/observability/faro.md))                                  |
 
 The platform team also owns, outside this repo: who is notified for each tier and landscape (routing), on-call, trace tail sampling, and deploying the primordial chart.
 
@@ -56,13 +59,16 @@ Skills, in the order you use them: `observability-check` (decide signals) → `g
 
 ```text
 observability/
+├── index.md            # points here
 ├── SIGNALS.md          # the six-gate answers, one block per feature
 ├── overview.md         # system overview that every runbook links to
 ├── dashboards/         # curated dashboards; empty until Gate 4 says yes
+│   ├── README.md       # keeps the folder in git
 │   ├── overview.json
 │   ├── .lint           # dashboard-linter exclusions, each with a reason
 │   └── log-notes.md    # what the stored log lines look like
 └── alerts/
+    ├── README.md       # keeps the folder in git
     └── <slug>/         # one alert set: tier files and runbook.md
 ```
 
@@ -71,8 +77,8 @@ Start empty. Add a dashboard or alert only when a gate in `SIGNALS.md` says yes.
 ## Three rules
 
 1. **Labels are stamped, never written.** Alert and dashboard files hold plain Grafana content: no Kubernetes wrapper and no LPSM label blocks. Selecting LPSM labels in a query, such as `{service="zinc"}`, is expected. The primordial chart stamps alerts. For metrics, logs and traces, the OTel library sets the values from the service's config, and the collector (Grafana Alloy, an agent on each Kubernetes node) turns them into labels. This repo's app chart, `infra/root_chart/`, sets none.
-2. **Strict on metrics and alerts, liberal on logs and traces.** Metrics cost ATS for as long as they exist, and alerts cost a person's attention, so both default to NO. Logs and traces default to YES for user and business events; the platform team samples them to control volume.
-3. **Rules never decide who gets paged.** The platform team's routing reads the `severity` and LPSM labels and decides who is notified in each landscape. The same rule file works in every landscape.
+2. **Strict on metrics and alerts, liberal on logs and traces**: [why and how](/docs/standards/observability/signals.md#cost-strict-on-metrics-liberal-on-logs-and-traces).
+3. **Rules never decide who gets paged**, e.g. no `team:` or `receiver:` label and no contact point in a tier file. The platform team's routing reads the `severity` and LPSM labels and decides who is notified in each landscape. The same rule file works in every landscape.
 
 ## Check a signal exists before you use it
 

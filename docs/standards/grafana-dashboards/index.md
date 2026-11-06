@@ -6,14 +6,14 @@ How to write this service's dashboards as code, and how to check them by looking
 
 Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashboard, `overview.json` first. Write them in the format Grafana's Dashboard → Export → JSON gives you (the classic schema, not the newer v2 schema). The primordial chart turns each file into a Grafana dashboard ([Shipping](/docs/standards/observability/shipping.md)).
 
-- `overview.json` (uid `<platform>-<service>-overview`) is the one alerts link to. **Every `panel` id an alert uses must exist in it.**
+- `overview.json` (uid `<platform>-<service>-overview`) is the one alerts link to with their [`panel`](/docs/standards/observability/alerts.md#the-tier-file) field.
 - A deep-dive gets its own file (uid `<platform>-<service>-<purpose>`), linked from the overview.
 
 ## Authoring rules
 
 ### Identity
 
-- Pin the `uid` to `<platform>-<service>-<purpose>`, at most 40 characters, so re-applying never makes duplicates and alert links stay valid.
+- Pin the `uid` to `<platform>-<service>-<purpose>` ([length limit](/docs/standards/observability/shipping.md#structural-checks)), so re-applying never makes duplicates and alert links stay valid.
 - Title: `<Service> — <Purpose>`, e.g. `Zinc — Retry overview`.
 - Experiments are made in the Grafana UI only and never committed.
 
@@ -21,7 +21,7 @@ Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashbo
 
 - A row is one horizontal band of panels. Use **RED** (rate, errors, duration) for request-driven views and **USE** (utilization, saturation, errors) for resources.
 - The first row (the **overview row**) answers "is it healthy?" in under 5 seconds, with trend panels and threshold colors. The rows below (**detail rows**) follow in the order a responder triages.
-- Open with a text panel: purpose, audience, and links to `observability/overview.md` (on the repo's web page) and the generic dashboard (`/d/{generic-dashboard-uid}`).
+- Open with a text panel: purpose, audience, and links to `{repo-url}/observability/overview.md` ([placeholders](/docs/standards/observability/index.md#values-the-platform-team-gives-you)) and the generic dashboard (`/d/{generic-dashboard-uid}`).
 - One dashboard, one purpose. Put deep dives on a linked dashboard, not in row 12.
 
 ### Panels
@@ -35,13 +35,13 @@ Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashbo
 ### Queries
 
 - Use `$__rate_interval` in `rate()` and `increase()`. Rate first, then sum: `sum by (status) (rate(x_total[$__rate_interval]))`, never `rate(sum(...))`.
-- Always aggregate by the labels you want to see; never a bare `sum(rate(...))` and never an unaggregated query.
+- Always aggregate by the labels you want to see; never a bare `sum(rate(...))` and never an unaggregated query. (Dashboards only: an alert `expr` may sum everything.)
 - Cap anything with many label values: `topk(10, ...)`.
 - Show latency as percentiles (p50, p95, p99) from histograms, not averages.
 
 ### Variables and links
 
-- `$landscape` is required on every dashboard, with `refresh: 2` (reload on time change). Add a datasource variable labeled `Data source` for metrics and, with log panels, one labeled `Logs data source`. Set `editable: false`.
+- `$landscape` is required on every dashboard, with `refresh: 2` (reload on time change). Add the datasource variable `prometheus_datasource` labeled `Prometheus data source` and, with log panels, `loki_datasource` labeled `Loki data source`; these names pass strict lint. Set `editable: false`.
 - Log panels also get a `$filter` text variable, applied as `|~ "$filter"`.
 - Link panels to the next view: a log line to its trace, a service tile to `/d/<platform>-<service>-overview`. Carry the scope in the URL: `?var-landscape=${landscape}`.
 
@@ -65,16 +65,24 @@ Add a slow- or error-trace table (TraceQL) only once the service emits spans. No
 
 ## Check it before merge
 
-Run this for every new or changed dashboard. Commands, tools and files: [Dashboard sandbox](/docs/standards/grafana-dashboards/sandbox.md).
+Run this for every new or changed dashboard file. Tools and the sandbox: [Dashboard sandbox](/docs/standards/grafana-dashboards/sandbox.md).
 
-1. `jq empty observability/dashboards/overview.json`: the JSON parses.
-2. `dashboard-linter lint observability/dashboards/overview.json --strict`: fix every finding, or justify it in `observability/dashboards/.lint`.
-3. Render in the sandbox with synthetic data and read the PNGs.
-4. Fix what the checklist below finds and repeat from step 1.
+1. Parse and lint, from the repo root:
+
+   ```bash
+   for dashboard in observability/dashboards/*.json; do
+     jq empty "$dashboard" && dashboard-linter lint "$dashboard" --strict
+   done
+   ```
+
+   Fix every finding, or justify it in `observability/dashboards/.lint` (the linter reads `.lint` from the dashboard's folder). Start that file as a copy of `.claude/skills/grafana-dashboards/sandbox/dashboards/.lint` and keep only the exclusions your dashboards need.
+
+2. Render in the sandbox with synthetic data and read the PNGs.
+3. Fix what the checklist below finds and repeat from step 1.
 
 ### Visual checklist
 
-- [ ] No "No data" or error panels once synthetic data is loaded (log and trace panels marked `UNVERIFIED` are exempt).
+- [ ] No "No data" or error panels once synthetic data is loaded, except [`UNVERIFIED`](#log-and-trace-panels) log and trace panels.
 - [ ] Units show as units (`1.2k req/s`, `250 ms`), not raw numbers.
 - [ ] Y-axes fit: no clipped peaks, no lines flattened by a wrong scale.
 - [ ] Legends are short and do not swallow the panel.

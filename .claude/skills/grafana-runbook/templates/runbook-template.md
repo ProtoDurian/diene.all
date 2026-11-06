@@ -1,7 +1,7 @@
 # {Alert name}
 
 > Covers: 🚨 {critical title} · ⚠️ {warning title} (keep the tiers that exist)
-> Context: [System overview](/observability/overview.md) · [Dashboard panel]({grafana-url}/d/{platform}-{service}-overview?viewPanel={panel}) · Escalation: {team} in {#channel}
+> Context: [System overview](/observability/overview.md) · [Dashboard panel]({grafana-url}/d/{platform}-{service}-overview?viewPanel={panel}), or if the tiers set no `panel`, [Generic dashboard]({grafana-url}/d/{generic-dashboard-uid}?{generic-dashboard-vars}) · Escalation: {team} in {#channel}
 
 {What this means and who is affected, in two plain sentences.}
 

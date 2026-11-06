@@ -3,6 +3,7 @@
 - **Every alert set has its own runbook** at `observability/alerts/<slug>/runbook.md`.
 - **Shared context lives once** in `observability/overview.md`. Runbooks link to it instead of repeating it.
 - **Namespace, workload, team, channel and Grafana URL** come from the platform team; see [Values the platform team gives you](/docs/standards/observability/index.md#values-the-platform-team-gives-you).
+- **Commands use `kubectl`**, which is in this repo's nix shell. Cluster access comes from the platform team.
 
 ## The system overview
 
@@ -24,5 +25,5 @@ Start from [the runbook template](/.claude/skills/grafana-runbook/templates/runb
 - [ ] Triage, Remediation and Escalation are present and filled.
 - [ ] Every fix ends with "Confirm with: …".
 - [ ] Any Mermaid diagram renders (paste it into mermaid.live).
-- [ ] Every `{placeholder}` is filled.
+- [ ] Every `{placeholder}` is filled, except platform-team values not known yet (they keep their name) and `{landscape}` in queries, which the responder fills in.
 - [ ] `overview.md` still fits on one screen.

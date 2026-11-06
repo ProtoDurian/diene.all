@@ -8,7 +8,7 @@ Frontends send telemetry with Grafana Faro, Grafana's frontend observability SDK
 
 Both frontends must:
 
-1. Read a validated config: an enabled flag, the Faro collector URL, the sampling ratio and the service-tree `app:` block (shape in [OpenTelemetry](/docs/standards/observability/otel.md#resource-attributes)). The collector URL, app id and stack id come from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you).
+1. Read a validated config under `client.faro`: an enabled flag, the Faro collector URL, the sampling ratio, the app id (this frontend's app in Faro) and the stack id (the Grafana stack that holds it), plus the service-tree `app:` block (shape in [OpenTelemetry](/docs/standards/observability/otel.md#resource-attributes)). Key names other than `client.faro.build.*` come from the frontend template's config schema. The collector URL, app id and stack id come from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you).
 2. Start Faro exactly once, after the client config (the part of the app config that may reach the browser) is available.
 3. Do nothing, and make no network calls, when disabled.
 4. Fail visibly when enabled with invalid config. Never swallow a start-up failure and pretend telemetry works.
@@ -47,7 +47,7 @@ Use the official `@grafana/faro-web-sdk` and `@grafana/faro-web-tracing` package
 Upload source maps with `@grafana/faro-webpack-plugin` from the webpack hook in `next.config.ts`, during the production build.
 
 - Add the plugin only when Faro and the app config's `client.faro.build.enabled` are both true.
-- Require the collector URL, app id, stack id and the build secret `ATOMI_CLIENT__FARO__BUILD__KEY` before uploading. In the variable name, `__` separates config levels: it is `client.faro.build.key`.
+- Require the collector URL, app id, stack id and the build secret `ATOMI_CLIENT__FARO__BUILD__KEY` before uploading. The name is the app's prefix `ATOMI_` plus the config path `client.faro.build.key` in upper case, with `__` between levels.
 - Read the key from the build environment just before the build. It must never reach YAML, the generated client config, `DefinePlugin` values, the bundle, the image or any build output.
 - Test the upload guard in CI with a dry run.
 
@@ -63,7 +63,7 @@ lib/src/observability/
 
 Use Grafana's verified-publisher `faro` package. Map `service` to `appName`, `platform` to `namespace`, `version` to `appVersion` and landscape to `appEnv`; put the `atomi.*` values and `deployment.environment.name` in session or resource attributes. Wrap the app once with the SDK bootstrap, and add only the interaction and asset instrumentation widgets you need.
 
-Flutter does not use the webpack source-map plugin. Native symbol upload belongs to the Flutter release pipeline.
+Flutter does not use the webpack source-map plugin; native symbol upload is not covered here.
 
 ## Tests each frontend needs
 

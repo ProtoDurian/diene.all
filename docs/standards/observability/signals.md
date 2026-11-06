@@ -12,13 +12,13 @@ Terms such as LPSM, ATS and SLO are defined in [Observability Standards](/docs/s
 | Logs    | Lines × bytes × retention                                                        | **Liberal**, as long as logs follow events, not loops                               |
 | Traces  | Spans × traffic × retention                                                      | **Liberal.** The platform team samples traces in the collector                      |
 
-An unbounded label (user ID, URL, request ID) turns one metric into millions of ATS. Put IDs in logs and span attributes instead. If the collector keeps a per-pod label (`pod` or `instance`; check one series in Grafana Explore), multiply the ATS by the replica count.
+An unbounded label (user ID, URL, request ID) turns one metric into millions of ATS. Put IDs in logs and span attributes instead. If the collector keeps a per-pod label (`pod` or `instance`; check one series in Grafana Explore), multiply the ATS by the replica count. For a new metric, assume it does and use the planned replica count.
 
 ## The six gates
 
 ### Gate 1 — Metrics (default NO)
 
-Say YES only if a person or automation acts on the number, an SLO uses it, or you need an aggregate logs cannot give (such as p99 latency). Name each metric, its type, its labels and its ATS. Prefer counters and gauges; use a histogram only when you need percentiles.
+Say YES only if a person or automation acts on the number, an SLO uses it, or you need an aggregate logs cannot give (such as p99 latency). List only the metrics this feature adds, each with its type, labels and ATS; name an existing metric an SLO uses in the Why line. Prefer counters and gauges; use a histogram only when you need percentiles.
 
 Example: gauge `webhook_retry_queue_depth` with label `module` (2 values) in 2 landscapes → about 4 ATS.
 
@@ -30,13 +30,13 @@ Example: one INFO line per delivery attempt with `delivery_id`, `target`, `attem
 
 ### Gate 3 — Traces (default YES for user flows)
 
-Add a span for each meaningful stage of a user flow, with key IDs as attributes. Skip tracing only for internal work with no per-request flow. The service sets only its head-sampling `ratio` (the share of new traces kept); keeping every error trace is the collector's tail sampling, run by the platform team.
+Add a span for each meaningful stage of a user flow, with key IDs as attributes. Skip tracing only for internal work with no per-request flow. The service sets only its head-sampling `ratio` (the share of new traces kept); keeping every error trace is the platform team's **tail sampling** (the collector decides after a trace ends, so it can keep all errors).
 
 Example: span `webhook.deliver` with `delivery_id`, ratio 0.1.
 
 ### Gate 4 — Dashboard (default: the generic dashboard is enough)
 
-The generic dashboard already shows request rate, errors, duration and resource use; never copy those panels. Only custom metrics from Gate 1 can earn a panel on a curated dashboard. No custom metrics means no curated dashboard. See [Dashboards](/docs/standards/grafana-dashboards/index.md).
+Never copy panels of the [generic dashboard](/docs/standards/observability/index.md#terms). Only custom metrics from Gate 1 earn a curated dashboard; their log evidence (the failure classes from Gates 2 and 5) sits beside them. No custom metrics means no curated dashboard. See [Dashboards](/docs/standards/grafana-dashboards/index.md).
 
 Example: "Retry queue depth" panel in a detail row.
 
@@ -46,7 +46,7 @@ An alert must pass all three checks:
 
 1. **Nothing heals it already.** If an autoscaler, restart policy or retry loop fixes the condition, do not alert on it. Alert when that mechanism is exhausted.
 2. **Someone can act.** The runbook must say what to do. "Watch it" means `info` at most, or no alert.
-3. **Someone owns it.** The owner team in `observability/overview.md` agrees to receive it. Delivery is the platform team's routing; if `{platform}` has no route yet, ask them.
+3. **Someone owns it.** The owner team in `observability/overview.md` agrees to receive it. Until the platform team names it, record `Owner: pending`; an alert set cannot merge while its owner is pending. Delivery is the platform team's routing; if `{platform}` has no route yet, ask them.
 
 | Condition                             | Already healed by         | Alert?                          |
 | ------------------------------------- | ------------------------- | ------------------------------- |
@@ -56,17 +56,17 @@ An alert must pass all three checks:
 | One pod restart                       | restart policy            | No; a sustained crash loop: yes |
 | Retry queue growing despite retries   | retries are losing        | Yes                             |
 
-For each alert that survives, record its tiers ([how many](/docs/standards/observability/alerts.md#one-alert-set--one-folder)), its type (see [Alerts](/docs/standards/observability/alerts.md)), any SLO it uses, and a **noise budget**: how often you expect it to fire, e.g. "≤2 pages/month". An alert that fires more often than someone acts fails check 2.
+For each alert that survives, record in the Gate 5 table its tiers ([how many](/docs/standards/observability/alerts.md#one-alert-set--one-folder)), its type (see [Alerts](/docs/standards/observability/alerts.md)), any SLO it uses, what already heals it, its owner and a **noise budget**: how often you expect it to fire, e.g. "≤2 pages/month". An alert that fires more often than someone acts fails check 2.
 
 ### Gate 6 — Alert-set folders
 
-Each Gate 5 alert becomes one folder, `observability/alerts/<slug>/`, with its tier files and `runbook.md`, in the same PR. The slug is the alert name in lower case with spaces turned into hyphens, using only `a-z`, `0-9` and `-`: `Retry queue` → `retry-queue`. Keep it short: it is part of a uid with a length limit ([Shipping](/docs/standards/observability/shipping.md#structural-checks)).
+Each Gate 5 alert becomes one folder, `observability/alerts/<slug>/`, with its tier files and `runbook.md`, in the same PR. Record a short slug next to each alert name, using only `a-z`, `0-9` and `-`: `Retry queue saturated` → `retry-queue`. Its length limit: [Shipping](/docs/standards/observability/shipping.md#structural-checks).
 
 ## Review checklist
 
 - [ ] The feature has a block in `SIGNALS.md` with all six gates answered.
 - [ ] Every answer has a one-line reason; a bare YES or NO fails review.
 - [ ] Every YES names its metric, log event, span, panel or folder, and its cost (ATS, log volume or sampling).
-- [ ] Every Gate 5 YES has its tiers, an alert type and a noise budget.
+- [ ] Every Gate 5 YES has its tiers, an alert type, a noise budget and an owner (or `pending`).
 - [ ] Everything named exists in the PR: the metric in the service code, each Gate 6 folder under `observability/alerts/`.
 - [ ] No unbounded metric labels, no logs in hot loops, a sampling ratio for every trace.

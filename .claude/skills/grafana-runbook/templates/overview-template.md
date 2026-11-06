@@ -23,16 +23,16 @@
 
 ## Common commands
 
-| Purpose               | Command                                                                                      |
-| --------------------- | -------------------------------------------------------------------------------------------- |
-| Pod status            | `kubectl get pods -n {namespace}`                                                            |
-| Recent errors (LogQL) | `{service="{service}", landscape="{landscape}"} \| json \| {error filter from log-notes.md}` |
-| {Key domain query}    | `{query}`                                                                                    |
-| Slow traces (TraceQL) | `{ resource.service.name="{service}" && duration > 2s }`                                     |
-| Restart               | `kubectl rollout restart {workload} -n {namespace}`                                          |
+| Purpose                                                     | Command                                                                                                                             |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Pod status                                                  | `kubectl get pods -n {namespace}`                                                                                                   |
+| Recent errors (LogQL; the responder fills in `{landscape}`) | `{service="{service}", landscape="{landscape}"} \| json \| {error filter from log-notes.md, or the expected one marked UNVERIFIED}` |
+| {Key domain query}                                          | `{query}`                                                                                                                           |
+| Slow traces (TraceQL)                                       | `{ resource.service.name="{service}" && duration > 2s }`                                                                            |
+| Restart                                                     | `kubectl rollout restart {workload} -n {namespace}`                                                                                 |
 
 ## Links
 
 - Owner: {team} in {#channel}
-- [Curated dashboard]({grafana-url}/d/{platform}-{service}-overview) · [Generic dashboard]({grafana-url}/d/{generic-dashboard-uid}?{its LPSM variables})
-- [Deployment]({url}) · [Design doc]({url})
+- [Curated dashboard]({grafana-url}/d/{platform}-{service}-overview) · [Generic dashboard]({grafana-url}/d/{generic-dashboard-uid}?{generic-dashboard-vars})
+- [Design doc]({design-doc-url}) (delete the line if there is none)

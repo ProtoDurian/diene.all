@@ -36,20 +36,18 @@ One block per feature. To add one, copy [the SIGNALS template](/.claude/skills/o
 **Decision:** generic dashboard is enough | curated panels
 **Why:** {custom metrics only; standard signals are on the generic dashboard}
 
-| Panel     | Row             | Metric     |
-| --------- | --------------- | ---------- |
-| `{title}` | overview/detail | `{metric}` |
+| Panel     | Row             | Metric or log event        |
+| --------- | --------------- | -------------------------- |
+| `{title}` | overview/detail | `{metric or Gate 2 event}` |
 
 ### Gate 5 — Alerts
 
 **Decision:** NO | YES
-**Already healed by:** {autoscaler, restarts, retries… and why that does not cover it}
-**Noise budget:** {expected fire rate, e.g. ≤2 pages/month}
 
-| Alert name  | Type                                                        | Tiers | Thresholds                                     |
-| ----------- | ----------------------------------------------------------- | ----- | ---------------------------------------------- |
-| `{symptom}` | threshold/absence/event/burn rate/seasonal/forecast/outlier | 1/2/3 | `{warning X, critical Y; or SLO + burn rates}` |
+| Alert name  | Type                                                        | Tiers | Thresholds                                     | SLO            | Already healed by       | Noise budget | Owner                |
+| ----------- | ----------------------------------------------------------- | ----- | ---------------------------------------------- | -------------- | ----------------------- | ------------ | -------------------- |
+| `{symptom}` | threshold/absence/event/burn rate/seasonal/forecast/outlier | 1/2/3 | `{warning X, critical Y; or SLO + burn rates}` | {SLO, or none} | {mechanism, or nothing} | {≤2/month}   | {team, or `pending`} |
 
 ### Gate 6 — Alert-set folders
 
-- None, or `observability/alerts/{alert-slug}/`
+- None, or `{alert name}` → `observability/alerts/{slug}/`, one line per Gate 5 alert

@@ -1,8 +1,7 @@
-# Save as observability/alerts/{slug}/{critical|warning|info}.yaml; rules: docs/standards/observability/alerts.md
 title: '{the symptom, e.g. Retry queue saturated}'
 datasource: '{metrics | logs}'
 expr: '{query that is true while the problem lasts, e.g. queue_depth{service="zinc"} > 5000}'
 for: '{10m}'
-summary: '{what and how bad, e.g. Queue at {{ $values.A }}; dropping work}'
+summary: '{what and how bad, e.g. Queue at {{ $values.A.Value }}; dropping work}'
 description: '{the first thing to do}'
-panel: 0 # an integer: the panel id in observability/dashboards/overview.json; delete the line to link the generic dashboard
+# panel: {a panel id in observability/dashboards/overview.json; uncomment to set, leave out for the generic dashboard}
