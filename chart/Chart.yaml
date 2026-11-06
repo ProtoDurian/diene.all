@@ -1,13 +1,12 @@
 apiVersion: v2
-name: diene-helm-wrapper
-description: Minimal production-grade Helm wrapper template for AtomiCloud platform charts
+name: xenon
+description: AtomiCloud Resource Metrics API - conditional passthrough of kubernetes-sigs/metrics-server, ON only where no built-in provider exists
 type: application
 version: 0.1.0
-appVersion: '6.9.2'
-kubeVersion: '>=1.27.0-0'
+appVersion: '0.8.1'
 dependencies:
-  - name: podinfo
+  - name: metrics-server
     alias: upstream
-    version: 6.9.2
-    repository: oci://ghcr.io/stefanprodan/charts
+    version: 3.13.1
+    repository: https://kubernetes-sigs.github.io/metrics-server
     condition: upstream.enabled

@@ -1,0 +1,56 @@
+# Xenon enablement: ON exactly where no built-in Resource Metrics API provider is declared.
+# One row per defined landscape (exactly eight). Serving is decided per registered serving cluster.
+landscapes:
+  - landscape: primordial
+    overlay: values.primordial.yaml
+    substrate: central cluster
+    builtInMetricsProvider: false
+    xenon: 'ON'
+  - landscape: lapras
+    overlay: values.lapras.yaml
+    substrate: local k3d/k3s
+    builtInMetricsProvider: true
+    xenon: 'OFF'
+  - landscape: ditto
+    overlay: values.ditto.yaml
+    substrate: fresh k3d, or the nsc built-in k3s in CI
+    builtInMetricsProvider: true
+    xenon: 'OFF'
+  - landscape: rotom
+    overlay: values.rotom.yaml
+    substrate: retained offline k3d/k3s
+    builtInMetricsProvider: true
+    xenon: 'OFF'
+  - landscape: absol
+    overlay: values.absol.yaml
+    substrate: fresh offline k3d, or the nsc built-in k3s in CI
+    builtInMetricsProvider: true
+    xenon: 'OFF'
+  - landscape: eevee
+    overlay: values.eevee.yaml
+    substrate: hosted workload vcluster
+    builtInMetricsProvider: false
+    xenon: 'ON'
+  - landscape: castform
+    overlay: values.castform.yaml
+    substrate: preview workload vcluster
+    builtInMetricsProvider: false
+    xenon: 'ON'
+  - landscape: serving
+    overlay: values.serving.yaml
+    substrate: per registered serving cluster
+    builtInMetricsProvider: per-cluster
+    xenon: per-cluster
+servingSubstrates:
+  - substrate: EKS classic
+    builtInMetricsProvider: false
+    xenon: 'ON'
+  - substrate: EKS Auto
+    builtInMetricsProvider: false
+    xenon: 'ON'
+  - substrate: DOKS
+    builtInMetricsProvider: false
+    xenon: 'ON'
+  - substrate: on-prem
+    builtInMetricsProvider: false
+    xenon: 'ON'

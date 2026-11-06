@@ -90,6 +90,6 @@ See [docs/standards/shell-scripts/index.md](docs/standards/shell-scripts/index.m
 
 See [docs/standards/taskfile/index.md](docs/standards/taskfile/index.md).
 
-# Helm wrapper
+# Xenon
 
-Read [docs/developer/helm-wrapper-baseline.md](docs/developer/helm-wrapper-baseline.md) before changing `chart/`, the stacked values, CR/LPSM helpers, provider LoadBalancer annotations, config vendoring, or chart publishing.
+Read [docs/developer/xenon-baseline.md](docs/developer/xenon-baseline.md) before changing `chart/`, the landscape overlays, the toggle map, LPSM labels, or chart publishing.

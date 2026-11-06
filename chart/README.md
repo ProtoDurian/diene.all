@@ -1,33 +1,51 @@
-# diene-helm-wrapper
+# xenon
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 6.9.2](https://img.shields.io/badge/AppVersion-6.9.2-informational?style=flat-square)
+![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.8.1](https://img.shields.io/badge/AppVersion-0.8.1-informational?style=flat-square)
 
-Minimal production-grade Helm wrapper template for AtomiCloud platform charts
+AtomiCloud Resource Metrics API - conditional passthrough of kubernetes-sigs/metrics-server, ON only where no built-in provider exists
+
+## Needed/provided matrix
+
+Xenon provides the Resource Metrics API (`v1beta1.metrics.k8s.io`) for HPA and `kubectl top`. It is needed only where
+the cluster has no built-in provider. Each overlay declares that fact as `builtInMetricsProvider`; the chart refuses an
+overlay whose `upstream.enabled` is not its opposite. OFF renders nothing, so the chart installs everywhere. ON needs
+Kubernetes 1.31+ (metrics-server 0.8). `toggle-map.yaml` is the machine-readable form of this table.
+
+| Landscape | Substrate | Built-in provider | Xenon | Kubelet TLS |
+| --- | --- | --- | --- | --- |
+| primordial | central cluster | no (none declared) | ON | secure |
+| lapras | local k3d/k3s | yes (k3s bundles metrics-server) | OFF | bundled |
+| ditto | fresh k3d, or the nsc built-in k3s in CI | yes (k3s bundles metrics-server) | OFF | bundled |
+| rotom | retained offline k3d/k3s | yes (k3s bundles metrics-server) | OFF | bundled |
+| absol | fresh offline k3d, or the nsc built-in k3s in CI | yes (k3s bundles metrics-server) | OFF | bundled |
+| eevee | hosted workload vcluster | no (no bundled provider) | ON | `--kubelet-insecure-tls` |
+| castform | preview workload vcluster | no (no bundled provider) | ON | `--kubelet-insecure-tls` |
+| serving | per registered serving cluster | per cluster | per cluster | secure |
+
+Serving is evaluated per registered cluster. Each cluster's overlay restates `builtInMetricsProvider`; a cluster whose
+substrate bundles a provider must set it `true` and xenon OFF.
+
+| Serving substrate | Built-in provider | Xenon |
+| --- | --- | --- |
+| EKS classic | no (not preinstalled) | ON |
+| EKS Auto | no (not managed; the community add-on is a separate install) | ON |
+| DOKS | no (metrics-server is a user-managed Marketplace install) | ON |
+| on-prem | no (not preinstalled) | ON |
 
 ## Requirements
 
-Kubernetes: `>=1.27.0-0`
-
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/stefanprodan/charts | upstream(podinfo) | 6.9.2 |
+| https://kubernetes-sigs.github.io/metrics-server | upstream(metrics-server) | 3.13.1 |
 
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| contracts | object | `{"health":{"expectedStatus":"2xx","path":"/healthz"},"lpsm":{"identityLandscape":"example","instance":"run001","instanceZone":"local.example.invalid","landscape":"example","module":"api","ordinaryZone":"cluster.atomi.cloud","parseHostname":"","service":"wrapper"},"webhook":{"pathPrefix":"/internal/webhooks","provider":"example"}}` | Current health and webhook delivery conventions. |
-| fullnameOverride | string | `"wrapper-api"` | Primary workload fullname. It must be `<service>-<dashless-token>`. |
-| gateway | object | `{"aws":{"eipAllocationIds":[],"subnetIds":[]},"enabled":true,"oci":{"reservedPublicIp":""},"port":80,"provider":"digitalocean"}` | Provider-managed LoadBalancer service for the gateway. |
-| instance | object | `{"physicalId":"example-repository:run-001"}` | Optional physical-instance metadata. The instance remains outside LPSM. |
-| labelPrefix | string | `"atomi.cloud"` | Prefix used by every service-tree label and annotation helper. |
-| migration | object | `{"command":["sh","-c","echo migration-ready"],"enabled":true,"image":{"pullPolicy":"IfNotPresent","repository":"busybox","tag":"1.37.0-glibc"},"reloader":{"enabled":true},"resources":{"limits":{"cpu":"25m","memory":"32Mi"},"requests":{"cpu":"5m","memory":"8Mi"}}}` | Separate pre-sync migration hook. It never owns or recreates the Deployment. |
-| primordial | object | `{"apiVersions":{"edge":"edge.atomi.cloud/v1alpha1","fleet":"fleet.atomi.cloud/v1alpha1","identity":"identity.atomi.cloud/v1alpha1"},"cloudflareDeploy":{"enabled":true,"pin":true,"scriptName":"wrapper-web","tag":"0.1.0"},"enabled":true,"identity":{"concreteLandscapes":["example"]},"logtoApp":{"enabled":true,"extraRedirectUris":[],"landscapes":["example"],"paths":["/auth/callback"],"resourceRefs":["wrapper-api"]},"placement":{"preferredHost":"example-host"},"platformDependency":{"modules":{"cache":{"hot":{"credentialMode":"standard","delivery":"replicated","engine":{"dragonfly":{}},"ram":"128Mi","rotation":"on","type":"dragonfly"}},"database":{"maindb":{"backup":{"crossVendor":true},"cpu":1,"credentialMode":"standard","delivery":"external","engine":{"neon":{"tier":"example"}},"providerAccountRef":"example-neon","ram":"1Gi","rotation":"on","storage":"10Gi","type":"neon","version":"16"}},"kv":{"sessions":{"credentialMode":"standard","delivery":"external","engine":{"upstash":{}},"providerAccountRef":"example-upstash","ram":"128Mi","rotation":"on","type":"upstash"}},"store":{"assets":{"credentialMode":"standard","delivery":"external","engine":{"tigris":{}},"providerAccountRef":"example-tigris","rotation":"on","type":"tigris"}}}},"problem":{"enabled":true,"entries":[{"endpoints":[{"method":"GET","path":"/"}],"id":"example","recoverable":false,"schema":{},"status":500,"title":"Example problem","type":"https://errors.example.invalid/example"}],"version":"0.1.0"},"targetLandscape":"example","virtualLandscapeService":{"enabled":true,"serve":true},"vlandscape":"example-vlandscape"}` | Reusable primordial-chart CR helper inputs against the frozen T3 shapes. |
-| secret | object | `{"enabled":true,"refreshInterval":"1h","serviceFolder":"/wrapper","sharedFolder":"/shared","store":{"kind":"SecretStore","name":"sample-store"}}` | One service-scoped ExternalSecret with folder-prefix rewrites. |
-| serviceTree | object | `{"layer":"2","module":"api","platform":"sample","service":"wrapper"}` | Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays. |
-| upstream | object | `{"enabled":false,"fullnameOverride":"wrapper-upstream","image":{"repository":"ghcr.io/stefanprodan/podinfo","tag":"6.9.2"},"podAnnotations":{"reloader.stakater.com/auto":"true"},"podSecurityContext":{"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000},"resources":{"limits":{"cpu":"100m","memory":"128Mi"},"requests":{"cpu":"10m","memory":"32Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000}}` | Pinned optional upstream chart. Every instantiated dependency must receive a conforming override. |
-| webhookRoute | object | `{"enabled":true,"parentGateway":"sample-gateway","parentNamespace":"gateway-system"}` | Optional Gateway API route scaffold for a webhook receiver. |
-| workload | object | `{"image":{"pullPolicy":"IfNotPresent","repository":"ghcr.io/stefanprodan/podinfo","tag":"6.9.2"},"podSecurityContext":{"fsGroup":10000,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000},"port":9898,"reloader":{"enabled":true},"replicas":1,"resources":{"limits":{"cpu":"100m","memory":"128Mi"},"requests":{"cpu":"10m","memory":"32Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000}}` | Wrapper-owned sample workload. |
-
-----------------------------------------------
-Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)
+| builtInMetricsProvider | bool | `false` | The declared fact the toggle derives from: true when the cluster already serves `v1beta1.metrics.k8s.io` (k3s bundles metrics-server). Then `upstream.enabled` must be false; otherwise it must be true. |
+| labelPrefix | string | `"atomi.cloud"` | Prefix used by every service-tree label. |
+| serviceTree | object | `{"layer":"1","module":"metrics","platform":"metrics","service":"xenon"}` | Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays. |
+| upstream | object | `{"commonLabels":{"atomi.cloud/layer":"1","atomi.cloud/module":"metrics","atomi.cloud/platform":"metrics","atomi.cloud/service":"xenon"},"deploymentAnnotations":{"reloader.stakater.com/auto":"true"},"enabled":true,"fullnameOverride":"xenon-metrics","nameOverride":"metrics-server","podLabels":{"atomi.cloud/layer":"1","atomi.cloud/module":"metrics","atomi.cloud/platform":"metrics","atomi.cloud/service":"xenon"},"podSecurityContext":{"runAsNonRoot":true},"resources":{"limits":{"cpu":"500m","memory":"400Mi"},"requests":{"cpu":"100m","memory":"200Mi"}}}` | metrics-server 3.13.1 (app 0.8.1, Kubernetes 1.31+) values: upstream defaults plus the toggle, LPSM labels, Reloader, pod non-root and limits. No ServiceMonitor, no metrics endpoint (upstream defaults stay off). |
+| upstream.enabled | bool | `true` | The xenon toggle (Helm dependency condition). ON exactly when `builtInMetricsProvider` is false. |
+| upstream.fullnameOverride | string | `"xenon-metrics"` | Conforming `<service>-<token>` name for every upstream object. |
+| upstream.nameOverride | string | `"metrics-server"` | Standard `app.kubernetes.io/name` (and selector) value; the `upstream` alias would leak in otherwise. |

@@ -48,12 +48,12 @@ checks that it names every surface.
 
 This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, Docker, Helm, secrets, release configuration, validators, and standards.
 
-# Helm wrapper
+# Xenon
 
-This branch adds the wrapper chart, stacked values, generated schema, rendered-manifest validation, k3d proof, and dual publish modes.
+This branch materializes the Helm wrapper as `xenon`: the Resource Metrics API (`kubectl top`, HPA) as a passthrough of kubernetes-sigs/metrics-server 3.13.1. It is ON only where the cluster has no built-in provider; the per-landscape toggle map is in the [chart README](chart/README.md).
 
-- `task build` — vendor external config and build pinned chart dependencies.
-- `task test:unit` — run schema, lint, render, contracts, VAP, and publish dry-runs.
-- `task test:int` — install on ephemeral k3d and round-trip the chart through a local OCI registry.
-- `task example:lapras:template` — render the independent landscape + cluster stack.
-- [Helm wrapper baseline](docs/developer/helm-wrapper-baseline.md)
+- `task build` — build the pinned chart dependency.
+- `task test:unit` — run schema, lint, render, toggle map, LPSM, Reloader, VAP, and publish dry-runs.
+- `task test:int` — install on the `canary-xenon` k3d cluster (bundled metrics-server disabled), check `kubectl top nodes`, and round-trip the chart through a local OCI registry.
+- `task serving:canary:template` — render the independent landscape + cluster stack.
+- [Xenon baseline](docs/developer/xenon-baseline.md)

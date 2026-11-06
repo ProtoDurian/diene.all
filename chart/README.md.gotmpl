@@ -1,0 +1,37 @@
+{{ template "chart.header" . }}
+
+{{ template "chart.versionBadge" . }}{{ template "chart.typeBadge" . }}{{ template "chart.appVersionBadge" . }}
+
+{{ template "chart.description" . }}
+
+## Needed/provided matrix
+
+Xenon provides the Resource Metrics API (`v1beta1.metrics.k8s.io`) for HPA and `kubectl top`. It is needed only where
+the cluster has no built-in provider. Each overlay declares that fact as `builtInMetricsProvider`; the chart refuses an
+overlay whose `upstream.enabled` is not its opposite. OFF renders nothing, so the chart installs everywhere. ON needs
+Kubernetes 1.31+ (metrics-server 0.8). `toggle-map.yaml` is the machine-readable form of this table.
+
+| Landscape | Substrate | Built-in provider | Xenon | Kubelet TLS |
+| --- | --- | --- | --- | --- |
+| primordial | central cluster | no (none declared) | ON | secure |
+| lapras | local k3d/k3s | yes (k3s bundles metrics-server) | OFF | bundled |
+| ditto | fresh k3d, or the nsc built-in k3s in CI | yes (k3s bundles metrics-server) | OFF | bundled |
+| rotom | retained offline k3d/k3s | yes (k3s bundles metrics-server) | OFF | bundled |
+| absol | fresh offline k3d, or the nsc built-in k3s in CI | yes (k3s bundles metrics-server) | OFF | bundled |
+| eevee | hosted workload vcluster | no (no bundled provider) | ON | `--kubelet-insecure-tls` |
+| castform | preview workload vcluster | no (no bundled provider) | ON | `--kubelet-insecure-tls` |
+| serving | per registered serving cluster | per cluster | per cluster | secure |
+
+Serving is evaluated per registered cluster. Each cluster's overlay restates `builtInMetricsProvider`; a cluster whose
+substrate bundles a provider must set it `true` and xenon OFF.
+
+| Serving substrate | Built-in provider | Xenon |
+| --- | --- | --- |
+| EKS classic | no (not preinstalled) | ON |
+| EKS Auto | no (not managed; the community add-on is a separate install) | ON |
+| DOKS | no (metrics-server is a user-managed Marketplace install) | ON |
+| on-prem | no (not preinstalled) | ON |
+
+{{ template "chart.requirementsSection" . }}
+
+{{ template "chart.valuesSection" . }}

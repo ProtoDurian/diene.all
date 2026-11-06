@@ -1,0 +1,22 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: canary-xenon
+servers: 1
+agents: 0
+image: rancher/k3s:v1.31.5-k3s1
+registries:
+  create:
+    name: canary-xenon-registry
+    host: 127.0.0.1
+    hostPort: '5002'
+options:
+  k3s:
+    extraArgs:
+      # No bundled provider: the state of the landscapes where xenon is ON.
+      - arg: --disable=metrics-server
+        nodeFilters:
+          - server:*
+      - arg: --disable=traefik
+        nodeFilters:
+          - server:*

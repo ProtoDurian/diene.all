@@ -1,0 +1,7 @@
+serviceTree:
+  landscape: absol
+
+builtInMetricsProvider: true
+
+upstream:
+  enabled: false

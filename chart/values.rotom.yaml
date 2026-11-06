@@ -1,0 +1,7 @@
+serviceTree:
+  landscape: rotom
+
+builtInMetricsProvider: true
+
+upstream:
+  enabled: false

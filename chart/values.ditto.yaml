@@ -1,0 +1,7 @@
+serviceTree:
+  landscape: ditto
+
+builtInMetricsProvider: true
+
+upstream:
+  enabled: false

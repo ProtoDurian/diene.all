@@ -1,12 +1,7 @@
 serviceTree:
-  cluster: lapras
+  landscape: lapras
 
-# Disabled: their CRDs are not installed in k3d.
-secret:
-  enabled: false
+builtInMetricsProvider: true
 
-webhookRoute:
-  enabled: false
-
-primordial:
+upstream:
   enabled: false

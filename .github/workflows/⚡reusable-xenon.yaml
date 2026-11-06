@@ -1,0 +1,29 @@
+name: ⚡ Reusable Xenon
+
+on:
+  workflow_call:
+
+jobs:
+  unit:
+    name: Xenon Unit
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Run the unit tier
+        run: nix develop .#ci -c ./scripts/ci/xenon.sh
+
+  integration:
+    name: Xenon Integration
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Install on canary-xenon (k3d, no bundled metrics-server), kubectl top answers
+        run: nix develop .#ci -c ./scripts/ci/xenon-k3d.sh

@@ -2,13 +2,13 @@ version: '3'
 
 includes:
   helm: tasks/Taskfile.helm.yaml
-  example:lapras:
+  serving:canary:
     taskfile: tasks/Taskfile.cluster.yaml
     vars:
-      RELEASE_NAME: helm-wrapper
-      NAMESPACE: sample
-      LANDSCAPE: example
-      CLUSTER: lapras
+      RELEASE_NAME: xenon
+      NAMESPACE: metrics
+      LANDSCAPE: serving
+      CLUSTER: canary
 
 tasks:
   setup:
@@ -22,10 +22,9 @@ tasks:
       - pre-commit run --all-files
 
   build:
-    desc: Vendor config and build chart dependencies
+    desc: Build chart dependencies
     cmds:
-      - ./scripts/local/vendor-chart-config.sh
-      - helm dependency build chart
+      - ./scripts/local/with-chart-repos.sh helm dependency build chart
 
   update:
     desc: Refresh the pinned upstream chart dependency
@@ -40,12 +39,12 @@ tasks:
   test:unit:
     desc: Run schema, lint, render, policy, and contract validation
     cmds:
-      - ./scripts/ci/helm-wrapper.sh
+      - ./scripts/ci/xenon.sh
 
   test:int:
-    desc: Run the local k3d installation proof
+    desc: Run the canary-xenon k3d install and kubectl top proof
     cmds:
-      - ./scripts/validate/helm-wrapper-k3d.sh
+      - ./scripts/ci/xenon-k3d.sh
 
   start:cluster:
     desc: Start the local k3d lapras proof cluster
