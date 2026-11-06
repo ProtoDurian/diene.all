@@ -41,7 +41,8 @@ cat >"${work}/tsconfig.json" <<JSON
 }
 JSON
 cat >"${work}/esm.mjs" <<JS
-import { ConfigLoader, ConfigRegistry } from '${name}';
+import { createRequire } from 'node:module';
+import { ConfigLoader, ConfigRegistry, ConfigValidationError } from '${name}';
 import { BuildTimeValueMapper } from '${name}/build-time';
 import { ConfigAssertions, ConfigStubBuilder, InMemoryConfigSource } from '${name}/test-helper';
 import { z } from 'zod';
@@ -52,9 +53,13 @@ if (config.get('server').port !== 2) throw new Error('ESM loader returned the wr
 if (new BuildTimeValueMapper().map({ ATOMI_X: '1', Y: '2' }, 'ATOMI_').ATOMI_X !== '1') throw new Error('ESM build-time map is wrong');
 const error = await new ConfigAssertions(new ConfigStubBuilder(registry)).expectInvalid({ base: {} });
 if (error.issues.length === 0) throw new Error('ESM asserter missed an invalid config');
+if (!(error instanceof ConfigValidationError)) throw new Error('ESM /test-helper error is not the root ConfigValidationError');
+const cjsHelper = createRequire(import.meta.url)('${name}/test-helper');
+const mixed = await new cjsHelper.ConfigAssertions(new cjsHelper.ConfigStubBuilder(registry)).expectInvalid({ base: {} });
+if (!(mixed instanceof ConfigValidationError)) throw new Error('CJS /test-helper error is not the ESM root ConfigValidationError');
 JS
 cat >"${work}/cjs.cjs" <<JS
-const { ConfigLoader, ConfigRegistry } = require('${name}');
+const { ConfigLoader, ConfigRegistry, ConfigValidationError } = require('${name}');
 const { BuildTimeValueMapper } = require('${name}/build-time');
 const { ConfigAssertions, ConfigStubBuilder, InMemoryConfigSource } = require('${name}/test-helper');
 const { z } = require('zod');
@@ -67,6 +72,7 @@ Promise.all([
 ]).then(([config, error]) => {
   if (config.get('server').port !== 2) throw new Error('CJS loader returned the wrong port');
   if (error.issues.length === 0) throw new Error('CJS asserter missed an invalid config');
+  if (!(error instanceof ConfigValidationError)) throw new Error('CJS /test-helper error is not the root ConfigValidationError');
 }).catch(error => {
   console.error(error);
   process.exit(1);
