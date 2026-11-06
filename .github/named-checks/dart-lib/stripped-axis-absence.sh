@@ -44,8 +44,7 @@ DH_TOKENS=(
   helm/index.md a-helm-lint helm-lint helm-render
   '](infra)' 'infra/' 'docker:build' 'docker:run'
 )
-# UPSTREAM-CHANGES.md is an audit record that lists the parent's paths by name.
-SCAN_EXEMPT=(':!.github/named-checks/**' ':!Changelog.md' ':!UPSTREAM-CHANGES.md' ':!probes/lib/**')
+SCAN_EXEMPT=(':!.github/named-checks/**' ':!Changelog.md' ':!probes/lib/**')
 
 F_PATH_RE='(^|/)(android|ios|macos|linux|windows|web|gradle|Pods)/|\.(xcodeproj|xcworkspace)/|(^|/)(build|settings)\.gradle(\.kts)?$|(^|/)(gradle\.properties|gradlew|gradlew\.bat|local\.properties|Podfile|Podfile\.lock|AndroidManifest\.xml|\.metadata|\.flutter-plugins|\.flutter-plugins-dependencies)$|\.(gradle|gradle\.kts|podspec|xcconfig|pbxproj|storyboard|xib|entitlements)$'
 F_IMPORT_RE="['\"](package:flutter[a-z0-9_]*/|dart:ui['\"])"

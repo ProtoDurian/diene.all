@@ -14,6 +14,11 @@ member_pubspec="${member_dir}/pubspec.yaml"
 
 [[ $(yq -r '.name' "${member_pubspec}") != "diene_dart_lib" ]] && echo "❌ member pubspec name must be diene_dart_lib" >&2 && exit 1
 [[ $(yq -r '.repository' "${member_pubspec}") != "https://github.com/ProtoDurian/diene.dart_lib" ]] && echo "❌ member pubspec repository is not the snaked mirror" >&2 && exit 1
+[[ $(yq -r '.issue_tracker' "${member_pubspec}") != "https://github.com/ProtoDurian/diene.dart_lib/issues" ]] && echo "❌ member pubspec issue_tracker is not the mirror's issues page" >&2 && exit 1
+sdk_range='^>=3[.][0-9]+[.][0-9]+ <4[.]0[.]0$'
+[[ ! $(yq -r '.environment.sdk // ""' "${member_pubspec}") =~ ${sdk_range} ]] && echo "❌ member pubspec environment.sdk must be a >=3.x.y <4.0.0 range" >&2 && exit 1
+[[ $(yq -r '.topics // [] | length' "${member_pubspec}") -lt 1 ]] && echo "❌ member pubspec declares no pub.dev topics" >&2 && exit 1
+[[ $(head -n 1 "${member_dir}/LICENSE") != "MIT License" ]] && echo "❌ ${member_dir}/LICENSE is not the MIT license" >&2 && exit 1
 
 runtime_deps="$(yq -r '.dependencies // {} | length' "${member_pubspec}")"
 [[ ${runtime_deps} -ne 0 ]] && echo "❌ diene_dart_lib must have zero runtime dependencies (found ${runtime_deps})" >&2 && exit 1
