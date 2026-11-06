@@ -19,12 +19,16 @@ coverage_file="${report_dir}/lcov.info"
 echo "🧪 Running ${mode} tests with coverage..."
 rm -rf "${report_dir}"
 
-if [[ ${mode} == "meta" ]]; then
+if [[ ${mode} == "unit" ]]; then
+  bun test --config="${config}" --coverage
+elif [[ ${mode} == "meta" ]]; then
   ./scripts/local/test-meta.sh "${config}" coverage
   # Without a TestHelper the meta tier is a successful no-op: there is no ledger to check.
   [[ -z "$(find src/test-helper -type f -name "*.ts" -print -quit 2>/dev/null || true)" ]] && exit 0
 else
-  bun test --config="${config}" --coverage
+  ./scripts/local/test-int.sh "${config}" coverage
+  # Without adapters or integration tests the int tier is a successful no-op (A121).
+  [[ -z "$(find src/adapters -type f -name "*.ts" -print -quit 2>/dev/null || true)" && -z "$(find tests/integration -type f -name "*.test.ts" -print -quit 2>/dev/null || true)" ]] && exit 0
 fi
 
 # rg exits 2 on a missing file, so absence needs its own refusal.

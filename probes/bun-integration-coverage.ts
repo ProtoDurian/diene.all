@@ -9,26 +9,47 @@ export default {
   probes: [
     {
       name: 'baseline-bun-integration-coverage-green',
-      description: 'Integration coverage is complete and scoped only to src/adapters.',
+      description: 'Integration coverage is green: a no-op with no adapters, else complete and scoped to src/adapters.',
       kind: 'baseline',
       async run(repo: any) {
         await expectBunGreen(repo, command, 'bun-integration-coverage');
-        await assertScopedLcov(repo, 'reports/integration/lcov.info', 'src/adapters/');
+        if ((await repo.glob('src/adapters/**/*.ts')).length > 0) {
+          await assertScopedLcov(repo, 'reports/integration/lcov.info', 'src/adapters/');
+        }
       },
     },
     {
       name: 'mutation-bun-integration-coverage-caught',
-      description: 'An uncovered adapter source file turns the integration coverage ledger red.',
+      description: 'An adapter file no integration test covers turns the integration coverage ledger red.',
       kind: 'mutation',
       expectedImpact: ['bun-deadcode'],
       async run(repo: any) {
         await repo.write(
           'src/adapters/__probe_uncovered__.ts',
-          'export function probeAdapterUncovered(): number {\n  return 1;\n}\n',
+          'export class ProbeUncoveredAdapter {\n  value(): number {\n    return 1;\n  }\n}\n',
+        );
+        await repo.write(
+          'tests/integration/__probe_unrelated__.test.ts',
+          [
+            "import { it } from 'bun:test';",
+            "import 'should';",
+            '',
+            "it('passes without touching the adapter', () => {",
+            '  // Arrange',
+            '  const expected = 1;',
+            '',
+            '  // Act',
+            '  const actual = 1;',
+            '',
+            '  // Assert',
+            '  actual.should.equal(expected);',
+            '});',
+            '',
+          ].join('\n'),
         );
         await repo.write(
           'src/index.ts',
-          `${await repo.read('src/index.ts')}\nexport { probeAdapterUncovered } from './adapters/__probe_uncovered__';\n`,
+          `${await repo.read('src/index.ts')}\nexport { ProbeUncoveredAdapter } from './adapters/__probe_uncovered__';\n`,
         );
         await expectBunRed(repo, command, 'bun-integration-coverage');
       },
