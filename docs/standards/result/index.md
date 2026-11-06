@@ -18,7 +18,8 @@ making exceptions part of ordinary control flow.
 - `ResultSerial<T, E>` and `OptionSerial<T>` are JSON-safe discriminated tuples.
 
 All predicates, extraction, transforms, matching, projections, and wire methods
-are async-native because constructors accept promised values.
+are async-native because constructors accept promised values; the `*Sync`
+inspectors below are the exception.
 
 ## Sync inspection
 
@@ -37,9 +38,21 @@ if (checked.isErrSync()) {
 const label = validate('ada').matchSync({ ok: name => `hi ${name}`, err: error => error });
 ```
 
+To compose sync validators, inspect and re-wrap the error; combinators make the
+Result pending:
+
+```ts
+const greet = (name: string): Result<string, string> => {
+  const checked = validate(name);
+  if (checked.isErrSync()) return Err(checked.unwrapErrSync());
+  return Ok(`hi ${checked.unwrapSync()}`);
+};
+```
+
 `isOkSync`, `isErrSync`, `unwrapSync`, `unwrapErrSync`, and `matchSync` throw
 `UnwrapError` (type `Expected settled got pending`) on a Result built from a
 promise or derived by `map`, `andThen`, and the other combinators; await those.
+A payload with a callable `then` is adopted as a promise, so `Ok` a fresh value.
 Use sync inspection for synchronous validators instead of a parallel
 `{ ok, value }` type.
 

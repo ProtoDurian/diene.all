@@ -256,27 +256,40 @@ describe('Result type surface', () => {
 });
 
 describe('Result sync inspection', () => {
-  it('should inspect Results built from plain values without awaiting', () => {
+  it('should settle plain-value Results so sync and async views agree', async () => {
+    // Arrange
+    const settled: Array<[string, Result<unknown, unknown>, boolean]> = [
+      ['Ok', Ok<number, string>(4), true],
+      ['Err', Err<number, string>('bad'), false],
+      ['fromSerial', Res.fromSerial<number, string>(['ok', 5]), true],
+      ['Ok(undefined)', Ok<undefined, string>(undefined), true],
+      ['Err(null)', Err<number, null>(null), false],
+    ];
+
+    // Act
+    const views = await Promise.all(
+      settled.map(async ([label, result]) => [label, result.isOkSync(), result.isErrSync(), await result.isOk()]),
+    );
+
+    // Assert
+    views.should.eql(settled.map(([label, , ok]) => [label, ok, !ok, ok]));
+  });
+
+  it('should unwrap and match settled Results without awaiting', () => {
     // Arrange
     const ok = Ok<number, string>(4);
     const err = Err<number, string>('bad');
-    const wire = Res.fromSerial<number, string>(['ok', 5]);
     const cases = { ok: (v: number) => `ok:${v}`, err: (e: string) => `err:${e}` };
 
     // Act
-    const okMatched = ok.matchSync(cases);
-    const errMatched = err.matchSync(cases);
+    const value = ok.unwrapSync();
+    const error = err.unwrapErrSync();
+    const matched = [ok.matchSync(cases), err.matchSync(cases)];
 
     // Assert
-    ok.isOkSync().should.be.true();
-    ok.isErrSync().should.be.false();
-    ok.unwrapSync().should.equal(4);
-    err.isErrSync().should.be.true();
-    err.isOkSync().should.be.false();
-    err.unwrapErrSync().should.equal('bad');
-    wire.unwrapSync().should.equal(5);
-    okMatched.should.equal('ok:4');
-    errMatched.should.equal('err:bad');
+    value.should.equal(4);
+    error.should.equal('bad');
+    matched.should.eql(['ok:4', 'err:bad']);
   });
 
   it('should throw UnwrapError for a wrong-variant sync unwrap', () => {
@@ -293,15 +306,38 @@ describe('Result sync inspection', () => {
     unwrapOkFromErr.should.throw(UnwrapError, { type: 'Expected Ok got Error' });
   });
 
-  it('should refuse sync inspection of a pending Result', async () => {
+  it('should refuse sync inspection of promised and derived Results', async () => {
     // Arrange
-    const pending = Ok<number, string>(Promise.resolve(2)).map(v => v + 1);
+    const pending: Result<number, string>[] = [
+      Ok<number, string>(Promise.resolve(2)),
+      Err<number, string>(Promise.resolve('later')),
+      Res.fromSerial<number, string>(Promise.resolve(['ok', 2] as ['ok', number])),
+      Ok<number, string>(2).map(v => v + 1),
+    ];
 
     // Act
-    const inspect = () => pending.isOkSync();
+    const inspections = pending.map(result => () => result.isOkSync());
 
     // Assert
-    inspect.should.throw(UnwrapError, { type: 'Expected settled got pending' });
-    (await pending.unwrap()).should.equal(3);
+    for (const inspect of inspections) {
+      inspect.should.throw(UnwrapError, { type: 'Expected settled got pending' });
+    }
+    ((await pending[3]?.unwrap()) as number).should.equal(3);
+  });
+
+  it('should keep a throwing then getter on the async path as a rejected Result', async () => {
+    // Arrange
+    const hostile = Object.defineProperty({}, 'then', {
+      get(): never {
+        throw new Error('hostile then');
+      },
+    });
+
+    // Act
+    const result = Ok<typeof hostile, string>(hostile);
+    const rejection = (await result.isOk().catch(error => error as Error)) as Error;
+
+    // Assert
+    rejection.message.should.equal('hostile then');
   });
 });

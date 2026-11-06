@@ -11,8 +11,10 @@ cd "${root_dir}"
 
 [[ ${coverage_mode} == "coverage" ]] && rm -rf reports/integration
 
-[[ -z "$(find src/adapters tests/integration -type f -name '*.ts' -print -quit 2>/dev/null || true)" ]] &&
-  echo "⏭️ No adapters or integration tests exist; integration tier is a successful no-op" && exit 0
+adapter="$(find src/adapters -type f -name '*.ts' -print -quit 2>/dev/null || true)"
+int_test="$(find tests/integration -type f -name '*.test.ts' -print -quit 2>/dev/null || true)"
+[[ -z ${adapter} && -z ${int_test} ]] && echo "⏭️ No adapters or integration tests exist; integration tier is a successful no-op" && exit 0
+[[ -z ${adapter} || -z ${int_test} ]] && echo "❌ adapters and integration tests must be added together" >&2 && exit 1
 
 [[ ${coverage_mode} == "coverage" ]] && bun test --config="${config}" --coverage
 [[ -z ${coverage_mode} ]] && bun test --config="${config}"
