@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import type { MigrationService } from '../../lib/migration/migration-service';
 import { userMessage } from '../../lib/release/release-service';
 import type { ICliIo } from '../terminal/console-io';
-import { EXIT_ERROR, EXIT_SUCCESS } from './exit-codes';
+import { EXIT_ERROR, EXIT_OK } from './exit-codes';
 
 export class MigrateController {
   constructor(
@@ -20,7 +20,7 @@ export class MigrateController {
   async handle(): Promise<void> {
     try {
       this.io.write((await this.migration.migrate()).output);
-      this.io.setExitCode(EXIT_SUCCESS);
+      this.io.setExitCode(EXIT_OK);
     } catch (error) {
       this.io.writeError(`${userMessage(error)}\n`);
       this.io.setExitCode(EXIT_ERROR);

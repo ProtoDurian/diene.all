@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# One-line installer served from the GitHub release:
-#   curl -fsSL https://github.com/AtomiCloud/releaser/releases/latest/download/install.sh | bash
 REPO="AtomiCloud/releaser"
 BINARY="releaser"
 

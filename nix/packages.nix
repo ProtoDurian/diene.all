@@ -1,12 +1,11 @@
 {
   atomi,
+  atomiLib,
   pkgs-2605,
   pkgs-unstable,
 }:
 let
   all = rec {
-    # ### nix-root
-    # #### source: main
     atomipkgs = (
       with atomi;
       {
@@ -14,24 +13,19 @@ let
           atomiutils
           cyanprint
           dlint
-          infralint-core
-          infrautils-core
+          infralint
+          infrautils
           releaser
           skills-sync
           ;
       }
     );
 
-    # ### workspace
-    # #### source: workspace
     nix-2605 = (
       with pkgs-2605;
       {
         inherit
           actionlint
-          bash
-          # ### bun-base-packages
-          # #### source: bun-base
           bun
           dpkg
           gh
@@ -40,7 +34,6 @@ let
           go-task
           goreleaser
           infisical
-          jq
           nix
           nodejs
           pre-commit
@@ -48,24 +41,18 @@ let
           rpm
           shellcheck
           treefmt
-          yq-go
           ;
       }
     );
 
-    # ### nix-unstable
-    # #### source: main
     nix-unstable = (
       with pkgs-unstable;
       {
       }
     );
 
-    # ### bun-cli-package
-    # #### source: bun-cli
     cli =
       let
-        bunPkg = pkgs-2605.bun;
         manifest = builtins.fromJSON (builtins.readFile ../package.json);
         cliNames = builtins.attrNames manifest.bin;
         cliName =
@@ -90,49 +77,19 @@ let
               "result"
             ]);
         };
-        deps = pkgs-2605.stdenv.mkDerivation {
-          pname = "${cliName}-deps";
-          version = manifest.version;
-          inherit src;
-          nativeBuildInputs = [ bunPkg ];
-          dontConfigure = true;
-          # Production deps only: the compiled binary bundles runtime imports (all pure JS),
-          # and excluding devDependencies (notably the platform-specific @biomejs/biome binary)
-          # keeps node_modules identical across linux/darwin so one fixed-output hash suffices.
-          buildPhase = ''
-            export HOME="$TMPDIR"
-            bun install --frozen-lockfile --no-progress --production
-          '';
-          installPhase = ''
-            mkdir -p "$out"
-            cp -r node_modules "$out/node_modules"
-          '';
-          dontFixup = true;
-          outputHashMode = "recursive";
-          outputHashAlgo = "sha256";
-          outputHash = "sha256-QS0fN9OiIBGKAxxWCsvZBP9hmErPoL5vWN6NG6lbfPc=";
-        };
       in
       {
-        releaser = pkgs-2605.stdenv.mkDerivation {
-          pname = cliName;
+        # Keep the pinned bun; the compiled runtime and depsHash depend on it.
+        releaser = atomiLib.buildBunCli {
+          name = cliName;
           version = manifest.version;
           inherit src;
-          nativeBuildInputs = [ bunPkg ];
-          dontConfigure = true;
-          buildPhase = ''
-            export HOME="$TMPDIR"
-            cp -r --no-preserve=mode ${deps}/node_modules ./node_modules
-            bun build "./${entry}" --compile --outfile "${cliName}"
-          '';
-          installPhase = ''
-            install -Dm755 "${cliName}" "$out/bin/${cliName}"
-          '';
-          dontFixup = true;
-          meta.mainProgram = cliName;
+          entrypoint = entry;
+          depsHash = "sha256-QS0fN9OiIBGKAxxWCsvZBP9hmErPoL5vWN6NG6lbfPc=";
+          bun = pkgs-2605.bun;
         };
       };
   };
 in
 with all;
-nix-2605 // nix-unstable // atomipkgs // cli
+atomipkgs // nix-2605 // nix-unstable // cli

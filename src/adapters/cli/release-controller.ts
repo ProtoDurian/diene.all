@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import { type ReleaseService, userMessage } from '../../lib/release/release-service';
 import type { ICliIo } from '../terminal/console-io';
-import { EXIT_ERROR, EXIT_SUCCESS } from './exit-codes';
+import { EXIT_ERROR, EXIT_OK } from './exit-codes';
 
 export class ReleaseController {
   constructor(
@@ -27,7 +27,7 @@ export class ReleaseController {
         for (const warning of preview.warnings) this.io.writeError(`warning: ${warning}\n`);
         this.io.write(dryRun ? `${preview.version}\n\n${preview.notes}` : `released ${preview.version}\n`);
       }
-      this.io.setExitCode(EXIT_SUCCESS);
+      this.io.setExitCode(EXIT_OK);
     } catch (error) {
       this.io.writeError(`${userMessage(error)}\n`);
       this.io.setExitCode(EXIT_ERROR);

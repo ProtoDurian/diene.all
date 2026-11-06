@@ -1,7 +1,7 @@
 schemaVersion: 1
 checks:
   action-pins:
-    trustedPattern: ^AtomiCloud/
+    trustedPattern: ^(AtomiCloud|ProtoDurian|actions)/
     workflowsDir: .github/workflows
   exec-bits:
     globs:
@@ -18,15 +18,27 @@ checks:
     binaries:
       - actionlint
       - bash
+      - cyanprint
       - dlint
+      - docker
+      - dpkg
+      - gh
       - git
+      - go version
+      - gomplate
+      - goreleaser
+      - hadolint
       - infisical
       - jq
+      - k3d
+      - kubectl version --client
       - nix
       - pre-commit
       - releaser
       - rg
+      - rpm
       - shellcheck
+      - skopeo
       - task
       - treefmt
       - yq
@@ -35,3 +47,4 @@ checks:
       - nix/packages.nix
       - nix/env.nix
       - nix/shells.nix
+  release-gating: {}

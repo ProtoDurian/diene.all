@@ -1,5 +1,4 @@
-# A Go stub is built per target and the shim swaps the prebuilt Bun binary in (prebuilt builder
-# is Pro-only, mirrors sulfone.iridium); GoReleaser owns archives, deb/rpm, cask, and the release.
+# GoReleaser's prebuilt builder is Pro-only, so a Go stub is built and the shim swaps in the Bun binary.
 version: 2
 
 project_name: releaser
@@ -10,7 +9,6 @@ builds:
     binary: releaser
     goos: [linux, darwin]
     goarch: [amd64, arm64]
-    # Only darwin arm64 ships (no intel mac).
     ignore:
       - goos: darwin
         goarch: amd64
@@ -28,7 +26,6 @@ checksum:
   name_template: 'checksums.txt'
 
 release:
-  # install.sh is served from the GitHub release (see INSTALLATION.md's one-line installer).
   extra_files:
     - glob: scripts/release/install.sh
 

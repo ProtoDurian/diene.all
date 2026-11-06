@@ -64,5 +64,5 @@ Shared engineering standards live under [docs/standards/](docs/standards/).
 <!-- #### source: releaser -->
 
 The release vocabulary, lint rules, hooks, assets, and distribution ownership
-are defined in [atomi_release.yaml](atomi_release.yaml). No runtime path invokes a
+are defined in [release.yaml](release.yaml). No runtime path invokes a
 package manager or dynamically loads plugins.

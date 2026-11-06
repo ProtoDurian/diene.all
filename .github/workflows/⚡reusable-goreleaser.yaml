@@ -1,0 +1,30 @@
+name: ⚡ Reusable GoReleaser
+
+on:
+  workflow_call:
+    secrets:
+      FURY_TOKEN:
+        required: false
+      HOMEBREW_TAP_TOKEN:
+        required: false
+
+jobs:
+  goreleaser:
+    name: GoReleaser Publish
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 45
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - uses: AtomiCloud/actions.cache-bun@v2
+      - name: Validate the Nix CLI package
+        run: nix build .#releaser
+      - name: Compile, package, and publish all channels
+        env:
+          FURY_ENDPOINT: push.fury.io/atomicloud
+          FURY_TOKEN: ${{ secrets.FURY_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: nix develop .#releaser -c ./scripts/ci/publish.sh

@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import { type ReleaseService, userMessage } from '../../lib/release/release-service';
 import type { ICliIo } from '../terminal/console-io';
-import { EXIT_ERROR, EXIT_SUCCESS } from './exit-codes';
+import { EXIT_ERROR, EXIT_OK } from './exit-codes';
 
 export class ChangelogController {
   constructor(
@@ -20,7 +20,7 @@ export class ChangelogController {
     try {
       const preview = await this.releases.preview();
       if (preview !== null) this.io.write(preview.notes);
-      this.io.setExitCode(EXIT_SUCCESS);
+      this.io.setExitCode(EXIT_OK);
     } catch (error) {
       this.io.writeError(`${userMessage(error)}\n`);
       this.io.setExitCode(EXIT_ERROR);

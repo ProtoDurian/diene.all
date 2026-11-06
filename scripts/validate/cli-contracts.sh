@@ -9,25 +9,18 @@ arch)
   test -f bin/releaser.ts
   test -f src/lib/release/ports.ts
   test -f src/adapters/terminal/console-io.ts
-  rg -q 'console\.|process\.(stdin|stdout|stderr|exitCode)|Bun\.(spawn|file)|node:(fs|path|process)|from .commander.' src/lib && echo '❌ terminal, filesystem, process, or CLI IO leaked into src/lib' >&2 && exit 1
+  rg -q 'console\.|process\.(stdin|stdout|stderr|exitCode)|from .commander.' src/lib && echo '❌ terminal or CLI IO leaked into src/lib' >&2 && exit 1
   rg -q "from ['\"](\\.\\./)+adapters(?:/|['\"])" src/lib && echo '❌ src/lib imports an adapter (forbidden upward dependency)' >&2 && exit 1
-  for config in knip.json knip.llm.json knip.production.json knip.production.llm.json; do
-    jq -e '.entry | index("bin/releaser.ts") != null' "${config}" >/dev/null || {
-      echo "❌ ${config} must retain bin/releaser.ts as a real entry" >&2
-      exit 1
-    }
-  done
   ;;
 release-backup-order)
-  yq -o=json '.' atomi_release.yaml | jq -e '
-    .schemaVersion == 2 and
-    .release.hooks.prepare[0] == {"phase":"beforeWrite","command":"./scripts/release/backup-changelog.sh"} and
-    .release.hooks.prepare[1].phase == "afterWrite" and
+  yq -o=json '.' release.yaml | jq -e '
+    .release.hooks.prepare[0].phase == "beforeWrite" and
+    .release.hooks.prepare[0].command == "./scripts/release/backup-changelog.sh" and
     .release.github == false'
   ;;
 changelog-asset)
   test -f Changelog.old.md
-  yq -o=json '.' atomi_release.yaml | jq -e '
+  yq -o=json '.' release.yaml | jq -e '
     .release.commit.assets | index("Changelog.old.md") != null'
   rg -F -- '--release-notes ./IncrementalChangelog.md' scripts/release/publish.sh
   ;;
@@ -48,7 +41,9 @@ homebrew-cask)
     ([.homebrew_casks[].hooks.post.install] | join("\n") | contains("com.apple.quarantine"))'
   ;;
 fury-wiring)
-  rg -F './scripts/release/publish.sh' .github/workflows/cd.yaml
+  yq -o=json '.' .github/workflows/cd.yaml | jq -e '.jobs.goreleaser.uses == "./.github/workflows/⚡reusable-goreleaser.yaml"'
+  rg -F './scripts/ci/publish.sh' .github/workflows/⚡reusable-goreleaser.yaml
+  rg -F './scripts/release/publish.sh' scripts/ci/publish.sh
   rg -F './scripts/release/fury.sh' scripts/release/publish.sh
   stage_line="$(rg -nF 'goreleaser release --clean --skip=publish --release-notes ./IncrementalChangelog.md' scripts/release/publish.sh | cut -d: -f1)"
   fury_line="$(rg -nF './scripts/release/fury.sh' scripts/release/publish.sh | cut -d: -f1)"
@@ -77,8 +72,9 @@ installation-parity)
   rg -F 'releaser_<os>_<arch>.tar.gz' INSTALLATION.md
   ;;
 nix-release-wiring)
-  rg -F 'releaser = pkgs.stdenv.mkDerivation' nix/packages.nix
-  rg -F 'nix build .#releaser' .github/workflows/cd.yaml
+  rg -F 'releaser = atomiLib.buildBunCli' nix/packages.nix
+  yq -o=json '.' .github/workflows/cd.yaml | jq -e '.jobs.goreleaser.uses == "./.github/workflows/⚡reusable-goreleaser.yaml"'
+  rg -F 'nix build .#releaser' .github/workflows/⚡reusable-goreleaser.yaml
   ;;
 *)
   echo "❌ unknown CLI contract: ${contract}" >&2

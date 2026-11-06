@@ -128,9 +128,9 @@ yq -en '.ok = true | .ok == true' >/dev/null
 releaser --version | rg -qx '1.0.0'
 releaser --help >/dev/null
 printf '%s\n' 'feat: add a smoke capability' >"${tmp}/good-commit.txt"
-releaser lint-commit -c atomi_release.yaml "${tmp}/good-commit.txt"
+releaser lint-commit -c release.yaml "${tmp}/good-commit.txt"
 printf '%s\n' 'wibble: not a real type' >"${tmp}/bad-commit.txt"
-if releaser lint-commit -c atomi_release.yaml "${tmp}/bad-commit.txt"; then
+if releaser lint-commit -c release.yaml "${tmp}/bad-commit.txt"; then
   echo "❌ releaser lint-commit accepted an invalid commit" >&2
   exit 1
 fi

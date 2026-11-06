@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Swap the prebuilt Bun binary over GoReleaser's Go stub (its prebuilt builder is Pro-only).
 dest="$1"
 
-# Artifact prefix is the .bin key (the CLI's own name) — never hardcode the sample name.
 prefix="$(jq -r '.bin | to_entries[0].key' package.json)"
 [ -z "${prefix}" ] && echo "❌ no .bin entry in package.json" >&2 && exit 1
 [ "${prefix}" = "null" ] && echo "❌ no .bin entry in package.json" >&2 && exit 1

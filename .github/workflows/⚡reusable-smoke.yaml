@@ -1,5 +1,3 @@
-# ### releaser-reusable-smoke
-# #### source: releaser
 name: ⚡ Reusable Smoke
 on:
   workflow_call:
@@ -16,17 +14,16 @@ jobs:
   smoke:
     name: Smoke
     runs-on: ${{ fromJSON(inputs.runs_on) }}
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Download compiled binaries
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@v8
         with:
           name: cli-binaries
-          path: dist
-      - name: Restore executable modes from the archive
-        run: tar -xzf dist/cli-binaries.tar.gz -C dist
+          path: dist/bin
       # `binary` goes through env: so caller input is never expanded into shell source.
       - name: Smoke
         env:

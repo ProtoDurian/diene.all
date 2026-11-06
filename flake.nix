@@ -1,6 +1,4 @@
 {
-  # ### workspace-flake
-  # #### source: workspace
   inputs = {
     # util
     flake-utils.url = "github:numtide/flake-utils";
@@ -39,6 +37,7 @@
         pkgs-2605 = nixpkgs-2605.legacyPackages.${system};
         pkgs-unstable = nixpkgs-unstable.legacyPackages.${system};
         atomi = atomipkgs.packages.${system};
+        atomiLib = atomipkgs.lib.${system};
         pre-commit-lib = pre-commit-hooks.lib.${system};
       in
       let
@@ -58,7 +57,12 @@
           inherit treefmt-nix pkgs;
         };
         packages = import ./nix/packages.nix {
-          inherit pkgs-2605 pkgs-unstable atomi;
+          inherit
+            pkgs-2605
+            pkgs-unstable
+            atomi
+            atomiLib
+            ;
         };
         env = import ./nix/env.nix {
           inherit pkgs packages;

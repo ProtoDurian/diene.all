@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Push the built Linux packages (deb/rpm) to Gemfury. Instance values arrive via env (cd.yaml).
 [ -z "${FURY_TOKEN:-}" ] && echo "❌ 'FURY_TOKEN' env var not set" >&2 && exit 1
 [ -z "${FURY_ENDPOINT:-}" ] && echo "❌ 'FURY_ENDPOINT' env var not set" >&2 && exit 1
 
 endpoint="${FURY_ENDPOINT}"
 
-# Keep the token out of argv and process listings. curl reads the equivalent
-# Basic-auth setting from a mode-0600 config that is removed on every exit.
+# Keep the token out of argv: curl reads it from a 0600 config removed on exit.
 credential_config="$(mktemp)"
 chmod 600 "${credential_config}"
 trap 'rm -f -- "${credential_config}"' EXIT
