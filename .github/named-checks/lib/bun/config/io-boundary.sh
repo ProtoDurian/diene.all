@@ -71,9 +71,11 @@ for path in "${files[@]}"; do
     const { dirname, join } = require("node:path/posix");
     for (const m of out.matchAll(specifier)) {
       const spec = strings[+m[1]];
-      if (/^\.{1,2}\//.test(spec) && !process.env.FILE.startsWith("src/adapters/") && process.env.FILE !== "src/index.ts" && (join(dirname(process.env.FILE), spec).startsWith("src/adapters/") || /^src\/index(\.[jt]s)?$/.test(join(dirname(process.env.FILE), spec)))) console.log(`import ${spec} (the domain reaches into src/adapters/ or the root barrel)`);
+      if (/^\.{1,2}\//.test(spec) && !process.env.FILE.startsWith("src/adapters/") && process.env.FILE !== "src/index.ts" && (/^src\/adapters(\/|$)/.test(join(dirname(process.env.FILE), spec)) || /^src(\/index(\.[jt]s)?)?\/?$/.test(join(dirname(process.env.FILE), spec)))) console.log(`import ${spec} (the domain reaches into src/adapters/ or the root barrel)`);
     }
-    for (const m of out.matchAll(/\bimport\s*\.\s*meta\b|\bMath\s*\.\s*random\b|(?<![.\w$])Function\s*\(|\.\s*constructor\s*\.\s*constructor\b|(?<![.\w$])(?:new\s+)?Date\s*(?:\(|\.\s*now\b)/g)) console.log(`global ${m[0].replace(/\s+/g, "")}`);
+    for (const m of out.matchAll(/\bimport\s*\.\s*meta\b|\bMath\s*\.\s*random\b|(?<![.\w$])Function\s*\(|\.\s*constructor\b/g)) console.log(`global ${m[0].replace(/\s+/g, "")}`);
+    for (const m of out.matchAll(/"S(\d+)"/g)) if (strings[+m[1]] === "constructor") console.log("global constructor (by string key)");
+    for (const m of out.matchAll(/(?<![.\w$])Date(?![\w$])/g)) if (!/(?:\binstanceof|[:<|&])\s*$/.test(out.slice(0, m.index))) console.log("global Date");
     for (const m of out.matchAll(/\b(import|require)\s*\(\s*(?!"S\d+"\s*\))/g)) console.log(`non-literal ${m[1]}()`);
     const globals = /(?<![.\w$])(process|Bun|Deno|globalThis|global|window|self|console|Buffer|fetch|require|module|exports|__dirname|__filename|setInterval|setTimeout|setImmediate|queueMicrotask|eval|crypto|Reflect|performance|navigator|XMLHttpRequest|WebSocket)(?![\w$])(?!\s*:)/g;
     const allowGlobal = new RegExp(process.env.ALLOW_GLOBAL);

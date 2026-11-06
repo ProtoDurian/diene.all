@@ -66,8 +66,7 @@ for path in "${files[@]}"; do
     }
     const rest = out.join("");
     for (const m of rest.matchAll(/=>|\bfunction\b/g)) console.log(`${lineOf(m.index)}:${m[0] === "=>" ? "arrow" : "function"}`);
-    const method = /[{,]\s*(?:async\s+|get\s+|set\s+|\*\s*)?(?:[A-Za-z_$][\w$]*|\[[^\]]*\])\s*(?:<[^>]*>)?\s*\([^)]*\)\s*(?::[^{;]*)?\{/g;
-    for (const m of rest.matchAll(method)) console.log(`${lineOf(m.index + m[0].search(/[^\s{,]/))}:method`);
+    for (const m of rest.matchAll(/\)\s*(?::[^{;=]*)?\{/g)) console.log(`${lineOf(m.index)}:method`);
   ')"
   if [[ -n ${report} ]]; then
     while IFS=: read -r line name; do echo "❌ ${path}:${line}: free ${name} outside a class body" >&2; done <<<"${report}"
