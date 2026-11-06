@@ -213,5 +213,50 @@
     "template": "diene/bun-base",
     "name": "bun-preview",
     "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-hyperdrive-only",
+    "class": "gate"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-worker-safe",
+    "class": "gate"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-rls",
+    "class": "gate"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-job-runner",
+    "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-local-worker",
+    "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-tenant-approval",
+    "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-fork",
+    "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-cli-release",
+    "class": "smoke"
+  },
+  {
+    "template": "diene/aseity",
+    "name": "aseity-web-pwa",
+    "class": "smoke"
   }
 ]
