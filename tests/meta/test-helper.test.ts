@@ -1,36 +1,40 @@
-import { afterAll, beforeAll, describe, it } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import should from 'should';
+import { describe, it } from 'bun:test';
+import 'should';
 import { z } from 'zod';
-import { YamlConfigSource } from '../../src/adapters/yaml-source.js';
-import { loadConfig } from '../../src/lib/loader.js';
+import { ConfigLoader } from '../../src/lib/loader.js';
 import { ConfigRegistry } from '../../src/lib/registry.js';
+import { ConfigValidationError } from '../../src/lib/validator.js';
 import {
-  expectInvalid,
-  expectValid,
+  ConfigAssertions,
+  ConfigStubBuilder,
   InMemoryConfigSource,
-  stubConfig,
+  type InMemoryTiers,
+  LandscapeConfigSource,
   TestHelperError,
-  withLandscape,
 } from '../../src/test-helper/index.js';
 
 const registry = ConfigRegistry.create().register('server', z.object({ port: z.number(), host: z.string() }));
+const GOOD: InMemoryTiers = { base: { server: { port: 80, host: 'h' } } };
+const BAD: InMemoryTiers = { base: { server: { port: 'x', host: 'h' } } };
 
 describe('InMemoryConfigSource', () => {
   it('should default every tier to empty', async () => {
     // Arrange
     const source = new InMemoryConfigSource();
 
-    // Act / Assert
-    should(await source.base()).deepEqual({});
-    should(await source.overlay('prod')).deepEqual({});
-    should(await source.buildTimeEnv()).deepEqual({});
-    should(await source.runtimeEnv()).deepEqual({});
+    // Act
+    const tiers = [
+      await source.base(),
+      await source.overlay('prod'),
+      await source.buildTimeEnv(),
+      await source.runtimeEnv(),
+    ];
+
+    // Assert
+    tiers.should.deepEqual([{}, {}, {}, {}]);
   });
 
-  it('should serve the provided tiers', async () => {
+  it('should serve the provided tiers and an empty overlay for an unknown landscape', async () => {
     // Arrange
     const source = new InMemoryConfigSource({
       base: { a: 1 },
@@ -39,152 +43,162 @@ describe('InMemoryConfigSource', () => {
       runtimeEnv: { ATOMI_A: '4' },
     });
 
-    // Act / Assert
-    should(await source.base()).deepEqual({ a: 1 });
-    should(await source.overlay('prod')).deepEqual({ a: 2 });
-    should(await source.overlay('missing')).deepEqual({});
-    should(await source.buildTimeEnv()).deepEqual({ ATOMI_A: '3' });
-    should(await source.runtimeEnv()).deepEqual({ ATOMI_A: '4' });
+    // Act
+    const tiers = [
+      await source.base(),
+      await source.overlay('prod'),
+      await source.overlay('missing'),
+      await source.buildTimeEnv(),
+      await source.runtimeEnv(),
+    ];
+
+    // Assert
+    tiers.should.deepEqual([{ a: 1 }, { a: 2 }, {}, { ATOMI_A: '3' }, { ATOMI_A: '4' }]);
   });
 });
 
-describe('stubConfig — builder invariant (always passes the registry)', () => {
-  it('should build a validated config from in-memory tiers', async () => {
-    // Arrange / Act
-    const config = await stubConfig(registry, { base: { server: { port: 80, host: 'h' } } });
-
-    // Assert
-    should(config.get('server')).deepEqual({ port: 80, host: 'h' });
-  });
-
-  it('should honour a custom prefix and explicit landscape', async () => {
-    // Arrange / Act
-    const config = await stubConfig(
-      registry,
-      { base: { server: { port: 80, host: 'base' } }, overlays: { prod: { server: { host: 'prod' } } } },
-      { prefix: 'X_', landscape: 'prod' },
-    );
-
-    // Assert
-    should(config.get('server').host).equal('prod');
-  });
-});
-
-describe('withLandscape — landscape fake', () => {
-  it('should stamp app.landscape onto a base without an app block', async () => {
+describe('LandscapeConfigSource', () => {
+  it.each([
+    { label: 'a source with no tiers', tiers: undefined, expected: { app: { landscape: 'prod' } } },
+    {
+      label: 'an existing app block',
+      tiers: { base: { app: { team: 'core', landscape: 'old' }, server: { port: 1 } } },
+      expected: { app: { team: 'core', landscape: 'prod' }, server: { port: 1 } },
+    },
+    { label: 'a non-object app value', tiers: { base: { app: 'x' } }, expected: { app: { landscape: 'prod' } } },
+  ])('should stamp app.landscape onto $label', async ({ tiers, expected }) => {
     // Arrange
-    const source = withLandscape('prod');
+    const source = new LandscapeConfigSource('prod', tiers);
 
     // Act
-    const base = (await source.base()) as { app: { landscape: string } };
+    const base = await source.base();
 
     // Assert
-    should(base.app.landscape).equal('prod');
+    base.should.deepEqual(expected);
   });
 
-  it('should merge into an existing app block', async () => {
+  it('should make the real loader select its overlay with no explicit landscape', async () => {
     // Arrange
-    const source = withLandscape('prod', { base: { app: { team: 'core' }, server: { port: 1 } } });
+    const source = new LandscapeConfigSource('prod', { ...GOOD, overlays: { prod: { server: { host: 'prod' } } } });
 
     // Act
-    const base = (await source.base()) as { app: { landscape: string; team: string } };
+    const config = await new ConfigLoader(source, registry, { prefix: 'ATOMI_' }).load();
 
     // Assert
-    should(base.app).deepEqual({ team: 'core', landscape: 'prod' });
+    config.get('server').should.deepEqual({ port: 80, host: 'prod' });
   });
 });
 
-describe('expectValid / expectInvalid — assert-the-asserter', () => {
-  it('expectValid should return the config on a known-good input', async () => {
-    // Arrange / Act
-    const config = await expectValid(registry, { base: { server: { port: 80, host: 'h' } } });
+describe('ConfigStubBuilder — invariants', () => {
+  it.each([
+    { label: 'base only', tiers: GOOD, options: {}, expected: { port: 80, host: 'h' } },
+    {
+      label: 'a custom prefix',
+      tiers: { ...GOOD, runtimeEnv: { X_SERVER__PORT: '9', ATOMI_SERVER__PORT: '1' } },
+      options: { prefix: 'X_' },
+      expected: { port: 9, host: 'h' },
+    },
+    {
+      label: 'an explicit landscape',
+      tiers: { ...GOOD, overlays: { prod: { server: { host: 'prod' } } } },
+      options: { landscape: 'prod' },
+      expected: { port: 80, host: 'prod' },
+    },
+    {
+      label: 'the default ATOMI_ prefix',
+      tiers: { ...GOOD, runtimeEnv: { ATOMI_SERVER__PORT: '7' } },
+      options: {},
+      expected: { port: 7, host: 'h' },
+    },
+  ])('should build a stub that passes the registry from $label', async ({ tiers, options, expected }) => {
+    // Arrange
+    const builder = new ConfigStubBuilder(registry, options);
+
+    // Act
+    const config = await builder.build(tiers);
 
     // Assert
-    should(config.get('server').port).equal(80);
+    config.get('server').should.deepEqual(expected);
+    registry.rootSchema().safeParse(config.all()).success.should.be.true();
   });
 
-  it('expectValid should throw TestHelperError on a known-bad (invalid) input', async () => {
-    // Arrange / Act
-    const act = expectValid(registry, { base: { server: { port: 'x', host: 'h' } } });
+  it('should never hand back a stub that fails the registry', async () => {
+    // Arrange
+    const builder = new ConfigStubBuilder(registry);
+
+    // Act
+    const act = builder.build(BAD);
 
     // Assert
-    await act.then(
-      () => should.fail('resolved', 'rejected', 'expected rejection'),
-      error => should(error).be.instanceof(TestHelperError),
-    );
-  });
-
-  it('expectValid should surface a non-validation error as a TestHelperError', async () => {
-    // Arrange / Act — an unsafe landscape throws before validation
-    const act = expectValid(registry, {}, { landscape: '../bad' });
-
-    // Assert
-    await act.then(
-      () => should.fail('resolved', 'rejected', 'expected rejection'),
-      error => should(error).be.instanceof(TestHelperError),
-    );
-  });
-
-  it('expectInvalid should return the ConfigValidationError on a known-bad input', async () => {
-    // Arrange / Act
-    const error = await expectInvalid(registry, { base: { server: { port: 'x', host: 'h' } } });
-
-    // Assert
-    should(error.issues.length).be.above(0);
-  });
-
-  it('expectInvalid should throw TestHelperError when the config is actually valid', async () => {
-    // Arrange / Act
-    const act = expectInvalid(registry, { base: { server: { port: 80, host: 'h' } } });
-
-    // Assert
-    await act.then(
-      () => should.fail('resolved', 'rejected', 'expected rejection'),
-      error => should(error).be.instanceof(TestHelperError),
-    );
-  });
-
-  it('expectInvalid should throw TestHelperError on a non-validation error', async () => {
-    // Arrange / Act
-    const act = expectInvalid(registry, {}, { landscape: '../bad' });
-
-    // Assert
-    await act.then(
-      () => should.fail('resolved', 'rejected', 'expected rejection'),
-      error => should(error).be.instanceof(TestHelperError),
-    );
+    await act.should.be.rejectedWith(ConfigValidationError);
   });
 });
 
-describe('contract parity — real loader vs fake source', () => {
-  let dir: string;
+describe('ConfigAssertions — assert the asserter', () => {
+  const assertions = new ConfigAssertions(new ConfigStubBuilder(registry));
+  const unsafe = new ConfigAssertions(new ConfigStubBuilder(registry, { landscape: '../bad' }));
 
-  beforeAll(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'diene-config-meta-'));
-    await writeFile(join(dir, 'config.yaml'), ['server:', '  port: 80', '  host: base'].join('\n'));
-    await writeFile(join(dir, 'prod.config.yaml'), ['server:', '  host: prod'].join('\n'));
-  });
-
-  afterAll(async () => {
-    await rm(dir, { recursive: true, force: true });
-  });
-
-  it('should produce identical config from YAML files and in-memory fakes', async () => {
+  it('expectValid should return the config on known-good tiers', async () => {
     // Arrange
-    const env = { ATOMI_SERVER__PORT: '8080' };
-    const real = new YamlConfigSource({ dir, env });
-    const fake = new InMemoryConfigSource({
-      base: { server: { port: 80, host: 'base' } },
-      overlays: { prod: { server: { host: 'prod' } } },
-      runtimeEnv: env,
-    });
+    const tiers = GOOD;
 
     // Act
-    const fromReal = await loadConfig(real, registry, { prefix: 'ATOMI_', landscape: 'prod' });
-    const fromFake = await loadConfig(fake, registry, { prefix: 'ATOMI_', landscape: 'prod' });
+    const config = await assertions.expectValid(tiers);
 
     // Assert
-    should(fromReal.all()).deepEqual(fromFake.all());
-    should(fromFake.get('server')).deepEqual({ port: 8080, host: 'prod' });
+    config.get('server').port.should.equal(80);
+  });
+
+  it.each([
+    { label: 'known-bad tiers', subject: assertions, message: /validation failed: server\.port: / },
+    { label: 'a non-validation error', subject: unsafe, message: /LandscapeResolutionError/ },
+  ])('expectValid should fail with TestHelperError on $label', async ({ subject, message }) => {
+    // Arrange
+    const tiers = BAD;
+
+    // Act
+    const act = subject.expectValid(tiers);
+
+    // Assert
+    const error: object = await act.then(
+      () => ({}),
+      (reason: Error) => reason,
+    );
+    error.should.be.instanceof(TestHelperError);
+    (error as TestHelperError).message.should.match(message);
+  });
+
+  it('expectInvalid should return the ConfigValidationError on known-bad tiers', async () => {
+    // Arrange
+    const tiers = BAD;
+
+    // Act
+    const error = await assertions.expectInvalid(tiers);
+
+    // Assert
+    error.issues.length.should.be.above(0);
+  });
+
+  it.each([
+    {
+      label: 'known-good tiers',
+      subject: assertions,
+      message: /^expected config validation to fail, but it succeeded$/,
+    },
+    { label: 'a non-validation error', subject: unsafe, message: /^expected a ConfigValidationError, but got: / },
+  ])('expectInvalid should fail with TestHelperError on $label', async ({ subject, message }) => {
+    // Arrange
+    const tiers = GOOD;
+
+    // Act
+    const act = subject.expectInvalid(tiers);
+
+    // Assert
+    const error: object = await act.then(
+      () => ({}),
+      (reason: Error) => reason,
+    );
+    error.should.be.instanceof(TestHelperError);
+    (error as TestHelperError).message.should.match(message);
   });
 });

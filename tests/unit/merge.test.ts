@@ -1,73 +1,46 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
-import { type ConfigRecord, deepMerge, isRecord } from '../../src/lib/merge.js';
+import 'should';
+import { type ConfigRecord, DeepMerger } from '../../src/lib/merge.js';
 
-describe('isRecord', () => {
+const merger = new DeepMerger();
+
+describe('DeepMerger.merge', () => {
   it.each([
-    { label: 'plain object', value: { a: 1 }, expected: true },
-    { label: 'empty object', value: {}, expected: true },
-    { label: 'array', value: [1, 2], expected: false },
-    { label: 'null', value: null, expected: false },
-    { label: 'string', value: 'x', expected: false },
-    { label: 'number', value: 3, expected: false },
-  ])('should return $expected for a $label', ({ value, expected }) => {
+    {
+      label: 'scalar keys, override winning',
+      base: { a: 1, b: 2 },
+      override: { b: 3, c: 4 },
+      expected: { a: 1, b: 3, c: 4 },
+    },
+    {
+      label: 'nested objects recursively',
+      base: { server: { port: 80, host: 'a' }, flag: false },
+      override: { server: { port: 8080 } },
+      expected: { server: { port: 8080, host: 'a' }, flag: false },
+    },
+    {
+      label: 'arrays wholesale',
+      base: { hosts: ['a', 'b', 'c'] },
+      override: { hosts: ['x'] },
+      expected: { hosts: ['x'] },
+    },
+    { label: 'an object with a scalar', base: { a: { nested: 1 } }, override: { a: 5 }, expected: { a: 5 } },
+    {
+      label: 'a scalar with an object',
+      base: { a: 5 },
+      override: { a: { nested: 1 } },
+      expected: { a: { nested: 1 } },
+    },
+    { label: 'a value with null', base: { a: { nested: 1 } }, override: { a: null }, expected: { a: null } },
+  ])('should merge $label', ({ base, override, expected }) => {
     // Arrange
+    const left: ConfigRecord = base;
 
     // Act
-    const actual = isRecord(value);
+    const actual = merger.merge(left, override);
 
     // Assert
-    should(actual).equal(expected);
-  });
-});
-
-describe('deepMerge', () => {
-  it('should overlay scalar keys, source winning', () => {
-    // Arrange
-    const base: ConfigRecord = { a: 1, b: 2 };
-    const override: ConfigRecord = { b: 3, c: 4 };
-
-    // Act
-    const actual = deepMerge(base, override);
-
-    // Assert
-    should(actual).deepEqual({ a: 1, b: 3, c: 4 });
-  });
-
-  it('should recursively merge nested objects', () => {
-    // Arrange
-    const base: ConfigRecord = { server: { port: 80, host: 'a' }, flag: false };
-    const override: ConfigRecord = { server: { port: 8080 } };
-
-    // Act
-    const actual = deepMerge(base, override);
-
-    // Assert
-    should(actual).deepEqual({ server: { port: 8080, host: 'a' }, flag: false });
-  });
-
-  it('should replace arrays wholesale rather than element-merging', () => {
-    // Arrange
-    const base: ConfigRecord = { hosts: ['a', 'b', 'c'] };
-    const override: ConfigRecord = { hosts: ['x'] };
-
-    // Act
-    const actual = deepMerge(base, override);
-
-    // Assert
-    should(actual).deepEqual({ hosts: ['x'] });
-  });
-
-  it('should replace an object with a scalar when the override is scalar', () => {
-    // Arrange
-    const base: ConfigRecord = { a: { nested: 1 } };
-    const override: ConfigRecord = { a: 5 };
-
-    // Act
-    const actual = deepMerge(base, override);
-
-    // Assert
-    should(actual).deepEqual({ a: 5 });
+    actual.should.deepEqual(expected);
   });
 
   it('should not mutate the inputs', () => {
@@ -76,10 +49,10 @@ describe('deepMerge', () => {
     const override: ConfigRecord = { a: { c: 2 } };
 
     // Act
-    deepMerge(base, override);
+    merger.merge(base, override);
 
     // Assert
-    should(base).deepEqual({ a: { b: 1 } });
-    should(override).deepEqual({ a: { c: 2 } });
+    base.should.deepEqual({ a: { b: 1 } });
+    override.should.deepEqual({ a: { c: 2 } });
   });
 });

@@ -1,65 +1,54 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
-import { BASE_LANDSCAPE, LandscapeResolutionError, resolveLandscape } from '../../src/lib/landscape.js';
+import 'should';
+import { BASE_LANDSCAPE, LandscapeResolutionError, LandscapeResolver } from '../../src/lib/landscape.js';
+import type { ConfigRecord } from '../../src/lib/merge.js';
 
-describe('resolveLandscape', () => {
-  it('should prefer an explicit landscape from the host', () => {
+const resolver = new LandscapeResolver();
+
+describe('LandscapeResolver.resolve', () => {
+  it.each([
+    {
+      label: 'an explicit host landscape',
+      explicit: 'raichu',
+      base: { app: { landscape: 'pichu' } },
+      expected: 'raichu',
+    },
+    {
+      label: 'the service-tree app.landscape',
+      explicit: undefined,
+      base: { app: { landscape: 'pikachu' } },
+      expected: 'pikachu',
+    },
+    { label: 'base when neither is present', explicit: undefined, base: {}, expected: BASE_LANDSCAPE },
+    { label: 'base for an explicit "base"', explicit: 'base', base: {}, expected: BASE_LANDSCAPE },
+    { label: 'base for a blank string', explicit: '   ', base: {}, expected: BASE_LANDSCAPE },
+    {
+      label: 'base for a non-string app.landscape',
+      explicit: undefined,
+      base: { app: { landscape: 42 } },
+      expected: BASE_LANDSCAPE,
+    },
+    { label: 'base for a non-object app', explicit: undefined, base: { app: 'x' }, expected: BASE_LANDSCAPE },
+    { label: 'a trimmed explicit landscape', explicit: ' prod ', base: {}, expected: 'prod' },
+  ])('should resolve $label', ({ explicit, base, expected }) => {
     // Arrange
-    const base = { app: { landscape: 'pichu' } };
+    const config: ConfigRecord = base;
 
     // Act
-    const actual = resolveLandscape('raichu', base);
+    const actual = resolver.resolve(explicit, config);
 
     // Assert
-    should(actual).equal('raichu');
+    actual.should.equal(expected);
   });
 
-  it('should fall back to the service-tree app.landscape when none is explicit', () => {
+  it.each(['../etc/passwd', 'Prod', '-lead'])('should reject the unsafe landscape token %s', token => {
     // Arrange
-    const base = { app: { landscape: 'pikachu' } };
+    const base: ConfigRecord = {};
 
     // Act
-    const actual = resolveLandscape(undefined, base);
+    const act = () => resolver.resolve(token, base);
 
     // Assert
-    should(actual).equal('pikachu');
-  });
-
-  it('should default to base when neither is present', () => {
-    // Arrange
-    const base = {};
-
-    // Act
-    const actual = resolveLandscape(undefined, base);
-
-    // Assert
-    should(actual).equal(BASE_LANDSCAPE);
-  });
-
-  it('should treat an explicit "base" and a blank string as base', () => {
-    // Arrange / Act / Assert
-    should(resolveLandscape('base', {})).equal(BASE_LANDSCAPE);
-    should(resolveLandscape('   ', {})).equal(BASE_LANDSCAPE);
-  });
-
-  it('should ignore a non-string app.landscape', () => {
-    // Arrange
-    const base = { app: { landscape: 42 } };
-
-    // Act
-    const actual = resolveLandscape(undefined, base);
-
-    // Assert
-    should(actual).equal(BASE_LANDSCAPE);
-  });
-
-  it('should throw LandscapeResolutionError on an unsafe landscape token', () => {
-    // Arrange
-
-    // Act
-    const actual = () => resolveLandscape('../etc/passwd', {});
-
-    // Assert
-    should(actual).throw(LandscapeResolutionError);
+    act.should.throw(LandscapeResolutionError);
   });
 });

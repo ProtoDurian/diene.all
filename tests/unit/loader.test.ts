@@ -1,165 +1,206 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
+import 'should';
 import { z } from 'zod';
-import { ConfigLoader, ConfigLoaderError, loadConfig } from '../../src/lib/loader.js';
-import type { ConfigRecord } from '../../src/lib/merge.js';
+import { EnvOverrides } from '../../src/lib/env.js';
+import { LandscapeResolver } from '../../src/lib/landscape.js';
+import { ConfigLoader, ConfigLoaderError } from '../../src/lib/loader.js';
+import { DeepMerger } from '../../src/lib/merge.js';
 import { ConfigRegistry } from '../../src/lib/registry.js';
-import type { ConfigSource, EnvRecord } from '../../src/lib/source.js';
-import { ConfigValidationError } from '../../src/lib/validator.js';
+import { ConfigValidationError, ConfigValidator } from '../../src/lib/validator.js';
+import { FakeSource, type FakeTiers } from './support/fake-source.js';
 
-interface FakeTiers {
-  base?: ConfigRecord;
-  overlays?: Record<string, ConfigRecord>;
-  buildTimeEnv?: EnvRecord;
-  runtimeEnv?: EnvRecord;
-  failBase?: Error;
-}
+const PREFIX = 'ATOMI_';
+const valueRegistry = ConfigRegistry.create().register('server', z.object({ value: z.string() }));
+const portRegistry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
 
-class FakeSource implements ConfigSource {
-  constructor(private readonly tiers: FakeTiers) {}
-  async base(): Promise<ConfigRecord> {
-    if (this.tiers.failBase) throw this.tiers.failBase;
-    return this.tiers.base ?? {};
-  }
-  async overlay(landscape: string): Promise<ConfigRecord> {
-    return this.tiers.overlays?.[landscape] ?? {};
-  }
-  async buildTimeEnv(): Promise<EnvRecord> {
-    return this.tiers.buildTimeEnv ?? {};
-  }
-  async runtimeEnv(): Promise<EnvRecord> {
-    return this.tiers.runtimeEnv ?? {};
+type Tier = 'base' | 'overlay' | 'build' | 'runtime';
+
+const tiersWith = (present: readonly Tier[]): FakeTiers => ({
+  base: present.includes('base') ? { server: { value: 'base' } } : {},
+  overlays: { prod: present.includes('overlay') ? { server: { value: 'overlay' } } : {} },
+  buildTimeEnv: present.includes('build') ? { ATOMI_SERVER__VALUE: 'build' } : {},
+  runtimeEnv: present.includes('runtime') ? { ATOMI_SERVER__VALUE: 'runtime' } : {},
+});
+
+class RecordingValidator extends ConfigValidator {
+  readonly seen: unknown[] = [];
+
+  override validate<T>(schema: z.ZodType<T>, value: unknown): T {
+    this.seen.push(structuredClone(value));
+    return super.validate(schema, value);
   }
 }
 
-const serverRegistry = ConfigRegistry.create().register(
-  'server',
-  z.object({ a: z.string(), b: z.string(), c: z.string(), d: z.string() }),
-);
-
-describe('ConfigLoader — 4-tier merge precedence', () => {
-  it('should apply base < overlay < build-time < runtime in order', async () => {
+describe('ConfigLoader.load — merge precedence across the 4 tiers', () => {
+  it.each<{ present: Tier[]; expected: Tier }>([
+    { present: ['base'], expected: 'base' },
+    { present: ['overlay'], expected: 'overlay' },
+    { present: ['build'], expected: 'build' },
+    { present: ['runtime'], expected: 'runtime' },
+    { present: ['base', 'overlay'], expected: 'overlay' },
+    { present: ['base', 'build'], expected: 'build' },
+    { present: ['base', 'runtime'], expected: 'runtime' },
+    { present: ['overlay', 'build'], expected: 'build' },
+    { present: ['overlay', 'runtime'], expected: 'runtime' },
+    { present: ['build', 'runtime'], expected: 'runtime' },
+    { present: ['base', 'overlay', 'build'], expected: 'build' },
+    { present: ['base', 'overlay', 'runtime'], expected: 'runtime' },
+    { present: ['base', 'build', 'runtime'], expected: 'runtime' },
+    { present: ['overlay', 'build', 'runtime'], expected: 'runtime' },
+    { present: ['base', 'overlay', 'build', 'runtime'], expected: 'runtime' },
+  ])('should let $expected win when $present set the key', async ({ present, expected }) => {
     // Arrange
+    const loader = new ConfigLoader(new FakeSource(tiersWith(present)), valueRegistry, {
+      prefix: PREFIX,
+      landscape: 'prod',
+    });
+
+    // Act
+    const config = await loader.load();
+
+    // Assert
+    config.get('server').value.should.equal(expected);
+  });
+
+  it('should keep each lower-tier key that no higher tier overrides', async () => {
+    // Arrange
+    const registry = ConfigRegistry.create().register(
+      'server',
+      z.object({ a: z.string(), b: z.string(), c: z.string(), d: z.string() }),
+    );
     const source = new FakeSource({
       base: { server: { a: 'base', b: 'base', c: 'base', d: 'base' } },
       overlays: { prod: { server: { b: 'overlay', c: 'overlay', d: 'overlay' } } },
       buildTimeEnv: { ATOMI_SERVER__C: 'build', ATOMI_SERVER__D: 'build' },
       runtimeEnv: { ATOMI_SERVER__D: 'runtime' },
     });
-    const loader = new ConfigLoader(source, serverRegistry, { prefix: 'ATOMI_', landscape: 'prod' });
+
+    // Act
+    const config = await new ConfigLoader(source, registry, { prefix: PREFIX, landscape: 'prod' }).load();
+
+    // Assert
+    config.all().should.deepEqual({ server: { a: 'base', b: 'overlay', c: 'build', d: 'runtime' } });
+  });
+});
+
+describe('ConfigLoader.load — landscape selection', () => {
+  it.each([
+    { label: 'no overlay read for base', tiers: {}, landscape: undefined, expected: [] },
+    { label: 'the explicit landscape', tiers: {}, landscape: 'prod', expected: ['prod'] },
+    {
+      label: 'the service-tree landscape',
+      tiers: { base: { app: { landscape: 'stage' } } },
+      landscape: undefined,
+      expected: ['stage'],
+    },
+  ])('should read $label', async ({ tiers, landscape, expected }) => {
+    // Arrange
+    const source = new FakeSource(tiers);
+    const loader = new ConfigLoader(source, ConfigRegistry.create(), { prefix: PREFIX, landscape });
+
+    // Act
+    await loader.load();
+
+    // Assert
+    source.overlayCalls.should.deepEqual(expected);
+  });
+});
+
+describe('ConfigLoader.load — fail-fast on the final layer only', () => {
+  it('should validate once, on the final merged layer, never on an intermediate tier', async () => {
+    // Arrange
+    const validator = new RecordingValidator();
+    const source = new FakeSource({
+      base: { server: {} },
+      overlays: { prod: { server: { port: 'not-a-number' } } },
+      buildTimeEnv: { ATOMI_SERVER__PORT: 'still-bad' },
+      runtimeEnv: { ATOMI_SERVER__PORT: '8080' },
+    });
+    const collaborators = {
+      merger: new DeepMerger(),
+      overrides: new EnvOverrides(),
+      landscapes: new LandscapeResolver(),
+      validator,
+    };
+    const loader = new ConfigLoader(source, portRegistry, { prefix: PREFIX, landscape: 'prod' }, collaborators);
 
     // Act
     const config = await loader.load();
 
     // Assert
-    should(config.get('server')).deepEqual({ a: 'base', b: 'overlay', c: 'build', d: 'runtime' });
+    validator.seen.should.deepEqual([{ server: { port: 8080 } }]);
+    config.get('server').port.should.equal(8080);
   });
-});
 
-describe('ConfigLoader — accessor', () => {
-  it('should expose the value as a callable, via get, and via all', async () => {
+  it.each([
+    { label: 'a wrong type', tiers: { base: { server: { port: 'x' } } } },
+    {
+      label: 'a missing secret left blank in yaml and env',
+      tiers: { base: { server: {} }, runtimeEnv: { ATOMI_SERVER__PORT: '' } },
+    },
+  ])('should reject $label with ConfigValidationError', async ({ tiers }) => {
     // Arrange
-    const registry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
-    const source = new FakeSource({ base: { server: { port: 8080 } } });
+    const loader = new ConfigLoader(new FakeSource(tiers), portRegistry, { prefix: PREFIX });
 
     // Act
-    const config = await loadConfig(source, registry, { prefix: 'ATOMI_' });
+    const act = loader.load();
 
     // Assert
-    should(config('server')).deepEqual({ port: 8080 });
-    should(config.get('server')).deepEqual({ port: 8080 });
-    should(config.all()).deepEqual({ server: { port: 8080 } });
+    await act.should.be.rejectedWith(ConfigValidationError);
   });
 });
 
-describe('ConfigLoader — validation', () => {
-  it('should validate the FINAL merged layer only, not intermediate tiers', async () => {
-    // Arrange — base is invalid (port missing); runtime env supplies it.
-    const registry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
-    const source = new FakeSource({
-      base: { server: {} },
-      runtimeEnv: { ATOMI_SERVER__PORT: '8080' },
+describe('ConfigLoader.loadResult', () => {
+  it('should return Ok with the config when valid', async () => {
+    // Arrange
+    const loader = new ConfigLoader(new FakeSource({ base: { server: { port: 1 } } }), portRegistry, {
+      prefix: PREFIX,
     });
-
-    // Act
-    const config = await loadConfig(source, registry, { prefix: 'ATOMI_' });
-
-    // Assert
-    should(config.get('server')).deepEqual({ port: 8080 });
-  });
-
-  it('should throw ConfigValidationError when the final layer is invalid (fail-fast)', async () => {
-    // Arrange
-    const registry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
-    const source = new FakeSource({ base: { server: { port: 'not-a-number' } } });
-
-    // Act
-    const act = loadConfig(source, registry, { prefix: 'ATOMI_' });
-
-    // Assert
-    await act.then(
-      () => should.fail('resolved', 'rejected', 'expected rejection'),
-      error => should(error).be.instanceof(ConfigValidationError),
-    );
-  });
-});
-
-describe('ConfigLoader — loadResult (railway variant)', () => {
-  it('should return Ok on a valid config', async () => {
-    // Arrange
-    const registry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
-    const loader = new ConfigLoader(new FakeSource({ base: { server: { port: 1 } } }), registry, { prefix: 'ATOMI_' });
 
     // Act
     const result = await loader.loadResult();
 
     // Assert
-    should(await result.isOk()).be.true();
+    (await result.isOk()).should.be.true();
+    (await result.unwrap()).get('server').port.should.equal(1);
   });
 
   it('should return Err on a validation failure', async () => {
     // Arrange
-    const registry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
-    const loader = new ConfigLoader(new FakeSource({ base: { server: { port: 'x' } } }), registry, {
-      prefix: 'ATOMI_',
+    const loader = new ConfigLoader(new FakeSource({ base: { server: { port: 'x' } } }), portRegistry, {
+      prefix: PREFIX,
     });
 
     // Act
     const result = await loader.loadResult();
 
     // Assert
-    should(await result.isErr()).be.true();
-    const error = await result.unwrapErr();
-    should(error).be.instanceof(ConfigValidationError);
+    (await result.unwrapErr()).should.be.instanceof(ConfigValidationError);
   });
 
-  it('should rethrow a non-validation (IO) error', async () => {
+  it('should rethrow a non-validation error', async () => {
     // Arrange
-    const registry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
-    const loader = new ConfigLoader(new FakeSource({ failBase: new Error('disk gone') }), registry, {
-      prefix: 'ATOMI_',
+    const loader = new ConfigLoader(new FakeSource({ failBase: new Error('disk gone') }), portRegistry, {
+      prefix: PREFIX,
     });
 
     // Act
     const act = loader.loadResult();
 
     // Assert
-    await act.then(
-      () => should.fail('resolved', 'rejected', 'expected rejection'),
-      error => should((error as Error).message).equal('disk gone'),
-    );
+    await act.should.be.rejectedWith('disk gone');
   });
 });
 
-describe('ConfigLoader — construction', () => {
-  it('should reject an empty prefix (no baked default)', () => {
+describe('ConfigLoader construction', () => {
+  it('should reject an empty prefix', () => {
     // Arrange
-    const registry = ConfigRegistry.create();
+    const source = new FakeSource({});
 
     // Act
-    const actual = () => new ConfigLoader(new FakeSource({}), registry, { prefix: '' });
+    const act = () => new ConfigLoader(source, ConfigRegistry.create(), { prefix: '' });
 
     // Assert
-    should(actual).throw(ConfigLoaderError);
+    act.should.throw(ConfigLoaderError);
   });
 });

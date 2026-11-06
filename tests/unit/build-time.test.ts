@@ -1,36 +1,31 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
-import { buildTimeValueMap } from '../../src/lib/build-time.js';
+import 'should';
+import { BuildTimeValueMapper } from '../../src/lib/build-time.js';
 
-describe('buildTimeValueMap', () => {
-  it('should keep only prefixed, non-blank variables', () => {
+const mapper = new BuildTimeValueMapper();
+
+describe('BuildTimeValueMapper.map', () => {
+  it.each([
+    {
+      label: 'only prefixed, non-blank variables',
+      env: {
+        ATOMI_CLIENT__FARO__BUILD__KEY: 'secret',
+        ATOMI_CLIENT__NAME: 'app',
+        ATOMI_BLANK: '',
+        OTHER__VAR: 'ignored',
+        ATOMI_UNSET: undefined,
+      },
+      expected: { ATOMI_CLIENT__FARO__BUILD__KEY: 'secret', ATOMI_CLIENT__NAME: 'app' },
+    },
+    { label: 'nothing when no variable matches', env: { PATH: '/usr/bin' }, expected: {} },
+  ])('should keep $label', ({ env, expected }) => {
     // Arrange
-    const env = {
-      ATOMI_CLIENT__FARO__BUILD__KEY: 'secret',
-      ATOMI_CLIENT__NAME: 'app',
-      ATOMI_BLANK: '',
-      OTHER__VAR: 'ignored',
-      UNDEFINED_VAR: undefined,
-    };
+    const prefix = 'ATOMI_';
 
     // Act
-    const actual = buildTimeValueMap(env, 'ATOMI_');
+    const actual = mapper.map(env, prefix);
 
     // Assert
-    should(actual).deepEqual({
-      ATOMI_CLIENT__FARO__BUILD__KEY: 'secret',
-      ATOMI_CLIENT__NAME: 'app',
-    });
-  });
-
-  it('should return an empty map when nothing matches', () => {
-    // Arrange
-    const env = { PATH: '/usr/bin' };
-
-    // Act
-    const actual = buildTimeValueMap(env, 'ATOMI_');
-
-    // Assert
-    should(actual).deepEqual({});
+    actual.should.deepEqual(expected);
   });
 });

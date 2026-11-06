@@ -1,48 +1,57 @@
 import { describe, it } from 'bun:test';
-import should from 'should';
+import 'should';
 import { z } from 'zod';
-import { ConfigValidationError, validateConfig } from '../../src/lib/validator.js';
+import { ConfigValidationError, ConfigValidator } from '../../src/lib/validator.js';
 
-describe('validateConfig', () => {
+const validator = new ConfigValidator();
+
+const caught = (act: () => unknown): ConfigValidationError => {
+  try {
+    act();
+  } catch (error) {
+    if (error instanceof ConfigValidationError) return error;
+    throw error;
+  }
+  throw new Error('expected a ConfigValidationError');
+};
+
+describe('ConfigValidator.validate', () => {
   it('should return the parsed value when valid', () => {
     // Arrange
     const schema = z.object({ port: z.number() });
 
     // Act
-    const actual = validateConfig(schema, { port: 8080 });
+    const actual = validator.validate(schema, { port: 8080 });
 
     // Assert
-    should(actual).deepEqual({ port: 8080 });
+    actual.should.deepEqual({ port: 8080 });
   });
 
-  it('should throw ConfigValidationError with a dotted path for a nested failure', () => {
+  it.each([
+    { label: 'a nested failure by dotted path', value: { server: { port: 'nope' } }, pattern: /^server\.port: / },
+    { label: 'a root failure as (root)', value: 'not-an-object', pattern: /^\(root\): / },
+  ])('should label $label', ({ value, pattern }) => {
     // Arrange
     const schema = z.object({ server: z.object({ port: z.number() }) });
 
     // Act
-    const actual = () => validateConfig(schema, { server: { port: 'nope' } });
+    const error = caught(() => validator.validate(schema, value));
 
     // Assert
-    should(actual).throw(ConfigValidationError);
-    try {
-      validateConfig(schema, { server: { port: 'nope' } });
-    } catch (error) {
-      should(error).be.instanceof(ConfigValidationError);
-      should((error as ConfigValidationError).issues[0]).match(/^server\.port: /);
-    }
+    error.name.should.equal('ConfigValidationError');
+    (error.issues[0] ?? '').should.match(pattern);
   });
 
-  it('should label a root-level failure as (root)', () => {
+  it('should aggregate every issue into one readable message', () => {
     // Arrange
-    const schema = z.object({ port: z.number() });
+    const schema = z.object({ port: z.number(), host: z.string() });
 
-    // Act / Assert
-    try {
-      validateConfig(schema, 'not-an-object');
-      should.fail('expected a throw', 'throw', 'no throw');
-    } catch (error) {
-      should(error).be.instanceof(ConfigValidationError);
-      should((error as ConfigValidationError).issues[0]).match(/^\(root\): /);
-    }
+    // Act
+    const error = caught(() => validator.validate(schema, {}));
+
+    // Assert
+    error.issues.length.should.equal(2);
+    error.message.should.startWith('configuration validation failed on the final merged layer: port: ');
+    error.message.should.containEql('; host: ');
   });
 });

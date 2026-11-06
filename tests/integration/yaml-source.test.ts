@@ -2,12 +2,13 @@ import { afterAll, beforeAll, describe, it } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import should from 'should';
+import 'should';
 import { z } from 'zod';
 import { YamlConfigSource, YamlConfigSourceError } from '../../src/adapters/yaml-source.js';
-import { loadConfig } from '../../src/lib/loader.js';
+import { ConfigLoader } from '../../src/lib/loader.js';
 import { ConfigRegistry } from '../../src/lib/registry.js';
 
+const PREFIX = 'ATOMI_';
 const registry = ConfigRegistry.create().register(
   'server',
   z.object({ port: z.number(), host: z.string(), tags: z.array(z.string()) }),
@@ -19,11 +20,10 @@ beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'diene-config-int-'));
   await writeFile(
     join(dir, 'config.yaml'),
-    ['$schema: ./schema.json', 'server:', '  port: 80', '  host: base-host', '  tags:', '    - a', '    - b'].join(
-      '\n',
-    ),
+    '# yaml-language-server: $schema=./schema.json\nserver:\n  port: 80\n  host: base-host\n  tags:\n    - a\n    - b\n',
   );
-  await writeFile(join(dir, 'prod.config.yaml'), ['server:', '  host: prod-host'].join('\n'));
+  await writeFile(join(dir, 'prod.config.yaml'), 'server:\n  host: prod-host\n');
+  await writeFile(join(dir, 'custom.yaml'), 'server:\n  port: 1\n  host: custom-host\n  tags: []\n');
   await writeFile(join(dir, 'empty.config.yaml'), '');
   await writeFile(join(dir, 'broken.config.yaml'), '- just\n- a\n- list\n');
 });
@@ -32,46 +32,44 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-describe('YamlConfigSource — through the full loader', () => {
-  it('should load base + landscape overlay + runtime env with indexed-list override', async () => {
+describe('YamlConfigSource through the full loader', () => {
+  it('should merge base, overlay and runtime env with an indexed-list override', async () => {
     // Arrange
-    const source = new YamlConfigSource({
-      dir,
-      env: { ATOMI_SERVER__PORT: '8080', ATOMI_SERVER__TAGS__1: 'z' },
-    });
+    const source = new YamlConfigSource({ dir, env: { ATOMI_SERVER__PORT: '8080', ATOMI_SERVER__TAGS__1: 'z' } });
 
     // Act
-    const config = await loadConfig(source, registry, { prefix: 'ATOMI_', landscape: 'prod' });
+    const config = await new ConfigLoader(source, registry, { prefix: PREFIX, landscape: 'prod' }).load();
 
     // Assert
-    should(config.get('server')).deepEqual({ port: 8080, host: 'prod-host', tags: ['a', 'z'] });
+    config.get('server').should.deepEqual({ port: 8080, host: 'prod-host', tags: ['a', 'z'] });
   });
 
   it('should treat a missing overlay file as an empty overlay', async () => {
     // Arrange
-    const source = new YamlConfigSource({ dir, env: { ATOMI_SERVER__PORT: '80' } });
+    const source = new YamlConfigSource({ dir, env: {} });
 
-    // Act — landscape with no file present
-    const config = await loadConfig(source, registry, { prefix: 'ATOMI_', landscape: 'staging' });
+    // Act
+    const config = await new ConfigLoader(source, registry, { prefix: PREFIX, landscape: 'staging' }).load();
 
-    // Assert — base host survives
-    should(config.get('server').host).equal('base-host');
+    // Assert
+    config.get('server').host.should.equal('base-host');
   });
 
-  it('should read runtime values from process.env by default', async () => {
+  it('should read runtime values from the real process.env by default', async () => {
     // Arrange
     process.env.ATOMI_SERVER__PORT = '9090';
     const source = new YamlConfigSource({ dir });
 
     // Act
-    const config = await loadConfig(source, registry, { prefix: 'ATOMI_' });
+    const config = await new ConfigLoader(source, registry, { prefix: PREFIX }).load().finally(() => {
+      delete process.env.ATOMI_SERVER__PORT;
+    });
 
     // Assert
-    should(config.get('server').port).equal(9090);
-    delete process.env.ATOMI_SERVER__PORT;
+    config.get('server').port.should.equal(9090);
   });
 
-  it('should apply a build-time env map before runtime env', async () => {
+  it('should apply the build-time env map before runtime env', async () => {
     // Arrange
     const source = new YamlConfigSource({
       dir,
@@ -80,69 +78,78 @@ describe('YamlConfigSource — through the full loader', () => {
     });
 
     // Act
-    const config = await loadConfig(source, registry, { prefix: 'ATOMI_' });
+    const config = await new ConfigLoader(source, registry, { prefix: PREFIX }).load();
 
-    // Assert — build-time host stays, runtime port wins
-    should(config.get('server').host).equal('build-host');
-    should(config.get('server').port).equal(2);
+    // Assert
+    config.get('server').should.deepEqual({ port: 2, host: 'build-host', tags: ['a', 'b'] });
   });
 
-  it('should honour a custom baseFile and overlayFile', async () => {
+  it('should honour a custom base file and overlay naming', async () => {
     // Arrange
     const source = new YamlConfigSource({
       dir,
-      baseFile: 'config.yaml',
-      overlayFile: landscape => `${landscape}.config.yaml`,
-      env: { ATOMI_SERVER__PORT: '80' },
+      baseFile: 'custom.yaml',
+      overlayFile: name => `${name}.config.yaml`,
+      env: {},
     });
 
     // Act
-    const config = await loadConfig(source, registry, { prefix: 'ATOMI_', landscape: 'prod' });
+    const config = await new ConfigLoader(source, registry, { prefix: PREFIX, landscape: 'prod' }).load();
 
     // Assert
-    should(config.get('server').host).equal('prod-host');
+    config.get('server').should.deepEqual({ port: 1, host: 'prod-host', tags: [] });
   });
+});
 
-  it('should read an empty YAML overlay as an empty object', async () => {
+describe('YamlConfigSource tiers', () => {
+  it.each([
+    { label: 'an empty overlay file', landscape: 'empty' },
+    { label: 'an absent overlay file', landscape: 'absent' },
+  ])('should read $label as an empty object', async ({ landscape }) => {
     // Arrange
-    const source = new YamlConfigSource({ dir, env: { ATOMI_SERVER__PORT: '80' } });
+    const source = new YamlConfigSource({ dir, env: {} });
 
     // Act
-    const overlay = await source.overlay('empty');
+    const overlay = await source.overlay(landscape);
 
     // Assert
-    should(overlay).deepEqual({});
+    overlay.should.deepEqual({});
   });
 
   it('should reject a YAML file that is not a mapping', async () => {
     // Arrange
-    const source = new YamlConfigSource({ dir });
+    const source = new YamlConfigSource({ dir, env: {} });
 
     // Act
     const act = source.overlay('broken');
 
     // Assert
-    await act.then(
-      () => should.fail('resolved', 'rejected', 'expected rejection'),
-      error => should(error).be.instanceof(YamlConfigSourceError),
-    );
+    await act.should.be.rejectedWith(YamlConfigSourceError);
   });
 
   it('should reject when the required base file is missing', async () => {
     // Arrange
-    const source = new YamlConfigSource({ dir, baseFile: 'does-not-exist.yaml' });
+    const source = new YamlConfigSource({ dir, baseFile: 'does-not-exist.yaml', env: {} });
 
     // Act
     const act = source.base();
 
     // Assert
-    await act.then(
-      () => should.fail('resolved', 'rejected', 'expected rejection'),
-      error => should((error as { code?: string }).code).equal('ENOENT'),
-    );
+    await act.should.be.rejectedWith({ code: 'ENOENT' });
   });
 
-  it('should default build-time env to empty', async () => {
+  it('should rethrow an overlay read error other than a missing file', async () => {
+    // Arrange
+    const source = new YamlConfigSource({ dir, overlayFile: () => '.', env: {} });
+
+    // Act
+    const act = source.overlay('prod');
+
+    // Assert
+    await act.should.be.rejectedWith({ code: 'EISDIR' });
+  });
+
+  it('should default the build-time env to empty', async () => {
     // Arrange
     const source = new YamlConfigSource({ dir });
 
@@ -150,6 +157,6 @@ describe('YamlConfigSource — through the full loader', () => {
     const buildTime = await source.buildTimeEnv();
 
     // Assert
-    should(buildTime).deepEqual({});
+    buildTime.should.deepEqual({});
   });
 });
