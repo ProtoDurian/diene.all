@@ -1,7 +1,10 @@
 # Wire Format: TypeScript
 
-`JSON.stringify` and Zod produce every row of [Wire Format](../index.md). Parse
-input with a Zod schema; write output with the conversion shown.
+These tools produce every row of [Wire Format](../index.md):
+
+- `JSON.stringify` writes the JSON.
+- Zod (`zod`) validates and parses what comes in.
+- Temporal (`@js-temporal/polyfill`) holds instants, dates, times and durations.
 
 ## Keys
 
