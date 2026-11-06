@@ -30,6 +30,18 @@ describe('LandscapeResolver.resolve', () => {
     },
     { label: 'base for a non-object app', explicit: undefined, base: { app: 'x' }, expected: BASE_LANDSCAPE },
     { label: 'a trimmed explicit landscape', explicit: ' prod ', base: {}, expected: 'prod' },
+    {
+      label: 'app.landscape when the explicit value is blank',
+      explicit: '',
+      base: { app: { landscape: 'prod' } },
+      expected: 'prod',
+    },
+    {
+      label: 'app.landscape when the explicit value is whitespace',
+      explicit: '  ',
+      base: { app: { landscape: 'prod' } },
+      expected: 'prod',
+    },
   ])('should resolve $label', ({ explicit, base, expected }) => {
     // Arrange
     const config: ConfigRecord = base;

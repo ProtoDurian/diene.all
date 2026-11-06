@@ -2,8 +2,9 @@ import { describe, it } from 'bun:test';
 import 'should';
 import { z } from 'zod';
 import { EnvOverrides } from '../../src/lib/env.js';
+import { ConfigLoaderError } from '../../src/lib/errors.js';
 import { LandscapeResolver } from '../../src/lib/landscape.js';
-import { ConfigLoader, ConfigLoaderError } from '../../src/lib/loader.js';
+import { ConfigLoader } from '../../src/lib/loader.js';
 import { DeepMerger } from '../../src/lib/merge.js';
 import { ConfigRegistry } from '../../src/lib/registry.js';
 import { ConfigValidationError, ConfigValidator } from '../../src/lib/validator.js';
@@ -202,5 +203,63 @@ describe('ConfigLoader construction', () => {
 
     // Assert
     act.should.throw(ConfigLoaderError);
+  });
+});
+
+describe('ConfigLoader.load — env overrides follow the registry schema', () => {
+  it('should keep an all-digit secret a string and reach a camelCase key absent from yaml', async () => {
+    // Arrange
+    const registry = ConfigRegistry.create()
+      .register('db', z.object({ password: z.string().min(1) }))
+      .register('svc', z.object({ maxRetries: z.number().optional() }));
+    const source = new FakeSource({
+      base: { db: { password: '' }, svc: {} },
+      runtimeEnv: { ATOMI_DB__PASSWORD: '123456', ATOMI_SVC__MAX_RETRIES: '3' },
+    });
+
+    // Act
+    const config = await new ConfigLoader(source, registry, { prefix: PREFIX }).load();
+
+    // Assert
+    config.all().should.deepEqual({ db: { password: '123456' }, svc: { maxRetries: 3 } });
+  });
+
+  it('should reject a secret left blank in yaml and env when declared min(1)', async () => {
+    // Arrange
+    const registry = ConfigRegistry.create().register('db', z.object({ password: z.string().min(1) }));
+    const source = new FakeSource({ base: { db: { password: '' } }, runtimeEnv: { ATOMI_DB__PASSWORD: '' } });
+
+    // Act
+    const act = new ConfigLoader(source, registry, { prefix: PREFIX }).load();
+
+    // Assert
+    await act.should.be.rejectedWith({ name: 'ConfigValidationError', message: /db\.password/ });
+  });
+});
+
+describe('ConfigLoader.load — landscape guards', () => {
+  it('should treat a blank explicit landscape as unset and use app.landscape', async () => {
+    // Arrange
+    const source = new FakeSource({ base: { app: { landscape: 'prod' } } });
+
+    // Act
+    await new ConfigLoader(source, ConfigRegistry.create(), { prefix: PREFIX, landscape: '' }).load();
+
+    // Assert
+    source.overlayCalls.should.deepEqual(['prod']);
+  });
+
+  it.each([
+    { tier: 'runtime', tiers: { runtimeEnv: { ATOMI_APP__LANDSCAPE: 'prod' } }, name: /ATOMI_APP__LANDSCAPE/ },
+    { tier: 'build-time', tiers: { buildTimeEnv: { ATOMI_app__Landscape: 'prod' } }, name: /ATOMI_app__Landscape/ },
+  ])('should refuse a $tier env override of app.landscape', async ({ tiers, name }) => {
+    // Arrange
+    const loader = new ConfigLoader(new FakeSource(tiers), ConfigRegistry.create(), { prefix: PREFIX });
+
+    // Act
+    const act = loader.load();
+
+    // Assert
+    await act.should.be.rejectedWith({ name: 'ConfigLoaderError', message: name });
   });
 });

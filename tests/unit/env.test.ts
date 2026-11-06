@@ -1,6 +1,8 @@
 import { describe, it } from 'bun:test';
 import 'should';
+import { z } from 'zod';
 import { EnvOverrides, NESTING_SEPARATOR } from '../../src/lib/env.js';
+import { ConfigLoaderError } from '../../src/lib/errors.js';
 import type { ConfigRecord } from '../../src/lib/merge.js';
 
 const PREFIX = 'ATOMI_';
@@ -123,13 +125,6 @@ describe('EnvOverrides.apply — nesting and indexed lists', () => {
       expected: { items: [{ name: 'a', port: 2 }] },
     },
     { label: 'a scalar replaced by an object', base: { a: 1 }, env: { ATOMI_A__B: 'x' }, expected: { a: { b: 'x' } } },
-    {
-      label: 'a non-numeric segment into an array',
-      base: { list: ['a'] },
-      env: { ATOMI_LIST__FOO: 'x' },
-      expected: { list: ['a'] },
-    },
-    { label: 'an index past the bound', base: { list: [] }, env: { ATOMI_LIST__5000: 'x' }, expected: { list: [] } },
   ])('should handle $label', ({ base, env, expected }) => {
     // Arrange
     const target: ConfigRecord = base;
@@ -150,5 +145,177 @@ describe('EnvOverrides.apply — nesting and indexed lists', () => {
 
     // Assert
     base.should.deepEqual({ server: { port: 80 } });
+  });
+});
+
+describe('EnvOverrides.apply — schema-directed coercion', () => {
+  const schema = z.object({
+    db: z.object({ password: z.string(), id: z.string(), zip: z.string(), token: z.string() }),
+    svc: z.object({
+      maxRetries: z.number().optional(),
+      debug: z.boolean().default(false),
+      name: z.string().nullable(),
+    }),
+    tags: z.array(z.string()).optional(),
+    items: z.array(z.object({ maxRetries: z.number() })).optional(),
+    piped: z.string().transform(value => value.length),
+  });
+
+  it.each([
+    {
+      label: 'an all-digit secret into a string',
+      env: { ATOMI_DB__PASSWORD: '123456' },
+      path: ['db', 'password'],
+      expected: '123456',
+    },
+    {
+      label: 'an id past 2^53 into a string',
+      env: { ATOMI_DB__ID: '9007199254740993' },
+      path: ['db', 'id'],
+      expected: '9007199254740993',
+    },
+    {
+      label: 'a leading-zero code into a string',
+      env: { ATOMI_DB__ZIP: '0123' },
+      path: ['db', 'zip'],
+      expected: '0123',
+    },
+    {
+      label: 'a boolean-looking token into a string',
+      env: { ATOMI_DB__TOKEN: 'true' },
+      path: ['db', 'token'],
+      expected: 'true',
+    },
+    {
+      label: 'a camelCase optional number absent from yaml',
+      env: { ATOMI_SVC__MAX_RETRIES: '3' },
+      path: ['svc', 'maxRetries'],
+      expected: 3,
+    },
+    { label: 'a defaulted boolean', env: { ATOMI_SVC__DEBUG: 'TRUE' }, path: ['svc', 'debug'], expected: true },
+    {
+      label: 'a non-boolean word into a boolean',
+      env: { ATOMI_SVC__DEBUG: 'yes' },
+      path: ['svc', 'debug'],
+      expected: 'yes',
+    },
+    {
+      label: 'a non-numeric word into a number',
+      env: { ATOMI_SVC__MAX_RETRIES: '1e3' },
+      path: ['svc', 'maxRetries'],
+      expected: '1e3',
+    },
+    {
+      label: 'a number-looking value into a nullable string',
+      env: { ATOMI_SVC__NAME: '42' },
+      path: ['svc', 'name'],
+      expected: '42',
+    },
+    {
+      label: 'a number-looking value into an indexed string list',
+      env: { ATOMI_TAGS__0: '7' },
+      path: ['tags', '0'],
+      expected: '7',
+    },
+    {
+      label: 'an indexed list of camelCase objects',
+      env: { ATOMI_ITEMS__0__MAX_RETRIES: '2' },
+      path: ['items', '0', 'maxRetries'],
+      expected: 2,
+    },
+    { label: 'the input side of a pipe', env: { ATOMI_PIPED: '99' }, path: ['piped'], expected: '99' },
+    {
+      label: 'a key the schema does not know',
+      env: { ATOMI_EXTRA__COUNT: '5' },
+      path: ['extra', 'count'],
+      expected: 5,
+    },
+  ])('should place $label', ({ env, path, expected }) => {
+    // Arrange
+    const base: ConfigRecord = { db: { password: '', id: '', zip: '', token: '' }, svc: {} };
+
+    // Act
+    const actual = overrides.apply(base, env, PREFIX, schema);
+
+    // Assert
+    const leaf = path.reduce<unknown>((node, key) => (node as Record<string, unknown>)[key], actual);
+    (leaf as object).should.equal(expected);
+  });
+});
+
+describe('EnvOverrides.apply — refusals and ordering', () => {
+  it.each([
+    {
+      label: 'an index past the bound',
+      base: { list: [] },
+      env: { ATOMI_LIST__5000: 'x' },
+      message: /ATOMI_LIST__5000/,
+    },
+    {
+      label: 'a non-numeric segment into an array',
+      base: { list: ['a'] },
+      env: { ATOMI_LIST__FOO: 'x' },
+      message: /ATOMI_LIST__FOO/,
+    },
+    {
+      label: 'an ambiguous key match',
+      base: { myKey: 1, my_key: 2 },
+      env: { ATOMI_MY_KEY: '3' },
+      message: /ATOMI_MY_KEY.*myKey.*my_key/,
+    },
+  ])('should throw ConfigLoaderError for $label', ({ base, env, message }) => {
+    // Arrange
+    const target: ConfigRecord = base;
+
+    // Act
+    const act = () => overrides.apply(target, env, PREFIX);
+
+    // Assert
+    act.should.throw(ConfigLoaderError, { message });
+  });
+
+  it.each([
+    { label: 'parent first', env: { ATOMI_A: 'v', ATOMI_A__B: 'w' } },
+    { label: 'child first', env: { ATOMI_A__B: 'w', ATOMI_A: 'v' } },
+  ])('should apply shorter paths first whatever the env order ($label)', ({ env }) => {
+    // Arrange
+    const base: ConfigRecord = {};
+
+    // Act
+    const actual = overrides.apply(base, env, PREFIX);
+
+    // Assert
+    actual.should.deepEqual({ a: { b: 'w' } });
+  });
+});
+
+describe('EnvOverrides.keysFor', () => {
+  it('should name every non-blank variable that targets a path', () => {
+    // Arrange
+    const env = {
+      ATOMI_APP__LANDSCAPE: 'prod',
+      ATOMI_app__landscape: '',
+      ATOMI_APP__NAME: 'x',
+      OTHER_APP__LANDSCAPE: 'y',
+    };
+
+    // Act
+    const actual = overrides.keysFor(env, PREFIX, ['app', 'landscape']);
+
+    // Assert
+    actual.should.deepEqual(['ATOMI_APP__LANDSCAPE']);
+  });
+});
+
+describe('EnvOverrides.apply — exact bigint through the loader schema', () => {
+  it('should hand z.coerce.bigint the raw text so 2^53 + 1 survives', () => {
+    // Arrange
+    const schema = z.object({ ids: z.object({ big: z.coerce.bigint() }) });
+
+    // Act
+    const actual = schema.parse(overrides.apply({}, { ATOMI_IDS__BIG: '9007199254740993' }, PREFIX, schema));
+
+    // Assert
+    actual.ids.big.toString().should.equal('9007199254740993');
   });
 });

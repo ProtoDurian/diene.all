@@ -15,10 +15,10 @@ class LandscapeResolver {
   // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
   constructor() {}
 
-  // Explicit host value, then the service-tree `app.landscape`, then base; never detected here.
   resolve(explicit: string | undefined, base: ConfigRecord): string {
     const fromBase = isRecord(base.app) && typeof base.app.landscape === 'string' ? base.app.landscape : undefined;
-    const chosen = (explicit ?? fromBase ?? BASE_LANDSCAPE).trim();
+    const given = explicit?.trim() === '' ? undefined : explicit;
+    const chosen = (given ?? fromBase ?? BASE_LANDSCAPE).trim();
     if (chosen === '' || chosen === BASE_LANDSCAPE) return BASE_LANDSCAPE;
     if (!LANDSCAPE_TOKEN.test(chosen)) throw new LandscapeResolutionError(`invalid landscape name: "${chosen}"`);
     return chosen;

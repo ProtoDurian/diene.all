@@ -1,6 +1,9 @@
 import { isRecord } from '@atomicloud/diene.core-utils';
+import type { z } from 'zod';
 import { EnvKeyMatcher, ScalarCoercer } from './coerce.js';
+import { ConfigLoaderError } from './errors.js';
 import type { ConfigRecord } from './merge.js';
+import { SchemaWalker } from './schema-walker.js';
 import type { EnvRecord } from './source.js';
 
 const NESTING_SEPARATOR = '__';
@@ -9,46 +12,88 @@ const MAX_INDEX = 4096;
 
 type Container = ConfigRecord | unknown[];
 
+interface Override {
+  name: string;
+  segments: readonly string[];
+  raw: string;
+}
+
 class EnvOverrides {
   constructor(
     private readonly coercer: ScalarCoercer = new ScalarCoercer(),
     private readonly matcher: EnvKeyMatcher = new EnvKeyMatcher(),
+    private readonly walker: SchemaWalker = new SchemaWalker(),
   ) {}
 
-  apply(target: ConfigRecord, env: EnvRecord, prefix: string): ConfigRecord {
+  apply(target: ConfigRecord, env: EnvRecord, prefix: string, schema?: z.ZodType): ConfigRecord {
     const result = structuredClone(target);
-    for (const [rawKey, rawValue] of Object.entries(env)) {
-      if (!rawKey.startsWith(prefix) || rawValue === undefined) continue;
-      const value = this.coercer.coerce(rawValue);
-      if (value === undefined) continue;
-      const segments = rawKey.slice(prefix.length).split(NESTING_SEPARATOR);
-      if (segments.some(segment => segment === '')) continue;
-      this.place(result, segments, value);
-    }
+    const overrides = this.overrides(env, prefix).sort(
+      (a, b) => a.segments.length - b.segments.length || a.name.localeCompare(b.name),
+    );
+    for (const override of overrides) this.place(result, override.segments, override, schema);
     return result;
   }
 
-  private place(container: Container, segments: readonly string[], value: unknown): void {
+  keysFor(env: EnvRecord, prefix: string, path: readonly string[]): string[] {
+    const wanted = path.map(segment => this.matcher.normalize(segment)).join(NESTING_SEPARATOR);
+    return this.overrides(env, prefix)
+      .filter(
+        override =>
+          override.segments.map(segment => this.matcher.normalize(segment)).join(NESTING_SEPARATOR) === wanted,
+      )
+      .map(override => override.name);
+  }
+
+  private overrides(env: EnvRecord, prefix: string): Override[] {
+    return Object.entries(env).flatMap(([name, raw]) => {
+      if (!name.startsWith(prefix) || raw === undefined || raw === '') return [];
+      const segments = name.slice(prefix.length).split(NESTING_SEPARATOR);
+      return segments.some(segment => segment === '') ? [] : [{ name, segments, raw }];
+    });
+  }
+
+  private place(container: Container, segments: readonly string[], override: Override, schema?: z.ZodType): void {
     const [head, next] = segments as [string, string | undefined];
-    const key = this.keyFor(container, head);
-    if (key === undefined) return;
+    const key = this.keyFor(container, head, override, schema);
+    const childSchema = this.walker.child(schema, key);
     if (next === undefined) {
-      this.assign(container, key, value);
+      this.assign(container, key, this.coercer.coerceAs(override.raw, this.walker.kind(childSchema)));
       return;
     }
     const existing = Array.isArray(container) ? container[key as number] : container[key];
-    const child: Container = isRecord(existing) || Array.isArray(existing) ? existing : INDEX.test(next) ? [] : {};
+    const child: Container =
+      isRecord(existing) || Array.isArray(existing) ? existing : this.emptyFor(childSchema, next);
     this.assign(container, key, child);
-    this.place(child, segments.slice(1), value);
+    this.place(child, segments.slice(1), override, childSchema);
   }
 
-  private keyFor(container: Container, segment: string): string | number | undefined {
-    if (!Array.isArray(container)) return this.matcher.match(Object.keys(container), segment);
-    if (!INDEX.test(segment)) return undefined;
-    const index = Number.parseInt(segment, 10);
-    if (index > MAX_INDEX) return undefined;
-    while (container.length <= index) container.push(undefined);
-    return index;
+  private emptyFor(schema: z.ZodType | undefined, next: string): Container {
+    const kind = this.walker.kind(schema);
+    if (kind === 'array') return [];
+    if (kind === 'object') return {};
+    return INDEX.test(next) ? [] : {};
+  }
+
+  private keyFor(container: Container, segment: string, override: Override, schema?: z.ZodType): string | number {
+    if (Array.isArray(container)) {
+      if (!INDEX.test(segment)) throw new ConfigLoaderError(`${override.name}: "${segment}" is not a list index`);
+      const index = Number.parseInt(segment, 10);
+      if (index > MAX_INDEX) throw new ConfigLoaderError(`${override.name}: list index ${index} exceeds ${MAX_INDEX}`);
+      while (container.length <= index) container.push(undefined);
+      return index;
+    }
+    return (
+      this.unique(this.walker.keys(schema), segment, override) ??
+      this.unique(Object.keys(container), segment, override) ??
+      segment.toLowerCase()
+    );
+  }
+
+  private unique(keys: readonly string[], segment: string, override: Override): string | undefined {
+    const found = this.matcher.matches(keys, segment);
+    if (found.length > 1)
+      throw new ConfigLoaderError(`${override.name} matches more than one key: ${found.join(', ')}`);
+    return found[0];
   }
 
   private assign(container: Container, key: string | number, value: unknown): void {

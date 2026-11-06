@@ -25,22 +25,48 @@ describe('EnvKeyMatcher.normalize', () => {
   });
 });
 
-describe('EnvKeyMatcher.match', () => {
+describe('EnvKeyMatcher.matches', () => {
   it.each([
-    { style: 'snake', keys: ['port', 'max_retries'], expected: 'max_retries' },
-    { style: 'pascal', keys: ['port', 'MaxRetries'], expected: 'MaxRetries' },
-    { style: 'camel', keys: ['port', 'maxRetries'], expected: 'maxRetries' },
-    { style: 'kebab', keys: ['port', 'max-retries'], expected: 'max-retries' },
-    { style: 'absent', keys: ['port'], expected: 'max_retries' },
+    { style: 'snake', keys: ['port', 'max_retries'], expected: ['max_retries'] },
+    { style: 'pascal', keys: ['port', 'MaxRetries'], expected: ['MaxRetries'] },
+    { style: 'camel', keys: ['port', 'maxRetries'], expected: ['maxRetries'] },
+    { style: 'kebab', keys: ['port', 'max-retries'], expected: ['max-retries'] },
+    { style: 'duplicated', keys: ['maxRetries', 'maxRetries'], expected: ['maxRetries'] },
+    { style: 'ambiguous', keys: ['maxRetries', 'max_retries'], expected: ['maxRetries', 'max_retries'] },
+    { style: 'absent', keys: ['port'], expected: [] },
   ])('should resolve MAX_RETRIES against a $style key', ({ keys, expected }) => {
     // Arrange
     const segment = 'MAX_RETRIES';
 
     // Act
-    const actual = matcher.match(keys, segment);
+    const actual = matcher.matches(keys, segment);
 
     // Assert
-    actual.should.equal(expected);
+    actual.should.deepEqual(expected);
+  });
+});
+
+describe('ScalarCoercer.coerceAs', () => {
+  it.each([
+    { raw: '0123', kind: 'string', expected: '0123' },
+    { raw: 'true', kind: 'string', expected: 'true' },
+    { raw: '42', kind: 'number', expected: 42 },
+    { raw: '4x', kind: 'number', expected: '4x' },
+    { raw: 'FALSE', kind: 'boolean', expected: false },
+    { raw: '1', kind: 'boolean', expected: '1' },
+    { raw: '7', kind: 'array', expected: '7' },
+    { raw: '7', kind: 'object', expected: '7' },
+    { raw: '7', kind: 'unknown', expected: 7 },
+    { raw: '', kind: 'string', expected: undefined },
+  ] as const)('should coerce "$raw" for a $kind target to $expected', ({ raw, kind, expected }) => {
+    // Arrange
+    const input = raw;
+
+    // Act
+    const actual = coercer.coerceAs(input, kind);
+
+    // Assert
+    should(actual).equal(expected);
   });
 });
 

@@ -2,6 +2,7 @@ export * from './adapters/yaml-source.js';
 export * from './lib/coerce.js';
 export * from './lib/config.js';
 export * from './lib/env.js';
+export * from './lib/errors.js';
 export * from './lib/landscape.js';
 export * from './lib/loader.js';
 export * from './lib/merge.js';
