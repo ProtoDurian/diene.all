@@ -4,7 +4,7 @@ set -euo pipefail
 # The node-owned consumer fixture: a throwaway package that `bun add`s the
 # library, then proves `import`, `require()` and the TypeScript types of both
 # conditions resolve. With no argument it consumes this tree's packed tarball;
-# pass a registry spec (e.g. @atomicloud/diene.bun-lib@1.4.0) to consume a real
+# pass a registry spec (e.g. @atomicloud/diene.otel@2.0.0) to consume a real
 # publish instead.
 
 root_dir="$(git rev-parse --show-toplevel)"
@@ -23,7 +23,7 @@ work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
 
 cat >"${work}/package.json" <<JSON
-{ "name": "bun-lib-consumer-fixture", "private": true, "version": "0.0.0" }
+{ "name": "bun-otel-consumer-fixture", "private": true, "version": "0.0.0" }
 JSON
 # The public types reference pino's, which need Node's: give the fixture the repo's pinned @types/node.
 cat >"${work}/tsconfig.json" <<JSON
@@ -40,23 +40,46 @@ cat >"${work}/tsconfig.json" <<JSON
 }
 JSON
 cat >"${work}/esm.mjs" <<JS
-import { KeyComposer } from '${name}';
-if (new KeyComposer('Consumer Proof').compose('ESM') !== 'consumer-proof:esm') throw new Error('ESM import returned the wrong key');
+import { createRequire } from 'node:module';
+import { OtelBootstrap, TraceError, defaultOtelBlock, otelBlockSchema } from '${name}';
+import { AppIdentityBuilder, OtelAssertions, OtelBlockFixtures, OtelTestHarness } from '${name}/test-helper';
+const runtime = new OtelBootstrap().init(otelBlockSchema.parse(defaultOtelBlock), new AppIdentityBuilder().build(), { environment: {} });
+if (runtime.active.metrics || runtime.active.traces) throw new Error('ESM init exported with every exporter off');
+await runtime.shutdown();
+const run = new OtelTestHarness().start(new OtelBlockFixtures().otlp());
+await run.runtime.traceEmitter.emit({ name: 'esm' }).unwrap();
+new OtelAssertions().traceRecords(run.traces, [{ name: 'esm' }]);
+const cjsHelper = createRequire(import.meta.url)('${name}/test-helper');
+const error = await new cjsHelper.InMemoryTraceEmitter().emit({ name: '' }).unwrapErr();
+if (!(error instanceof TraceError)) throw new Error('CJS /test-helper error is not the ESM root TraceError');
 JS
 cat >"${work}/cjs.cjs" <<JS
-const { KeyComposer } = require('${name}');
-if (new KeyComposer('Consumer Proof').compose('CJS') !== 'consumer-proof:cjs') throw new Error('CJS require returned the wrong key');
+const { OtelBootstrap, defaultOtelBlock } = require('${name}');
+const { AppIdentityBuilder, OtelAssertions, OtelTestHarness } = require('${name}/test-helper');
+const runtime = new OtelBootstrap().init(defaultOtelBlock, new AppIdentityBuilder().build(), { environment: {} });
+const run = new OtelTestHarness().start();
+run.runtime.traceEmitter
+  .emit({ name: 'cjs' })
+  .unwrap()
+  .then(() => new OtelAssertions().traceRecords(run.traces, [{ name: 'cjs' }]))
+  .then(() => runtime.shutdown())
+  .catch(error => {
+    console.error(error);
+    process.exit(1);
+  });
 JS
-cat >"${work}/types-esm.mts" <<TS
-import { KeyComposer } from '${name}';
-const key: string = new KeyComposer('Consumer Proof').compose('ESM');
-export { key };
+for ext in mts cts; do
+  cat >"${work}/types.${ext}" <<TS
+import { type OtelBlock, OtelBootstrap, type OtelRuntime, type TraceEmitter, otelBlockSchema } from '${name}';
+import { AppIdentityBuilder, InMemoryTraceEmitter, OtelBlockFixtures, type OtelHarnessRun, OtelTestHarness } from '${name}/test-helper';
+const block: OtelBlock = otelBlockSchema.parse(new OtelBlockFixtures().canonical());
+const runtime: OtelRuntime = new OtelBootstrap().init(block, new AppIdentityBuilder().build());
+const seam: TraceEmitter = new InMemoryTraceEmitter();
+const run: OtelHarnessRun = new OtelTestHarness().start(block);
+const live: TraceEmitter = run.traces;
+export { live, runtime, seam };
 TS
-cat >"${work}/types-cjs.cts" <<TS
-import { KeyComposer } from '${name}';
-const key: string = new KeyComposer('Consumer Proof').compose('CJS');
-export { key };
-TS
+done
 
 echo "📥 bun add ${spec}..."
 (cd "${work}" && bun add --no-progress "${spec}")
@@ -64,4 +87,4 @@ echo "📥 bun add ${spec}..."
 echo "🔎 import, require() and types..."
 (cd "${work}" && node esm.mjs && node cjs.cjs && "${tsc}" -p tsconfig.json)
 
-echo "✅ consumer fixture: ${spec} installs; import, require() and both type conditions resolve"
+echo "✅ consumer fixture: ${spec} installs; import, require() and both type conditions resolve for the root and /test-helper"
