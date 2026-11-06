@@ -44,11 +44,19 @@ incomplete as long as the merged result satisfies the root schema.
 - **Shorter paths apply first**, so `ATOMI_A` and `ATOMI_A__B` give the same
   result whatever order the environment lists them in.
 - **Coercion follows the schema's leaf type**, never a hand-rolled `Number()`
-  (M31). A string field keeps the raw text (`0123`, `true`, `123456` stay
-  strings), a number field is parsed by zod, a boolean field takes only
-  `true`/`false`. A field the schema does not type (union, `unknown`, an
-  unregistered key) gets the plain scalar coercion. A value the type cannot take
-  stays a string, so validation reports it.
+  (M31). The loader sees through wrappers, pipes, `lazy`, unions (including
+  discriminated), intersections, records, tuples and catchall. A string field
+  keeps the raw text (`0123`, `true`, `123456` stay strings), a number field
+  is parsed by zod. A field with no single type (a union whose members disagree,
+  `unknown`, an unregistered key) gets the plain scalar coercion. A value the type
+  cannot take stays a string, so validation reports it.
+- **Booleans take only `true` / `false`**; anything else throws
+  `ConfigLoaderError`. Declare them `z.boolean()` or `z.stringbool()`, never
+  `z.coerce.boolean()`, which reads any other text as `true`.
+- **A key under a schema the loader cannot walk** (`z.custom`, `z.map`,
+  `z.set`, …) throws `ConfigLoaderError` instead of being dropped.
+- **Dates come in as ISO text** (`2024-01-31T00:00:00Z`) for `z.coerce.date()`;
+  epoch milliseconds are rejected.
 - **A blank env value means UNSET** (M33): it is dropped, leaving the file value,
   never written as an empty string.
 - **Secrets are blank in YAML** and injected at runtime (Infisical). Since
@@ -79,8 +87,9 @@ with build-time / runtime.
 
 - The **runtime loader** keeps SSR/server-side runtime secrets.
 - **`BuildTimeValueMapper.map(env, prefix)`** (`/build-time`) returns only the
-  non-blank `<prefix>CLIENT__*` variables, minus any key with a `BUILD` segment
-  after `CLIENT__`, to inline with a DefinePlugin-style static injection. nextjs owns the DefinePlugin wiring; this lib owns the value map.
+  non-blank `<prefix>CLIENT__*` and `<prefix>SHARED__*` variables (shared values
+  are client-visible, so never secret), minus any key with a `BUILD` segment;
+  `SERVER__*` is never mapped, to inline with a DefinePlugin-style static injection. nextjs owns the DefinePlugin wiring; this lib owns the value map.
   Runtime env still wins over a frozen build-time value.
 - **Build-time secrets** (e.g. the Faro source-map upload key
   `ATOMI_CLIENT__FARO__BUILD__KEY`) are CI-injected during the build, consumed by
@@ -115,6 +124,7 @@ working defaults.
 - An empty `prefix`, an env override of `app.landscape`, an ambiguous key match
   and a bad list index throw `ConfigLoaderError`.
 - The loaded config is deep-frozen: every block, nested object and array.
+  Instances such as `Date` or `URL` are kept by reference; treat them as read-only.
 - `JsonSchemaGenerator` emits the JSON Schema a config YAML's first line points
   at: `# yaml-language-server: $schema=./schema.json`. It describes the schema's
   input side, so a field with a default is optional in the editor. A unit test

@@ -36,7 +36,7 @@ build-time/runtime.
 | Fully-static frontend                            | build-time values only; zero runtime env, so no runtime secrets                                  |
 
 Runtime env still wins over a build-time value wherever both exist.
-`BuildTimeValueMapper` keeps only `<prefix>CLIENT__*` keys and drops any key with a `BUILD` segment.
+`BuildTimeValueMapper` keeps only `<prefix>CLIENT__*` and `<prefix>SHARED__*` keys and drops any key with a `BUILD` segment.
 
 ## Env-override rules
 
@@ -51,6 +51,8 @@ Runtime env still wins over a build-time value wherever both exist.
 - Don't set `app.landscape` from env; pass `landscape` to the loader.
 - String fields keep env text as-is (`0123` stays `0123`); number and boolean
   fields are parsed by their schema type.
+- Declare booleans `z.boolean()` or `z.stringbool()`, never `z.coerce.boolean()`;
+  env booleans must be `true` or `false`.
 
 ## Testing (`/test-helper`)
 
