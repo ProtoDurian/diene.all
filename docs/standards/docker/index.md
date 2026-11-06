@@ -10,14 +10,14 @@ Local work uses Taskfile one-liners (these never call the CI scripts). The
 authoritative list is `tasks/Taskfile.docker.yaml`: it holds one `build:`, `run:`,
 and `clean:` task per Dockerfile, keyed by the Dockerfile's own name — bare
 `infra/Dockerfile` is `main`, `infra/<name>.Dockerfile` is `<name>`. Read the task
-`desc` to see which Dockerfile a task builds, or run `pls --list`.
+`desc` to see which Dockerfile a task builds, or run `task --list`.
 
 Pass an optional tag **suffix** after `--`; it is appended to the `:local` tag:
 
 ```bash
-pls docker:build:main            # -> diene-workspace:local
-pls docker:build:main -- 1       # -> diene-workspace:local-1
-pls docker:build:main -- hello   # -> diene-workspace:local-hello
+task docker:build:main            # -> diene-workspace:local
+task docker:build:main -- 1       # -> diene-workspace:local-1
+task docker:build:main -- hello   # -> diene-workspace:local-hello
 ```
 
 `run` and `clean` take the same suffix so they act on the image you built.
@@ -29,7 +29,7 @@ variable.
 ## CI/CD release structure
 
 Publishing is driven by the `⚡reusable-docker.yaml` reusable workflow, called from `ci.yaml`
-(every commit) and `cd.yaml` (release tag):
+(every commit builds; step 3 says which publish) and `cd.yaml` (release tag):
 
 1. The reusable workflow sets up the builder with `AtomiCloud/actions.setup-docker` — a
    Namespace (nscloud) backed buildx builder with managed layer caching, so you do **not**
@@ -42,6 +42,12 @@ Publishing is driven by the `⚡reusable-docker.yaml` reusable workflow, called 
 
    A release build is effectively a re-tag rather than a rebuild, because the buildx cache is
    already warm from the commit build.
+
+3. Only `main` and tags publish. The reusable workflow sets `CI_DOCKER_PUSH` true for
+   `refs/heads/main` and `refs/tags/*` only; every other branch and pull request takes the
+   script's build-only path (no registry login, no push). `ci.yaml` passes
+   `platform: linux/amd64`, so the `:latest` image from `main` is amd64-only; the multi-arch
+   (`linux/arm64,linux/amd64`) image is the tagged release `cd.yaml` builds.
 
 ### Adding more images
 

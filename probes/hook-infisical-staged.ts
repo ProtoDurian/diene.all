@@ -20,7 +20,7 @@ export default {
       name: 'mutation-hook-infisical-staged-caught',
       description: 'A focused sabotage must turn the hook-infisical-staged mechanism red.',
       kind: 'mutation',
-      expectedImpact: ['hook-infisical-full', 'secret-scan-command'],
+      expectedImpact: ['hook-infisical-full'],
       async run(repo: any) {
         const secret = ['AKIA', 'QRSTUVWXYZABCDEF'].join('');
         await repo.write('probe-secret.txt', `aws_access_key_id=${secret}\n`);

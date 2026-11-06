@@ -2,8 +2,16 @@ name: CI
 
 on:
   push:
+    branches-ignore:
+      - 'dependabot/**'
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   precommit:
@@ -11,6 +19,13 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/⚡reusable-precommit.yaml
+    secrets: inherit
+
+  named-checks:
+    name: named-checks
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-named-checks.yaml
     secrets: inherit
 
   docker:
@@ -24,6 +39,7 @@ jobs:
     with:
       image_name: diene-workspace
       dockerfile: ./infra/Dockerfile
+      platform: linux/amd64
 
   helm:
     name: Helm Chart
