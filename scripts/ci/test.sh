@@ -34,6 +34,11 @@ fi
 
 bun install --frozen-lockfile
 
+if [[ ${tier} == "sit" ]]; then
+  if [[ -d dist/bin ]]; then chmod -R +x dist/bin; fi
+  if [[ -n ${CLI_BIN:-} ]]; then chmod +x "${CLI_BIN}"; fi
+fi
+
 if [[ -z ${scope} ]]; then
   echo "🧪 Running ${tier} tests..."
   bun test --config="${config}"

@@ -14,20 +14,22 @@ rules remain in `docs/standards/`.
 - `task setup` installs the locked Bun dependencies after synchronizing vendored
   package skills.
 - `task lint` runs every generated pre-commit hook.
-- `task test`, `task test:unit`, and `task test:int` run the test tiers without
-  coverage.
-- `task test:coverage`, `task test:unit:coverage`, and
-  `task test:int:coverage` write scoped LCOV artifacts.
+- `task test`, `task test:unit`, `task test:int`, and `task test:sit` run the
+  test tiers without coverage; SIT drives the freshly compiled binary.
+- `task test:coverage`, `task test:unit:coverage`,
+  `task test:int:coverage`, and `task test:sit:coverage` write scoped LCOV
+  artifacts. SIT coverage uses the in-process driver only.
 - `task test:watch` watches the unit tier.
-- `task build` bundles `src/index.ts` to `dist/index.js`.
+- `task build` bundles the `package.json` `bin` entry to `dist/bun-cli.js`.
+- `task compile` emits the three supported standalone binaries under `dist/bin/`.
 - `task deadcode` runs the two non-blocking LLM Knip views.
 - `task run -- <args>` executes the source entry point.
-- `task preview -- <args>` rebuilds and executes the bundled artifact.
+- `task preview -- <args>` compiles and executes this host's standalone binary.
+- `task up` and `task down` manage the sample Redis used for interactive CLI runs.
 - `task docker:build` and `task docker:run` build and run the Bun image.
 
-There is no `task dev`, `task up`, or `task down` surface in this base. Hot reload
-belongs to runnable descendants, and the integration tier owns its Redis
-dependency through Testcontainers.
+There is no `task dev` surface. Integration and SIT own isolated Redis containers;
+`up`/`down` exist only for interactive sample commands.
 
 ## Quality gates
 
@@ -36,19 +38,22 @@ Prettier formats only Markdown and YAML. The Biome hook only lints. TypeScript
 uses strict no-emit typechecking. Knip has four dead-code modes, none with ignore or exclude lists:
 
 - `knip.json`: blocking hook over source and tests, so dead test code fails too.
-- `knip.production.json`: blocking `--production` hook from `src/index.ts`
+- `knip.production.json`: blocking `--production` hook from `bin/bun-cli.ts`
   that ignores test usage, so a file only tests use fails.
 - `knip.llm.json`: non-blocking repository review for LLMs.
 - `knip.production.llm.json`: non-blocking production review for LLMs.
 
 ## Test and coverage tiers
 
-- `.config/bun-base.coverage.yaml` lists the tiers (`unit`, `int`, `meta`), each
-  with its test folder and coverage scope; `scripts/ci/test.sh <tier>` reads it.
+- `.config/bun-base.coverage.yaml` lists the tiers (`unit`, `int`, `meta`,
+  `sit`), each with its test folder and coverage scope;
+  `scripts/ci/test.sh <tier>` reads it.
   A tier with no test files passes and writes no coverage file.
 - Unit tests live under `tests/unit/` and cover only `src/lib/**`.
 - Integration tests live under `tests/integration/`, use Testcontainers Redis,
   and cover only `src/adapters/**`.
+- SIT lives under `tests/sit/`: binary mode is black-box, while in-process mode
+  records the full-system `reports/e2e/lcov.info` ledger.
 - Both CI entry points require an LCOV artifact, reject paths outside their
   tier ledger, and require every ledger line to be hit.
 - Each tier writes its own LCOV file: `reports/unit/lcov.info` and
@@ -61,15 +66,13 @@ Container images are version-pinned without digests.
 ## Build and runtime
 
 The local build and CI build share `scripts/local/build.sh`. The Dockerfile
-uses version-pinned `oven/bun` build and runtime stages, installs from the
-frozen lockfile, bundles the sample, and runs as the unprivileged `bun` user.
-The sample is stateless classes wired in `src/index.ts`: the domain in
-`src/lib/sample/`, pino and Redis in `src/adapters/`. It prints a composed key
-by default; `REDIS_HOST` plus `REDIS_PORT` enable a Redis round trip.
+compiles in a version-pinned `oven/bun` stage and copies only the binary into
+`gcr.io/distroless/cc-debian12:nonroot`. `REDIS_HOST` and `REDIS_PORT` select
+the Redis endpoint and reject blank or invalid overrides.
 
-The sample logs pino JSON only. Trace-context injection belongs to the
-observability payload, which descendants add; this node declares no
-`@atomicloud/diene.*` dependency.
+The CLI writes to the terminal through its adapters and ships no logger.
+Trace-context injection belongs to the observability payload; this node
+declares no `@atomicloud/diene.*` dependency.
 
 ## TypeScript standards
 

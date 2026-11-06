@@ -6,6 +6,13 @@ on:
       - 'v*.*.*'
 
 jobs:
+  goreleaser:
+    name: GoReleaser Publish
+    permissions:
+      contents: write
+    uses: ./.github/workflows/⚡reusable-goreleaser.yaml
+    secrets: inherit
+
   docker:
     name: Docker Image
     permissions:
@@ -15,6 +22,6 @@ jobs:
     uses: ./.github/workflows/⚡reusable-docker.yaml
     secrets: inherit
     with:
-      image_name: diene-workspace
+      image_name: diene-bun-cli
       dockerfile: ./infra/Dockerfile
       version: ${{ github.ref_name }}

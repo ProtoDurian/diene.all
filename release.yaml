@@ -164,16 +164,17 @@ release:
       ${notes}
     assets:
       - Changelog.md
+      - Changelog.old.md
       - docs/developer/CommitConventions.md
       - package.json
-  github:
-    enabled: true
-    successComment: 'Released in ${version}.'
-    releasedLabels:
-      - released
+  # GoReleaser publishes this tag's GitHub release; a second publisher would collide.
+  github: false
   hooks:
     # A file a hook writes joins commit.assets in the same edit.
+    # beforeWrite must run before afterWrite: publish.sh diffs Changelog.old.md.
     prepare:
+      - phase: beforeWrite
+        command: ./scripts/release/backup-changelog.sh
       - phase: afterWrite
         command: './scripts/release/bump.sh ${version}'
     success: []

@@ -8,3 +8,6 @@ tiers:
   meta:
     tests: tests/meta
     scope: ''
+  sit:
+    tests: tests/sit
+    scope: ''
