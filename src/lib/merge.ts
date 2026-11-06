@@ -6,7 +6,6 @@ class DeepMerger {
   // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
   constructor() {}
 
-  // Arrays and scalars replace wholesale; per-index list overrides belong to the env tier.
   merge<T extends ConfigRecord>(base: T, override: ConfigRecord): T {
     const out: ConfigRecord = { ...base };
     for (const [key, value] of Object.entries(override)) {
