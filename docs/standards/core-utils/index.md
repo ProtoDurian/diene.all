@@ -2,7 +2,7 @@
 
 `@atomicloud/diene.core-utils` is the Bun family's small, deterministic value
 layer. Import from the package root. It owns common normalization, timing,
-collection, hashing, path-value and C0 temporal-codec behavior; configuration
+collection, hashing, path-value and wire temporal-codec behavior; configuration
 loading and deep merge belong to `@atomicloud/diene.config`, and filesystem
 effects belong to the System/VFS ports of `@atomicloud/diene.interfaces`.
 
@@ -61,10 +61,10 @@ with POSIX rules, and a result outside `root` is an `Err`. Every failure is a
 `Ok` value is a valid path for a `VirtualFileSystem`. Read and write files
 through that port, not through this package.
 
-## C0 wire-date codecs
+## Wire-date codecs
 
 `WireDateCodec` translates between Temporal domain values and the transport forms
-of C0 §1 Serialization, the cross-language serialization contract; the table
+of the cross-language serialization contract; the table
 below is that contract's complete wire rule set. It follows the repository's
 [date/time standard](../datetime/index.md). These are wire values, not display
 formats.
