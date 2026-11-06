@@ -10,33 +10,34 @@ These tools produce every row of [Wire Format](../index.md):
 
 ```typescript
 JSON.stringify({ orderId }); // '{"orderId":"..."}'
+const Order = z.object({ orderId: z.uuid() });
 ```
 
 ## UUID
 
 ```typescript
-const id = Bun.randomUUIDv7(); // lowercase v7
+JSON.stringify({ id: Bun.randomUUIDv7() }); // lowercase v7
 const Id = z.uuid().toLowerCase();
 ```
 
 ## Instant
 
 ```typescript
-instant.toString({ fractionalSecondDigits: 3 }); // '2024-03-15T14:30:00.000Z'
+JSON.stringify({ at: instant.toString({ fractionalSecondDigits: 3 }) }); // '{"at":"2024-03-15T14:30:00.000Z"}'
 const Instant = z.iso.datetime({ precision: 3 }).transform(s => Temporal.Instant.from(s));
 ```
 
 ## Date
 
 ```typescript
-Temporal.PlainDate.from('2024-03-15').toString(); // '2024-03-15'
+JSON.stringify({ day: day.toString() }); // '{"day":"2024-03-15"}'
 const Day = z.iso.date().transform(s => Temporal.PlainDate.from(s));
 ```
 
 ## Time of day
 
 ```typescript
-Temporal.PlainTime.from('14:30').toString({ smallestUnit: 'second' }); // '14:30:00'
+JSON.stringify({ opensAt: time.toString({ smallestUnit: 'second' }) }); // '{"opensAt":"14:30:00"}'
 const TimeOfDay = z.iso.time({ precision: 0 }).transform(s => Temporal.PlainTime.from(s));
 ```
 
@@ -45,21 +46,21 @@ const TimeOfDay = z.iso.time({ precision: 0 }).transform(s => Temporal.PlainTime
 ```typescript
 JSON.stringify({ at: zoned.toInstant().toString({ fractionalSecondDigits: 3 }), zone: zoned.timeZoneId });
 // '{"at":"2024-03-15T14:30:00.000Z","zone":"Asia/Singapore"}'
-Temporal.Instant.from(at).toZonedDateTimeISO(zone); // read it back
+const Zoned = z.object({ at: Instant, zone: z.string() }).transform(({ at, zone }) => at.toZonedDateTimeISO(zone));
 ```
 
 ## Duration
 
 ```typescript
-Temporal.Duration.from({ hours: 2, minutes: 30 }).toString(); // 'PT2H30M'
-Temporal.Duration.from({ days: 1, hours: 2 }).toString(); // 'P1DT2H'
+JSON.stringify({ timeout: timeout.toString() }); // '{"timeout":"PT2H30M"}', or 'P1DT2H'
+const Duration = z.iso.duration().transform(s => Temporal.Duration.from(s));
 ```
 
 ## Money / decimal
 
 ```typescript
-const Money = z.object({ amount: z.string().regex(/^-?\d+(\.\d+)?$/), currency: z.string().regex(/^[A-Z]{3}$/) });
 JSON.stringify({ amount: '12.50', currency: 'SGD' }); // never 12.5
+const Money = z.object({ amount: z.string().regex(/^-?\d+(\.\d+)?$/), currency: z.string().regex(/^[A-Z]{3}$/) });
 ```
 
 ## Integer beyond ±2^53
@@ -75,20 +76,21 @@ const Count = z
 ## Enum
 
 ```typescript
+JSON.stringify({ status: 'in_progress' });
 const Status = z.enum(['pending', 'in_progress', 'done']);
 ```
 
 ## Missing value
 
 ```typescript
-const Order = z.object({ note: z.string().optional() }); // not .nullable()
 JSON.stringify({ note: undefined }); // '{}'
+const Order = z.object({ note: z.string().optional() }); // not .nullable()
 ```
 
 ## Binary
 
 ```typescript
-Buffer.from(bytes).toString('base64'); // 'aGk='
+JSON.stringify({ data: Buffer.from(bytes).toString('base64') }); // '{"data":"aGk="}'
 const Bytes = z.base64().transform(s => Buffer.from(s, 'base64'));
 ```
 
@@ -103,4 +105,5 @@ Response.json(
   },
   { status: 404, headers: { 'Content-Type': 'application/problem+json' } },
 );
+const Problem = z.object({ type: z.url(), title: z.string(), status: z.number().int() });
 ```

@@ -152,7 +152,7 @@ try {
   const user = UserSchema.parse(input);
 } catch (error) {
   if (error instanceof z.ZodError) {
-    console.log(error.errors);
+    console.log(error.issues);
   }
 }
 ```
@@ -167,7 +167,7 @@ const result = UserSchema.safeParse(input);
 if (result.success) {
   const user = result.data;
 } else {
-  const errors = result.error.errors;
+  const errors = result.error.issues;
 }
 ```
 
@@ -257,7 +257,7 @@ if (!result.success) {
   // }
 
   // Or flat list
-  const errors = result.error.errors;
+  const errors = result.error.issues;
   // [
   //   { path: ["email"], message: "Invalid email", code: "invalid_string" },
   //   { path: ["age"], message: "Must be a positive number", code: "too_small" }
@@ -291,7 +291,7 @@ async function createUser(req: Request, res: Response) {
         type: 'https://errors.atomi.cloud/docs/lapras/nitroso/zinc/api/v1/validation_error',
         title: 'The request is invalid',
         status: 400,
-        errors: result.error.errors.map(e => ({
+        errors: result.error.issues.map(e => ({
           field: e.path.join('.'),
           message: e.message,
         })),
@@ -324,7 +324,7 @@ async function createUser(req: Request): Promise<Response> {
         type: 'https://errors.atomi.cloud/docs/lapras/nitroso/zinc/api/v1/validation_error',
         title: 'The request is invalid',
         status: 400,
-        errors: result.error.errors.map(e => ({
+        errors: result.error.issues.map(e => ({
           field: e.path.join('.'),
           message: e.message,
         })),
