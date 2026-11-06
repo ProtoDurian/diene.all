@@ -13,11 +13,17 @@ class ConcurrencyMapper {
 
     const results = new Array<R>(items.length);
     let next = 0;
+    let failed = false;
     const worker = async (): Promise<void> => {
-      while (next < items.length) {
+      while (!failed && next < items.length) {
         const current = next;
         next += 1;
-        results[current] = await mapper(items[current] as T, current);
+        try {
+          results[current] = await mapper(items[current] as T, current);
+        } catch (error) {
+          failed = true;
+          throw error;
+        }
       }
     };
 

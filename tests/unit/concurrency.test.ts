@@ -93,4 +93,24 @@ describe('ConcurrencyMapper.mapWithConcurrency', () => {
     // Assert
     await actual.should.be.rejectedWith(boom);
   });
+
+  it('should start no further item once a mapper rejects', async () => {
+    // Arrange
+    const mapper = new ConcurrencyMapper();
+    const started: number[] = [];
+
+    // Act
+    const actual = mapper.mapWithConcurrency([0, 1, 2, 3, 4, 5], 2, async item => {
+      started.push(item);
+      if (item === 0) throw new Error('mapper failed');
+      await timing.sleep(0.005);
+      return item;
+    });
+    await actual.catch(() => undefined);
+    await timing.sleep(0.03);
+
+    // Assert
+    await actual.should.be.rejectedWith('mapper failed');
+    started.should.deepEqual([0, 1]);
+  });
 });
