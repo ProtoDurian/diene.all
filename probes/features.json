@@ -238,5 +238,10 @@
     "template": "diene/bun-base",
     "name": "bun-preview",
     "class": "smoke"
+  },
+  {
+    "template": "diene/bun-base",
+    "name": "bun-biome-format",
+    "class": "gate"
   }
 ]

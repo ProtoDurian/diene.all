@@ -32,8 +32,9 @@ dependency through Testcontainers.
 
 ## Quality gates
 
-Biome is lint-only; treefmt owns formatting. TypeScript uses strict no-emit
-typechecking. Knip has four dead-code modes, none with ignore or exclude lists:
+treefmt runs Biome to format TS, JS and JSON in the style set in `biome.json`;
+Prettier formats only Markdown and YAML. The Biome hook only lints. TypeScript
+uses strict no-emit typechecking. Knip has four dead-code modes, none with ignore or exclude lists:
 
 - `knip.json`: blocking hook over source and tests, so dead test code fails too.
 - `knip.production.json`: blocking `--production` hook from `src/index.ts`
