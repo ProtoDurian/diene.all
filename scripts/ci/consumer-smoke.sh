@@ -50,7 +50,7 @@ const registry = ConfigRegistry.create().register('server', z.object({ port: z.n
 const source = new InMemoryConfigSource({ base: { server: { port: 1 } }, runtimeEnv: { ATOMI_SERVER__PORT: '2' } });
 const config = await new ConfigLoader(source, registry, { prefix: 'ATOMI_' }).load();
 if (config.get('server').port !== 2) throw new Error('ESM loader returned the wrong port');
-if (new BuildTimeValueMapper().map({ ATOMI_X: '1', Y: '2' }, 'ATOMI_').ATOMI_X !== '1') throw new Error('ESM build-time map is wrong');
+if (Object.keys(new BuildTimeValueMapper().map({ ATOMI_CLIENT__X: '1', ATOMI_CLIENT__FARO__BUILD__KEY: 's', ATOMI_SERVER__Y: '2' }, 'ATOMI_')).join() !== 'ATOMI_CLIENT__X') throw new Error('ESM build-time map kept a non-client value');
 const error = await new ConfigAssertions(new ConfigStubBuilder(registry, { prefix: 'ATOMI_' })).expectInvalid({ base: {} });
 if (error.issues.length === 0) throw new Error('ESM asserter missed an invalid config');
 if (!(error instanceof ConfigValidationError)) throw new Error('ESM /test-helper error is not the root ConfigValidationError');
@@ -65,7 +65,7 @@ const { ConfigAssertions, ConfigStubBuilder, InMemoryConfigSource } = require('$
 const { z } = require('zod');
 const registry = ConfigRegistry.create().register('server', z.object({ port: z.number() }));
 const source = new InMemoryConfigSource({ base: { server: { port: 1 } }, runtimeEnv: { ATOMI_SERVER__PORT: '2' } });
-if (new BuildTimeValueMapper().map({ ATOMI_X: '1', Y: '2' }, 'ATOMI_').ATOMI_X !== '1') throw new Error('CJS build-time map is wrong');
+if (Object.keys(new BuildTimeValueMapper().map({ ATOMI_CLIENT__X: '1', ATOMI_CLIENT__FARO__BUILD__KEY: 's', ATOMI_SERVER__Y: '2' }, 'ATOMI_')).join() !== 'ATOMI_CLIENT__X') throw new Error('CJS build-time map kept a non-client value');
 Promise.all([
   new ConfigLoader(source, registry, { prefix: 'ATOMI_' }).load(),
   new ConfigAssertions(new ConfigStubBuilder(registry, { prefix: 'ATOMI_' })).expectInvalid({ base: {} }),
