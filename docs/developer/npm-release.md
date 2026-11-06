@@ -6,7 +6,7 @@ mirror repository. The release workflow stamps the version in the release
 commit, creates `vX.Y.Z`, and the tag-triggered CD workflow verifies that the
 manifest version equals the tag before publishing.
 
-The reusable publish workflow receives the organization secret
+The reusable `npm-publish` workflow receives the organization secret
 `NPM_API_KEY`. It uses `bun publish --access public --tolerate-republish`, so a
 retry of an already-published tag is safe. Publishing never changes the
 manifest.
