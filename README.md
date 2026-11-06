@@ -2,7 +2,7 @@
 
 See the [.NET baseline](docs/developer/dotnet-baseline.md) for the
 language-specific toolchain, task surface, test tiers, coverage ledgers, dead-code
-passes, and the illustrative Note domain ([docs/domain/note.md](docs/domain/note.md)).
+passes, and the wire contract ([docs/domain/core-utils.md](docs/domain/core-utils.md)).
 C# variants accompany the shared standards for
 [date/time](docs/standards/datetime/languages/csharp.md),
 [domain-driven design](docs/standards/domain-driven-design/languages/csharp.md),
@@ -64,27 +64,36 @@ This tree is the all-features workspace baseline inherited by every downstream s
 
 # Publishable library packages
 
-[![NuGet version](https://img.shields.io/nuget/v/AtomiCloud.Diene.Note)](https://www.nuget.org/packages/AtomiCloud.Diene.Note)
-[![NuGet downloads](https://img.shields.io/nuget/dt/AtomiCloud.Diene.Note)](https://www.nuget.org/packages/AtomiCloud.Diene.Note)
+[![NuGet version](https://img.shields.io/nuget/v/AtomiCloud.Diene.CoreUtils)](https://www.nuget.org/packages/AtomiCloud.Diene.CoreUtils)
+[![NuGet downloads](https://img.shields.io/nuget/dt/AtomiCloud.Diene.CoreUtils)](https://www.nuget.org/packages/AtomiCloud.Diene.CoreUtils)
 
-This template publishes `AtomiCloud.Diene.Note` and the companion
-`AtomiCloud.Diene.Note.TestHelper` package at one committed version. The Note
-domain is illustrative; the package lifecycle is the reusable product.
+This repository publishes one package, `AtomiCloud.Diene.CoreUtils`: the wire
+codecs for dates, times, UTC instants, durations and IANA timezone ids, slug and
+namespaced-key helpers that match the TypeScript sibling byte for byte, and the
+key-matching rule the Config library consumes. It ships no TestHelper: every
+member is a deterministic value function with no port to fake.
 
 ```bash
-dotnet add package AtomiCloud.Diene.Note
-dotnet add package AtomiCloud.Diene.Note.TestHelper
+dotnet add package AtomiCloud.Diene.CoreUtils
 ```
 
 ```csharp
-using AtomiCloud.Diene.Note;
-using AtomiCloud.Diene.Note.TestHelper.Note;
+using System.Text.Json;
+using AtomiCloud.Diene.CoreUtils;
+using AtomiCloud.Diene.CoreUtils.Json;
 
-var summariser = new NoteSummariser();
-var note = new NoteRecord { Title = "Hello", Body = "world" };
-summariser.AssertSummary(note, 80, "Hello — world");
+var json = JsonSerializer.Serialize(receipt, AtomiJson.DefaultOptions);
+
+Wire.ParseTimeZone("Singapore Standard Time");  // Err: IANA ids only
+Wire.Format(TimeSpan.FromMinutes(90));          // "PT1H30M"
+
+Slug.NamespacedKey("AtomiCloud", "Express Parcel");  // Ok("atomicloud:express-parcel")
+KeyNormalizer.KeysMatch("error_portal", "ErrorPortal");  // true
 ```
 
-`nix develop .#ci -c ./scripts/ci/pkg-validate.sh` packs both packages, validates
-metadata and symbols, and restores them into a scratch consumer. See [the library baseline](docs/developer/dotnet-lib-baseline.md)
+It consumes the published `AtomiCloud.Diene.Result` and
+`AtomiCloud.Diene.Interfaces` packages from nuget.org, never a project reference.
+
+`nix develop .#ci -c ./scripts/ci/pkg-validate.sh` packs the package, validates
+metadata and symbols, and restores it into a scratch consumer. See [the library baseline](docs/developer/dotnet-lib-baseline.md)
 for release and promotion guidance.

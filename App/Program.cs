@@ -1,26 +1,40 @@
-using AtomiCloud.DotnetBase.App.Adapters.Redis;
-using AtomiCloud.Diene.Note;
-using StackExchange.Redis;
-
 namespace AtomiCloud.DotnetBase.App;
 
 public static class Program
 {
-    public static async Task Main()
+    public static int Main()
     {
-        var connectionString = Environment.GetEnvironmentVariable("REDIS_CONNECTION");
-        if (string.IsNullOrWhiteSpace(connectionString)) connectionString = "localhost:6379";
+        var built = Samples.Sample();
+        if (built.IsFailure(out var buildError)) return Reject(buildError);
 
-        await using var redis = await ConnectionMultiplexer.ConnectAsync(connectionString);
-        var notes = new NoteService(new RedisNoteRepository(redis), new NoteSummariser());
+        var receipt = built.Get();
+        var wire = Samples.ToWire(receipt);
 
-        var saved = await notes.Create(new NoteRecord
-        {
-            Title = "Welcome",
-            Body = "The first note stored through the Redis adapter.",
-        });
-        var preview = await notes.Preview(saved.Id);
+        var restored = Samples.FromWire(wire);
+        if (restored.IsFailure(out var decodeError)) return Reject(decodeError);
 
-        Console.WriteLine(preview ?? $"Note {saved.Id} could not be read back.");
+        var telemetry = Samples.Telemetry(receipt);
+        if (telemetry.IsFailure(out var attributeError)) return Reject(attributeError);
+
+        var tracking = Samples.Lookup(telemetry.Get(), "TrackingNumber");
+        if (tracking.IsFailure(out var lookupError)) return Reject(lookupError);
+
+        var matched = restored.Get() == receipt;
+        Console.WriteLine(wire);
+        Console.WriteLine($"tracking attribute resolved across spellings: {tracking.Get().Wire}");
+        Console.WriteLine($"Success: core-utils round trip {(matched ? "matched" : "drifted")}");
+        return matched ? 0 : 1;
+    }
+
+    private static int Reject(WireFormatError error)
+    {
+        Console.Error.WriteLine($"Failure: expected {error.Expected}, received {error.Actual}");
+        return 1;
+    }
+
+    private static int Reject(KeyError error)
+    {
+        Console.Error.WriteLine($"Failure: {error.Reason} (offending: {error.Offending})");
+        return 1;
     }
 }

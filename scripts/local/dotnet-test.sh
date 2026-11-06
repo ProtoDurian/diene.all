@@ -11,6 +11,7 @@ root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 config="${DOTNET_TEST_CONFIG:-$(find "${root}/.config" -maxdepth 1 -name '*.test.yaml' 2>/dev/null | head -n 1)}"
 [ ! -f "${config:-/nonexistent}" ] && echo "❌ Test config not found (.config/*.test.yaml)" >&2 && exit 1
 ! command -v yq >/dev/null && echo "❌ yq is required to read ${config}" >&2 && exit 1
+[ "${kind}" = "meta" ] && [ -z "$(find "${root}" -maxdepth 2 -type f -path '*/TestHelper*.csproj' -print -quit)" ] && echo "✅ No TestHelper project; meta tier is inactive" && exit 0
 
 mapfile -t projects < <(yq -r ".coverage.${kind}.projects[]?" "${config}")
 minimum="$(yq -er ".coverage.${kind}.minimum // \"\"" "${config}")"

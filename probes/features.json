@@ -256,18 +256,13 @@
   },
   {
     "template": "diene/dotnet-lib",
-    "name": "dotnet-lib-testhelper-contract",
-    "class": "gate"
-  },
-  {
-    "template": "diene/dotnet-lib",
     "name": "dotnet-lib-coverage-ledger",
     "class": "gate"
   },
   {
     "template": "diene/dotnet-lib",
-    "name": "dotnet-lib-testhelper-meta-ledger",
-    "class": "gate"
+    "name": "dotnet-lib-meta-tier-inactive",
+    "class": "smoke"
   },
   {
     "template": "diene/dotnet-lib",

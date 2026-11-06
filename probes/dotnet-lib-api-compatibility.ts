@@ -25,8 +25,11 @@ export default defineGate({
       'Removing a public member the published 1.0.0 package ships, and nothing in Lib reads, turns PackageValidation red.',
     expectedImpact: [],
     async run(repo: any) {
-      await repo.patch('Lib/NotePrincipal.cs', {
-        find: '    public required string Id { get; init; }\n',
+      await repo.patch('Lib/KeyNormalizer.cs', {
+        find:
+          '\n    /// <summary>Determines whether two keys name the same thing under the canonical rule.</summary>\n' +
+          '    public static bool KeysMatch(string a, string b) =>\n' +
+          '        string.Equals(Canonical(a), Canonical(b), StringComparison.Ordinal);\n',
         replace: '',
       });
       await expectRedBecause(

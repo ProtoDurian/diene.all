@@ -1,0 +1,5 @@
+global using AtomiCloud.Diene.CoreUtils;
+global using AtomiCloud.DotnetBase.App;
+global using AtomiCloud.Diene.Results;
+global using AtomiCloud.Diene.Results.TestHelper;
+global using FluentAssertions;

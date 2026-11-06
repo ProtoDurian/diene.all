@@ -19,9 +19,9 @@ shared workspace, standards, secret, and release surfaces.
 | `task dev`                         | Run the App through `dotnet watch`.                            |
 | `task run -- <args>`               | Run the App in development mode.                               |
 | `task preview -- <args>`           | Build and run the compiled Release artifact.                   |
-| `task up` / `task down`            | Start or stop the local Redis dependency.                      |
-| `task test`                        | Run unit and integration tiers.                                |
+| `task test`                        | Run every test tier.                                           |
 | `task test:unit` / `task test:int` | Run one tier.                                                  |
+| `task test:coverage`               | Enforce every merged coverage ledger.                          |
 | `task test:unit:coverage`          | Enforce the merged unit coverage ledger.                       |
 | `task test:int:coverage`           | Enforce the merged integration coverage ledger.                |
 | `task test:unit:watch`             | Watch the fast unit tier.                                      |
@@ -37,7 +37,8 @@ registered projects, merges Coverlet JSON, and enforces one final threshold per
 tier:
 
 - unit: every `[Lib*]*` assembly at 100%;
-- integration: every `[App*]*` assembly at 80%.
+- integration: every `[App*]*` assembly at 80% — here, the host-dependent parts
+  of the wire contract.
 
 The runner writes each tier's merged Cobertura report to its own file
 (`reports/unit/coverage.cobertura.xml`, `reports/integration/coverage.cobertura.xml`)
@@ -91,7 +92,7 @@ C# variants accompany the shared standards:
 ## Template-maintenance boundary
 
 Downstream nodes may adapt package/artifact identity, coverage thresholds,
-chart contents, badges, and the illustrative Note source/tests. Keep
+chart contents, badges, and product source/tests. Keep
 `dotnet-base.slnx`, `.config/dotnet-base.test.yaml`, and the
 `AtomiCloud.DotnetBase.*` root namespaces base-named for merge stability.
 
