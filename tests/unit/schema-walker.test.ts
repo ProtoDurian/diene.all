@@ -45,6 +45,11 @@ describe('SchemaWalker.kind', () => {
     },
     { label: 'a required optional boolean', schema: z.boolean().optional().nonoptional(), expected: 'boolean' },
     { label: 'the input side of a pipe', schema: z.string().pipe(z.coerce.number()), expected: 'string' },
+    { label: 'the output side of a preprocess', schema: z.preprocess(v => v, z.string()), expected: 'string' },
+    { label: 'the input side of a transform', schema: z.string().transform(Number), expected: 'string' },
+    { label: 'a union of string and null', schema: z.union([z.string(), z.null()]), expected: 'string' },
+    { label: 'a string or undefined', schema: z.string().or(z.undefined()), expected: 'string' },
+    { label: 'only null', schema: z.null(), expected: 'unknown' },
     { label: 'a lazy string', schema: z.lazy(() => z.string()), expected: 'string' },
     { label: 'no schema', schema: undefined, expected: 'unknown' },
   ])('should classify $label', ({ schema, expected }) => {
@@ -135,6 +140,25 @@ describe('SchemaWalker.opaque', () => {
 
     // Act
     const actual = walker.opaque(node);
+
+    // Assert
+    actual.should.equal(expected);
+  });
+});
+
+describe('SchemaWalker.caught', () => {
+  it.each([
+    { label: 'a catch boolean', schema: z.boolean().catch(false), expected: true },
+    { label: 'an optional catch boolean', schema: z.boolean().catch(false).optional(), expected: true },
+    { label: 'a plain boolean', schema: z.boolean(), expected: false },
+    { label: 'an optional boolean', schema: z.boolean().optional(), expected: false },
+    { label: 'no schema', schema: undefined, expected: false },
+  ])('should report $expected for $label', ({ schema, expected }) => {
+    // Arrange
+    const node = walker.root(schema);
+
+    // Act
+    const actual = walker.caught(node);
 
     // Assert
     actual.should.equal(expected);

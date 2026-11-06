@@ -8,6 +8,7 @@ interface Definition {
   type: string;
   innerType?: z.ZodType;
   in?: z.ZodType;
+  out?: z.ZodType;
   getter?: () => z.ZodType;
   options?: readonly z.ZodType[];
   left?: z.ZodType;
@@ -23,6 +24,7 @@ interface Definition {
 }
 
 const WRAPPERS = new Set(['optional', 'nullable', 'default', 'prefault', 'readonly', 'catch', 'nonoptional']);
+const ABSENT = new Set(['null', 'undefined', 'void', 'never']);
 const OPAQUE = new Set(['custom', 'map', 'set', 'promise', 'function', 'transform', 'file']);
 const KINDS: Record<string, LeafKind> = {
   string: 'string',
@@ -60,13 +62,22 @@ class SchemaWalker {
   }
 
   kind(node: SchemaNode): LeafKind {
-    const kinds = new Set(this.resolve(node).map(definition => this.kindOf(definition)));
+    const present = this.resolve(node).filter(definition => !ABSENT.has(definition.type));
+    const kinds = new Set(present.map(definition => this.kindOf(definition)));
     const [only] = kinds;
     return kinds.size === 1 && only !== undefined ? only : 'unknown';
   }
 
   opaque(node: SchemaNode): boolean {
     return this.resolve(node).some(definition => OPAQUE.has(definition.type));
+  }
+
+  caught(node: SchemaNode): boolean {
+    return node.some(schema => {
+      const definition = schema._zod.def as unknown as Definition;
+      if (definition.type === 'catch') return true;
+      return WRAPPERS.has(definition.type) && definition.innerType !== undefined && this.caught([definition.innerType]);
+    });
   }
 
   private childOf(definition: Definition, key: string): z.ZodType[] {
@@ -111,7 +122,11 @@ class SchemaWalker {
     return node.flatMap(schema => {
       const definition = schema._zod.def as unknown as Definition;
       if (WRAPPERS.has(definition.type) && definition.innerType) return this.resolve([definition.innerType]);
-      if (definition.type === 'pipe' && definition.in) return this.resolve([definition.in]);
+      if (definition.type === 'pipe' && definition.in) {
+        const input = this.resolve([definition.in]);
+        const output = definition.out;
+        return output !== undefined && input.every(step => step.type === 'transform') ? this.resolve([output]) : input;
+      }
       if (definition.type === 'lazy' && definition.getter) return this.resolve([definition.getter()]);
       if (definition.type === 'union') return this.resolve(definition.options ?? []);
       if (definition.type === 'intersection' && definition.left && definition.right) {

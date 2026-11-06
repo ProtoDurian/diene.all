@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import { EnvKeyMatcher, ScalarCoercer } from './coerce.js';
 import { ConfigLoaderError } from './errors.js';
 import type { ConfigRecord } from './merge.js';
-import { type LeafKind, type SchemaNode, SchemaWalker } from './schema-walker.js';
+import { type SchemaNode, SchemaWalker } from './schema-walker.js';
 import type { EnvRecord } from './source.js';
 
 const NESTING_SEPARATOR = '__';
@@ -53,25 +53,33 @@ class EnvOverrides {
     });
   }
 
-  private place(container: Container, segments: readonly string[], override: Override, node: SchemaNode): void {
+  private place(
+    container: Container,
+    segments: readonly string[],
+    override: Override,
+    node: SchemaNode,
+    blind = false,
+  ): void {
     const [head, next] = segments as [string, string | undefined];
-    const key = this.keyFor(container, head, override, node);
+    const nowBlind = blind || this.walker.opaque(node);
+    const key = this.keyFor(container, head, override, node, nowBlind);
     const childSchema = this.walker.child(node, key);
     if (next === undefined) {
-      this.assign(container, key, this.leaf(override, this.walker.kind(childSchema)));
+      this.assign(container, key, this.leaf(override, childSchema));
       return;
     }
     const existing = Array.isArray(container) ? container[key as number] : container[key];
     const child: Container =
       isRecord(existing) || Array.isArray(existing) ? existing : this.emptyFor(childSchema, next);
     this.assign(container, key, child);
-    this.place(child, segments.slice(1), override, childSchema);
+    this.place(child, segments.slice(1), override, childSchema, nowBlind);
   }
 
-  // z.coerce.boolean() would read any other text as true, so only true/false may reach a boolean.
-  private leaf(override: Override, kind: LeafKind): unknown {
+  // z.coerce.boolean() would read any other text as true, so only true/false may reach a boolean without a .catch().
+  private leaf(override: Override, node: SchemaNode): unknown {
+    const kind = this.walker.kind(node);
     const value = this.coercer.coerceAs(override.raw, kind);
-    if (kind === 'boolean' && typeof value !== 'boolean') {
+    if (kind === 'boolean' && typeof value !== 'boolean' && !this.walker.caught(node)) {
       throw new ConfigLoaderError(`${override.name}: expected true or false, got "${override.raw}"`);
     }
     return value;
@@ -84,7 +92,13 @@ class EnvOverrides {
     return INDEX.test(next) ? [] : {};
   }
 
-  private keyFor(container: Container, segment: string, override: Override, node: SchemaNode): string | number {
+  private keyFor(
+    container: Container,
+    segment: string,
+    override: Override,
+    node: SchemaNode,
+    blind: boolean,
+  ): string | number {
     if (Array.isArray(container)) {
       if (!INDEX.test(segment)) throw new ConfigLoaderError(`${override.name}: "${segment}" is not a list index`);
       const index = Number.parseInt(segment, 10);
@@ -95,7 +109,7 @@ class EnvOverrides {
     const found =
       this.unique(this.walker.keys(node), segment, override) ?? this.unique(Object.keys(container), segment, override);
     if (found !== undefined) return found;
-    if (this.walker.opaque(node)) {
+    if (blind) {
       throw new ConfigLoaderError(`${override.name}: "${segment}" sits under a schema the loader cannot walk`);
     }
     return segment.toLowerCase();

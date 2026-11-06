@@ -462,3 +462,102 @@ describe('EnvOverrides.apply — plain booleans', () => {
     act.should.throw(ConfigLoaderError, { message: 'ATOMI_SVC__DEBUG: expected true or false, got "yes"' });
   });
 });
+
+describe('EnvOverrides.apply — keys deeper under a schema it cannot walk', () => {
+  it.each([
+    {
+      label: 'two levels under z.custom',
+      schema: z.object({ blob: z.custom<{ inner: { maxRetries?: number } }>(() => true) }),
+      base: { blob: { inner: {} } },
+      name: 'ATOMI_BLOB__INNER__MAX_RETRIES',
+    },
+    {
+      label: 'two levels under a custom member of a union',
+      schema: z.object({ cfg: z.union([z.custom<{ inner: object }>(() => true), z.string()]) }),
+      base: { cfg: { inner: {} } },
+      name: 'ATOMI_CFG__INNER__MAX_RETRIES',
+    },
+  ])('should throw for a key $label', ({ schema, base, name }) => {
+    // Arrange
+    const env = { [name]: '3' };
+
+    // Act
+    const act = () => overrides.apply(base, env, PREFIX, schema);
+
+    // Assert
+    act.should.throw(ConfigLoaderError, { message: new RegExp(name) });
+  });
+});
+
+describe('EnvOverrides.apply — preprocess, null members and catch', () => {
+  it.each([
+    {
+      label: 'an absent key two levels under z.preprocess',
+      schema: z.object({
+        cfg: z.preprocess(v => v, z.object({ inner: z.object({ maxRetries: z.number().optional() }) })),
+      }),
+      base: { cfg: { inner: {} } },
+      name: 'ATOMI_CFG__INNER__MAX_RETRIES',
+      raw: '3',
+      path: ['cfg', 'inner', 'maxRetries'],
+      expected: 3,
+    },
+    {
+      label: 'an absent key under z.preprocess',
+      schema: z.object({
+        cfg: z.preprocess(v => v, z.object({ maxRetries: z.number().optional(), name: z.string() })),
+      }),
+      base: { cfg: { name: 'n' } },
+      name: 'ATOMI_CFG__MAX_RETRIES',
+      raw: '3',
+      path: ['cfg', 'maxRetries'],
+      expected: 3,
+    },
+    {
+      label: 'a z.preprocess string leaf',
+      schema: z.object({ code: z.preprocess(v => v, z.string()) }),
+      base: {},
+      name: 'ATOMI_CODE',
+      raw: '0123',
+      path: ['code'],
+      expected: '0123',
+    },
+    {
+      label: 'a string or null leaf',
+      schema: z.object({ code: z.union([z.string(), z.null()]) }),
+      base: { code: null },
+      name: 'ATOMI_CODE',
+      raw: '0123',
+      path: ['code'],
+      expected: '0123',
+    },
+    {
+      label: 'a string or undefined leaf',
+      schema: z.object({ code: z.string().or(z.undefined()) }),
+      base: {},
+      name: 'ATOMI_CODE',
+      raw: '0123',
+      path: ['code'],
+      expected: '0123',
+    },
+    {
+      label: 'the .catch() fallback for a non-boolean word',
+      schema: z.object({ m: z.boolean().catch(false) }),
+      base: {},
+      name: 'ATOMI_M',
+      raw: 'yes',
+      path: ['m'],
+      expected: false,
+    },
+  ])('should reach $label', ({ schema, base, name, raw, path, expected }) => {
+    // Arrange
+    const env = { [name]: raw };
+
+    // Act
+    const actual = schema.parse(overrides.apply(base, env, PREFIX, schema));
+
+    // Assert
+    const leaf = path.reduce<unknown>((node, key) => (node as Record<string, unknown>)[key], actual);
+    (leaf as object).should.equal(expected);
+  });
+});
