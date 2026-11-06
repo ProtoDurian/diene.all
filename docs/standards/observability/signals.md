@@ -30,7 +30,7 @@ Example: one INFO line per delivery attempt with `delivery_id`, `target`, `attem
 
 ### Gate 3 — Traces (default YES for user flows)
 
-Add a span for each meaningful stage of a user flow, with key IDs as attributes. Skip tracing only for internal work with no per-request flow. The service sets only its head-sampling `ratio` (the share of new traces kept): keep the base `ratio: 1.0` and lower it in a landscape's config when that landscape's trace volume is high. Keeping every error trace is the platform team's **tail sampling** (the collector decides after a trace ends, so it can keep all errors).
+Add a span for each meaningful stage of a user flow, with key IDs as attributes. Skip tracing only for internal work with no per-request flow. The service sets only its head-sampling `ratio` (the share of new traces kept): keep the base `ratio: 1.0` and lower it in a landscape's config when that landscape's trace volume is high (the platform team asks, or its traces cost more than its logs). Keeping every error trace is the platform team's **tail sampling** (the collector decides after a trace ends, so it can keep all errors).
 
 Example: span `webhook.deliver` with `delivery_id`; ratio 1.0, lowered to 0.1 in `raichu` because of its high volume.
 

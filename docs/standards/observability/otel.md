@@ -44,7 +44,7 @@ otel:
         timeout: PT10S
 ```
 
-The base config turns the three signals on and every exporter off, and keeps every trace (`ratio: 1.0`). Each landscape's config turns on the exporters it needs, and lowers `otel.traces.sampler.ratio` when that landscape's trace volume is high, e.g. `otel.traces.exporter.otlp: { enabled: true, endpoint: '{otlp-endpoint}' }` (endpoint from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you)).
+The base config turns the three signals on and every exporter off, and keeps every trace (`ratio: 1.0`). Each landscape's config turns on the exporters it needs, e.g. `otel.traces.exporter.otlp: { enabled: true, endpoint: '{otlp-endpoint}' }` (endpoint from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you)), and lowers `otel.traces.sampler.ratio` when that landscape's trace volume is high (the platform team asks, or its traces cost more than its logs).
 
 Rules:
 

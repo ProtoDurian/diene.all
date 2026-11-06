@@ -7,6 +7,7 @@ A local Grafana, image renderer and Prometheus, so you can render a dashboard wi
 - **Metrics only.** The sandbox has Prometheus, but no log store (Loki) or trace store (Tempo). Log and trace panels show "No data" or a datasource error here; they are the [`UNVERIFIED`](/docs/standards/grafana-dashboards/index.md#log-and-trace-panels) ones.
 - **No folders.** Dashboards land in Grafana's General folder. The service folder (`<platform>-<service>-folder`, see [Shipping](/docs/standards/observability/shipping.md)) is checked after deploy.
 - **One sandbox at a time.** Ports 3000 (Grafana) and 9090 (Prometheus) are fixed.
+- **Alert condition.** It also proves the chart's alert condition fires on a value-0 series ([Check the alert condition](#check-the-alert-condition)).
 
 ## Tools
 

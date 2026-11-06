@@ -75,7 +75,7 @@ Run this for every new or changed dashboard file. Tools and the sandbox: [Dashbo
    done
    ```
 
-   Fix every finding, or justify it in `observability/dashboards/.lint` (the linter reads `.lint` from the dashboard's folder). Start that file as a copy of `.claude/skills/grafana-dashboards/sandbox/dashboards/.lint` A dashboard that selects only by LPSM labels (no `job` or `instance`) needs all four of its exclusions. For any exclusion you add beyond them: drop it, lint again, and put it back only if the lint fails.
+   Fix every finding, or justify it in `observability/dashboards/.lint` (the linter reads `.lint` from the dashboard's folder). Start that file as a copy of `.claude/skills/grafana-dashboards/sandbox/dashboards/.lint`. A dashboard that selects only by LPSM labels (no `job` or `instance`) needs all four of its exclusions. For any exclusion you add beyond them: drop it, lint again, and put it back only if the lint fails.
 
 2. Render in the sandbox with synthetic data and read the PNGs.
 3. Fix what the checklist below finds and repeat from step 1.
