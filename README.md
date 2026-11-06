@@ -19,10 +19,8 @@ the [authorization standard](docs/standards/authorization/index.md).
 Run `task --list` for every available task and its description. The task set is
 declared in [`Taskfile.yaml`](Taskfile.yaml), whose `includes:` block maps each
 namespace to a file under [`tasks/`](tasks); a task shown as `<namespace>:<task>`
-is that key in the included file. Build artifacts — Dockerfiles and Helm charts —
-live under [`infra/`](infra) and may be plural, so their tasks are keyed per
-artifact. See [the Taskfile standard](docs/standards/taskfile/index.md) for the
-conventions.
+is that key in the included file. See
+[the Taskfile standard](docs/standards/taskfile/index.md) for the conventions.
 
 # Development Environment
 
@@ -62,4 +60,4 @@ checks that it names every surface.
 
 # Workspace baseline
 
-This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, Docker, secrets, release configuration, validators, and standards.
+This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, secrets, release configuration, validators, and standards.
