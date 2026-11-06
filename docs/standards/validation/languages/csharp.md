@@ -36,7 +36,7 @@ if (!result.IsValid)
         extensions: new Dictionary<string, object?>
         {
             ["errors"] = result.Errors
-                .GroupBy(error => error.PropertyName)
+                .GroupBy(error => JsonNamingPolicy.CamelCase.ConvertName(error.PropertyName))
                 .ToDictionary(group => group.Key, group => group.Select(error => error.ErrorMessage).ToArray()),
         });
 }

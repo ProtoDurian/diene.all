@@ -1,8 +1,9 @@
 # Wire Format: C#/.NET
 
 `System.Text.Json` produces every row of [Wire Format](../index.md) with one
-`JsonSerializerOptions`. Build it once and pass it to every `JsonSerializer` call
-(or to `ConfigureHttpJsonOptions` in ASP.NET Core).
+`JsonSerializerOptions`. Build it once and pass it to every `JsonSerializer` call.
+In ASP.NET Core, add the same settings and converters to `o.SerializerOptions`
+inside `ConfigureHttpJsonOptions` (and `AddJsonOptions` for MVC).
 
 ```csharp
 using System.Globalization;
@@ -17,7 +18,7 @@ public static class Wire
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         Converters =
         {
-            new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false),
             new InstantConverter(),
             new DurationConverter(),
             new DecimalStringConverter(),
@@ -31,7 +32,9 @@ public sealed class InstantConverter : JsonConverter<DateTimeOffset>
     private const string Format = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
 
     public override DateTimeOffset Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options) =>
-        DateTimeOffset.ParseExact(reader.GetString()!, Format, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+        DateTimeOffset.TryParseExact(reader.GetString(), Format, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var value)
+            ? value
+            : throw new JsonException("Expected an instant like 2024-03-15T14:30:00.000Z.");
 
     public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options) =>
         writer.WriteStringValue(value.UtcDateTime.ToString(Format, CultureInfo.InvariantCulture));
@@ -39,8 +42,24 @@ public sealed class InstantConverter : JsonConverter<DateTimeOffset>
 
 public sealed class DurationConverter : JsonConverter<TimeSpan>
 {
-    public override TimeSpan Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options) =>
-        XmlConvert.ToTimeSpan(reader.GetString()!);
+    public override TimeSpan Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options)
+    {
+        var text = reader.GetString() ?? "";
+        // XmlConvert reads P1M as 30 days and P1Y as 365 days; calendar units are not durations.
+        if (text.Split('T')[0].IndexOfAny(['Y', 'M']) >= 0)
+        {
+            throw new JsonException("Expected a duration in days, hours, minutes and seconds.");
+        }
+
+        try
+        {
+            return XmlConvert.ToTimeSpan(text);
+        }
+        catch (FormatException e)
+        {
+            throw new JsonException("Expected an ISO 8601 duration like PT2H30M.", e);
+        }
+    }
 
     public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options) =>
         writer.WriteStringValue(XmlConvert.ToString(value));
@@ -49,7 +68,9 @@ public sealed class DurationConverter : JsonConverter<TimeSpan>
 public sealed class DecimalStringConverter : JsonConverter<decimal>
 {
     public override decimal Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options) =>
-        decimal.Parse(reader.GetString()!, NumberStyles.Number, CultureInfo.InvariantCulture);
+        decimal.TryParse(reader.GetString(), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : throw new JsonException("Expected a decimal string like \"12.50\".");
 
     public override void Write(Utf8JsonWriter writer, decimal value, JsonSerializerOptions options) =>
         writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
@@ -58,7 +79,9 @@ public sealed class DecimalStringConverter : JsonConverter<decimal>
 public sealed class Int64StringConverter : JsonConverter<long>
 {
     public override long Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options) =>
-        long.Parse(reader.GetString()!, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
+        long.TryParse(reader.GetString(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : throw new JsonException("Expected an integer string like \"9007199254740993\".");
 
     public override void Write(Utf8JsonWriter writer, long value, JsonSerializerOptions options) =>
         writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
@@ -69,7 +92,8 @@ The defaults that need a converter: `DateTimeOffset` writes `+00:00` and up to 7
 fractional digits, `TimeSpan` writes `02:30:00`, and `decimal` and `long` write
 JSON numbers that lose precision in JavaScript readers. Every `long` field is a
 string, so its wire type never depends on its value; use `int` for counts that
-fit in a JSON number.
+fit in a JSON number. Each converter throws `JsonException` on bad input, which
+ASP.NET Core answers with a 400.
 
 ## Keys
 
@@ -92,7 +116,7 @@ public sealed record Created(DateTimeOffset At);
 
 var json = JsonSerializer.Serialize(new Created(DateTimeOffset.Parse("2024-03-15T22:30:00+08:00")), Wire.Options);
 // {"at":"2024-03-15T14:30:00.000Z"}
-var at = JsonSerializer.Deserialize<Created>(json, Wire.Options)!.At; // 2024-03-15 14:30:00 +00:00
+var at = JsonSerializer.Deserialize<Created>(json, Wire.Options)!.At; // 14:30 UTC, offset 00:00
 ```
 
 ## Date
@@ -111,7 +135,8 @@ public sealed record Opening(TimeOnly OpensAt);
 JsonSerializer.Serialize(new Opening(new TimeOnly(14, 30)), Wire.Options); // {"opensAt":"14:30:00"}
 ```
 
-Keep `TimeOnly` values at whole seconds; a fraction would be written too.
+The default `TimeOnly` converter already writes `HH:mm:ss`. Keep values at whole
+seconds, because a fraction would be written too.
 
 ## Zoned value
 
@@ -131,7 +156,8 @@ var local = TimeZoneInfo.ConvertTime(meeting.At, TimeZoneInfo.FindSystemTimeZone
 public sealed record Retry(TimeSpan Timeout);
 
 var json = JsonSerializer.Serialize(new Retry(new TimeSpan(2, 30, 0)), Wire.Options); // {"timeout":"PT2H30M"}
-var timeout = JsonSerializer.Deserialize<Retry>("""{"timeout":"P1DT2H"}""", Wire.Options)!.Timeout; // 1.02:00:00
+var timeout = JsonSerializer.Deserialize<Retry>(json, Wire.Options)!.Timeout; // 02:30:00
+JsonSerializer.Serialize(new Retry(new TimeSpan(1, 2, 0, 0)), Wire.Options); // {"timeout":"P1DT2H"}
 ```
 
 ## Money / decimal
