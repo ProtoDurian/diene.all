@@ -7,8 +7,9 @@ loading and deep merge belong to `@atomicloud/diene.config`, and filesystem
 effects belong to the System/VFS ports of `@atomicloud/diene.interfaces`.
 
 The package depends on the published `@atomicloud/diene.result@1.0.2` and
-`@atomicloud/diene.interfaces@1.0.0`. Fallible values use the former's
-async-native `Result<T, E>` rather than a throw path.
+`@atomicloud/diene.interfaces@1.0.0`. Fallible domain results use the former's
+async-native `Result<T, E>`; programmer errors (a bad `concurrency` or
+`seconds`, a cyclic config) throw or reject with a `RangeError` or `TypeError`.
 
 ## Shape
 

@@ -17,8 +17,10 @@ boundary. TypeScript variants accompany the shared standards for
 `@atomicloud/diene.core-utils` is the Bun family's deterministic utility layer:
 slugs and namespaced keys, timing, fuzzy matching, bounded concurrency, stable
 records, SHA-256, dedupe, explicit-root path joins and the C0 Temporal wire-date
-codecs. Every member is a stateless class; fallible members return a
-`Result` from `@atomicloud/diene.result`. It ships dual **ESM + CommonJS** with
+codecs. Every member is a stateless class; fallible domain results return a
+`Result` from `@atomicloud/diene.result`, while programmer errors (a bad
+`concurrency` or `seconds`, a cyclic config) throw or reject with a
+`RangeError` or `TypeError`. It ships dual **ESM + CommonJS** with
 bundled type declarations. See the
 [core-utils standard](docs/standards/core-utils/index.md) and the shipped
 [usage skill](skills/diene-core-utils-usage/SKILL.md).
