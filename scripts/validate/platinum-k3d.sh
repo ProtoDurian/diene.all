@@ -252,7 +252,15 @@ echo "✅ route follows the named-port change"
 k -n entei-fixture delete httproute api-zinc --wait >/dev/null
 k -n entei-fixture delete listenerset api-zinc --wait >/dev/null
 shared_ok() { [[ "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:${pf_http}/healthz")" =~ ^2[0-9][0-9]$ ]]; }
-gone() { shared_ok && ! tls_body >/dev/null 2>&1 && shared_ok; }
+# A refused TLS probe restarts the tunnel, so it must serve /healthz again before each probe.
+tunnel_up() {
+  for _ in 1 2 3 4 5; do
+    shared_ok && return 0
+    sleep 1
+  done
+  return 1
+}
+gone() { tunnel_up && ! tls_body >/dev/null 2>&1; }
 wait_for 120 "the per-host listener to disappear" gone
 gateway_snapshot >"${tmp}/gateway-after.json"
 cert_snapshot >"${tmp}/cert-after.txt"
