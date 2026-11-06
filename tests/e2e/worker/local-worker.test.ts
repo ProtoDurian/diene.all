@@ -5,7 +5,7 @@ import { PostgresFixture } from '../../support/postgres';
 import { TEST_TENANT_HEADER } from '../../support/test-auth';
 import { WranglerDev } from '../../support/wrangler-dev';
 
-const AUTH_SECRET = 'e2e-only-secret-that-is-at-least-32-characters';
+const AUTH_SECRET = `${crypto.randomUUID()}${crypto.randomUUID()}`;
 
 describe('Worker on local workerd (wrangler dev) against Postgres', () => {
   let postgres: PostgresFixture;

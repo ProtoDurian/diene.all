@@ -17,12 +17,14 @@ describe('FileKeyPolicy', () => {
 });
 
 describe('StorageSettingsParser', () => {
+  const accessKeyId = crypto.randomUUID();
+  const secretAccessKey = crypto.randomUUID();
   const env = {
     S3_ENDPOINT: 'http://127.0.0.1:9000/',
     S3_BUCKET: 'aseity',
     S3_REGION: 'auto',
-    S3_ACCESS_KEY_ID: 'key',
-    S3_SECRET_ACCESS_KEY: 'secret',
+    S3_ACCESS_KEY_ID: accessKeyId,
+    S3_SECRET_ACCESS_KEY: secretAccessKey,
   };
 
   it('should read the storage bindings and drop a trailing slash from the endpoint', async () => {
@@ -37,8 +39,8 @@ describe('StorageSettingsParser', () => {
       endpoint: 'http://127.0.0.1:9000',
       bucket: 'aseity',
       region: 'auto',
-      accessKeyId: 'key',
-      secretAccessKey: 'secret',
+      accessKeyId,
+      secretAccessKey,
     });
   });
 

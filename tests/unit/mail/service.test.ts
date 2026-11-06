@@ -14,6 +14,8 @@ class RecordingMailer implements Mailer {
   }
 }
 
+const API_KEY = crypto.randomUUID();
+
 const mailJob = (payload: Record<string, unknown>): Job => ({
   id: crypto.randomUUID(),
   tenantId: 'tenant-a',
@@ -27,10 +29,10 @@ const mailJob = (payload: Record<string, unknown>): Job => ({
 
 describe('MailPolicy', () => {
   it.each([
-    { isFork: true, apiKey: 'live-key', expected: 'sink' },
-    { isFork: false, apiKey: undefined, expected: 'sink' },
-    { isFork: false, apiKey: 'live-key', expected: 'http' },
-  ])('should pick $expected for fork=$isFork key=$apiKey', ({ isFork, apiKey, expected }) => {
+    { when: 'a fork has a key', isFork: true, apiKey: API_KEY, expected: 'sink' },
+    { when: 'no key is set', isFork: false, apiKey: undefined, expected: 'sink' },
+    { when: 'a key is set outside a fork', isFork: false, apiKey: API_KEY, expected: 'http' },
+  ])('should pick $expected when $when', ({ isFork, apiKey, expected }) => {
     // Arrange
     const subject = new MailPolicy();
     const settings = apiKey === undefined ? { from: 'app@example.com' } : { from: 'app@example.com', apiKey };
@@ -92,10 +94,10 @@ describe('MailSettingsParser', () => {
     const subject = new MailSettingsParser();
 
     // Act
-    const actual = await expectOk(subject.parse({ MAIL_FROM: 'app@example.com', MAIL_API_KEY: 're_live' }));
+    const actual = await expectOk(subject.parse({ MAIL_FROM: 'app@example.com', MAIL_API_KEY: API_KEY }));
 
     // Assert
-    actual.should.deepEqual({ from: 'app@example.com', apiKey: 're_live' });
+    actual.should.deepEqual({ from: 'app@example.com', apiKey: API_KEY });
   });
 
   it('should treat a blank provider key as unset', async () => {

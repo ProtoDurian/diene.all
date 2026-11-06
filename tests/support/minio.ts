@@ -11,8 +11,9 @@ export class MinioFixture {
   ) {}
 
   static async start(bucket = 'aseity'): Promise<MinioFixture> {
+    const password = crypto.randomUUID();
     const container = await new GenericContainer(MINIO_IMAGE)
-      .withEnvironment({ MINIO_ROOT_USER: 'aseity', MINIO_ROOT_PASSWORD: 'aseity-test' })
+      .withEnvironment({ MINIO_ROOT_USER: 'aseity', MINIO_ROOT_PASSWORD: password })
       .withCommand(['server', '/data'])
       .withExposedPorts(9000)
       .withWaitStrategy(Wait.forHttp('/minio/health/ready', 9000))
@@ -22,7 +23,7 @@ export class MinioFixture {
       bucket,
       region: 'us-east-1',
       accessKeyId: 'aseity',
-      secretAccessKey: 'aseity-test',
+      secretAccessKey: password,
     };
     const fixture = new MinioFixture(container, settings);
     await fixture.createBucket(bucket);

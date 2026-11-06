@@ -55,7 +55,7 @@ describe('S3FileStore (Testcontainers MinIO)', () => {
 
   it('should raise a storage error when the provider refuses the request', async () => {
     // Arrange
-    const wrongKey = new S3FileStore({ ...minio.settings, secretAccessKey: 'not-the-secret' });
+    const wrongKey = new S3FileStore({ ...minio.settings, secretAccessKey: crypto.randomUUID() });
 
     // Act
     const put = await wrongKey.put('k', { body: new ArrayBuffer(1), contentType: 'text/plain' }).catch(e => e);

@@ -13,12 +13,13 @@ export class PostgresFixture {
   ) {}
 
   static async start(options: { migrate?: boolean } = {}): Promise<PostgresFixture> {
+    const password = crypto.randomUUID();
     const container = await new GenericContainer(POSTGRES_IMAGE)
-      .withEnvironment({ POSTGRES_PASSWORD: 'postgres', POSTGRES_DB: 'app' })
+      .withEnvironment({ POSTGRES_PASSWORD: password, POSTGRES_DB: 'app' })
       .withExposedPorts(5432)
       .withWaitStrategy(Wait.forLogMessage(/database system is ready to accept connections/, 2))
       .start();
-    const url = `postgres://postgres:postgres@${container.getHost()}:${container.getMappedPort(5432)}/app`;
+    const url = `postgres://postgres:${password}@${container.getHost()}:${container.getMappedPort(5432)}/app`;
     const fixture = new PostgresFixture(container, url);
     if (options.migrate !== false) await new PgMigrator({ connectionString: url }).migrate(MIGRATIONS_DIR);
     return fixture;

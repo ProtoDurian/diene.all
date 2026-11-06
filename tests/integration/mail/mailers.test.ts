@@ -20,6 +20,9 @@ class RecordingSinkLog implements SinkLog {
   }
 }
 
+const API_KEY = crypto.randomUUID();
+const REJECTED_KEY = crypto.randomUUID();
+
 const marker = (isFork: boolean): IForkMarkerReader => ({ read: async () => ({ isFork }) });
 
 describe('Mailers against a local HTTP mail API', () => {
@@ -33,8 +36,8 @@ describe('Mailers against a local HTTP mail API', () => {
       port: 0,
       fetch: async request => {
         received.push({ authorization: request.headers.get('authorization'), body: await request.json() });
-        return new Response(request.headers.get('authorization') === 'Bearer bad' ? 'no' : '{}', {
-          status: request.headers.get('authorization') === 'Bearer bad' ? 422 : 200,
+        return new Response(request.headers.get('authorization') === `Bearer ${REJECTED_KEY}` ? 'no' : '{}', {
+          status: request.headers.get('authorization') === `Bearer ${REJECTED_KEY}` ? 422 : 200,
         });
       },
     });
@@ -48,18 +51,18 @@ describe('Mailers against a local HTTP mail API', () => {
   it('should post the message with the sender and bearer key', async () => {
     // Arrange
     received.length = 0;
-    const subject = new HttpMailer('app@example.com', 're_live', endpoint);
+    const subject = new HttpMailer('app@example.com', API_KEY, endpoint);
 
     // Act
     await subject.send(message);
 
     // Assert
-    received.should.deepEqual([{ authorization: 'Bearer re_live', body: { from: 'app@example.com', ...message } }]);
+    received.should.deepEqual([{ authorization: `Bearer ${API_KEY}`, body: { from: 'app@example.com', ...message } }]);
   });
 
   it('should raise when the provider rejects the message', async () => {
     // Arrange
-    const subject = new HttpMailer('app@example.com', 'bad', endpoint);
+    const subject = new HttpMailer('app@example.com', REJECTED_KEY, endpoint);
 
     // Act
     const actual = await subject.send(message).catch(e => e);
@@ -80,10 +83,10 @@ describe('Mailers against a local HTTP mail API', () => {
   });
 
   it.each([
-    { isFork: true, apiKey: 're_live', delivered: 0, sunk: 1 },
-    { isFork: false, apiKey: undefined, delivered: 0, sunk: 1 },
-    { isFork: false, apiKey: 're_live', delivered: 1, sunk: 0 },
-  ])('should deliver $delivered and sink $sunk for fork=$isFork key=$apiKey', async ({ isFork, apiKey, delivered, sunk }) => {
+    { when: 'a fork has a key', isFork: true, apiKey: API_KEY, delivered: 0, sunk: 1 },
+    { when: 'no key is set', isFork: false, apiKey: undefined, delivered: 0, sunk: 1 },
+    { when: 'a key is set outside a fork', isFork: false, apiKey: API_KEY, delivered: 1, sunk: 0 },
+  ])('should deliver $delivered and sink $sunk when $when', async ({ isFork, apiKey, delivered, sunk }) => {
     // Arrange
     received.length = 0;
     const log = new RecordingSinkLog();

@@ -42,7 +42,7 @@ describe('WorkerRuntime over HTTP (Testcontainers Postgres + MinIO)', () => {
       HYPERDRIVE: { connectionString: postgres.connectionString },
       APP_URL,
       MAIL_FROM: 'app@example.com',
-      MAIL_API_KEY: 're_test',
+      MAIL_API_KEY: crypto.randomUUID(),
       ...minio.env,
     };
     log = new RecordingLog();
