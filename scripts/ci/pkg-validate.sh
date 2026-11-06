@@ -27,7 +27,25 @@ printf '%s\n' \
   '' \
   'var result = Result.Ok<int, string>(42);' \
   'result.Should().BeOk(42);' >"${scratch}/Program.cs"
-dotnet restore "${scratch}" --source "$(pwd)/${artifacts}" --packages "${scratch}/packages" >/dev/null
+cat >"${scratch}/nuget.config" <<EOF
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="local" value="$(pwd)/${artifacts}" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="local">
+      <package pattern="AtomiCloud.Diene.Result" />
+      <package pattern="AtomiCloud.Diene.Result.TestHelper" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+EOF
+dotnet restore "${scratch}" --packages "${scratch}/packages" >/dev/null
 dotnet build "${scratch}" -c Release --no-restore >/dev/null
 
 echo "✅ Package validation and scratch consumption passed"
