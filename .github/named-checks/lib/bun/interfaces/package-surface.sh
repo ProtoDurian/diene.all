@@ -3,7 +3,7 @@ set -euo pipefail
 
 # The published shape the goal fixes: one runtime dep (the published Result
 # package), the /test-helper subpath with both conditions, the usage skill in
-# the files allowlist, and no sample adapter or integration tier from the parent.
+# the files allowlist, no sample adapter, and the parent's integration tier kept empty.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -32,13 +32,14 @@ exports_want='{".":{"import":{"types":"./dist/index.d.ts","default":"./dist/inde
 [[ "$(q '.typesVersions["*"]["test-helper"] // [] | join(",")')" == ./dist/test-helper.d.ts ]] || fail "typesVersions does not map test-helper to ./dist/test-helper.d.ts (node10 resolution)"
 [[ -n "$(git ls-tree --name-only "${tree}" -- skills/diene-interfaces-usage/SKILL.md)" ]] || fail "skills/diene-interfaces-usage/SKILL.md is not tracked"
 [[ -z "$(git ls-tree -r --name-only "${tree}" -- skills | grep -v '^skills/diene-interfaces-usage/' || true)" ]] || fail "skills/ ships a skill other than diene-interfaces-usage"
-for p in src/adapters src/lib/sample tests/integration; do
+for p in src/adapters src/lib/sample; do
   [[ -z "$(git ls-tree --name-only "${tree}" -- "${p}")" ]] || fail "parent sample path still tracked: ${p}"
 done
-[[ "$(git show "${tree}:.github/workflows/ci.yaml" | yq '.jobs | has("int")')" == false ]] || fail "ci.yaml still runs the integration tier"
+[[ "$(git show "${tree}:.github/workflows/ci.yaml" | yq '.jobs | has("int")')" == true ]] || fail "ci.yaml dropped the integration tier"
+[[ -n "$(git ls-tree --name-only "${tree}" -- bunfig.int.toml)" ]] || fail "bunfig.int.toml is not tracked"
 
 if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ package-surface: runtime deps = @atomicloud/diene.result only, exact exports/files/typesVersions, usage skill shipped, no sample or integration tier"
+echo "✅ package-surface: runtime deps = @atomicloud/diene.result only, exact exports/files/typesVersions, usage skill shipped, no sample adapter, empty integration tier kept"

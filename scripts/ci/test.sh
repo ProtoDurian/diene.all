@@ -23,6 +23,9 @@ if [[ ${mode} == "meta" ]]; then
   ./scripts/local/test-meta.sh "${config}" coverage
   # Without a TestHelper the meta tier is a successful no-op: there is no ledger to check.
   [[ -z "$(find src/test-helper -type f -name "*.ts" -print -quit 2>/dev/null || true)" ]] && exit 0
+elif [[ ${mode} == "int" ]]; then
+  ./scripts/local/test-int.sh "${config}" coverage
+  [[ -z "$(find src/adapters tests/integration -type f -name "*.ts" -print -quit 2>/dev/null || true)" ]] && exit 0
 else
   bun test --config="${config}" --coverage
 fi
