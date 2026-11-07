@@ -110,14 +110,6 @@ apply_H() {
   edit docs/developer/go-baseline.md sed_z 's|## Docker and Helm\n|## Docker\n|'
   edit docs/developer/go-baseline.md sed_z 's| The root chart\nremains a minimal\nall-yes Helm surface and is intentionally independent of downstream service\nchart design\.\n|\n|'
   edit docs/developer/go-baseline.md sed_z 's|surface, the Docker entrypoint and chart\nmetadata\. |surface and the Docker entrypoint.\n|'
-
-  # nix: the aggregates carry H by content; take the axis-pure slices. Docker
-  # (D) keeps its slices. kubectl and k3d ship only in infrautils-k8s, beside
-  # helm, so they leave with the aggregate and their declared smokes go too.
-  edit nix/packages.nix sed_e 's/^          infralint$/          # Axis-pure slices: the infralint\/infrautils aggregates ship helm, helm-docs and helmlint.\n          infralint-core\n          infralint-docker/;s/^          infrautils$/          infrautils-core\n          infrautils-docker/'
-  edit nix/env.nix sed_e 's/^    infralint$/    infralint-core\n    infralint-docker/;s/^    infrautils$/    infrautils-core\n    infrautils-docker/'
-  edit dlint.yaml sed_e '/^      - k3d$/d;/^      - kubectl version --client$/d'
-  edit probes/binary-smoke.ts drop_lines '^k3d version' '^printf .* kyverno jp query'
 }
 
 # --- recompute from the parent ------------------------------------------------

@@ -93,6 +93,17 @@ git -C "$tmp" add empty
 git -C "$tmp" commit -qm smoke
 (cd "$tmp" && infisical scan . -v >/dev/null 2>&1)
 
+k3d version >/dev/null
+k3d cluster list --no-headers >/dev/null
+
+kubeconform -v >/dev/null
+
+kubectl version --client >/dev/null
+kubectl --kubeconfig=/dev/null config view >/dev/null
+
+kyverno version >/dev/null
+printf '%s\n' '{"probe":{"ok":true}}' | kyverno jp query 'probe.ok' 2>/dev/null | tail -n 1 | rg -qx true
+
 nix --version >/dev/null
 nix flake metadata --no-write-lock-file --json . | jq -e '.url | type == "string"' >/dev/null
 
