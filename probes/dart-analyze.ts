@@ -1,44 +1,37 @@
-import { expectGreen, expectRed, preserveMutationBeforeRestore } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-// Gate: `scripts/ci/analyze.sh` runs `dart analyze --fatal-infos
-// --fatal-warnings` across the workspace. Sabotage injects a lint-violating
-// declaration (`print` + unused element) into a library source file and proves
-// the analyzer escalates it to a failure.
+const ANALYZE = 'nix develop .#ci -c ./scripts/ci/analyze.sh';
+
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: {
-    post: [
-      'nix develop .#ci --no-write-lock-file -c flutter pub get --offline || nix develop .#ci --no-write-lock-file -c flutter pub get',
-    ],
-  },
+  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
   probes: [
     {
       name: 'baseline-dart-analyze-green',
-      description: 'dart analyze passes on the pristine template with infos/warnings fatal',
+      description: 'dart analyze passes the workspace with infos and warnings fatal',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, 'nix develop .#ci --no-write-lock-file -c ./scripts/ci/analyze.sh', 'dart-analyze');
+        await expectGreen(repo, ANALYZE, 'dart-analyze');
       },
     },
     {
       name: 'mutation-dart-analyze-caught',
-      description: 'dart analyze fails when a library source file introduces a lint violation',
+      description: 'dart analyze fails once a library source calls print, which the strict lints forbid',
       kind: 'mutation',
-      expectedImpact: ['unit-coverage-ledger', 'pana-score'],
+      expectedImpact: [],
       async run(repo: any) {
-        const sources = (await repo.glob('packages/*/lib/src/**/*.dart')).sort();
-        const target = sources[0];
+        const target = (await repo.glob('packages/*/lib/src/**/*.dart')).sort()[0];
         if (!target) {
           throw new Error('dart-analyze: no library source file to sabotage');
         }
-        const original = await repo.read(target);
-        try {
-          await repo.write(target, `${original}\nvoid _probeAnalyzeViolation() {\n  print('probe');\n}\n`);
-          await expectRed(repo, 'nix develop .#ci --no-write-lock-file -c ./scripts/ci/analyze.sh', 'dart-analyze');
-        } finally {
-          await preserveMutationBeforeRestore(repo, 'dart-analyze', target, original);
-        }
+        await withCleanProbeState(repo, [target], async () => {
+          await repo.write(
+            target,
+            `${await repo.read(target)}\nvoid probeAnalyzeViolation() {\n  print('probe');\n}\n`,
+          );
+          await expectRedBecause(repo, ANALYZE, 'dart-analyze', ['avoid_print']);
+        });
       },
     },
   ],

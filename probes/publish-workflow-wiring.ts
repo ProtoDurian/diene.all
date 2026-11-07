@@ -1,27 +1,33 @@
-// Gate (static wiring): the release pipeline (cd.yaml) must reference the
-// reusable publish workflow, which in turn must invoke a publish script that
-// exists on disk. Sabotage points the reusable workflow at a missing script and
-// proves the wiring check no longer resolves end to end.
-import { preserveMutationBeforeRestore } from './lib/helpers.ts';
+import { withCleanProbeState } from './lib/helpers.ts';
 
 const CD = '.github/workflows/cd.yaml';
 const REUSABLE = '.github/workflows/⚡reusable-publish.yaml';
-const USES = 'uses: ./.github/workflows/⚡reusable-publish.yaml';
+const SCRIPT = './scripts/ci/publish.sh';
 
-async function wiringResolves(repo: any): Promise<boolean> {
-  const cd = await repo.read(CD);
-  if (!cd.includes(USES)) {
-    return false;
+// Caller job -> reusable workflow -> every repository script its steps run.
+async function wiringViolation(repo: any): Promise<string | undefined> {
+  const caller = Bun.YAML.parse(await repo.read(CD)) as any;
+  const jobs = Object.values(caller?.jobs ?? {}) as any[];
+  if (!jobs.some(job => job?.uses === `./${REUSABLE}`)) {
+    return `${CD} has no job calling ${REUSABLE}`;
   }
   if ((await repo.glob(REUSABLE)).length !== 1) {
-    return false;
+    return `missing reusable workflow ${REUSABLE}`;
   }
-  const reusable = await repo.read(REUSABLE);
-  const scriptMatch = reusable.match(/scripts\/[A-Za-z0-9_./-]+\.sh/);
-  if (!scriptMatch) {
-    return false;
+  const reusable = Bun.YAML.parse(await repo.read(REUSABLE)) as any;
+  const runs = Object.values(reusable?.jobs ?? {})
+    .flatMap((job: any) => (Array.isArray(job?.steps) ? job.steps : []))
+    .map((step: any) => (typeof step?.run === 'string' ? step.run : ''));
+  const scripts = runs.flatMap(run => run.match(/\.\/scripts\/[\w./-]+\.sh/g) ?? []);
+  for (const script of scripts) {
+    if ((await repo.glob(script.slice(2))).length !== 1) {
+      return `missing script ${script}`;
+    }
   }
-  return (await repo.glob(scriptMatch[0])).length === 1;
+  if (!scripts.includes(SCRIPT)) {
+    return `${REUSABLE} does not run ${SCRIPT}`;
+  }
+  return undefined;
 }
 
 export default {
@@ -30,32 +36,31 @@ export default {
   probes: [
     {
       name: 'baseline-publish-workflow-wiring-green',
-      description: 'cd.yaml → reusable-publish.yaml → publish.sh resolves end to end',
+      description: 'CD reaches the guarded credentialed publish script through the reusable workflow',
       kind: 'baseline',
       async run(repo: any) {
-        if (!(await wiringResolves(repo))) {
-          throw new Error('publish-workflow-wiring: the publish wiring does not resolve');
+        const violation = await wiringViolation(repo);
+        if (violation) {
+          throw new Error(`publish-workflow-wiring: ${violation}`);
         }
       },
     },
     {
       name: 'mutation-publish-workflow-wiring-caught',
-      description: 'the wiring check detects the reusable workflow pointing at a missing script',
+      description: 'the wiring check fails once the reusable workflow points at a missing script',
       kind: 'mutation',
-      expectedImpact: ['workflow-wiring'],
+      expectedImpact: [],
       async run(repo: any) {
-        if (!(await wiringResolves(repo))) {
-          throw new Error('publish-workflow-wiring: wiring already broken before sabotage');
-        }
-        const reusable = await repo.read(REUSABLE);
-        try {
-          await repo.write(REUSABLE, reusable.replace('publish.sh', 'publish-missing.sh'));
-          if (await wiringResolves(repo)) {
-            throw new Error('publish-workflow-wiring: wiring survived sabotage');
+        await withCleanProbeState(repo, [REUSABLE], async () => {
+          if (await wiringViolation(repo)) {
+            throw new Error('publish-workflow-wiring: wiring already broken before sabotage');
           }
-        } finally {
-          await preserveMutationBeforeRestore(repo, 'publish-workflow-wiring', REUSABLE, reusable);
-        }
+          await repo.patch(REUSABLE, { find: SCRIPT, replace: './scripts/ci/publish-missing.sh' });
+          const violation = await wiringViolation(repo);
+          if (!violation?.startsWith('missing script')) {
+            throw new Error(`publish-workflow-wiring: wiring survived sabotage (${violation ?? 'green'})`);
+          }
+        });
       },
     },
   ],

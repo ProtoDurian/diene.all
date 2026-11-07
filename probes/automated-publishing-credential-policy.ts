@@ -1,20 +1,5 @@
-// Gate (static policy): publishing uses the long-lived AtomiCloud org credential
-// `PUB_CREDENTIALS_JSON`, and the window in which that credential exists on disk
-// must contain nothing but the approved publish. So this gate does not look for
-// forbidden substrings — it pins the workflow's entire security-relevant
-// execution shape and rejects everything else.
-//
-// `Bun.YAML.parse` gives the parsed document; the policy then requires an exact
-// allow-list at every level: the workflow's top-level keys, its single trigger,
-// its single `publish` job, that job's keys, and each of its five steps in order
-// — key set, name, env mapping, and command sequence. Substring searching cannot
-// certify this boundary. A step can read the credential without ever naming the
-// file (`base64 "$HOME/.config/dart/"*`), spend it outside the approved
-// entrypoint (`flutter pub publish --force`), relocate it (`env: {HOME: /tmp}`), or
-// neutralize its guard through control flow alone (`continue-on-error: true` on
-// the write, `if: always()` on the publish). None of those spell anything a
-// filter could match, so the only sound rule is: exactly these steps, exactly
-// these keys, exactly these commands, in exactly this order.
+import { withCleanProbeState } from './lib/helpers.ts';
+
 const REUSABLE_PUBLISH = '.github/workflows/⚡reusable-publish.yaml';
 
 const PUBLISH_JOB = 'publish';
@@ -31,24 +16,21 @@ const WORKFLOW_NAME = '⚡ Reusable Dart Publish';
 const JOB_NAME = 'Publish to pub.dev';
 const TIMEOUT_MINUTES = 20;
 const RUNNER_LABELS = [
-  'nscloud-ubuntu-22.04-amd64-4x8-with-cache',
-  'nscloud-cache-size-50gb',
-  'nscloud-cache-tag-atomi-nix-store-cache-linux-amd64',
+  'nscloud-ubuntu-26.04-amd64-4x8-with-cache',
+  'nscloud-cache-size-20gb',
+  'nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64',
 ];
 
-// A `echo "…" >&2` diagnostic. The message is free text — rewording a failure
-// message is not a policy change — but nothing else may share the line.
 const DIAGNOSTIC = /^echo "[^"]*" >&2$/;
 
-// The exact approved scripts, as ordered command lists.
 const TAG_PIN_SCRIPT: Array<string | RegExp> = [
   '[[ ${TAG} =~ ^v[0-9]+[.][0-9]+[.][0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || {',
   DIAGNOSTIC,
   'exit 1',
   '}',
   'git fetch --tags --force origin',
-  'git checkout "refs/tags/${TAG}" -- packages/diene_auth_engine',
-  'git --no-pager diff --stat "refs/tags/${TAG}" -- packages/diene_auth_engine',
+  'git restore --source="refs/tags/${TAG}" --staged --worktree -- packages/diene_dart_lib',
+  'git --no-pager diff --exit-code "refs/tags/${TAG}" -- packages/diene_dart_lib',
 ];
 const CONFIGURE_SCRIPT: Array<string | RegExp> = [
   `mkdir -p "${CREDENTIAL_DIR}"`,
@@ -72,11 +54,6 @@ interface StepSpec {
   script?: Array<string | RegExp>;
 }
 
-// The complete expected job body. Because each entry pins its own key set, no
-// execution modifier can be attached to any step: `continue-on-error`, `if` on a
-// step that should not have one, `shell`, `working-directory`, `with`, `timeout-
-// minutes`, or an extra `env` var are all rejected by the key set alone. Because
-// the list length is fixed, no step can be inserted while the credential exists.
 const EXPECTED_STEPS: StepSpec[] = [
   { label: 'pinned setup-nix action', keys: ['uses'], uses: SETUP_NIX },
   {
@@ -112,17 +89,10 @@ const EXPECTED_STEPS: StepSpec[] = [
 const CONFIGURE_INDEX = EXPECTED_STEPS.findIndex(step => step.env?.[CREDENTIAL_KEY] === CREDENTIAL_VALUE);
 const CLEANUP_INDEX = EXPECTED_STEPS.findIndex(step => step.script === CLEANUP_SCRIPT);
 
-// Exactly the keys the workflow and its job may carry. Anything absent from
-// these lists is rejected, which is what forbids workflow- or job-level `env`
-// (so `HOME`, `BASH_ENV`, and `PATH` cannot be redirected), `defaults` (so no
-// custom shell or working directory), and job-level `continue-on-error`.
 const WORKFLOW_KEYS = ['name', 'on', 'jobs'];
 const JOB_KEYS = ['name', 'permissions', 'environment', 'timeout-minutes', 'runs-on', 'steps'];
 const JOB_PERMISSIONS = { contents: 'read' };
 
-// The only accepted trigger: a reusable call taking exactly one required string
-// input. Pinning this exactly is what forbids an extra `secrets:` block (a second
-// credential channel), an extra input, or a relaxed `required: false`.
 const TAG_INPUT_KEYS = ['description', 'required', 'type'];
 
 interface Occurrence {
@@ -148,10 +118,6 @@ function mappingEquals(node: unknown, expected: Record<string, string>): boolean
   return Object.entries(expected).every(([key, value]) => actual[key] === value);
 }
 
-// Every scalar and every mapping key in the parsed document, with its path.
-// A backstop for the free-text fields the specs above deliberately leave open
-// (job name, trigger description, diagnostic messages): the credential name and
-// its filename must still appear only where the policy allows.
 function collectOccurrences(node: unknown, path: string, sink: Occurrence[]): void {
   if (typeof node === 'string') {
     sink.push({ path, text: node });
@@ -168,9 +134,7 @@ function collectOccurrences(node: unknown, path: string, sink: Occurrence[]): vo
   }
 }
 
-// A `run:` script as an ordered command list. Blank lines carry no meaning to the
-// shell and are dropped; comments are NOT dropped, because a commented-out
-// `rm -f` is precisely the no-op cleanup this gate has to reject.
+// Comments are kept: a commented-out `rm -f` is exactly the no-op cleanup to reject.
 function commandList(run: unknown): string[] {
   if (typeof run !== 'string') return [];
   return run
@@ -198,30 +162,24 @@ function stepMatches(step: unknown, spec: StepSpec): boolean {
   return true;
 }
 
-// GitHub resolves `permissions: write-all` to write access for every available
-// permission — including `id-token: write`, which is all trusted publishing
-// needs. The job's permissions must therefore be exactly `contents: read`: a
-// scalar shorthand is not a mapping and is rejected, and no `id-token` key in any
-// quoting or flow syntax can survive an exact mapping comparison (the parser has
-// already normalized `"id-token"`, `id-token: "write"`, and `{id-token: write}`
-// to the same key).
+// `write-all` grants id-token without naming it, so only the exact mapping passes.
 function permissionsAreSafe(permissions: unknown): boolean {
   if (!mappingEquals(permissions, JOB_PERMISSIONS)) return false;
   return !Object.keys(permissions as Record<string, unknown>).some(key => key.trim().toLowerCase() === 'id-token');
 }
 
-// The live workflow spells the environment as a scalar, so that is the only
-// accepted form: an equivalent-looking `{name: pub.dev}` mapping is still a
-// deviation from the certified shape, and this gate certifies one exact shape.
 function environmentIsPinned(environment: unknown): boolean {
   return environment === DEPLOY_ENVIRONMENT;
 }
 
-// Exactly one required string input named `tag`, and no `secrets:` block.
 function triggerIsExact(on: unknown): boolean {
   if (!hasExactKeys(on, ['workflow_call'])) return false;
   const call = (on as Record<string, unknown>).workflow_call;
-  if (!hasExactKeys(call, ['inputs'])) return false;
+  if (!hasExactKeys(call, ['inputs', 'secrets'])) return false;
+  const secrets = (call as Record<string, unknown>).secrets;
+  if (!hasExactKeys(secrets, [CREDENTIAL_KEY])) return false;
+  const declared = (secrets as Record<string, unknown>)[CREDENTIAL_KEY];
+  if (!hasExactKeys(declared, ['required']) || (declared as Record<string, unknown>).required !== true) return false;
   const inputs = (call as Record<string, unknown>).inputs;
   if (!hasExactKeys(inputs, ['tag'])) return false;
   const tag = (inputs as Record<string, unknown>).tag;
@@ -239,33 +197,18 @@ function credentialPolicyHolds(source: string): boolean {
     return false;
   }
 
-  // 1. the workflow carries exactly these top-level keys — no workflow-level
-  //    `env` (HOME/BASH_ENV/PATH), no `defaults` (shell, working directory), no
-  //    workflow-level `permissions` shorthand
   if (!hasExactKeys(document, WORKFLOW_KEYS)) return false;
   const doc = document as Record<string, unknown>;
   if (doc.name !== WORKFLOW_NAME) return false;
 
-  // 2. reusable-call is the only way in — no push/pull_request trigger can put
-  //    this credentialed job on an untrusted ref — and the call surface is
-  //    exactly one required string `tag` with no extra inputs and no `secrets:`
   if (!triggerIsExact(doc.on)) return false;
 
-  // 3. exactly one job, and it is `publish`. A second job is how cleanup gets
-  //    moved off this runner and how a `pub.dev` decoy satisfies a workflow-wide
-  //    environment search.
   if (!hasExactKeys(doc.jobs, [PUBLISH_JOB])) return false;
   const publish = (doc.jobs as Record<string, unknown>)[PUBLISH_JOB];
 
-  // 4. the job carries exactly these keys — this is what makes job-level `env`
-  //    (and so a `HOME` override that relocates the credential), `defaults`,
-  //    `continue-on-error`, `strategy`, `container`, and `services` impossible
   if (!hasExactKeys(publish, JOB_KEYS)) return false;
   const job = publish as Record<string, unknown>;
 
-  // 5. the job's own deployment environment is pinned, its permissions are
-  //    exactly `contents: read`, it runs on the approved runner set, and its
-  //    credential window is bounded to the approved timeout
   if (job.name !== JOB_NAME) return false;
   if (!environmentIsPinned(job.environment)) return false;
   if (!permissionsAreSafe(job.permissions)) return false;
@@ -275,9 +218,6 @@ function credentialPolicyHolds(source: string): boolean {
   if (!labels.every((label, index) => label === RUNNER_LABELS[index])) return false;
   if (job['timeout-minutes'] !== TIMEOUT_MINUTES) return false;
 
-  // 6. exactly the approved steps, in order, each an exact key set with an exact
-  //    env mapping and an exact command sequence. No step may be inserted while
-  //    the credential exists, and no step may carry an execution modifier.
   if (!Array.isArray(job.steps)) return false;
   const steps = job.steps as unknown[];
   if (steps.length !== EXPECTED_STEPS.length) return false;
@@ -288,10 +228,11 @@ function credentialPolicyHolds(source: string): boolean {
   const configurePath = `.jobs.${PUBLISH_JOB}.steps[${CONFIGURE_INDEX}]`;
   const cleanupPath = `.jobs.${PUBLISH_JOB}.steps[${CLEANUP_INDEX}]`;
 
-  // 7. backstop over the free-text fields: the credential name appears only
-  //    where it is injected and written, its filename only in the approved write
-  //    and removal, and the workflow consumes exactly one secret
-  const credentialPaths = [`${configurePath}.env.${CREDENTIAL_KEY}`, `${configurePath}.run`];
+  const credentialPaths = [
+    `.on.workflow_call.secrets.${CREDENTIAL_KEY}`,
+    `${configurePath}.env.${CREDENTIAL_KEY}`,
+    `${configurePath}.run`,
+  ];
   const filePaths = [`${configurePath}.run`, `${cleanupPath}.run`];
   for (const { path, text } of occurrences) {
     if (text.includes(CREDENTIAL_KEY) && !credentialPaths.includes(path)) return false;
@@ -318,18 +259,14 @@ const DECOY_JOB =
   `      - name: Decoy\n` +
   `        run: echo decoy\n`;
 
-// Add a command to the credential-configuring step, immediately after chmod.
 function injectIntoConfigure(source: string, command: string): string {
   return source.replace(LOCKDOWN_LINE, `${LOCKDOWN_LINE}          ${command}\n`);
 }
 
-// Insert a whole step immediately after the credential is materialized — i.e.
-// inside the window where the credential file exists on disk.
 function insertAfterConfigure(source: string, step: string): string {
   return source.replace(VERIFY_HEADER, `${step}${VERIFY_HEADER}`);
 }
 
-// Replace the `[ -s … ] || { … }` guard without hardcoding its message.
 function replaceNonEmptyGuard(source: string, replacement: string): string {
   const lines = source.split('\n');
   const start = lines.findIndex(line => line.trim().startsWith('[ -s '));
@@ -341,30 +278,24 @@ function replaceNonEmptyGuard(source: string, replacement: string): string {
   return lines.join('\n');
 }
 
-// In-memory negative controls. Each builder must produce a workflow the policy
-// REJECTS; together they prove no limb of the predicate is vacuous. Every one is
-// valid Actions YAML, and each was accepted by some earlier version of this
-// predicate — these are regressions that really happened, not hypotheticals.
 const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
-  // --- arbitrary execution inside the credential window -------------------
   {
     label: 'credential directory exfiltrated by glob, never naming the file',
     build: source =>
       insertAfterConfigure(source, '      - name: Collect diagnostics\n        run: base64 "$HOME/.config/dart/"*\n'),
   },
   {
-    label: 'rogue flutter pub publish spends the credential outside the approved entrypoint',
+    label: 'rogue dart pub publish spends the credential outside the approved entrypoint',
     build: source =>
       insertAfterConfigure(
         source,
-        '      - name: Extra publish\n        run: cd packages/diene_auth_engine && flutter pub publish --force\n',
+        '      - name: Extra publish\n        run: cd packages/diene_dart_lib && dart pub publish --force\n',
       ),
   },
   {
     label: 'benign-looking extra step executes while the credential exists',
     build: source => insertAfterConfigure(source, '      - name: Unrelated\n        run: echo hello\n'),
   },
-  // --- control flow that neutralizes the guard ---------------------------
   {
     label: 'continue-on-error on Configure (an empty-credential failure no longer blocks publish)',
     build: source => source.replace(CONFIGURE_ENV, `        continue-on-error: true\n${CONFIGURE_ENV}`),
@@ -373,7 +304,6 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
     label: 'if: always() on Verify (publishes even after Configure fails)',
     build: source => source.replace(VERIFY_HEADER, `${VERIFY_HEADER}        if: always()\n`),
   },
-  // --- relocating or reinterpreting the credential -----------------------
   {
     label: 'job-level HOME override relocates the supposedly canonical credential path',
     build: source =>
@@ -404,18 +334,26 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
   },
   {
     label: 'runner swapped to an unapproved label',
-    build: source => source.replace('      - nscloud-cache-size-50gb\n', '      - self-hosted-attacker\n'),
+    build: source => source.replace('      - nscloud-cache-size-20gb\n', '      - self-hosted-attacker\n'),
   },
   {
     label: 'pull_request trigger added so the credentialed job runs on untrusted refs',
     build: source => source.replace('on:\n  workflow_call:\n', 'on:\n  pull_request:\n  workflow_call:\n'),
   },
   {
-    label: 'a workflow_call secrets block opens a second credential channel',
+    label: 'a second workflow_call secret opens another credential channel',
     build: source =>
       source.replace(
-        '  workflow_call:\n    inputs:\n',
-        '  workflow_call:\n    secrets:\n      PUB_CREDENTIALS_JSON:\n        required: true\n      EXTRA:\n        required: false\n    inputs:\n',
+        '    secrets:\n      PUB_CREDENTIALS_JSON:\n        required: true\n',
+        '    secrets:\n      PUB_CREDENTIALS_JSON:\n        required: true\n      EXTRA:\n        required: false\n',
+      ),
+  },
+  {
+    label: 'the declared credential relaxed to required: false (an absent secret no longer fails the call)',
+    build: source =>
+      source.replace(
+        '      PUB_CREDENTIALS_JSON:\n        required: true\n',
+        '      PUB_CREDENTIALS_JSON:\n        required: false\n',
       ),
   },
   {
@@ -442,7 +380,6 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
     label: 'setup-nix action unpinned from its major version',
     build: source => source.replace(`uses: ${SETUP_NIX}`, 'uses: AtomiCloud/actions.setup-nix@main'),
   },
-  // --- credential scope -------------------------------------------------
   {
     label: 'credential hoisted from the step to job-level env (exposed to every step)',
     build: source =>
@@ -481,7 +418,6 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
     label: 'credential written outside the canonical HOME path',
     build: source => source.split(CREDENTIAL_PATH).join('./pub-credentials.json'),
   },
-  // --- OIDC, in every syntax that parses to an id-token key --------------
   {
     label: 'OIDC re-requested with a plain id-token key',
     build: source => source.replace('      contents: read', '      id-token: write\n      contents: read'),
@@ -514,7 +450,6 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
     label: 'workflow-level write-all inherited by a second job',
     build: source => source.replace('jobs:\n', `permissions: write-all\n\njobs:\n${DECOY_JOB}`),
   },
-  // --- the guard and the cleanup ----------------------------------------
   {
     label: 'non-empty guard deleted (an empty secret reaches dart pub)',
     build: source => replaceNonEmptyGuard(source, ''),
@@ -560,7 +495,6 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
     label: 'cleanup reordered before the publish step',
     build: source => source.replace(CLEANUP_STEP, '').replace(VERIFY_HEADER, `${CLEANUP_STEP}${VERIFY_HEADER}`),
   },
-  // --- the publish entrypoint and the tag pin ---------------------------
   {
     label: 'publish entrypoint replaced so the credential is used by something else',
     build: source => source.replace('./scripts/ci/publish.sh "${TAG}"', './scripts/ci/rogue.sh "${TAG}"'),
@@ -575,9 +509,25 @@ const BYPASSES: Array<{ label: string; build: (source: string) => string }> = [
   },
   {
     label: 'tag pin no longer restores the package from the tag',
-    build: source => source.replace('git checkout "refs/tags/${TAG}" -- packages/diene_auth_engine\n', ''),
+    build: source =>
+      source.replace('git restore --source="refs/tags/${TAG}" --staged --worktree -- packages/diene_dart_lib\n', ''),
   },
-  // --- the deployment environment ---------------------------------------
+  {
+    label: 'tag pin overlays the tag so files added after it survive',
+    build: source =>
+      source.replace(
+        'git restore --source="refs/tags/${TAG}" --staged --worktree -- packages/diene_dart_lib',
+        'git checkout "refs/tags/${TAG}" -- packages/diene_dart_lib',
+      ),
+  },
+  {
+    label: 'tag pin reports a difference without failing',
+    build: source =>
+      source.replace(
+        'git --no-pager diff --exit-code "refs/tags/${TAG}" -- packages/diene_dart_lib',
+        'git --no-pager diff --stat "refs/tags/${TAG}" -- packages/diene_dart_lib',
+      ),
+  },
   {
     label: 'pub.dev deployment environment unpinned',
     build: source => source.replace(`    environment: ${DEPLOY_ENVIRONMENT}\n`, ''),
@@ -620,8 +570,6 @@ export default {
           throw new Error('automated-publishing-credential-policy: policy already broken before sabotage');
         }
 
-        // Every bypass must be rejected. These run in memory so one probe row
-        // covers the whole boundary without adding inventory rows.
         for (const { label, build } of BYPASSES) {
           const mutated = build(source);
           if (mutated === source) {
@@ -632,10 +580,15 @@ export default {
           }
         }
 
-        await repo.write(REUSABLE_PUBLISH, source.split(CREDENTIAL_VALUE).join("''"));
-        if (credentialPolicyHolds(await repo.read(REUSABLE_PUBLISH))) {
-          throw new Error('automated-publishing-credential-policy: policy survived sabotage');
-        }
+        await withCleanProbeState(repo, [REUSABLE_PUBLISH], async () => {
+          await repo.write(
+            REUSABLE_PUBLISH,
+            source.replace(PERMISSIONS_BLOCK, `${PERMISSIONS_BLOCK}      id-token: write\n`),
+          );
+          if (credentialPolicyHolds(await repo.read(REUSABLE_PUBLISH))) {
+            throw new Error('automated-publishing-credential-policy: policy survived id-token: write');
+          }
+        });
       },
     },
   ],

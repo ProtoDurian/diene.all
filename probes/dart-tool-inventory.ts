@@ -1,29 +1,21 @@
 import { expectGreen } from './lib/helpers.ts';
 
-// Smoke: the Dart toolchain the pipeline depends on (dart SDK, releaser, pana,
-// coverage, dart_code_linter) is resolvable and runnable inside the dev shell.
+const INVENTORY =
+  "nix develop .#ci -c bash -c 'set -euo pipefail; dart --version; cd packages/diene_dart_lib; " +
+  '{ dart run pana --help 2>&1 || true; } | grep -q -- --dartdoc-version; dart run coverage:format_coverage --help >/dev/null; ' +
+  "dart run dart_code_linter:metrics --help >/dev/null; dart test --help >/dev/null'";
+
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: {
-    post: [
-      'nix develop .#ci --no-write-lock-file -c flutter pub get --offline || nix develop .#ci --no-write-lock-file -c flutter pub get',
-      // The inventory asserts pana is REACHABLE; it lives in its own global
-      // resolution here, not in the workspace, so activate it first.
-      'nix develop .#ci --no-write-lock-file -c dart pub global activate --overwrite pana 0.23.14',
-    ],
-  },
+  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
   probes: [
     {
       name: 'baseline-dart-tool-inventory-green',
-      description: 'the Dart toolchain (dart, releaser, pana, coverage, dart_code_linter) is available',
+      description: 'the ci shell exposes the pinned Dart SDK and each declared package tool runs',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(
-          repo,
-          'nix develop .#ci --no-write-lock-file -c bash -lc \'dart --version >/dev/null 2>&1 && releaser --help >/dev/null 2>&1 && cd packages/diene_auth_engine && dart pub global run pana --help 2>&1 | grep -qiE "usage|pana" && flutter pub run coverage:format_coverage --help >/dev/null 2>&1 && flutter pub run dart_code_linter:metrics --help >/dev/null 2>&1\'',
-          'dart-tool-inventory',
-        );
+        await expectGreen(repo, INVENTORY, 'dart-tool-inventory');
       },
     },
   ],
