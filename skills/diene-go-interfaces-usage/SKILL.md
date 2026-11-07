@@ -34,7 +34,8 @@ host type. Concrete adapters live in the consuming runtime, not here.
   existing directory is a no-op.
 - `Delete` refuses a non-empty directory unless `DirectoryOptions.Recursive` is set.
 - A path is a file or a directory, never both: writing onto a directory, creating a directory onto a file,
-  or going through a file as a parent fails.
+  or going through a file as a parent fails, and `Exists` on a path through a file returns false with an
+  error.
 
 ## Test doubles
 
@@ -42,6 +43,9 @@ Import `github.com/ProtoDurian/diene.go-interfaces/testhelper` in tests only.
 
 - `NewInMemorySystem`, `NewInMemoryVfs`, `NewInMemoryTerminal`, `NewInMemoryLoggerSink` and
   `NewInMemoryMetricsCollector` return deterministic doubles; seed them through their options.
+- `InMemoryVfsOptions` creates the parent directories of every seeded file and directory, so seed only the
+  leaves. Seeding a path as both a file and a directory, or anything under a seeded file, panics in
+  `NewInMemoryVfs`.
 - Script the next results with the `Enqueue…Result` methods (FIFO). A scripted plain error comes back
   as a `*problem.Error` that still matches the original with `errors.Is`; a problem error is returned
   unchanged.
@@ -63,5 +67,5 @@ path or executable and `Data` set to `{"id": "<id>"}`. Assert on the id and stat
 | `directory-not-empty`          | 409    | a non-recursive delete of a directory with entries                                |
 | `path-is-directory`            | 409    | a write onto a directory                                                          |
 | `path-is-file`                 | 409    | a directory create onto a file                                                    |
-| `not-a-directory`              | 409    | a write or create whose ancestor is a file                                        |
+| `not-a-directory`              | 409    | a write, create or `Exists` whose ancestor is a file                              |
 | `terminal-result-not-scripted` | 500    | `InMemoryTerminal.Run` with no scripted result                                    |

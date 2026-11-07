@@ -174,7 +174,7 @@ func (s *InMemorySystem) SetNow(now time.Time) {
 	s.state.now = now.UTC()
 }
 
-// InMemoryVfsOptions seeds an InMemoryVfs; the root directory is always present.
+// InMemoryVfsOptions seeds an InMemoryVfs; parents are created, and a path seeded as both kinds or under a file panics.
 type InMemoryVfsOptions struct {
 	Files       map[string][]byte
 	Directories []string
@@ -274,7 +274,7 @@ func (v *InMemoryVfs) Exists(_ context.Context, path string) (bool, error) {
 		v.state.existsResults = v.state.existsResults[1:]
 		return result.value, result.err
 	}
-	return v.state.store.Exists(path), nil
+	return v.state.store.Exists(path)
 }
 
 // ReadBytes implements interfaces.Vfs.

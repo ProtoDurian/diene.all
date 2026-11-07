@@ -2,7 +2,9 @@
 package vfsstore
 
 import (
+	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/ProtoDurian/diene.go-interfaces/lib/interfaces"
@@ -20,22 +22,43 @@ func New() *Store {
 	return &Store{files: map[string][]byte{}, directories: map[string]struct{}{"/": {}}}
 }
 
-// Seed inserts copies of the initial files and directories under normalized paths.
+// Seed inserts copies of the files and directories with their parents, and panics when a path would be both kinds.
 func (s *Store) Seed(files map[string][]byte, directories []string) {
 	for path, bytes := range files {
 		s.files[Normalize(path)] = append([]byte(nil), bytes...)
 	}
+	folders := make([]string, 0, 1+len(directories))
+	folders = append(folders, "/")
 	for _, directory := range directories {
-		s.directories[Normalize(directory)] = struct{}{}
+		folders = append(folders, Normalize(directory))
+	}
+	for _, folder := range folders {
+		if _, ok := s.files[folder]; ok {
+			panic("testhelper: InMemoryVfsOptions seeds " + strconv.Quote(folder) + " as both a file and a directory")
+		}
+	}
+	for _, path := range append(slices.Sorted(maps.Keys(s.files)), folders...) {
+		if file, ok := s.FileAncestor(path); ok {
+			panic("testhelper: InMemoryVfsOptions seeds " + strconv.Quote(path) + " under the file " + strconv.Quote(file))
+		}
+	}
+	for path := range s.files {
+		s.CreateParents(Parent(path))
+	}
+	for _, folder := range folders {
+		s.CreateParents(folder)
 	}
 }
 
-// Exists reports whether path names a stored file or directory.
-func (s *Store) Exists(path string) bool {
+// Exists reports whether path names a stored entry; a path through a file faults with not-a-directory.
+func (s *Store) Exists(path string) (bool, error) {
 	normalized := Normalize(path)
+	if file, ok := s.FileAncestor(normalized); ok {
+		return false, faults.NotADirectory(file)
+	}
 	_, file := s.files[normalized]
 	_, directory := s.directories[normalized]
-	return file || directory
+	return file || directory, nil
 }
 
 // ReadBytes returns a copy of the file at path, or a path-not-found fault.

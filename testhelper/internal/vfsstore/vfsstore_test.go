@@ -1,6 +1,7 @@
 package vfsstore_test
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -58,7 +59,7 @@ func TestReadsCopyStoredBytes(t *testing.T) {
 	if bytesErr != nil || textErr != nil || string(again) != "text" || text != "text" {
 		t.Fatalf("reads: %q %q %v %v", again, text, bytesErr, textErr)
 	}
-	if !store.Exists("/a/file") || store.Exists("/nope") {
+	if !present(store, "/a/file") || present(store, "/nope") {
 		t.Fatal("Exists mismatch")
 	}
 }
@@ -105,7 +106,7 @@ func TestWriteCreatesParentsOnRequest(t *testing.T) {
 	deepErr := store.Write("/deep/nested/file", []byte("y"), interfaces.WriteOptions{CreateParents: true})
 
 	// Assert
-	if topErr != nil || deepErr != nil || !store.Exists("/deep/nested") || !store.Exists("/deep/nested/file") {
+	if topErr != nil || deepErr != nil || !present(store, "/deep/nested") || !present(store, "/deep/nested/file") {
 		t.Fatalf("write: %v %v %v", topErr, deepErr, store.Directories())
 	}
 }
@@ -180,7 +181,7 @@ func TestDelete(t *testing.T) {
 	treeErr := store.Delete("/a", interfaces.DirectoryOptions{Recursive: true})
 
 	// Assert
-	if fileErr != nil || treeErr != nil || store.Exists("/keep") || store.Exists("/a") || store.Exists("/a/sub") || len(store.Files()) != 0 {
+	if fileErr != nil || treeErr != nil || present(store, "/keep") || present(store, "/a") || present(store, "/a/sub") || len(store.Files()) != 0 {
 		t.Fatalf("delete: %v %v %v", fileErr, treeErr, store.Directories())
 	}
 }
@@ -223,6 +224,73 @@ func TestFileAncestor(t *testing.T) {
 			t.Fatalf("FileAncestor(%q) = %q, %v", testCase.path, got, ok)
 		}
 	}
+}
+
+func TestSeedCreatesParents(t *testing.T) {
+	// Arrange
+	store := vfsstore.New()
+
+	// Act
+	store.Seed(map[string][]byte{"/app/config/settings.json": nil}, []string{"/var/log"})
+
+	// Assert
+	if !slices.Equal(store.Directories(), []string{"/", "/app", "/app/config", "/var", "/var/log"}) {
+		t.Fatalf("directories: %v", store.Directories())
+	}
+}
+
+func TestSeedPanicsOnKindConflicts(t *testing.T) {
+	// Arrange
+	cases := []struct {
+		name        string
+		files       map[string][]byte
+		directories []string
+		want        string
+	}{
+		{"file and directory", map[string][]byte{"/p": nil}, []string{"//p/"}, `testhelper: InMemoryVfsOptions seeds "/p" as both a file and a directory`},
+		{"root as a file", map[string][]byte{"/": nil}, nil, `testhelper: InMemoryVfsOptions seeds "/" as both a file and a directory`},
+		{"file under a file", map[string][]byte{"/p": nil, "/p/q/r": nil}, nil, `testhelper: InMemoryVfsOptions seeds "/p/q/r" under the file "/p"`},
+		{"directory under a file", map[string][]byte{"/p": nil}, []string{"/p/q"}, `testhelper: InMemoryVfsOptions seeds "/p/q" under the file "/p"`},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			store := vfsstore.New()
+
+			// Act
+			got := panicMessage(func() { store.Seed(testCase.files, testCase.directories) })
+
+			// Assert
+			if got != testCase.want {
+				t.Fatalf("panic %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestExistsThroughAFile(t *testing.T) {
+	// Arrange
+	store := vfsstore.New()
+	store.Seed(map[string][]byte{"/a/file": nil}, nil)
+
+	// Act
+	exists, err := store.Exists("/a/file/child")
+
+	// Assert
+	if exists {
+		t.Fatal("a path through a file must not exist")
+	}
+	probtest.AssertError(t, err, probtest.ExpectID("not-a-directory"), probtest.ExpectDetail("/a/file"))
+}
+
+func present(store *vfsstore.Store, path string) bool {
+	exists, err := store.Exists(path)
+	return exists && err == nil
+}
+
+func panicMessage(run func()) (message string) {
+	defer func() { message = fmt.Sprint(recover()) }()
+	run()
+	return ""
 }
 
 func entryPaths(entries []interfaces.VfsEntry) []string {

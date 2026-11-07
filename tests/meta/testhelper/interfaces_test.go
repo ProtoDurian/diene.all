@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -213,6 +214,57 @@ func TestInMemoryVfsState(t *testing.T) {
 	if !slices.Equal(vfs.Directories(), []string{"/", "/created", "/created/a", "/new", "/top"}) || len(vfs.Files()) != 2 {
 		t.Fatalf("final state: %v %v", vfs.Directories(), vfs.Files())
 	}
+}
+
+func TestInMemoryVfsSeedCreatesParents(t *testing.T) {
+	// Arrange
+	vfs := testhelper.NewInMemoryVfs(testhelper.InMemoryVfsOptions{Files: map[string][]byte{"/app/config.json": []byte("{}")}})
+
+	// Act
+	exists, existsErr := vfs.Exists(context.Background(), "/app")
+	entries, listErr := vfs.List(context.Background(), "/app", interfaces.ListOptions{})
+
+	// Assert
+	if !exists || existsErr != nil || listErr != nil || len(entries) != 1 || entries[0].Path != "/app/config.json" {
+		t.Fatalf("seeded parent: %v %v %#v %v", exists, existsErr, entries, listErr)
+	}
+}
+
+func TestInMemoryVfsSeedPanicsOnKindConflicts(t *testing.T) {
+	// Arrange
+	cases := map[string]testhelper.InMemoryVfsOptions{
+		"file and directory": {Files: map[string][]byte{"/p": nil}, Directories: []string{"/p"}},
+		"file under a file":  {Files: map[string][]byte{"/p": nil, "/p/q": nil}},
+	}
+	for name, options := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Act
+			panicked := func() (recovered any) {
+				defer func() { recovered = recover() }()
+				testhelper.NewInMemoryVfs(options)
+				return nil
+			}()
+
+			// Assert
+			if message, ok := panicked.(string); !ok || !strings.HasPrefix(message, "testhelper: InMemoryVfsOptions seeds ") {
+				t.Fatalf("want a seeding panic, got %#v", panicked)
+			}
+		})
+	}
+}
+
+func TestInMemoryVfsExistsThroughAFile(t *testing.T) {
+	// Arrange
+	vfs := testhelper.NewInMemoryVfs(testhelper.InMemoryVfsOptions{Files: map[string][]byte{"/a/file": nil}})
+
+	// Act
+	exists, err := vfs.Exists(context.Background(), "/a/file/child")
+
+	// Assert
+	if exists {
+		t.Fatal("a path through a file must not exist")
+	}
+	assertFault(t, err, "not-a-directory", 409)
 }
 
 func TestInMemoryVfsDeleteRootKeepsRoot(t *testing.T) {

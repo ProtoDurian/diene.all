@@ -91,6 +91,9 @@ func vfsContract(r reporter, vfs interfaces.Vfs) {
 
 	expectProblem(r, "write onto a directory", vfs.WriteText(ctx, "/docs/sub", "x", interfaces.WriteOptions{}))
 	expectProblem(r, "write under a file", vfs.WriteText(ctx, "/docs/a.txt/child", "x", interfaces.WriteOptions{CreateParents: true}))
+	if exists, existsErr := vfs.Exists(ctx, "/docs/a.txt/child"); exists || !isProblem(existsErr) {
+		r.Errorf("exists through a file: want false and a problem error, got %v %v", exists, existsErr)
+	}
 	expectProblem(r, "mkdir onto a file", vfs.CreateDirectory(ctx, "/docs/a.txt", interfaces.DirectoryOptions{}))
 	expectProblem(r, "mkdir under a file", vfs.CreateDirectory(ctx, "/docs/a.txt/child", interfaces.DirectoryOptions{Recursive: true}))
 	expectNoError(r, "mkdir existing directory", vfs.CreateDirectory(ctx, "/docs", interfaces.DirectoryOptions{}))
@@ -324,6 +327,13 @@ func (v alwaysRecursiveList) List(ctx context.Context, name string, _ interfaces
 	return v.Vfs.List(ctx, name, interfaces.ListOptions{Recursive: true})
 }
 
+type existsHidesErrors struct{ interfaces.Vfs }
+
+func (v existsHidesErrors) Exists(ctx context.Context, name string) (bool, error) {
+	exists, err := v.Vfs.Exists(ctx, name)
+	return exists && err == nil, nil
+}
+
 type alwaysRecursiveDelete struct{ interfaces.Vfs }
 
 func (v alwaysRecursiveDelete) Delete(ctx context.Context, name string, _ interfaces.DirectoryOptions) error {
@@ -394,6 +404,7 @@ func TestVfsContractRejectsKnownBad(t *testing.T) {
 		{"flat recursive list", flatList{newMemoryVfs()}, "list recursive"},
 		{"always recursive list", alwaysRecursiveList{newMemoryVfs()}, "list direct"},
 		{"always recursive delete", alwaysRecursiveDelete{newMemoryVfs()}, "delete non-empty"},
+		{"exists hides errors", existsHidesErrors{newMemoryVfs()}, "exists through a file"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
