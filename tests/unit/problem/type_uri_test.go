@@ -53,7 +53,7 @@ func TestTypeURI(t *testing.T) {
 		{name: "dot-dot service", portal: withPortal(func(p *problem.ErrorPortal) { p.Service = ".." }), version: "v1", id: "x", wantSegment: "service"},
 		{name: "dot landscape", portal: withPortal(func(p *problem.ErrorPortal) { p.Landscape = "." }), version: "v1", id: "x", wantSegment: "landscape"},
 		{name: "dot-dot id", portal: testPortal(), version: "v1", id: "..", wantSegment: "id"},
-		{name: "kebab id", portal: testPortal(), version: "v1", id: "entity-not-found", wantSegment: "id"},
+		{name: "kebab id", portal: testPortal(), version: "v1", id: "quota-exceeded", wantSegment: "id"},
 		{name: "upper-case id", portal: testPortal(), version: "v1", id: "EntityNotFound", wantSegment: "id"},
 	}
 	for _, tc := range cases {
