@@ -1,6 +1,5 @@
 namespace AtomiCloud.DotnetBase.UnitTest.Meta;
 
-/// <summary>Every call fails, so no happy-path parity case can pass.</summary>
 internal sealed class AlwaysFailingEmitter : ITraceEmitter
 {
     private static TraceError Error => TraceErrors.Io("sabotage", "always fails");
@@ -10,10 +9,8 @@ internal sealed class AlwaysFailingEmitter : ITraceEmitter
     public Result<Unit, TraceError> Flush() => Error;
 }
 
-/// <summary>Every call succeeds vacuously, so no rejection case can pass.</summary>
 internal sealed class AlwaysSucceedingEmitter : ITraceEmitter
 {
-    /// <summary>The span names it was handed, proving it really saw them and still passed.</summary>
     public List<string> Seen { get; } = [];
 
     public Result<Unit, TraceError> Emit(TraceRecord record)
@@ -25,7 +22,6 @@ internal sealed class AlwaysSucceedingEmitter : ITraceEmitter
     public Result<Unit, TraceError> Flush() => Result.Ok<Unit, TraceError>(default);
 }
 
-/// <summary>Records are accepted but dropped, so no capture case can pass.</summary>
 internal sealed class ForgetfulEmitter : ITraceEmitter
 {
     public int Emitted { get; private set; }
@@ -39,57 +35,128 @@ internal sealed class ForgetfulEmitter : ITraceEmitter
     public Result<Unit, TraceError> Flush() => Result.Ok<Unit, TraceError>(default);
 }
 
-/// <summary>
-/// Proves the parity expectations have teeth. If a saboteur could satisfy them, the
-/// suite would be certifying nothing — so each saboteur is shown to violate exactly
-/// the expectation its defect targets.
-/// </summary>
 public class SaboteurTests
 {
     private static TraceRecord Record() => TraceRecord.Create("demo.request").Should().BeOk().Which;
 
     [Fact]
-    public void AnAlwaysFailingEmitter_CannotSatisfyTheAcceptanceExpectation()
+    public void AnAlwaysFailingEmitter_FailsEveryEmit()
     {
+        // Arrange
         var emitter = new AlwaysFailingEmitter();
 
-        emitter.Emit(Record()).Should().BeTraceErr(TraceErrorCode.Io);
-        emitter.Flush().Should().BeTraceErr(TraceErrorCode.Io);
-        FluentActions.Invoking(() => emitter.Emit(Record()).Should().BeOk()).Should().Throw<Exception>();
+        // Act
+        var result = emitter.Emit(Record());
+
+        // Assert
+        result.Should().BeTraceErr(TraceErrorCode.Io);
+    }
+
+    [Fact]
+    public void AnAlwaysFailingEmitter_FailsEveryFlush()
+    {
+        // Arrange
+        var emitter = new AlwaysFailingEmitter();
+
+        // Act
+        var result = emitter.Flush();
+
+        // Assert
+        result.Should().BeTraceErr(TraceErrorCode.Io);
+    }
+
+    [Fact]
+    public void AnAlwaysFailingEmitter_CannotSatisfyTheAcceptanceExpectation()
+    {
+        // Arrange
+        var emitter = new AlwaysFailingEmitter();
+
+        // Act
+        var act = () => emitter.Emit(Record()).Should().BeOk();
+
+        // Assert
+        act.Should().Throw<Exception>();
+    }
+
+    [Fact]
+    public void AnAlwaysSucceedingEmitter_AcceptsANullRecordItHasSeen()
+    {
+        // Arrange
+        var emitter = new AlwaysSucceedingEmitter();
+
+        // Act
+        var result = emitter.Emit(null!);
+
+        // Assert
+        result.Should().BeOk();
+        emitter.Seen.Should().Equal("<null>");
     }
 
     [Fact]
     public void AnAlwaysSucceedingEmitter_CannotSatisfyTheRejectionExpectation()
     {
+        // Arrange
         var emitter = new AlwaysSucceedingEmitter();
 
-        emitter.Emit(null!).Should().BeOk();
-        FluentActions
-            .Invoking(() => emitter.Emit(null!).Should().BeTraceErr(TraceErrorCode.InvalidInput))
-            .Should().Throw<Exception>();
+        // Act
+        var act = () => emitter.Emit(null!).Should().BeTraceErr(TraceErrorCode.InvalidInput);
+
+        // Assert
+        act.Should().Throw<Exception>();
         emitter.Seen.Should().AllBe("<null>");
+    }
+
+    [Fact]
+    public void AForgetfulEmitter_AcceptsAndCountsTheSpan()
+    {
+        // Arrange
+        var emitter = new ForgetfulEmitter();
+
+        // Act
+        var result = emitter.Emit(Record());
+
+        // Assert
+        result.Should().BeOk();
+        emitter.Emitted.Should().Be(1);
     }
 
     [Fact]
     public void AForgetfulEmitter_CannotSatisfyTheCaptureExpectation()
     {
-        var emitter = new ForgetfulEmitter();
+        // Arrange
+        var emitter = new InMemoryTraceEmitter();
 
-        emitter.Emit(Record()).Should().BeOk();
+        // Act
+        var act = () => emitter.Should().HaveEmitted("demo.request");
 
-        emitter.Emitted.Should().Be(1);
-        FluentActions
-            .Invoking(() => new InMemoryTraceEmitter().Should().HaveEmitted("demo.request"))
-            .Should().Throw<Exception>();
+        // Assert
+        act.Should().Throw<Exception>();
     }
 
     [Fact]
-    public void TheRealEmittersSatisfyBothExpectationsTheSaboteursBreak()
+    public void TheRealEmitter_AcceptsAValidSpanAndCapturesIt()
     {
+        // Arrange
         var emitter = new InMemoryTraceEmitter();
 
-        emitter.Emit(Record()).Should().BeOk();
-        emitter.Emit(null!).Should().BeTraceErr(TraceErrorCode.InvalidInput);
+        // Act
+        var result = emitter.Emit(Record());
+
+        // Assert
+        result.Should().BeOk();
         emitter.Should().HaveEmitted("demo.request");
+    }
+
+    [Fact]
+    public void TheRealEmitter_RejectsANullRecord()
+    {
+        // Arrange
+        var emitter = new InMemoryTraceEmitter();
+
+        // Act
+        var result = emitter.Emit(null!);
+
+        // Assert
+        result.Should().BeTraceErr(TraceErrorCode.InvalidInput);
     }
 }

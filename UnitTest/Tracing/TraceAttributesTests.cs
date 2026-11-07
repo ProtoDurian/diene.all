@@ -6,101 +6,152 @@ public class TraceAttributesTests
         new(StringComparer.Ordinal) { [key] = value };
 
     [Fact]
-    public void Empty_IsAnEmptyOrdinalMap()
+    public void Empty_IsAnEmptyMap()
     {
-        TraceAttributes.Empty.Should().BeEmpty();
-        TraceAttributes.Equal(TraceAttributes.Empty, TraceAttributes.Empty).Should().BeTrue();
+        // Act
+        var empty = TraceAttributes.Empty;
+
+        // Assert
+        empty.Should().BeEmpty();
     }
 
     [Fact]
-    public void Check_TreatsNullAsEmpty() =>
-        TraceAttributes.Check(null, "emit").Should().BeOk().Which.Should().BeEmpty();
+    public void Empty_EqualsItself()
+    {
+        // Act
+        var equal = TraceAttributes.Equal(TraceAttributes.Empty, TraceAttributes.Empty);
+
+        // Assert
+        equal.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Check_TreatsNullAsEmpty()
+    {
+        // Act
+        var result = TraceAttributes.Check(null, "emit");
+
+        // Assert
+        result.Should().BeOk().Which.Should().BeEmpty();
+    }
 
     [Fact]
     public void Check_SortsKeysSoOrderCannotAffectEquality()
     {
-        var checked_ = TraceAttributes
-            .Check(
-                [
-                    new("zulu", AttributeValue.Text("z")),
-                    new("alpha", AttributeValue.Text("a")),
-                    new("mike", AttributeValue.Text("m")),
-                ],
-                "emit")
-            .Should().BeOk().Which;
+        // Arrange
+        KeyValuePair<string, AttributeValue>[] attributes =
+        [
+            new("zulu", AttributeValue.Text("z")),
+            new("alpha", AttributeValue.Text("a")),
+            new("mike", AttributeValue.Text("m")),
+        ];
 
-        checked_.Keys.Should().Equal("alpha", "mike", "zulu");
+        // Act
+        var result = TraceAttributes.Check(attributes, "emit");
+
+        // Assert
+        result.Should().BeOk().Which.Keys.Should().Equal("alpha", "mike", "zulu");
     }
 
     [Fact]
-    public void Check_KeepsTheLastValueForARepeatedKey() =>
-        TraceAttributes
-            .Check([new("key", AttributeValue.Integer(1)), new("key", AttributeValue.Integer(2))], "emit")
-            .Should().BeOk()
-            .Which["key"].Should().Be(AttributeValue.Integer(2));
+    public void Check_KeepsTheLastValueForARepeatedKey()
+    {
+        // Arrange
+        KeyValuePair<string, AttributeValue>[] attributes =
+            [new("key", AttributeValue.Integer(1)), new("key", AttributeValue.Integer(2))];
+
+        // Act
+        var result = TraceAttributes.Check(attributes, "emit");
+
+        // Assert
+        result.Should().BeOk().Which["key"].Should().Be(AttributeValue.Integer(2));
+    }
 
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
     [InlineData("\t")]
-    public void Check_RejectsABlankKey(string key) =>
-        TraceAttributes
-            .Check(Of(key, AttributeValue.Text("value")), "emit")
-            .Should().BeErr()
-            .Which.Code.Should().Be(TraceErrorCode.InvalidInput);
+    public void Check_RejectsABlankKey(string key)
+    {
+        // Act
+        var result = TraceAttributes.Check(Of(key, AttributeValue.Text("value")), "emit");
+
+        // Assert
+        result.Should().BeErr().Which.Code.Should().Be(TraceErrorCode.InvalidInput);
+    }
 
     [Fact]
     public void Check_RejectsAKeyCarryingANul()
     {
-        // The NUL is built at runtime on purpose: a literal control byte in source is a
-        // corruption hazard, and the invariant is about the character, not its spelling.
+        // Arrange
+        // Built at runtime: a literal control byte in source is a corruption hazard.
         var key = "route" + (char)0 + "suffix";
-        TraceAttributes
-            .Check(Of(key, AttributeValue.Text("value")), "emit")
-            .Should().BeErr()
-            .Which.Message.Should().Contain("NUL-free");
+
+        // Act
+        var result = TraceAttributes.Check(Of(key, AttributeValue.Text("value")), "emit");
+
+        // Assert
+        result.Should().BeErr().Which.Message.Should().Contain("NUL-free");
     }
 
     [Fact]
-    public void Check_AcceptsAKeyCarryingASpace() =>
-        TraceAttributes.Check(Of("two words", AttributeValue.Text("value")), "emit").Should().BeOk();
+    public void Check_AcceptsAKeyCarryingASpace()
+    {
+        // Act
+        var result = TraceAttributes.Check(Of("two words", AttributeValue.Text("value")), "emit");
+
+        // Assert
+        result.Should().BeOk();
+    }
 
     [Theory]
     [InlineData(double.NaN)]
     [InlineData(double.PositiveInfinity)]
     [InlineData(double.NegativeInfinity)]
-    public void Check_RejectsANonFiniteReal(double value) =>
-        TraceAttributes
-            .Check(Of("ratio", AttributeValue.Real(value)), "emit")
-            .Should().BeErr()
-            .Which.Message.Should().Contain("finite");
+    public void Check_RejectsANonFiniteReal(double value)
+    {
+        // Act
+        var result = TraceAttributes.Check(Of("ratio", AttributeValue.Real(value)), "emit");
+
+        // Assert
+        result.Should().BeErr().Which.Message.Should().Contain("finite");
+    }
 
     [Fact]
-    public void Check_AcceptsEveryOtherAttributeKind() =>
-        TraceAttributes
-            .Check(
-                [
-                    new("text", AttributeValue.Text("value")),
-                    new("integer", AttributeValue.Integer(long.MaxValue)),
-                    new("real", AttributeValue.Real(1.5)),
-                    new("flag", AttributeValue.Flag(true)),
-                    new("instant", AttributeValue.Instant(DateTimeOffset.UnixEpoch)),
-                    new("duration", AttributeValue.Duration(TimeSpan.FromSeconds(90))),
-                ],
-                "emit")
-            .Should().BeOk()
-            .Which.Should().HaveCount(6);
+    public void Check_AcceptsEveryOtherAttributeKind()
+    {
+        // Arrange
+        KeyValuePair<string, AttributeValue>[] attributes =
+        [
+            new("text", AttributeValue.Text("value")),
+            new("integer", AttributeValue.Integer(long.MaxValue)),
+            new("real", AttributeValue.Real(1.5)),
+            new("flag", AttributeValue.Flag(true)),
+            new("instant", AttributeValue.Instant(DateTimeOffset.UnixEpoch)),
+            new("duration", AttributeValue.Duration(TimeSpan.FromSeconds(90))),
+        ];
+
+        // Act
+        var result = TraceAttributes.Check(attributes, "emit");
+
+        // Assert
+        result.Should().BeOk().Which.Should().HaveCount(6);
+    }
 
     [Fact]
-    public void Check_ReportsTheOperationItWasGiven() =>
-        TraceAttributes
-            .Check(Of(" ", AttributeValue.Text("x")), "flush")
-            .Should().BeErr()
-            .Which.Operation.Should().Be("flush");
+    public void Check_ReportsTheOperationItWasGiven()
+    {
+        // Act
+        var result = TraceAttributes.Check(Of(" ", AttributeValue.Text("x")), "flush");
+
+        // Assert
+        result.Should().BeErr().Which.Operation.Should().Be("flush");
+    }
 
     [Fact]
     public void Equal_ComparesByContentNotByOrderOrIdentity()
     {
+        // Arrange
         var left = TraceAttributes
             .Check([new("a", AttributeValue.Integer(1)), new("b", AttributeValue.Integer(2))], "emit")
             .Should().BeOk().Which;
@@ -108,33 +159,60 @@ public class TraceAttributesTests
             .Check([new("b", AttributeValue.Integer(2)), new("a", AttributeValue.Integer(1))], "emit")
             .Should().BeOk().Which;
 
-        TraceAttributes.Equal(left, right).Should().BeTrue();
+        // Act
+        var equal = TraceAttributes.Equal(left, right);
+
+        // Assert
+        equal.Should().BeTrue();
     }
 
     [Fact]
-    public void Equal_IsFalseOnACountMismatch() =>
-        TraceAttributes
-            .Equal(Of("a", AttributeValue.Integer(1)), TraceAttributes.Empty)
-            .Should().BeFalse();
-
-    [Fact]
-    public void Equal_IsFalseOnAMissingKey() =>
-        TraceAttributes
-            .Equal(Of("a", AttributeValue.Integer(1)), Of("b", AttributeValue.Integer(1)))
-            .Should().BeFalse();
-
-    [Fact]
-    public void Equal_IsFalseOnADifferentValue() =>
-        TraceAttributes
-            .Equal(Of("a", AttributeValue.Integer(1)), Of("a", AttributeValue.Integer(2)))
-            .Should().BeFalse();
-
-    [Fact]
-    public void Equal_RejectsNullMaps()
+    public void Equal_IsFalseOnACountMismatch()
     {
-        FluentActions.Invoking(() => TraceAttributes.Equal(null!, TraceAttributes.Empty))
-            .Should().Throw<ArgumentNullException>();
-        FluentActions.Invoking(() => TraceAttributes.Equal(TraceAttributes.Empty, null!))
-            .Should().Throw<ArgumentNullException>();
+        // Act
+        var equal = TraceAttributes.Equal(Of("a", AttributeValue.Integer(1)), TraceAttributes.Empty);
+
+        // Assert
+        equal.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Equal_IsFalseOnAMissingKey()
+    {
+        // Act
+        var equal = TraceAttributes.Equal(Of("a", AttributeValue.Integer(1)), Of("b", AttributeValue.Integer(1)));
+
+        // Assert
+        equal.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Equal_IsFalseOnADifferentValue()
+    {
+        // Act
+        var equal = TraceAttributes.Equal(Of("a", AttributeValue.Integer(1)), Of("a", AttributeValue.Integer(2)));
+
+        // Assert
+        equal.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Equal_RejectsANullLeftMap()
+    {
+        // Act
+        var act = () => TraceAttributes.Equal(null!, TraceAttributes.Empty);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Equal_RejectsANullRightMap()
+    {
+        // Act
+        var act = () => TraceAttributes.Equal(TraceAttributes.Empty, null!);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
     }
 }

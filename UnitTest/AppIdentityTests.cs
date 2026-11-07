@@ -3,11 +3,14 @@ namespace AtomiCloud.DotnetBase.UnitTest;
 public class AppIdentityTests
 {
     [Fact]
-    public void Create_TrimsEveryField() =>
-        AppIdentity
-            .Create(" lapras ", " atomi ", " billing ", " api ", " 1.2.3 ")
-            .Should().BeOk()
-            .Which.Should().Be(new AppIdentity("lapras", "atomi", "billing", "api", "1.2.3"));
+    public void Create_TrimsEveryField()
+    {
+        // Act
+        var result = AppIdentity.Create(" lapras ", " atomi ", " billing ", " api ", " 1.2.3 ");
+
+        // Assert
+        result.Should().BeOk().Which.Should().Be(new AppIdentity("lapras", "atomi", "billing", "api", "1.2.3"));
+    }
 
     [Theory]
     [InlineData(null, "atomi", "billing", "api", "1.0.0")]
@@ -22,26 +25,49 @@ public class AppIdentityTests
         string? platform,
         string? service,
         string? module,
-        string? version) =>
-        AppIdentity
-            .Create(landscape, platform, service, module, version)
-            .Should().BeErr()
-            .Which.Id.Should().Be("invalid_argument");
-
-    [Fact]
-    public void Create_NamesTheFieldItRejected() =>
-        AppIdentity
-            .Create("lapras", "atomi", "billing", " ", "1.0.0")
-            .Should().BeErr()
-            .Which.Detail.Should().Contain("module");
-
-    [Fact]
-    public void Identity_HasValueEquality()
+        string? version)
     {
+        // Act
+        var result = AppIdentity.Create(landscape, platform, service, module, version);
+
+        // Assert
+        result.Should().BeErr().Which.Id.Should().Be("invalid_argument");
+    }
+
+    [Fact]
+    public void Create_NamesTheFieldItRejected()
+    {
+        // Act
+        var result = AppIdentity.Create("lapras", "atomi", "billing", " ", "1.0.0");
+
+        // Assert
+        result.Should().BeErr().Which.Detail.Should().Contain("module");
+    }
+
+    [Fact]
+    public void Identity_IsEqualWithTheSameHashToAnIdenticalIdentity()
+    {
+        // Arrange
         var left = new AppIdentity("lapras", "atomi", "billing", "api", "1.0.0");
+
+        // Act
         var right = new AppIdentity("lapras", "atomi", "billing", "api", "1.0.0");
+
+        // Assert
         left.Should().Be(right);
         left.GetHashCode().Should().Be(right.GetHashCode());
-        left.Should().NotBe(right with { Module = "worker" });
+    }
+
+    [Fact]
+    public void Identity_DiffersWhenAnyFieldDiffers()
+    {
+        // Arrange
+        var identity = new AppIdentity("lapras", "atomi", "billing", "api", "1.0.0");
+
+        // Act
+        var other = identity with { Module = "worker" };
+
+        // Assert
+        identity.Should().NotBe(other);
     }
 }

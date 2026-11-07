@@ -2,16 +2,8 @@ using System.Diagnostics;
 
 namespace AtomiCloud.DotnetBase.UnitTest.Meta;
 
-/// <summary>
-/// Contract parity: ONE behavioral suite run against BOTH the real
-/// <see cref="ActivityTraceEmitter" /> and the <see cref="InMemoryTraceEmitter" />
-/// consumers substitute for it. A mock that diverges from the real emitter is a
-/// broken test double, so the suite is the guarantee that substituting is safe.
-/// This is the twin of the bun sibling's <c>tests/meta/parity.test.ts</c>.
-/// </summary>
 public class TraceParityTests
 {
-    /// <summary>The emitters under parity, each with the capture its assertions read.</summary>
     public static TheoryData<string> Emitters => new("activity", "in-memory");
 
     private static TraceRecord Record(
@@ -50,10 +42,15 @@ public class TraceParityTests
     [MemberData(nameof(Emitters))]
     public void EveryEmitter_AcceptsAValidSpan(string kind)
     {
+        // Arrange
         var (emitter, names, scope) = Subject(kind);
         using (scope)
         {
-            emitter.Emit(Record("demo.request")).Should().BeOk();
+            // Act
+            var result = emitter.Emit(Record("demo.request"));
+
+            // Assert
+            result.Should().BeOk();
             names().Should().Equal("demo.request");
         }
     }
@@ -62,12 +59,15 @@ public class TraceParityTests
     [MemberData(nameof(Emitters))]
     public void EveryEmitter_PreservesEmitOrder(string kind)
     {
+        // Arrange
         var (emitter, names, scope) = Subject(kind);
         using (scope)
         {
-            emitter.Emit(Record("first")).Should().BeOk();
-            emitter.Emit(Record("second")).Should().BeOk();
-            emitter.Emit(Record("third")).Should().BeOk();
+            // Act
+            var results = new[] { "first", "second", "third" }.Select(name => emitter.Emit(Record(name))).ToList();
+
+            // Assert
+            results.Should().AllSatisfy(result => result.Should().BeOk());
             names().Should().Equal("first", "second", "third");
         }
     }
@@ -76,10 +76,15 @@ public class TraceParityTests
     [MemberData(nameof(Emitters))]
     public void EveryEmitter_RejectsANullRecordAsInvalidInput(string kind)
     {
+        // Arrange
         var (emitter, _, scope) = Subject(kind);
         using (scope)
         {
-            emitter.Emit(null!).Should().BeTraceErr(TraceErrorCode.InvalidInput);
+            // Act
+            var result = emitter.Emit(null!);
+
+            // Assert
+            result.Should().BeTraceErr(TraceErrorCode.InvalidInput);
         }
     }
 
@@ -87,14 +92,17 @@ public class TraceParityTests
     [MemberData(nameof(Emitters))]
     public void EveryEmitter_AcceptsEveryStatus(string kind)
     {
+        // Arrange
         var (emitter, names, scope) = Subject(kind);
         using (scope)
         {
-            foreach (var status in Enum.GetValues<TraceStatus>())
-            {
-                emitter.Emit(Record($"span.{status}", status)).Should().BeOk();
-            }
+            // Act
+            var results = Enum.GetValues<TraceStatus>()
+                .Select(status => emitter.Emit(Record($"span.{status}", status)))
+                .ToList();
 
+            // Assert
+            results.Should().HaveCount(3).And.AllSatisfy(result => result.Should().BeOk());
             names().Should().HaveCount(3);
         }
     }
@@ -103,20 +111,24 @@ public class TraceParityTests
     [MemberData(nameof(Emitters))]
     public void EveryEmitter_AcceptsEveryAttributeKind(string kind)
     {
+        // Arrange
         var (emitter, names, scope) = Subject(kind);
+        var record = Record(
+            "rich",
+            TraceStatus.Ok,
+            new("text", AttributeValue.Text("value")),
+            new("integer", AttributeValue.Integer(7)),
+            new("real", AttributeValue.Real(1.5)),
+            new("flag", AttributeValue.Flag(true)),
+            new("instant", AttributeValue.Instant(DateTimeOffset.UnixEpoch)),
+            new("duration", AttributeValue.Duration(TimeSpan.FromSeconds(30))));
         using (scope)
         {
-            emitter
-                .Emit(Record(
-                    "rich",
-                    TraceStatus.Ok,
-                    new("text", AttributeValue.Text("value")),
-                    new("integer", AttributeValue.Integer(7)),
-                    new("real", AttributeValue.Real(1.5)),
-                    new("flag", AttributeValue.Flag(true)),
-                    new("instant", AttributeValue.Instant(DateTimeOffset.UnixEpoch)),
-                    new("duration", AttributeValue.Duration(TimeSpan.FromSeconds(30)))))
-                .Should().BeOk();
+            // Act
+            var result = emitter.Emit(record);
+
+            // Assert
+            result.Should().BeOk();
             names().Should().Equal("rich");
         }
     }
@@ -125,10 +137,15 @@ public class TraceParityTests
     [MemberData(nameof(Emitters))]
     public void EveryEmitter_AcceptsASpanCarryingNothingButAName(string kind)
     {
+        // Arrange
         var (emitter, names, scope) = Subject(kind);
         using (scope)
         {
-            emitter.Emit(Record("bare")).Should().BeOk();
+            // Act
+            var result = emitter.Emit(Record("bare"));
+
+            // Assert
+            result.Should().BeOk();
             names().Should().Equal("bare");
         }
     }
@@ -137,11 +154,15 @@ public class TraceParityTests
     [MemberData(nameof(Emitters))]
     public void EveryEmitter_FlushesSuccessfullyAndRepeatedly(string kind)
     {
+        // Arrange
         var (emitter, _, scope) = Subject(kind);
         using (scope)
         {
-            emitter.Flush().Should().BeOk();
-            emitter.Flush().Should().BeOk();
+            // Act
+            var results = new[] { emitter.Flush(), emitter.Flush() };
+
+            // Assert
+            results.Should().AllSatisfy(result => result.Should().BeOk());
         }
     }
 
@@ -149,12 +170,18 @@ public class TraceParityTests
     [MemberData(nameof(Emitters))]
     public void EveryEmitter_KeepsWorkingAfterAFlush(string kind)
     {
+        // Arrange
         var (emitter, names, scope) = Subject(kind);
         using (scope)
         {
             emitter.Emit(Record("before")).Should().BeOk();
             emitter.Flush().Should().BeOk();
-            emitter.Emit(Record("after")).Should().BeOk();
+
+            // Act
+            var result = emitter.Emit(Record("after"));
+
+            // Assert
+            result.Should().BeOk();
             names().Should().Equal("before", "after");
         }
     }

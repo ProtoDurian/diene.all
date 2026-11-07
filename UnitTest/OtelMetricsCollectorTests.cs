@@ -41,8 +41,14 @@ public class OtelMetricsCollectorTests : IDisposable
     }
 
     [Fact]
-    public void Construct_RejectsANullInstrumentation() =>
-        FluentActions.Invoking(() => new OtelMetricsCollector(null!)).Should().Throw<ArgumentNullException>();
+    public void Construct_RejectsANullInstrumentation()
+    {
+        // Act
+        var act = () => new OtelMetricsCollector(null!);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
 
     [Theory]
     [InlineData(MetricKind.Counter)]
@@ -50,14 +56,19 @@ public class OtelMetricsCollectorTests : IDisposable
     [InlineData(MetricKind.Histogram)]
     public void Emit_RecordsEveryInstrumentKindWithItsTags(MetricKind kind)
     {
+        // Arrange
         var (measurements, listener) = Listen();
+        var collector = new OtelMetricsCollector(_instrumentation);
+
+        // Act
+        Result<Unit, SeamError> result;
         using (listener)
         {
-            new OtelMetricsCollector(_instrumentation)
-                .Emit(Sample(kind, 2.5, name: $"demo.{kind}"))
-                .Should().BeOk();
+            result = collector.Emit(Sample(kind, 2.5, name: $"demo.{kind}"));
         }
 
+        // Assert
+        result.Should().BeOk();
         measurements.Should().ContainSingle()
             .Which.Should().Be(($"demo.{kind}", 2.5, 1));
     }
@@ -65,14 +76,18 @@ public class OtelMetricsCollectorTests : IDisposable
     [Fact]
     public void Emit_ReusesTheInstrumentForARepeatedSeries()
     {
+        // Arrange
         var (measurements, listener) = Listen();
         var collector = new OtelMetricsCollector(_instrumentation);
+
+        // Act
         using (listener)
         {
             collector.Emit(Sample(value: 1.0)).Should().BeOk();
             collector.Emit(Sample(value: 2.0)).Should().BeOk();
         }
 
+        // Assert
         measurements.Should().HaveCount(2);
         measurements.Select(measurement => measurement.Value).Should().Equal(1.0, 2.0);
     }
@@ -80,64 +95,95 @@ public class OtelMetricsCollectorTests : IDisposable
     [Fact]
     public void Emit_TreatsADifferentUnitAsADifferentSeries()
     {
+        // Arrange
         var (measurements, listener) = Listen();
         var collector = new OtelMetricsCollector(_instrumentation);
+
+        // Act
         using (listener)
         {
             collector.Emit(Sample(unit: "ms")).Should().BeOk();
             collector.Emit(Sample(unit: null)).Should().BeOk();
         }
 
+        // Assert
         measurements.Should().HaveCount(2);
     }
 
     [Fact]
     public void Emit_AcceptsASampleCarryingNoAttributes()
     {
+        // Arrange
         var (measurements, listener) = Listen();
+        var collector = new OtelMetricsCollector(_instrumentation);
+
+        // Act
+        Result<Unit, SeamError> result;
         using (listener)
         {
-            new OtelMetricsCollector(_instrumentation)
-                .Emit(new MetricRecord(DateTimeOffset.UnixEpoch, "demo.bare", MetricKind.Counter, 1.0))
-                .Should().BeOk();
+            result = collector.Emit(new MetricRecord(DateTimeOffset.UnixEpoch, "demo.bare", MetricKind.Counter, 1.0));
         }
 
+        // Assert
+        result.Should().BeOk();
         measurements.Should().ContainSingle().Which.Tags.Should().Be(0);
     }
 
     [Fact]
-    public void Emit_RejectsANullRecord() =>
-        new OtelMetricsCollector(_instrumentation)
-            .Emit(null!)
-            .Should().BeSeamErr(SeamKind.Metrics, "invalid_argument");
+    public void Emit_RejectsANullRecord()
+    {
+        // Arrange
+        var collector = new OtelMetricsCollector(_instrumentation);
+
+        // Act
+        var result = collector.Emit(null!);
+
+        // Assert
+        result.Should().BeSeamErr(SeamKind.Metrics, "invalid_argument");
+    }
 
     [Fact]
-    public void Emit_RejectsAnUndefinedKind() =>
-        new OtelMetricsCollector(_instrumentation)
-            .Emit(new MetricRecord(DateTimeOffset.UnixEpoch, "demo", (MetricKind)42, 1.0))
-            .Should().BeSeamErr(SeamKind.Metrics, "invalid_argument")
+    public void Emit_RejectsAnUndefinedKind()
+    {
+        // Arrange
+        var collector = new OtelMetricsCollector(_instrumentation);
+
+        // Act
+        var result = collector.Emit(new MetricRecord(DateTimeOffset.UnixEpoch, "demo", (MetricKind)42, 1.0));
+
+        // Assert
+        result.Should().BeSeamErr(SeamKind.Metrics, "invalid_argument")
             .Which.Detail.Should().Contain("not a recognized metric kind");
+    }
 
     [Theory]
     [InlineData(double.NaN)]
     [InlineData(double.PositiveInfinity)]
     [InlineData(double.NegativeInfinity)]
-    public void Emit_RejectsANonFiniteValue(double value) =>
-        new OtelMetricsCollector(_instrumentation)
-            .Emit(Sample(value: value))
-            .Should().BeSeamErr(SeamKind.Metrics, "invalid_argument")
-            .Which.Detail.Should().Contain("finite");
+    public void Emit_RejectsANonFiniteValue(double value)
+    {
+        // Arrange
+        var collector = new OtelMetricsCollector(_instrumentation);
+
+        // Act
+        var result = collector.Emit(Sample(value: value));
+
+        // Assert
+        result.Should().BeSeamErr(SeamKind.Metrics, "invalid_argument").Which.Detail.Should().Contain("finite");
+    }
 
     [Fact]
     public void Emit_ReportsAnEmitFailureWhenTheMeterIsDisposed()
     {
+        // Arrange
         var instrumentation = new Instrumentation(new AppIdentity("l", "p", "s", "m", "1.0.0"));
         instrumentation.Dispose();
 
+        // Act
         var result = new OtelMetricsCollector(instrumentation).Emit(Sample());
 
-        // A disposed meter either refuses instrument creation or accepts the record as a no-op;
-        // either way the seam must report a value rather than throw into the caller.
+        // Assert
+        // A disposed meter may refuse the instrument or no-op; either way it returns a value, never throws.
         result.Match(_ => "ok", error => error.Id).Should().BeOneOf("ok", "emit_failed");
     }
 }

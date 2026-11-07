@@ -3,11 +3,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace AtomiCloud.DotnetBase.UnitTest;
 
-/// <summary>
-/// Pins the canonical block against a checked-in fixture. .NET is the reference
-/// binding for the <c>otel:</c> block, so a rename here is a cross-language contract
-/// change and has to fail loudly rather than drift.
-/// </summary>
 public class C0OtelBlockFixtureTests
 {
     private static JsonElement Fixture { get; } = JsonDocument
@@ -17,15 +12,24 @@ public class C0OtelBlockFixtureTests
     private static IReadOnlyDictionary<string, string> Entries(string property) =>
         Fixture.GetProperty(property).EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!);
 
+    private static string[] PinnedSamplerTypes() =>
+        [.. Fixture.GetProperty("samplerTypes").EnumerateArray().Select(t => t.GetString()!)];
+
     [Fact]
-    public void Section_MatchesTheOptionKey() =>
-        Fixture.GetProperty("section").GetString().Should().Be(OtelOption.Key);
+    public void Section_MatchesTheOptionKey()
+    {
+        // Act
+        var section = Fixture.GetProperty("section").GetString();
+
+        // Assert
+        section.Should().Be(OtelOption.Key);
+    }
 
     [Fact]
     public void EveryPinnedPathBindsToTheOptionsGraph()
     {
-        var paths = Entries("paths");
-        var values = paths.Values.ToDictionary(
+        // Arrange
+        var values = Entries("paths").Values.ToDictionary(
             path => path,
             path => path.EndsWith("Ratio", StringComparison.Ordinal) ? "0.5"
                 : path.EndsWith("Interval", StringComparison.Ordinal) ? "PT30S"
@@ -35,13 +39,14 @@ public class C0OtelBlockFixtureTests
                 : path.EndsWith("Type", StringComparison.Ordinal) ? "always_on"
                 : "true",
             StringComparer.Ordinal);
-
-        var option = new ConfigurationBuilder()
+        var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(values.Select(entry => new KeyValuePair<string, string?>(entry.Key, entry.Value)))
-            .Build()
-            .GetSection(OtelOption.Key)
-            .Get<OtelOption>();
+            .Build();
 
+        // Act
+        var option = configuration.GetSection(OtelOption.Key).Get<OtelOption>();
+
+        // Assert
         option.Should().NotBeNull();
         option!.Logs.Exporter.Otlp.Endpoint.Should().Be("http://collector:4318");
         option.Logs.Exporter.Otlp.Timeout.Should().Be("PT5S");
@@ -54,23 +59,34 @@ public class C0OtelBlockFixtureTests
     [Fact]
     public void EveryPinnedEnvNameIsThePrefixedDoubleUnderscoreSpellingOfItsPath()
     {
+        // Arrange
         var prefix = Fixture.GetProperty("envPrefix").GetString()!;
         var paths = Entries("paths");
+        var envNames = Entries("envNames");
 
-        foreach (var (key, variable) in Entries("envNames"))
-        {
-            paths.Should().ContainKey(key);
-            variable.Should().Be(prefix + paths[key].Replace(':', '_').Replace("_", "__", StringComparison.Ordinal)
-                .ToUpperInvariant());
-        }
+        // Act
+        var expected = envNames.Keys.ToDictionary(
+            key => key,
+            key => paths.TryGetValue(key, out var path)
+                ? prefix + path.Replace(':', '_').Replace("_", "__", StringComparison.Ordinal).ToUpperInvariant()
+                : null,
+            StringComparer.Ordinal);
+
+        // Assert
+        paths.Keys.Should().Contain(envNames.Keys);
+        envNames.Should().BeEquivalentTo(expected);
     }
 
     [Fact]
     public void PinnedDefaultsMatchTheShippedOptionDefaults()
     {
+        // Arrange
         var defaults = Fixture.GetProperty("defaults");
+
+        // Act
         var option = new OtelOption();
 
+        // Assert
         option.Logs.Enabled.Should().Be(defaults.GetProperty("signalEnabled").GetBoolean());
         option.Logs.Exporter.Console.Enabled.Should().Be(defaults.GetProperty("consoleEnabled").GetBoolean());
         option.Logs.Exporter.Otlp.Enabled.Should().Be(defaults.GetProperty("otlpEnabled").GetBoolean());
@@ -83,34 +99,53 @@ public class C0OtelBlockFixtureTests
     }
 
     [Fact]
-    public void PinnedSamplerTypesAreExactlyTheOnesTheEngineMaps()
+    public void PinnedSamplerTypesAreExactlyTheOnesTheEngineNames()
     {
-        var types = Fixture.GetProperty("samplerTypes").EnumerateArray().Select(t => t.GetString()).ToArray();
+        // Act
+        var types = PinnedSamplerTypes();
+
+        // Assert
         types.Should().BeEquivalentTo([
             OtelSampler.ParentBasedTraceIdRatio,
             OtelSampler.AlwaysOn,
             OtelSampler.AlwaysOff,
         ]);
-
-        foreach (var type in types)
-        {
-            OtelSampler.Create(new SamplerOption { Type = type! }, Env.None).Should().BeOk();
-        }
     }
 
     [Fact]
-    public void PinnedResourceKeysAreExactlyTheMappedKeys() =>
-        Fixture
-            .GetProperty("resourceKeys")
-            .EnumerateArray()
-            .Select(key => key.GetString())
-            .Should().BeEquivalentTo(AtomiResource.Map(new AppIdentity("l", "p", "s", "m", "v")).Keys);
+    public void EveryPinnedSamplerTypeIsMappedByTheEngine()
+    {
+        // Arrange
+        var types = PinnedSamplerTypes();
+
+        // Act
+        var results = types.Select(type => OtelSampler.Create(new SamplerOption { Type = type }, Env.None)).ToList();
+
+        // Assert
+        results.Should().HaveCount(3);
+        results.Should().AllSatisfy(result => result.Should().BeOk());
+    }
 
     [Fact]
-    public void PinnedProtocolMatchesTheHostExtensionConstant() =>
-        Fixture
-            .GetProperty("defaults")
-            .GetProperty("otlpProtocol")
-            .GetString()
-            .Should().Be(OtelHostExtensions.OtlpProtocol);
+    public void PinnedResourceKeysAreExactlyTheMappedKeys()
+    {
+        // Arrange
+        var mapped = AtomiResource.Map(new AppIdentity("l", "p", "s", "m", "v")).Keys;
+
+        // Act
+        var pinned = Fixture.GetProperty("resourceKeys").EnumerateArray().Select(key => key.GetString());
+
+        // Assert
+        pinned.Should().BeEquivalentTo(mapped);
+    }
+
+    [Fact]
+    public void PinnedProtocolMatchesTheHostExtensionConstant()
+    {
+        // Act
+        var protocol = Fixture.GetProperty("defaults").GetProperty("otlpProtocol").GetString();
+
+        // Assert
+        protocol.Should().Be(OtelHostExtensions.OtlpProtocol);
+    }
 }

@@ -14,41 +14,72 @@ public class AtomiResourceTests
     [InlineData("atomi.service", "billing")]
     [InlineData("atomi.module", "api")]
     [InlineData("atomi.version", "1.2.3")]
-    public void Map_LandsEveryIdentityValueOnItsKey(string key, string expected) =>
-        AtomiResource.Map(Identity)[key].Should().Be(expected);
+    public void Map_LandsEveryIdentityValueOnItsKey(string key, string expected)
+    {
+        // Act
+        var mapped = AtomiResource.Map(Identity);
+
+        // Assert
+        mapped[key].Should().Be(expected);
+    }
 
     [Fact]
     public void Map_ShipsNineKeysAndNoSemconvTwinForModule()
     {
+        // Act
         var mapped = AtomiResource.Map(Identity);
+
+        // Assert
         mapped.Should().HaveCount(9);
         mapped.Keys.Should().NotContain("service.module");
     }
 
     [Fact]
-    public void Map_RejectsANullIdentity() =>
-        FluentActions.Invoking(() => AtomiResource.Map(null!)).Should().Throw<ArgumentNullException>();
+    public void Map_RejectsANullIdentity()
+    {
+        // Act
+        var act = () => AtomiResource.Map(null!);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
 
     [Fact]
     public void SemconvKeys_AreTheSpecSpellings()
     {
-        AtomiResource.DeploymentEnvironmentNameKey.Should().Be("deployment.environment.name");
-        AtomiResource.ServiceNamespaceKey.Should().Be("service.namespace");
-        AtomiResource.ServiceNameKey.Should().Be("service.name");
-        AtomiResource.ServiceVersionKey.Should().Be("service.version");
+        // Act
+        string[] keys =
+        [
+            AtomiResource.DeploymentEnvironmentNameKey,
+            AtomiResource.ServiceNamespaceKey,
+            AtomiResource.ServiceNameKey,
+            AtomiResource.ServiceVersionKey,
+        ];
+
+        // Assert
+        keys.Should().Equal("deployment.environment.name", "service.namespace", "service.name", "service.version");
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void ParseResourceAttributes_TreatsAnAbsentValueAsEmpty(string? value) =>
-        AtomiResource.ParseResourceAttributes(value).Should().BeEmpty();
+    public void ParseResourceAttributes_TreatsAnAbsentValueAsEmpty(string? value)
+    {
+        // Act
+        var parsed = AtomiResource.ParseResourceAttributes(value);
+
+        // Assert
+        parsed.Should().BeEmpty();
+    }
 
     [Fact]
     public void ParseResourceAttributes_ReadsABaggageStyleList()
     {
+        // Act
         var parsed = AtomiResource.ParseResourceAttributes(" tenant = acme , region=ap-southeast-1 ");
+
+        // Assert
         parsed.Should().HaveCount(2);
         parsed["tenant"].Should().Be("acme");
         parsed["region"].Should().Be("ap-southeast-1");
@@ -59,57 +90,105 @@ public class AtomiResourceTests
     [InlineData("=orphan")]
     [InlineData(" =orphan")]
     [InlineData(",,")]
-    public void ParseResourceAttributes_DropsUnusableEntriesRatherThanFailing(string value) =>
-        AtomiResource.ParseResourceAttributes(value).Should().BeEmpty();
+    public void ParseResourceAttributes_DropsUnusableEntriesRatherThanFailing(string value)
+    {
+        // Act
+        var parsed = AtomiResource.ParseResourceAttributes(value);
+
+        // Assert
+        parsed.Should().BeEmpty();
+    }
 
     [Fact]
-    public void ParseResourceAttributes_KeepsAnEmptyValueForAKnownKey() =>
-        AtomiResource.ParseResourceAttributes("tenant=")["tenant"].Should().BeEmpty();
+    public void ParseResourceAttributes_KeepsAnEmptyValueForAKnownKey()
+    {
+        // Act
+        var parsed = AtomiResource.ParseResourceAttributes("tenant=");
+
+        // Assert
+        parsed["tenant"].Should().BeEmpty();
+    }
 
     [Fact]
-    public void ParseResourceAttributes_KeepsAValueContainingAnEqualsSign() =>
-        AtomiResource.ParseResourceAttributes("filter=a=b")["filter"].Should().Be("a=b");
+    public void ParseResourceAttributes_KeepsAValueContainingAnEqualsSign()
+    {
+        // Act
+        var parsed = AtomiResource.ParseResourceAttributes("filter=a=b");
+
+        // Assert
+        parsed["filter"].Should().Be("a=b");
+    }
 
     [Fact]
-    public void Attributes_UsesTheBlockWhenNoEnvironmentOverridesExist() =>
-        AtomiResource
-            .Attributes(Identity, Env.None)
-            .Should().BeEquivalentTo(AtomiResource.Map(Identity));
+    public void Attributes_UsesTheBlockWhenNoEnvironmentOverridesExist()
+    {
+        // Act
+        var attributes = AtomiResource.Attributes(Identity, Env.None);
+
+        // Assert
+        attributes.Should().BeEquivalentTo(AtomiResource.Map(Identity));
+    }
 
     [Fact]
-    public void Attributes_LetsResourceAttributesOverrideABlockDerivedValue() =>
-        AtomiResource
-            .Attributes(
-                Identity,
-                Env.Of((OtelEnvironment.ResourceAttributesVariable, "service.name=override,tenant=acme")))
+    public void Attributes_LetsResourceAttributesOverrideABlockDerivedValue()
+    {
+        // Arrange
+        var environment = Env.Of((OtelEnvironment.ResourceAttributesVariable, "service.name=override,tenant=acme"));
+
+        // Act
+        var attributes = AtomiResource.Attributes(Identity, environment);
+
+        // Assert
+        attributes
             .Should().Contain(new KeyValuePair<string, string>("service.name", "override"))
             .And.Contain(new KeyValuePair<string, string>("tenant", "acme"));
+    }
 
     [Fact]
-    public void Attributes_LetsServiceNameWinOverResourceAttributes() =>
-        AtomiResource
-            .Attributes(
-                Identity,
-                Env.Of(
-                    (OtelEnvironment.ResourceAttributesVariable, "service.name=from-list"),
-                    (OtelEnvironment.ServiceNameVariable, " from-variable ")))[AtomiResource.ServiceNameKey]
-            .Should().Be("from-variable");
+    public void Attributes_LetsServiceNameWinOverResourceAttributes()
+    {
+        // Arrange
+        var environment = Env.Of(
+            (OtelEnvironment.ResourceAttributesVariable, "service.name=from-list"),
+            (OtelEnvironment.ServiceNameVariable, " from-variable "));
+
+        // Act
+        var attributes = AtomiResource.Attributes(Identity, environment);
+
+        // Assert
+        attributes[AtomiResource.ServiceNameKey].Should().Be("from-variable");
+    }
 
     [Fact]
-    public void Attributes_IgnoresABlankServiceNameOverride() =>
-        AtomiResource
-            .Attributes(Identity, Env.Of((OtelEnvironment.ServiceNameVariable, "  ")))[AtomiResource.ServiceNameKey]
-            .Should().Be("billing");
+    public void Attributes_IgnoresABlankServiceNameOverride()
+    {
+        // Arrange
+        var environment = Env.Of((OtelEnvironment.ServiceNameVariable, "  "));
+
+        // Act
+        var attributes = AtomiResource.Attributes(Identity, environment);
+
+        // Assert
+        attributes[AtomiResource.ServiceNameKey].Should().Be("billing");
+    }
 
     [Fact]
-    public void Attributes_RejectsANullEnvironment() =>
-        FluentActions.Invoking(() => AtomiResource.Attributes(Identity, null!))
-            .Should().Throw<ArgumentNullException>();
+    public void Attributes_RejectsANullEnvironment()
+    {
+        // Act
+        var act = () => AtomiResource.Attributes(Identity, null!);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
 
     [Fact]
     public void Build_ProducesAResourceCarryingTheMappedAttributes()
     {
+        // Act
         var resource = AtomiResource.Build(Identity, Env.None).Build();
+
+        // Assert
         resource.Attributes.Should().Contain(new KeyValuePair<string, object>("service.name", "billing"));
         resource.Attributes.Should().Contain(new KeyValuePair<string, object>("atomi.module", "api"));
         resource.Attributes.Should().HaveCount(9);

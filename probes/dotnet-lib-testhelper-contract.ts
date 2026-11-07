@@ -23,7 +23,8 @@ export default defineGate({
         replace: '.ForCondition(true)',
       });
       await expectRedBecause(repo, UNIT, 'dotnet-lib-testhelper-contract', [
-        'HaveFlushed_PassesOnTheExactCountAndFailsOnAnyOther',
+        'HaveFlushed_FailsOnALowerCount',
+        'HaveFlushed_FailsOnAHigherCount',
       ]);
     },
   },

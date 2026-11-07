@@ -21,18 +21,26 @@ public class OtelOptionTests
             .Get<OtelOption>() ?? new OtelOption();
 
     [Fact]
-    public void Key_IsTheCanonicalSectionName() => OtelOption.Key.Should().Be("Otel");
+    public void Key_IsTheCanonicalSectionName()
+    {
+        // Act
+        var key = OtelOption.Key;
+
+        // Assert
+        key.Should().Be("Otel");
+    }
 
     [Fact]
     public void Defaults_AreSignalsOnAndExportersOff()
     {
+        // Act
         var option = new OtelOption();
 
+        // Assert
         option.Logs.Enabled.Should().BeTrue();
         option.Metrics.Enabled.Should().BeTrue();
         option.Traces.Enabled.Should().BeTrue();
-
-        foreach (var exporter in new[] { option.Logs.Exporter, option.Metrics.Exporter, option.Traces.Exporter })
+        new[] { option.Logs.Exporter, option.Metrics.Exporter, option.Traces.Exporter }.Should().AllSatisfy(exporter =>
         {
             exporter.Console.Enabled.Should().BeFalse();
             exporter.Otlp.Enabled.Should().BeFalse();
@@ -40,8 +48,7 @@ public class OtelOptionTests
             exporter.Otlp.Protocol.Should().Be("http/protobuf");
             exporter.Otlp.Timeout.Should().Be("PT10S");
             exporter.Otlp.Headers.Should().BeEmpty();
-        }
-
+        });
         option.Metrics.Interval.Should().Be("PT60S");
         option.Traces.Sampler.Type.Should().Be("parentbased_traceidratio");
         option.Traces.Sampler.Ratio.Should().Be(1.0);
@@ -50,6 +57,7 @@ public class OtelOptionTests
     [Fact]
     public void Signals_AreIndependentlyAssignable()
     {
+        // Act
         var option = new OtelOption
         {
             Logs = new LogsOption { Enabled = false },
@@ -57,6 +65,7 @@ public class OtelOptionTests
             Traces = new TracesOption { Enabled = false, Sampler = new SamplerOption { Type = "always_off" } },
         };
 
+        // Assert
         option.Logs.Enabled.Should().BeFalse();
         option.Metrics.Interval.Should().Be("PT30S");
         option.Traces.Sampler.Type.Should().Be("always_off");
@@ -65,6 +74,7 @@ public class OtelOptionTests
     [Fact]
     public void Exporter_IsIndependentlyAssignable()
     {
+        // Arrange
         var otlp = new OtlpExporterOption
         {
             Enabled = true,
@@ -73,6 +83,8 @@ public class OtelOptionTests
             Timeout = "PT5S",
             Headers = new Dictionary<string, string>(StringComparer.Ordinal) { ["x-tenant"] = "acme" },
         };
+
+        // Act
         var option = new SignalOption
         {
             Enabled = true,
@@ -83,6 +95,7 @@ public class OtelOptionTests
             },
         };
 
+        // Assert
         option.Exporter.Console.Enabled.Should().BeTrue();
         option.Exporter.Otlp.Should().BeSameAs(otlp);
         otlp.Headers.Should().ContainKey("x-tenant");
@@ -91,6 +104,7 @@ public class OtelOptionTests
     [Fact]
     public void Binding_ReadsTheCanonicalBlockPaths()
     {
+        // Act
         var option = Bind(
             ("Otel:Logs:Enabled", "false"),
             ("Otel:Logs:Exporter:Otlp:Enabled", "true"),
@@ -101,6 +115,7 @@ public class OtelOptionTests
             ("Otel:Traces:Sampler:Type", "always_on"),
             ("Otel:Traces:Sampler:Ratio", "0.25"));
 
+        // Assert
         option.Logs.Enabled.Should().BeFalse();
         option.Logs.Exporter.Otlp.Enabled.Should().BeTrue();
         option.Logs.Exporter.Otlp.Endpoint.Should().Be("http://collector:4318");
@@ -112,64 +127,136 @@ public class OtelOptionTests
     }
 
     [Fact]
-    public void Binding_AnEmptyRootYieldsTheShippedDefaults() =>
-        Bind(("Unrelated:Key", "value")).Metrics.Interval.Should().Be("PT60S");
+    public void Binding_AnEmptyRootYieldsTheShippedDefaults()
+    {
+        // Act
+        var option = Bind(("Unrelated:Key", "value"));
+
+        // Assert
+        option.Metrics.Interval.Should().Be("PT60S");
+    }
 
     [Fact]
     public void Binding_TheEnvironmentSpellingOfABlockPathIsDoubleUnderscore()
     {
+        // Arrange
         const string variable = "ATOMI_OTEL__LOGS__EXPORTER__OTLP__ENABLED";
-        var option = new ConfigurationBuilder()
+
+        // Act
+        var path = variable
+            .Replace("ATOMI_", string.Empty, StringComparison.Ordinal)
+            .Replace("__", ":", StringComparison.Ordinal);
+
+        // Assert
+        path.Should().Be("OTEL:LOGS:EXPORTER:OTLP:ENABLED");
+    }
+
+    [Fact]
+    public void Binding_AnEnvironmentWithoutThePrefixedBlockBindsNoBlock()
+    {
+        // Arrange
+        var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection([new("ATOMI_", null)])
             .AddEnvironmentVariables("ATOMI_")
             .Build();
 
-        variable
-            .Replace("ATOMI_", string.Empty, StringComparison.Ordinal)
-            .Replace("__", ":", StringComparison.Ordinal)
-            .Should().Be("OTEL:LOGS:EXPORTER:OTLP:ENABLED");
-        option.GetSection(OtelOption.Key).Get<OtelOption>().Should().BeNull();
+        // Act
+        var option = configuration.GetSection(OtelOption.Key).Get<OtelOption>();
+
+        // Assert
+        option.Should().BeNull();
     }
 
     [Theory]
     [InlineData("parentbased_traceidratio")]
     [InlineData("always_on")]
     [InlineData("always_off")]
-    public void Sampler_AcceptsTheThreeCanonicalTypes(string type) =>
-        Validate(new SamplerOption { Type = type }).Should().BeEmpty();
+    public void Sampler_AcceptsTheThreeCanonicalTypes(string type)
+    {
+        // Act
+        var errors = Validate(new SamplerOption { Type = type });
+
+        // Assert
+        errors.Should().BeEmpty();
+    }
 
     [Theory]
     [InlineData("traceidratio")]
     [InlineData("ALWAYS_ON")]
     [InlineData("")]
-    public void Sampler_RejectsAnyOtherType(string type) =>
-        Validate(new SamplerOption { Type = type }).Should().NotBeEmpty();
+    public void Sampler_RejectsAnyOtherType(string type)
+    {
+        // Act
+        var errors = Validate(new SamplerOption { Type = type });
+
+        // Assert
+        errors.Should().NotBeEmpty();
+    }
 
     [Theory]
     [InlineData(0.0)]
     [InlineData(0.5)]
     [InlineData(1.0)]
-    public void Sampler_AcceptsARatioInsideTheUnitInterval(double ratio) =>
-        Validate(new SamplerOption { Ratio = ratio }).Should().BeEmpty();
+    public void Sampler_AcceptsARatioInsideTheUnitInterval(double ratio)
+    {
+        // Act
+        var errors = Validate(new SamplerOption { Ratio = ratio });
+
+        // Assert
+        errors.Should().BeEmpty();
+    }
 
     [Theory]
     [InlineData(-0.1)]
     [InlineData(1.1)]
-    public void Sampler_RejectsARatioOutsideTheUnitInterval(double ratio) =>
-        Validate(new SamplerOption { Ratio = ratio }).Should().NotBeEmpty();
-
-    [Fact]
-    public void Otlp_AcceptsOnlyTheFleetProtocol()
+    public void Sampler_RejectsARatioOutsideTheUnitInterval(double ratio)
     {
-        Validate(new OtlpExporterOption { Protocol = "http/protobuf" }).Should().BeEmpty();
-        Validate(new OtlpExporterOption { Protocol = "grpc" }).Should().NotBeEmpty();
-        Validate(new OtlpExporterOption { Protocol = "" }).Should().NotBeEmpty();
+        // Act
+        var errors = Validate(new SamplerOption { Ratio = ratio });
+
+        // Assert
+        errors.Should().NotBeEmpty();
     }
 
     [Fact]
-    public void Otlp_RequiresATimeout() => Validate(new OtlpExporterOption { Timeout = null! }).Should().NotBeEmpty();
+    public void Otlp_AcceptsTheFleetProtocol()
+    {
+        // Act
+        var errors = Validate(new OtlpExporterOption { Protocol = "http/protobuf" });
+
+        // Assert
+        errors.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("grpc")]
+    [InlineData("")]
+    public void Otlp_RejectsAnyOtherProtocol(string protocol)
+    {
+        // Act
+        var errors = Validate(new OtlpExporterOption { Protocol = protocol });
+
+        // Assert
+        errors.Should().NotBeEmpty();
+    }
 
     [Fact]
-    public void Metrics_RequiresAnInterval() =>
-        Validate(new MetricsOption { Interval = null! }).Should().NotBeEmpty();
+    public void Otlp_RequiresATimeout()
+    {
+        // Act
+        var errors = Validate(new OtlpExporterOption { Timeout = null! });
+
+        // Assert
+        errors.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void Metrics_RequiresAnInterval()
+    {
+        // Act
+        var errors = Validate(new MetricsOption { Interval = null! });
+
+        // Assert
+        errors.Should().NotBeEmpty();
+    }
 }

@@ -2,7 +2,6 @@ using System.Diagnostics;
 
 namespace AtomiCloud.DotnetBase.UnitTest.Tracing;
 
-/// <summary>Captures the activities an emitter produced, via a real ActivityListener.</summary>
 internal sealed class ActivityCapture : IDisposable
 {
     private readonly ActivityListener _listener;
@@ -46,16 +45,27 @@ public class ActivityTraceEmitterTests : IDisposable
     }
 
     [Fact]
-    public void Construct_RejectsANullInstrumentation() =>
-        FluentActions.Invoking(() => new ActivityTraceEmitter(null!)).Should().Throw<ArgumentNullException>();
+    public void Construct_RejectsANullInstrumentation()
+    {
+        // Act
+        var act = () => new ActivityTraceEmitter(null!);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
 
     [Fact]
     public void Emit_ProducesAnActivityCarryingTagsEventsAndStatus()
     {
+        // Arrange
         using var capture = new ActivityCapture(_instrumentation.ActivitySource.Name);
+        var emitter = new ActivityTraceEmitter(_instrumentation);
 
-        new ActivityTraceEmitter(_instrumentation).Emit(Record()).Should().BeOk();
+        // Act
+        var result = emitter.Emit(Record());
 
+        // Assert
+        result.Should().BeOk();
         var activity = capture.Stopped.Should().ContainSingle().Which;
         activity.DisplayName.Should().Be("demo.request");
         activity.GetTagItem("route").Should().Be("/v1");
@@ -71,65 +81,103 @@ public class ActivityTraceEmitterTests : IDisposable
     [InlineData(TraceStatus.Error, ActivityStatusCode.Error)]
     public void Emit_MapsEveryStatus(TraceStatus status, ActivityStatusCode expected)
     {
+        // Arrange
         using var capture = new ActivityCapture(_instrumentation.ActivitySource.Name);
+        var emitter = new ActivityTraceEmitter(_instrumentation);
 
-        new ActivityTraceEmitter(_instrumentation).Emit(Record(status)).Should().BeOk();
+        // Act
+        var result = emitter.Emit(Record(status));
 
+        // Assert
+        result.Should().BeOk();
         capture.Stopped.Should().ContainSingle().Which.Status.Should().Be(expected);
     }
 
     [Fact]
     public void Emit_CarriesTheStatusMessageOnAFailedSpan()
     {
+        // Arrange
         using var capture = new ActivityCapture(_instrumentation.ActivitySource.Name);
+        var emitter = new ActivityTraceEmitter(_instrumentation);
 
-        new ActivityTraceEmitter(_instrumentation)
-            .Emit(Record(TraceStatus.Error, "upstream refused"))
-            .Should().BeOk();
+        // Act
+        var result = emitter.Emit(Record(TraceStatus.Error, "upstream refused"));
 
-        // Activity only retains a description for the Error status; that is the case a
-        // reader actually needs it for.
+        // Assert
+        // Activity keeps a description only for the Error status.
+        result.Should().BeOk();
         capture.Stopped.Should().ContainSingle().Which.StatusDescription.Should().Be("upstream refused");
     }
 
     [Fact]
     public void Emit_LeavesTheDescriptionUnsetWhenTheSpanCarriesNoMessage()
     {
+        // Arrange
         using var capture = new ActivityCapture(_instrumentation.ActivitySource.Name);
+        var emitter = new ActivityTraceEmitter(_instrumentation);
 
-        new ActivityTraceEmitter(_instrumentation).Emit(Record(statusMessage: null)).Should().BeOk();
+        // Act
+        var result = emitter.Emit(Record(statusMessage: null));
 
+        // Assert
+        result.Should().BeOk();
         capture.Stopped.Should().ContainSingle().Which.StatusDescription.Should().BeNull();
     }
 
     [Fact]
     public void Emit_IsASuccessfulNoOpWhenNothingIsListening()
     {
-        new ActivityTraceEmitter(_instrumentation).Emit(Record()).Should().BeOk();
+        // Arrange
+        var emitter = new ActivityTraceEmitter(_instrumentation);
+
+        // Act
+        var result = emitter.Emit(Record());
+
+        // Assert
+        result.Should().BeOk();
     }
 
     [Fact]
-    public void Emit_RejectsANullRecord() =>
-        new ActivityTraceEmitter(_instrumentation)
-            .Emit(null!)
-            .Should().BeErr()
-            .Which.Code.Should().Be(TraceErrorCode.InvalidInput);
+    public void Emit_RejectsANullRecord()
+    {
+        // Arrange
+        var emitter = new ActivityTraceEmitter(_instrumentation);
+
+        // Act
+        var result = emitter.Emit(null!);
+
+        // Assert
+        result.Should().BeErr().Which.Code.Should().Be(TraceErrorCode.InvalidInput);
+    }
 
     [Fact]
     public void Emit_AcceptsASpanCarryingNothingButAName()
     {
+        // Arrange
         using var capture = new ActivityCapture(_instrumentation.ActivitySource.Name);
+        var emitter = new ActivityTraceEmitter(_instrumentation);
+        var record = TraceRecord.Create("bare").Should().BeOk().Which;
 
-        new ActivityTraceEmitter(_instrumentation)
-            .Emit(TraceRecord.Create("bare").Should().BeOk().Which)
-            .Should().BeOk();
+        // Act
+        var result = emitter.Emit(record);
 
+        // Assert
+        result.Should().BeOk();
         var activity = capture.Stopped.Should().ContainSingle().Which;
         activity.TagObjects.Should().BeEmpty();
         activity.Events.Should().BeEmpty();
     }
 
     [Fact]
-    public void Flush_SucceedsBecauseTheSdkOwnsTheExportSchedule() =>
-        new ActivityTraceEmitter(_instrumentation).Flush().Should().BeOk();
+    public void Flush_SucceedsBecauseTheSdkOwnsTheExportSchedule()
+    {
+        // Arrange
+        var emitter = new ActivityTraceEmitter(_instrumentation);
+
+        // Act
+        var result = emitter.Flush();
+
+        // Assert
+        result.Should().BeOk();
+    }
 }
