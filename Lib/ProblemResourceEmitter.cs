@@ -22,6 +22,8 @@ public sealed class ProblemResourceEmitter(
     public ProblemResource Emit(ProblemResourceIdentity identity)
     {
         ArgumentNullException.ThrowIfNull(identity);
+        if (_portal.Scheme != "https")
+            throw new InvalidOperationException($"Problem resources need an https ErrorPortal; received {_portal.Scheme}.");
         ValidateIdentity(identity);
         var module = _portal.Identity.Module;
 

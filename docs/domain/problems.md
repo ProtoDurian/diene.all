@@ -99,7 +99,9 @@ landscape and version. The module comes from the ErrorPortal identity; an
 explicit module must equal it. `metadata.name` is
 `{service}.{module}.{landscape}.{version}`, each segment slugified to a DNS-1123
 label and joined with dots, so `a-b` + `c` and `a` + `b-c` never collide.
-`metadata.namespace` is the platform. The `spec` fields are written in the order
+Emitting needs an https ErrorPortal, because the Problem CRD accepts only
+https type URIs; envelopes may still use http. `metadata.namespace` is the
+platform. The `spec` fields are written in the order
 `platform, service, module, landscape, version, problems`, and `problems` is
 sorted by id.
 

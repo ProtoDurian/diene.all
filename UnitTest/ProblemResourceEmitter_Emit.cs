@@ -69,6 +69,22 @@ public class ProblemResourceEmitter_Emit
     }
 
     [Fact]
+    public void It_should_refuse_to_emit_for_an_http_portal_while_its_type_URIs_still_build()
+    {
+        // Arrange
+        var portal = new ErrorPortalConfig("http", "localhost:8080", Identity);
+        var emitter = Emitter(portal, catalog => catalog.Add<SampleProblem>(400, false));
+
+        // Act
+        var act = () => emitter.Emit(new ProblemResourceIdentity("dotnet", "notes", "lapras", "v1"));
+        var typeUri = new ProblemTypeUriBuilder(portal).Build("v1", "sample_problem");
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>().WithMessage("*https*");
+        typeUri.AbsoluteUri.Should().Be("http://localhost:8080/docs/lapras/dotnet/notes/api/v1/sample_problem");
+    }
+
+    [Fact]
     public void It_should_reject_a_name_segment_longer_than_a_DNS_label()
     {
         // Arrange
