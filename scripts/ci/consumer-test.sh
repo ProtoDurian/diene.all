@@ -111,7 +111,7 @@ void main() {
   print('consumer: \$okWire \$title');
 }
 DART
-if [[ -f ${unpacked}/lib/test_helper.dart ]]; then
+if [[ -f lib/test_helper.dart ]]; then
   cat >"${consumer}/bin/test_helper.dart" <<DART
 import 'package:${name}/diene_result.dart';
 import 'package:${name}/test_helper.dart';
@@ -122,10 +122,14 @@ void main() {
   expectNone(const Option<String>.none());
   try {
     expectSome(const Option<String>.none());
+    throw StateError('expectSome accepted None');
+  } on TestHelperFailure {}
+  try {
+    expectNone(const Option<String>.some('x'));
   } on TestHelperFailure {
     return;
   }
-  throw StateError('expectSome accepted None');
+  throw StateError('expectNone accepted Some');
 }
 DART
 fi
