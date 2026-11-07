@@ -14,8 +14,9 @@ toolchain and test boundaries.
 - `pls setup` installs the locked Bun dependencies after synchronizing vendored
   package skills.
 - `pls lint` runs every generated pre-commit hook.
-- `pls test`, `pls test:unit`, `pls test:int`, and `pls test:sit` run the test
-  tiers without coverage; SIT drives the freshly compiled binary.
+- `pls test`, `pls test:unit`, `pls test:int`, `pls test:meta`, and
+  `pls test:sit` run the test tiers without coverage through
+  `scripts/local/test.sh <tier>`; SIT drives the freshly compiled binary.
 - `pls test:coverage`, `pls test:unit:coverage`,
   `pls test:int:coverage`, and `pls test:sit:coverage` write scoped LCOV
   artifacts. SIT coverage uses the in-process driver only.
@@ -26,6 +27,9 @@ toolchain and test boundaries.
 - `pls deadcode` runs the two non-blocking LLM-review Knip configurations.
 - `pls run -- <args>` executes the source entry point.
 - `pls preview -- <args>` compiles and executes this host's standalone binary.
+
+Each tier task is a one-line call to `scripts/local/test.sh`, and `pls clean`
+calls `scripts/local/clean.sh`.
 
 There are no sample dependency, `up`/`down`, probe-matrix, or Docker tasks.
 
@@ -48,8 +52,9 @@ uses strict no-emit typechecking. Knip has four dead-code modes, none with ignor
 ## Test and coverage tiers
 
 - `.config/bun-base.coverage.yaml` lists the tiers (`unit`, `int`, `meta`,
-  `sit`), each with its test folder and coverage scope;
-  `scripts/ci/test.sh <tier>` reads it.
+  `sit`), each with its test folder and coverage scope; `scripts/ci/test.sh <tier>`
+  and `scripts/local/test.sh <tier>` read it.
+  A tier with no test files passes and writes no coverage file.
 - Unit tests cover the pure library under `src/lib/**`.
 - Integration tests use temporary directories, scratch Git repositories, local
   bare remotes, and fake HTTP only, and cover `src/adapters/**`.
