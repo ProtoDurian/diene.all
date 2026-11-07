@@ -9,7 +9,6 @@ vars:
 
 includes:
   compile: tasks/Taskfile.compile.yaml
-  docker: tasks/Taskfile.docker.yaml
   test: tasks/Taskfile.test.yaml
 
 tasks:
@@ -84,13 +83,3 @@ tasks:
     deps: [compile]
     cmds:
       - ./dist/bin/{{.ARTIFACT}} {{.CLI_ARGS}}
-
-  up:
-    desc: Start the sample Redis dependency in the background
-    cmds:
-      - docker run -d --rm --name {{.ARTIFACT_PREFIX}}-redis -p 6379:6379 redis:7.4.5-alpine
-
-  down:
-    desc: Stop the sample Redis dependency
-    cmds:
-      - docker rm -f {{.ARTIFACT_PREFIX}}-redis

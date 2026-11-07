@@ -80,12 +80,12 @@ let
       in
       {
         # Keep the pinned bun; the compiled runtime and depsHash depend on it.
-        bun-cli = atomiLib.buildBunCli {
+        releaser = atomiLib.buildBunCli {
           name = cliName;
           version = manifest.version;
           inherit src;
           entrypoint = entry;
-          depsHash = "sha256-mIb7xR1Cq1bjxDU0qK7T3jC5K0R1GfDiJy5LODpDfDg=";
+          depsHash = "sha256-QS0fN9OiIBGKAxxWCsvZBP9hmErPoL5vWN6NG6lbfPc=";
           bun = pkgs-2605.bun;
         };
       };

@@ -65,7 +65,7 @@ See **[docs/standards/nix/index.md](docs/standards/nix/index.md)** for the full 
 - Formatters and pre-commit hooks
 - Adding registries
 
-# Docker build and publishing
+# Docker boundary
 
 See [docs/standards/docker/index.md](docs/standards/docker/index.md).
 
@@ -96,3 +96,10 @@ See [docs/standards/shell-scripts/index.md](docs/standards/shell-scripts/index.m
 # Taskfile conventions
 
 See [docs/standards/taskfile/index.md](docs/standards/taskfile/index.md).
+
+# Releaser product boundary
+
+This materialized CLI uses pure `src/lib`, concrete `src/adapters`, and the sole
+`bin/releaser.ts` composition root. Its tests use scratch Git repositories,
+local bare remotes, and fake HTTP only. It has no Redis sample, CyanPrint
+probes, Python Gitlint/`sg`, dynamic plugins, or Docker distribution.

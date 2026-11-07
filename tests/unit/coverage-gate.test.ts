@@ -34,8 +34,11 @@ async function runGate(sabotage: boolean): Promise<GateRun> {
 
 describe('coverage threshold gate', () => {
   it('should pass and write a scoped lcov artifact when the fixture suite is intact', async () => {
+    // Arrange
+    const sabotage = false;
+
     // Act
-    const actual = await runGate(false);
+    const actual = await runGate(sabotage);
     const artifactExists = await Bun.file(resolve(REPOSITORY_ROOT, FIXTURE_ARTIFACT)).exists();
 
     // Assert
@@ -45,8 +48,11 @@ describe('coverage threshold gate', () => {
   }, 120_000);
 
   it('should fail when a test is skipped, even though no test fails', async () => {
+    // Arrange
+    const sabotage = true;
+
     // Act
-    const actual = await runGate(true);
+    const actual = await runGate(sabotage);
 
     // Assert
     actual.exitCode.should.equal(1, actual.output);

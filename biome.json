@@ -33,7 +33,10 @@
     "enabled": true,
     "includes": ["bin/**/*.ts", "src/**/*.ts", "tests/**/*.ts"],
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "suspicious": {
+        "noTemplateCurlyInString": "off"
+      }
     }
   }
 }

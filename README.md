@@ -1,73 +1,71 @@
-# Bun foundation
+# Releaser
 
-See the [Bun baseline](docs/developer/bun-baseline.md) for the language-specific
-toolchain, task surface, test tiers, coverage ledgers, build, and maintenance
-boundary. TypeScript variants accompany the shared standards for
-[date/time](docs/standards/datetime/languages/typescript.md),
-[domain-driven design](docs/standards/domain-driven-design/languages/typescript.md),
-[functional practices](docs/standards/functional-practices/languages/typescript.md),
-[SOLID](docs/standards/solid-principles/languages/typescript.md),
-[stateless OOP/DI](docs/standards/stateless-oop-di/languages/typescript.md),
-[testing](docs/standards/testing/languages/typescript.md),
-[utilities](docs/standards/utilities/languages/typescript.md), and
-[validation](docs/standards/validation/languages/typescript.md).
+<!-- ### nix-root -->
+<!-- #### source: main -->
 
-## Compiled CLI
+The reproducible development environment is managed by Nix. Enter it through
+direnv, then use the `pls` tasks from the loaded shell.
 
-This branch turns the Bun foundation into a DI-shaped standalone CLI. The
-single entry point is derived from `package.json`'s `bin` map; `task compile`
-emits Linux x64-baseline, Linux arm64, and Darwin arm64 binaries. Use
-`task run -- <args>` for source execution, `task preview -- <args>` for the
-host binary, and `task test:sit` for black-box journeys through a fresh binary.
+<!-- ### workspace -->
+<!-- #### source: workspace -->
 
-Release and installation channels are documented in [INSTALLATION.md](INSTALLATION.md).
+`releaser` is a standalone Bun/TypeScript binary for conventional release
+calculation, changelog generation, commit linting, Git publication, optional
+GitHub release side effects, and legacy configuration migration. It replaces
+runtime semantic-release plugin installation, `sg`, Python Gitlint, and the
+generated `.releaserc.yaml` split with one strict configuration.
 
-# Commands
+## CLI
 
-Run `task --list` for every available task and its description. The task set is
-declared in [`Taskfile.yaml`](Taskfile.yaml), whose `includes:` block maps each
-namespace to a file under [`tasks/`](tasks); a task shown as `<namespace>:<task>`
-is that key in the included file. Build artifacts — Dockerfiles and Helm charts —
-live under [`infra/`](infra) and may be plural, so their tasks are keyed per
-artifact. See [the Taskfile standard](docs/standards/taskfile/index.md) for the
-conventions.
-
-# Development Environment
-
-All binaries, tools, and PATH are managed by **Nix**. Do not install tools manually or modify PATH outside of the nix configuration.
-
-## Prerequisites
-
-1. **[Nix](https://nixos.org/download)** — package manager
-2. **[Docker](https://docs.docker.com/get-docker)** — container runtime
-3. **[direnv](https://direnv.net/docs/installation.html)** — auto-loads the nix shell on `cd`
-
-## Getting Started
-
-```bash
-direnv allow    # first time only — loads the nix dev shell
+```text
+releaser release [--dry-run] [-c <path>]
+releaser lint-commit <msgfile> [-c <path>]
+releaser next [-c <path>]
+releaser changelog [-c <path>]
+releaser conventions [-c <path>]
+releaser migrate [-c <path>]
 ```
 
-Once allowed, direnv automatically loads the development environment whenever you enter the project directory.
+Every subcommand takes `-c, --config <path>` and defaults to
+`release.yaml`.
 
-## Nix Configuration
+Only `release` without `--dry-run` mutates Git or publishes. `next`,
+`changelog`, and dry-run release are previews; `conventions` replaces only its
+configured document; `migrate` atomically rewrites the named configuration in
+place and removes legacy generated files.
 
-See [docs/standards/nix/index.md](docs/standards/nix/index.md) for the full guide on:
+## Development
 
-- File structure (`flake.nix`, `nix/`, `.envrc`)
-- Adding/removing packages
-- Environment groups and shells
-- Formatters and pre-commit hooks
-- Adding registries
+- `pls setup` installs the locked dependencies.
+- `pls lint` runs repository gates.
+- `pls test` runs unit, integration, and compiled-binary SIT tiers.
+- `pls build` bundles the source entry point.
+- `pls compile` emits Linux x64-baseline, Linux arm64, and Darwin arm64 binaries.
+- `pls preview -- --help` runs this host's compiled binary.
 
-# Standards
+The architecture points inward: `src/lib` contains pure configuration, commit,
+version, notes, and orchestration logic; `src/adapters` owns filesystem, Git,
+HTTP, process, and terminal I/O; [bin/releaser.ts](bin/releaser.ts) is the sole
+composition root.
 
-The conventions this repository follows live under
-[`docs/standards/`](docs/standards). Read the standard for the surface you are
-changing before you change it. [`CLAUDE.md`](CLAUDE.md) links the ones an agent
-reaches for most often; it is a convenience, not a required index, and nothing
-checks that it names every surface.
+## Distribution
 
-# Workspace baseline
+GoReleaser packages the three precompiled binaries as archives, checksums,
+Debian/RPM packages, a Homebrew cask, and the checksum-verifying installer. Nix
+exposes `.#releaser`. Docker is intentionally unsupported because release hooks
+and Git operations require an ordinary host environment.
 
-This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, Docker, secrets, release configuration, validators, and standards.
+See [INSTALLATION.md](INSTALLATION.md), the [Bun baseline](docs/developer/bun-baseline.md),
+and the [domain guide](docs/domain/releaser.md).
+
+<!-- ### shared -->
+<!-- #### source: shared -->
+
+Shared engineering standards live under [docs/standards/](docs/standards/).
+
+<!-- ### releaser -->
+<!-- #### source: releaser -->
+
+The release vocabulary, lint rules, hooks, assets, and distribution ownership
+are defined in [release.yaml](release.yaml). No runtime path invokes a
+package manager or dynamically loads plugins.
