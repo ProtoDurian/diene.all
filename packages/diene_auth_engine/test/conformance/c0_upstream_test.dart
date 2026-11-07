@@ -61,8 +61,14 @@ void main() {
 
     // Act
     final Set<String> names = vectors.keys.toSet();
+    final Set<String> vendored = Directory(_upstreamPath)
+        .listSync()
+        .map((FileSystemEntity f) => f.uri.pathSegments.last)
+        .where((String f) => f != 'manifest.json')
+        .toSet();
 
     // Assert
+    expect(vendored, names);
     expect(manifest['authority'], 'c0-fixtures-r2');
     expect(source['commit'], 'fe77520d591f81a9762c40ebf68dc9c0106502d3');
     expect(source['path'], 'contracts/c0/cases/identity.json');
@@ -92,6 +98,23 @@ void main() {
           digest,
           entry['sha256'],
           reason: 'upstream vector "$name" digest drifted from the manifest',
+        );
+      });
+
+      test('$name file bytes', () {
+        // Arrange
+        final Map<String, Object?> entry = _object(raw);
+
+        // Act
+        final String digest = sha256
+            .convert(File('$_upstreamPath/$name').readAsBytesSync())
+            .toString();
+
+        // Assert
+        expect(
+          digest,
+          entry['fileSha256'],
+          reason: 'upstream vector "$name" bytes drifted from the manifest',
         );
       });
     });
@@ -340,40 +363,89 @@ void main() {
       _objects(docVectors['valid']).single['doc'],
     );
 
-    test('required keys match the parser', () {
-      // Arrange
-      final LandscapeSelectorDoc doc = _doc(validDoc);
+    for (final String key
+        in (docB['requiredKeys']! as List<Object?>).cast<String>()) {
+      test('a doc without required key $key is untrusted', () {
+        // Arrange
+        final Map<String, Object?> json = <String, Object?>{...validDoc}
+          ..remove(key);
 
-      // Act
-      final Set<String> keys = validDoc.keys.toSet();
-      final Set<String> entryKeys = _objects(validDoc['landscapes'])
-          .map((Map<String, Object?> e) => e.keys.toSet())
-          .reduce((Set<String> a, Set<String> b) => a.intersection(b));
+        // Act
+        LandscapeSelectorDoc parse() => _doc(json);
 
-      // Assert
-      expect(keys, (docB['requiredKeys']! as List<Object?>).toSet());
-      expect(
-        entryKeys,
-        containsAll(docB['requiredEntryKeys']! as List<Object?>),
-      );
-      expect(doc.platform, validDoc['platform']);
-      expect(doc.tier, validDoc['tier']);
-    });
+        // Assert
+        expect(_doc(validDoc).landscapes, isNotEmpty);
+        expect(parse, throwsFormatException);
+      });
+    }
+
+    for (final String key
+        in (docB['requiredEntryKeys']! as List<Object?>).cast<String>()) {
+      test('a doc with an entry missing $key is untrusted', () {
+        // Arrange
+        final List<Map<String, Object?>> entries = _objects(
+          validDoc['landscapes'],
+        );
+        final List<Map<String, Object?>> docs = <Map<String, Object?>>[
+          for (int i = 0; i < entries.length; i++)
+            <String, Object?>{
+              ...validDoc,
+              'landscapes': <Object?>[
+                for (int j = 0; j < entries.length; j++)
+                  j == i
+                      ? (<String, Object?>{...entries[j]}..remove(key))
+                      : entries[j],
+              ],
+            },
+        ];
+
+        // Act
+        final List<LandscapeSelectorDoc Function()> parses =
+            <LandscapeSelectorDoc Function()>[
+              for (final Map<String, Object?> json in docs) () => _doc(json),
+            ];
+
+        // Assert
+        expect(
+          entries.every((Map<String, Object?> e) => e.containsKey(key)),
+          true,
+        );
+        for (final LandscapeSelectorDoc Function() parse in parses) {
+          expect(parse, throwsFormatException);
+        }
+      });
+    }
 
     for (final Map<String, Object?> sample in _objects(docVectors['valid'])) {
       test('valid doc ${sample['name']}', () {
         // Arrange
-        final Object? json = sample['doc'];
+        final Map<String, Object?> json = _object(sample['doc']);
 
         // Act
         final LandscapeSelectorDoc doc = _doc(json);
 
         // Assert
+        expect(doc.platform, json['platform']);
+        expect(doc.tier, json['tier']);
         expect(
-          doc.landscapes.map((LandscapeEntry e) => e.name).toList(),
-          _objects(
-            _object(json)['landscapes'],
-          ).map((Map<String, Object?> e) => e['name']).toList(),
+          doc.landscapes
+              .map(
+                (LandscapeEntry e) => <String, Object?>{
+                  'name': e.name,
+                  'region': e.region,
+                  'metadata': e.metadata,
+                },
+              )
+              .toList(),
+          _objects(json['landscapes'])
+              .map(
+                (Map<String, Object?> e) => <String, Object?>{
+                  'name': e['name'],
+                  'region': e['region'],
+                  'metadata': e['metadata'] ?? <String, Object?>{},
+                },
+              )
+              .toList(),
         );
       });
     }
