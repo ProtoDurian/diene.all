@@ -9,10 +9,10 @@ includes:
     taskfile: tasks/Taskfile.test.yaml
     vars:
       MODE: int
-  test:sit:
+  test:meta:
     taskfile: tasks/Taskfile.test.yaml
     vars:
-      MODE: sit
+      MODE: meta
 
 tasks:
   setup:
@@ -30,7 +30,7 @@ tasks:
       - rm -rf dist coverage reports
 
   build:
-    desc: Build the Go binary
+    desc: Build every package of the Go module
     cmds:
       - ./scripts/local/build.sh
 
@@ -39,16 +39,10 @@ tasks:
     cmds:
       - ./scripts/local/typecheck.sh
 
-  run:
-    desc: Run the Go composition root in development mode
+  validate:
+    desc: Run the library gates (module path, vet, API compatibility, export docs, examples, consumer test)
     cmds:
-      - go run ./cmd/go-base {{.CLI_ARGS}}
-
-  preview:
-    desc: Build and run the compiled Go artifact
-    deps: [build]
-    cmds:
-      - ./dist/go-base {{.CLI_ARGS}}
+      - ./scripts/local/pkg-validate.sh {{.CLI_ARGS}}
 
   up:
     desc: Start all local dependencies, detached
@@ -71,18 +65,18 @@ tasks:
       - ./scripts/local/deadcode.sh strict
 
   test:
-    desc: Run unit, integration and system integration tests
+    desc: Run unit, integration and TestHelper meta tests
     cmds:
       - task: test:unit
       - task: test:int
-      - task: build
-      - task: test:sit
+      - task: test:meta
 
   test:coverage:
-    desc: Run the unit and integration tiers with their coverage gates
+    desc: Run the unit, integration and meta tiers with their coverage gates
     cmds:
       - task: test:unit:coverage
       - task: test:int:coverage
+      - task: test:meta:coverage
 
   vuln:
     desc: Scan Go dependencies for known vulnerabilities

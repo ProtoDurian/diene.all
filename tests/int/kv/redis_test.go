@@ -1,10 +1,11 @@
 package kv_test
 
+// DOMAIN WIRING: replaceable Note Redis adapter integration test.
 import (
 	"context"
 	"testing"
 
-	"github.com/AtomiCloud/diene.go-base/adapters/kv"
+	"github.com/ProtoDurian/diene.go-lib/adapters/kv"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -51,3 +52,5 @@ func TestRedisStore(t *testing.T) {
 		t.Fatalf("Close() error = %v", err)
 	}
 }
+
+// END DOMAIN WIRING

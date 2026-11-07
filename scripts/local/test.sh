@@ -6,6 +6,7 @@ coverage="${2:-false}"
 watch="${3:-false}"
 
 [ -z "${mode}" ] && echo "❌ test mode not set" >&2 && exit 1
+[ "${mode}" = "meta" ] && [ ! -d testhelper ] && [ ! -d tests/meta ] && echo "✅ meta tier skipped: no testhelper package" && exit 0
 tests="$(yq -r ".tiers.${mode}.tests" .config/go-base.coverage.yaml)"
 packages="$(yq -r ".tiers.${mode}.packages" .config/go-base.coverage.yaml)"
 
@@ -14,6 +15,7 @@ packages="$(yq -r ".tiers.${mode}.packages" .config/go-base.coverage.yaml)"
 profile="reports/${mode/int/integration}/coverage.out"
 [ "${coverage}" = "true" ] && mkdir -p "$(dirname "${profile}")"
 cover_packages="$([ "${coverage}" = "true" ] && go list "${packages}" | paste -sd, - || echo "")"
+[ "${coverage}" = "true" ] && [ -z "${cover_packages}" ] && echo "❌ ${mode} coverage scope '${packages}' matches no package" >&2 && exit 1
 coverage_args=()
 [ "${coverage}" = "true" ] && coverage_args=(-covermode=atomic -coverpkg="${cover_packages}" -coverprofile="${profile}")
 

@@ -66,6 +66,13 @@ illustrative sample. Follow the Go variants under each standard's
 `languages/go.md` alongside the shared engineering standards. Keep every Go test
 in an external `_test` package and never add `export_test.go`.
 
+# Go library template
+
+Read [the Go library baseline](docs/developer/go-lib-baseline.md) before changing
+module identity, exported APIs, examples, TestHelper, the API baseline or tag/proxy
+publication. Every exported symbol needs a doc comment; an incompatible v1 change
+needs a `/v2` module.
+
 # Infisical and secrets
 
 See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).

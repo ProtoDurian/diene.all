@@ -34,7 +34,7 @@ grep -q ' (compile)$' "${scan}" && echo "❌ production staticcheck could not lo
 echo "## pass complete: production staticcheck (exit ${production_staticcheck}, lines $(grep -c '^' "${scan}" || true))" >>"${report}"
 
 production_deadcode=0
-deadcode ./... >"${scan}" 2>&1 || production_deadcode=$?
+./scripts/local/with-deadcode-consumer.sh deadcode ./... >"${scan}" 2>&1 || production_deadcode=$?
 cat "${scan}" >>"${report}"
 [ "${production_deadcode}" -ne 0 ] && echo "❌ production deadcode could not run (exit ${production_deadcode})" >&2 && exit 1
 echo "## pass complete: production deadcode (exit ${production_deadcode}, lines $(grep -c '^' "${scan}" || true))" >>"${report}"

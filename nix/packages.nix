@@ -13,6 +13,7 @@ let
           cyanprint
           dlint
           go
+          gorelease
           infralint
           infrautils
           releaser
@@ -39,6 +40,7 @@ let
           pre-commit
           shellcheck
           treefmt
+          zip
           ;
       }
     );

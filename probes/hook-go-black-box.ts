@@ -19,13 +19,6 @@ const plants = [
     filename: 'export_test.go',
     declaration: 'var ProbeExported = 1',
   },
-  {
-    name: 'mutation-go-black-box-main-caught',
-    description: 'A white-box test in the composition root must turn the golangci-lint hook red.',
-    glob: 'cmd/**/*.go',
-    filename: 'probe_white_box_test.go',
-    declaration: 'import "testing"\n\nfunc TestProbeWhiteBox(t *testing.T) { t.Helper() }',
-  },
 ];
 
 export default {

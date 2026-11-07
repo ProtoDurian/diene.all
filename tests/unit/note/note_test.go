@@ -1,11 +1,12 @@
 package note_test
 
+// DOMAIN WIRING: replaceable Note sample unit tests.
 import (
 	"context"
 	"errors"
 	"testing"
 
-	"github.com/AtomiCloud/diene.go-base/lib/note"
+	"github.com/ProtoDurian/diene.go-lib/lib/note"
 )
 
 type FakeStore struct {
@@ -96,3 +97,5 @@ func TestServiceErrors(t *testing.T) {
 		t.Fatalf("Load() error = %v, want %v", loadErr, want)
 	}
 }
+
+// END DOMAIN WIRING
