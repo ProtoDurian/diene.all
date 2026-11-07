@@ -90,7 +90,11 @@ void main() {
     recoverable: notFound.recoverable,
     data: const <String, Object?>{'entityType': 'note', 'id': '42'},
   );
-  if (Problem.fromJson(problem.toJson()) != problem) throw StateError('the wire codec did not round-trip');
+  const String uri = 'https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/entity_not_found';
+  if (problem.type != uri) throw StateError('unexpected type URI: \${problem.type}');
+  final Map<String, Object?> wire = problem.toJson();
+  if (wire['status'] != 404 || (wire['data']! as Map<String, Object?>)['id'] != '42') throw StateError('unexpected wire: \$wire');
+  if (Problem.fromJson(wire) != problem) throw StateError('the wire codec did not round-trip');
   final Map<String, Object?> resource = (ProblemCatalog(portal: portal)..addGenerics()).toProblemResource(version: 'v1');
   final Object? crName = (resource['metadata']! as Map<String, Object?>)['name'];
   if (crName != 'zinc.api.raichu.v1') throw StateError('unexpected Problem CR name: \$crName');
@@ -103,6 +107,12 @@ import 'package:${name}/test_helper.dart';
 
 void main() {
   expectProblem(aProblem(), status: 404, data: <String, Object?>{'entityType': 'user', 'id': '42'});
+  try {
+    expectProblem(aProblem(), status: 500);
+  } on ProblemMatcherError {
+    return;
+  }
+  throw StateError('expectProblem accepted a wrong status');
 }
 DART
 fi
