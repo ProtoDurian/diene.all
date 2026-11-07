@@ -1,0 +1,15 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    name: Release
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-release-note.yaml
+    with:
+      version: ${{ github.ref_name }}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Ledger = workspace removal-points.sh apply_H + DH set edits; helm binaries stay smoked (nix unchanged).
+# Ledger = workspace removal-points.sh apply_H + DH set edits + a publish-nothing CD stub; helm binaries stay smoked (nix unchanged).
 
 H_PATHS=(
   infra/root_chart
@@ -78,14 +78,73 @@ drop_yaml_job() {
     }' "$2" >"${2}.new" && mv "${2}.new" "$2"
 }
 
+add_file() {
+  if [[ -e $1 ]]; then
+    fail "ledger file $1 already in parent tree (stale anchor)"
+    return
+  fi
+  cat >"$1"
+}
+
+cd_release_job() {
+  cat >>"$1" <<'YAML'
+  release:
+    name: Release
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-release-note.yaml
+    with:
+      version: ${{ github.ref_name }}
+YAML
+}
+
+add_release_note() {
+  add_file '.github/workflows/⚡reusable-release-note.yaml' <<'YAML'
+name: ⚡ Reusable Release Note
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+  release-note:
+    name: Release Note
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 10
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Release note
+        env:
+          VERSION: ${{ inputs.version }}
+        run: nix develop .#cd -c ./scripts/ci/release-note.sh
+YAML
+  add_file scripts/ci/release-note.sh <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+[ -z "${VERSION:-}" ] && echo "❌ 'VERSION' env var not set" >&2 && exit 1
+
+echo "Released ${VERSION}"
+SH
+  chmod +x scripts/ci/release-note.sh
+}
+
 apply_H() {
-  rm_paths "${H_PATHS[@]}" .github/workflows/cd.yaml
+  rm_paths "${H_PATHS[@]}"
   rm_empty_dir infra
   rm_empty_dir tasks
   edit .github/workflows/ci.yaml drop_yaml_job '  helm:'
+  edit .github/workflows/cd.yaml drop_yaml_job '  helm:'
+  edit .github/workflows/cd.yaml cd_release_job
+  add_release_note
   edit Taskfile.yaml sed_z 's#includes:\n  helm: tasks/Taskfile\.helm\.yaml\n\n##'
   edit .github/dependabot.yml sed_z "s#  - package-ecosystem: helm\n    directory: /infra/root_chart\n    schedule:\n      interval: weekly\n    groups:\n      all:\n        patterns:\n          - '\*'\n    open-pull-requests-limit: 2\n##"
-  edit dlint.yaml sed_e '/^      - \.github\/workflows\/cd\.yaml$/d'
   edit CLAUDE.md drop_section '# Helm charts and publishing'
   edit probes/features.json sed_z 's#  {\n    "template": "diene/workspace",\n    "name": "helm-lint",\n[^}]*},\n##;s#  {\n    "template": "diene/workspace",\n    "name": "helm-render",\n[^}]*},\n##;s#  {\n    "template": "diene/workspace",\n    "name": "hook-helm-lint",\n[^}]*},\n##'
   edit probes/binary-smoke.ts sed_e '/^helm-docs --dry-run --chart-search-root infra\/root_chart /d;/^helm template diene-workspace infra\/root_chart /d'
