@@ -29,9 +29,8 @@ function groupBy<T>(items: T[], key: (item: T) => string): Record<string, T[]> {
 
 With a utility library:
 
-```typescript
-import { groupBy } from 'lodash-es';
-const grouped = groupBy(items, item => item.category);
+```text
+grouped = groupBy(items, item -> item.category)
 ```
 
 ### Reduce Tests
@@ -49,19 +48,17 @@ You don't need to test that the library correctly implements:
 
 Named utilities are self-documenting:
 
-```go
-// Without utility
-unique := make([]string, 0)
-seen := make(map[string]bool)
-for _, s := range items {
-    if !seen[s] {
-        seen[s] = true
-        unique = append(unique, s)
-    }
-}
+```text
+-- Without utility
+unique = empty list
+seen   = empty set
+for each s in items:
+    if s not in seen:
+        add s to seen
+        append s to unique
 
-// With utility
-unique := lo.Uniq(items)
+-- With utility
+unique = uniq(items)
 ```
 
 ---
@@ -130,46 +127,8 @@ Function utilities.
 
 ## Choosing the Right Tool
 
-### TypeScript: Lodash
-
-Use Lodash for operations not covered by native array methods.
-
-```typescript
-// Native is sufficient
-items.filter(x => x.active);
-items.map(x => x.name);
-items.reduce((acc, x) => acc + x.value, 0);
-
-// Lodash for more complex operations
-import { groupBy, sortBy, uniqBy, merge } from 'lodash';
-```
-
-### C#: LINQ
-
-LINQ is built into .NET and covers most needs.
-
-```csharp
-// LINQ covers almost everything
-items.Where(x => x.Active)
-     .Select(x => x.Name)
-     .OrderBy(x => x)
-     .GroupBy(x => x.Category)
-```
-
-### Go: stdlib + samber/lo
-
-Use stdlib `slices` and `maps` packages first (Go 1.21+). Use `samber/lo` for functional operations.
-
-```go
-// stdlib first
-slices.Contains(items, "target")
-slices.Sort(items)
-maps.Keys(m)
-
-// lo for functional operations
-lo.Map(items, func(x T, _ int) U { return x.Value })
-lo.Filter(items, func(x T, _ int) bool { return x.Active })
-```
+Use the language's native collection features first. Reach for its utility
+library only for operations the native features do not cover.
 
 ---
 
@@ -180,7 +139,7 @@ lo.Filter(items, func(x T, _ int) bool { return x.Active })
 - [ ] Check if native features suffice
 - [ ] Check if utility library provides it
 - [ ] Consider if the utility is actually needed
-- [ ] Ensure tree-shakeable import (Lodash, lo)
+- [ ] Ensure tree-shakeable import
 
 **When using utilities:**
 
@@ -195,8 +154,6 @@ lo.Filter(items, func(x T, _ int) bool { return x.Active })
 
 Language bases add their implementation guides in their own branch deltas. This
 shared standard defines only the language-agnostic contract.
-
-- [C#/.NET](languages/csharp.md)
 
 ## Related Articles
 

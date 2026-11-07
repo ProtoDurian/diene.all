@@ -1,5 +1,4 @@
-import { runWithOutput } from './lib/dotnet.ts';
-import { expectGreen } from './lib/helpers.ts';
+import { expectGreen } from './lib/dotnet.ts';
 
 export default {
   contractVersion: 1,
@@ -16,7 +15,7 @@ export default {
           'dotnet-dev-build',
           480000,
         );
-        await runWithOutput(
+        await expectGreen(
           repo,
           `nix develop .#default -c sh -lc '
             set -eu
@@ -55,6 +54,8 @@ export default {
             done
             exit 124
           '`,
+          'dotnet-base-probe-dev',
+          360000,
         );
       },
     },

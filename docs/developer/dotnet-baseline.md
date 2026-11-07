@@ -11,20 +11,26 @@ shared workspace, standards, secret, and release surfaces.
 
 ## Local commands
 
-| Command                             | Purpose                                                        |
-| ----------------------------------- | -------------------------------------------------------------- |
-| `task setup`                        | Synchronize vendored skills and restore repo-local .NET tools. |
-| `task clean`                        | Remove build and test artifacts.                               |
-| `task build`                        | Build every project in Release.                                |
-| `task dev`                          | Run the App through `dotnet watch`.                            |
-| `task run -- <args>`                | Run the App in development mode.                               |
-| `task preview -- <args>`            | Build and run the compiled Release artifact.                   |
-| `task test`                         | Run unit, integration, and TestHelper meta tiers.              |
-| `task test:unit` / `:int` / `:meta` | Run one tier.                                                  |
-| `task test:coverage`                | Enforce all three merged coverage ledgers.                     |
-| `task test:unit:watch`              | Watch the fast unit tier.                                      |
-| `task deadcode`                     | Emit the broad, non-blocking LLM review.                       |
-| `task lint`                         | Run every generated pre-commit hook.                           |
+| Command                            | Purpose                                                        |
+| ---------------------------------- | -------------------------------------------------------------- |
+| `task setup`                       | Synchronize vendored skills and restore repo-local .NET tools. |
+| `task clean`                       | Remove build and test artifacts.                               |
+| `task build`                       | Build every project in Release.                                |
+| `task dev`                         | Run the App through `dotnet watch`.                            |
+| `task run -- <args>`               | Run the App in development mode.                               |
+| `task preview -- <args>`           | Build and run the compiled Release artifact.                   |
+| `task test`                        | Run unit and integration tiers.                                |
+| `task test:unit` / `task test:int` | Run one tier.                                                  |
+| `task test:unit:coverage`          | Enforce the merged unit coverage ledger.                       |
+| `task test:int:coverage`           | Enforce the merged integration coverage ledger.                |
+| `task test:unit:watch`             | Watch the fast unit tier.                                      |
+| `task test:int:watch`              | Watch the integration tier.                                    |
+| `task deadcode`                    | Emit both broad, non-blocking LLM reviews.                     |
+| `task deadcode:strict`             | Run both blocking dead-code passes, as CI does.                |
+| `task lint`                        | Run every generated pre-commit hook.                           |
+
+Each tier task is a one-line call to `scripts/local/test.sh <tier>`, which reads
+the tiers from `.config/dotnet-base.test.yaml`; a tier with no test files passes.
 
 ## Projects and coverage
 
@@ -36,39 +42,35 @@ tier:
 - unit: every `[Lib*]*` assembly at 100%;
 - integration: every `[App*]*` assembly at 80%.
 
-The runner then parses the merged `coverage.cobertura.xml` with `xmlstarlet`: it
+The runner writes each tier's merged Cobertura report to its own file
+(`reports/unit/coverage.cobertura.xml`, `reports/integration/coverage.cobertura.xml`)
+and parses it with `xmlstarlet`: it
 rejects a report that measured zero lines, rejects any package whose assembly name
 escapes the tier ledger, and re-checks the tier minimum against every package's own
 `line-rate` rather than the merged total alone.
 
 Adding `Lib2` and `UnitTest2` requires one solution line per project and one YAML
-list entry for `UnitTest2`. Assembly filters, merged thresholds, Codecov globs,
-and production dead-code project discovery follow the naming convention
-automatically. Codecov remains informational.
+list entry for `UnitTest2`. Assembly filters, merged thresholds, and production
+dead-code project discovery follow the naming convention automatically.
 
 ## Dead code and supply chain
 
-CI runs two strict dn-inspect mechanisms: all projects, then production-only
-`App*`/`Lib*` projects so exports reachable only from tests still fail. Local
-`task deadcode` uses a deliberately broad filter and never blocks. Exclusion lists
-are forbidden.
+dn-inspect has four dead-code modes, none with exclusion lists:
+
+- strict all projects (`--strict-all`): blocking pass over source and tests, so dead test code fails too.
+- strict production (`--strict-production`): blocking pass over `App*`/`Lib*` only, so code only tests use fails.
+- LLM all projects: `task deadcode`, broad filter, non-blocking.
+- LLM production: `task deadcode`, broad filter, non-blocking.
+
+CI and `task deadcode:strict` run both strict passes; `task deadcode` runs both LLM views.
 
 The SDK is pinned by `global.json`; packages use Central Package Management.
 `NuGetAuditMode=all`, analyzers, deterministic builds, and warnings-as-errors are
 enforced in Release builds.
 
-`nix/dotnet-deps.json` pins the NuGet closure used by the reproducible Nix
-restore. Regenerate it after changing a project package reference, a central
-package version, or the pinned SDK:
-
-```bash
-nix_system="$(nix eval --impure --raw --expr builtins.currentSystem)"
-nix build ".#checks.${nix_system}.pre-commit-check.fetch-deps"
-./result nix/dotnet-deps.json
-```
-
-The command exposes `buildDotnetModule.passthru.fetch-deps`; its output replaces
-`nix/dotnet-deps.json`.
+The `dotnetlint` pre-commit hook runs `dotnet format --no-restore`, so it expects
+`dotnet restore dotnet-base.slnx` to have run; `task setup` and CI's pre-commit
+script both restore first.
 
 ## Release
 
@@ -76,10 +78,23 @@ Releaser stamps the version in the imported `Version.props` package manifest,
 which `Directory.Build.props` applies to every project; its canonical
 `release.yaml` is the single commit-type vocabulary.
 
+## C# standards
+
+C# variants accompany the shared standards:
+[date/time](../standards/datetime/languages/csharp.md),
+[domain-driven design](../standards/domain-driven-design/languages/csharp.md),
+[functional practices](../standards/functional-practices/languages/csharp.md),
+[SOLID](../standards/solid-principles/languages/csharp.md),
+[stateless OOP/DI](../standards/stateless-oop-di/languages/csharp.md),
+[testing](../standards/testing/languages/csharp.md),
+[utilities](../standards/utilities/languages/csharp.md),
+[validation](../standards/validation/languages/csharp.md), and
+[wire format](../standards/wire-format/languages/csharp.md).
+
 ## Template-maintenance boundary
 
 Downstream nodes may adapt package/artifact identity, coverage thresholds,
-badges, and the illustrative source/tests. Keep
+chart contents, badges, and the illustrative Note source/tests. Keep
 `dotnet-base.slnx`, `.config/dotnet-base.test.yaml`, and the
 `AtomiCloud.DotnetBase.*` root namespaces base-named for merge stability.
 

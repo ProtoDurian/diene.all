@@ -2,8 +2,16 @@ name: CI
 
 on:
   push:
+    branches-ignore:
+      - 'dependabot/**'
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   precommit:
@@ -13,8 +21,13 @@ jobs:
     uses: ./.github/workflows/⚡reusable-precommit.yaml
     secrets: inherit
 
-  # ### dotnet-base-ci
-  # #### source: dotnet-base
+  named-checks:
+    name: named-checks
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-named-checks.yaml
+    secrets: inherit
+
   deadcode:
     name: Dead Code
     permissions:
@@ -30,7 +43,6 @@ jobs:
     secrets: inherit
     with:
       mode: unit
-      name: Unit
 
   int:
     name: Integration Tests
@@ -40,10 +52,7 @@ jobs:
     secrets: inherit
     with:
       mode: int
-      name: Integration
 
-  # ### dotnet-lib-ci
-  # #### source: dotnet-lib
   meta:
     name: TestHelper Meta Tests
     permissions:
@@ -52,7 +61,6 @@ jobs:
     secrets: inherit
     with:
       mode: meta
-      name: TestHelper Meta
 
   package-validate:
     name: Package Validation
@@ -62,7 +70,7 @@ jobs:
     secrets: inherit
 
   build:
-    name: Build
+    name: Build Validation
     permissions:
       contents: read
     uses: ./.github/workflows/⚡reusable-build.yaml

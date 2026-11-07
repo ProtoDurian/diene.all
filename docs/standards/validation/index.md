@@ -36,23 +36,21 @@ function validateUser(input: unknown): User {
 
 With a library, it's declarative:
 
-```typescript
-// Zod schema - concise, type-safe
-const UserSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-});
+```text
+UserSchema = object {
+  name:  string, at least 2 characters
+  email: string, email format
+}
 
-// Expected-invalid input is a VALUE, not an exception. Use the non-throwing
-// entry point and lift it into the project Result type.
-const parsed = UserSchema.safeParse(input);
-const user = parsed.success ? Result.ok(parsed.data) : Result.err(ValidationError.from(parsed.error));
+-- Expected-invalid input is a VALUE, not an exception. Use the non-throwing
+-- entry point and lift it into the project Result type.
+user = UserSchema.parse-without-throwing(input)   -> Ok(User) | Err(ValidationError)
 ```
 
 Invalid external input is expected — a client can always send a bad email. Per
 [functional practices](../functional-practices/index.md) and the
 [three-layer architecture](../three-layer-architecture/index.md), expected
-failures are Result values, so validation never uses the throwing `parse`
+failures are Result values, so validation never uses a throwing parse
 entry point. Reserve throwing for genuinely exceptional conditions the caller
 cannot be expected to handle.
 
@@ -71,13 +69,13 @@ You only test your custom validators.
 
 Schemas can infer types, ensuring your validation and types never drift:
 
-```typescript
-const UserSchema = z.object({
-  name: z.string(),
-  age: z.number().int().positive(),
-});
+```text
+UserSchema = object {
+  name: string
+  age:  positive integer
+}
 
-type User = z.infer<typeof UserSchema>; // { name: string; age: number }
+User = the type inferred from UserSchema   -- { name: string, age: integer }
 ```
 
 ---
@@ -158,52 +156,45 @@ config — never for a client sending bad data.
 
 Define a schema, parse input against it:
 
-```typescript
-const CreateOrderSchema = z.object({
-  items: z
-    .array(
-      z.object({
-        productId: z.string().uuid(),
-        quantity: z.number().int().positive(),
-      }),
-    )
-    .min(1),
-  shippingAddress: z.object({
-    street: z.string(),
-    city: z.string(),
-    zipCode: z.string().regex(/^\d{5}$/),
-  }),
-});
+```text
+CreateOrderSchema = object {
+  items: array, at least 1, of object {
+    productId: string, UUID
+    quantity:  positive integer
+  }
+  shippingAddress: object {
+    street:  string
+    city:    string
+    zipCode: string matching ^\d{5}$
+  }
+}
 
-// Both outcomes are represented as values. Nothing throws.
-const result = CreateOrderSchema.safeParse(requestBody);
-const order: Result<CreateOrder, ValidationError> = result.success
-  ? Result.ok(result.data)
-  : Result.err(ValidationError.from(result.error));
+-- Both outcomes are represented as values. Nothing throws.
+order = CreateOrderSchema.parse-without-throwing(requestBody)   -> Ok(CreateOrder) | Err(ValidationError)
 ```
 
 ### Transform and Validate
 
 Parse, then transform:
 
-```typescript
-const SearchSchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().max(100).default(20),
-  query: z.string().trim().optional(),
-});
+```text
+SearchSchema = object {
+  page:  coerced to a positive integer, default 1
+  limit: coerced to an integer, at most 100, default 20
+  query: string, trimmed, optional
+}
 
-// "page=2&limit=50" -> { page: 2, limit: 50, query: undefined }
+-- "page=2&limit=50" -> { page: 2, limit: 50, query: absent }
 ```
 
 ### Cross-Field Validation
 
 Validate relationships between fields:
 
-```go
-type Registration struct {
-    Password     string `validate:"required,min=8"`
-    Confirmation string `validate:"required,eqfield=Password"`
+```text
+Registration = object {
+  password:     string, required, at least 8 characters
+  confirmation: string, required, equal to password
 }
 ```
 
@@ -211,10 +202,13 @@ type Registration struct {
 
 ## Error Messages
 
-Return meaningful, actionable errors:
+Return meaningful, actionable errors as an RFC 9457 Problem (see [Wire Format](../wire-format/index.md)):
 
 ```json
 {
+  "type": "https://errors.atomi.cloud/docs/lapras/nitroso/zinc/api/v1/validation_error",
+  "title": "The request is invalid",
+  "status": 400,
   "errors": {
     "email": ["Must be a valid email address"],
     "age": ["Must be at least 18"],
@@ -254,7 +248,7 @@ Return meaningful, actionable errors:
 - [ ] Use validation library, not hand-coded
 - [ ] Don't test library validators
 - [ ] Parse, don't validate
-- [ ] No throwing entry point (`parse`) for expected-invalid input — `safeParse` lifted into `Result`
+- [ ] No throwing entry point for expected-invalid input — the non-throwing parse lifted into `Result`
 - [ ] Exceptions reserved for the genuinely exceptional, never for client input
 
 ---
@@ -264,10 +258,9 @@ Return meaningful, actionable errors:
 Language bases add their implementation guides in their own branch deltas. This
 shared standard defines only the language-agnostic contract.
 
-- [C#/.NET](languages/csharp.md)
-
 ## Related Articles
 
 - [Three-Layer Architecture](../three-layer-architecture/index.md) — Where validation happens
 - [Error Handling](../functional-practices/index.md) — Returning validation errors
 - [Domain Modeling](../domain-driven-design/index.md) — Domain invariants
+- [Wire Format](../wire-format/index.md) — Error responses in JSON

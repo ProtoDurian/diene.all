@@ -1,4 +1,4 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRed } from './lib/dotnet.ts';
 
 export default {
   contractVersion: 1,

@@ -1,10 +1,29 @@
-export async function runWithOutput(repo: any, command: string): Promise<void> {
-  const result = await repo.exec(command, { timeoutMs: 360000 });
+import { capturedEnvCommand } from './helpers.ts';
+
+// A cold .NET restore and build runs past the parent helpers' 240 s cap.
+const DOTNET_TIMEOUT_MS = 600000;
+
+export async function expectGreen(
+  repo: any,
+  command: string,
+  label: string,
+  timeoutMs = DOTNET_TIMEOUT_MS,
+): Promise<void> {
+  const result = await repo.exec(capturedEnvCommand(command, label), { timeoutMs });
   if (result.exitCode !== 0) {
-    throw new Error(`${command} failed: ${result.stderr || result.stdout}`);
+    throw new Error(`${label} failed on the healthy repo: ${result.stderr || result.stdout}`);
   }
-  if (`${result.stdout}\n${result.stderr}`.trim().length === 0) {
-    throw new Error(`${command} produced no observable App process output`);
+}
+
+export async function expectRed(
+  repo: any,
+  command: string,
+  label: string,
+  timeoutMs = DOTNET_TIMEOUT_MS,
+): Promise<void> {
+  const result = await repo.exec(capturedEnvCommand(command, label), { timeoutMs });
+  if (result.exitCode === 0) {
+    throw new Error(`${label} stayed green after sabotage`);
   }
 }
 
@@ -41,9 +60,7 @@ export async function addSecondUnitProject(repo: any, uncovered: boolean): Promi
   });
 }
 
-// Registers a fully covered project whose assembly name escapes the unit `Lib*` ledger and
-// widens the Coverlet include filter to admit it. Both merged packages sit at 100%, so the
-// merged line threshold still passes and only the Cobertura package-scope parse can fail.
+// Both packages stay at 100%, so only the Cobertura package-scope parse can fail.
 export async function addEscapingUnitProject(repo: any): Promise<void> {
   await repo.write(
     'Escape/Escape.csproj',

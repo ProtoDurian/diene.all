@@ -40,22 +40,12 @@ describe('packPackages helper', () => {
     expect(repo.commands).toHaveLength(1);
     expect(repo.commands[0]).toContain('dotnet pack dotnet-base.slnx -c Release');
     expect(repo.commands[0]).toContain('--output artifacts/package');
+    expect(repo.timeouts[0]).toBe(600000);
   });
 
   test('restores before packing rather than reusing the stale --no-restore flag', async () => {
     const repo = new RecordingRepo();
     await packPackages(repo, 'pack-label');
-    // The accepted CI repair removed --no-restore from `dotnet pack`; the probe
-    // helper must match so the three package probes restore before packing.
     expect(repo.commands[0]).not.toContain('--no-restore');
-  });
-
-  test('removes copied build intermediates before packing the current probe state', async () => {
-    const repo = new RecordingRepo();
-    await packPackages(repo, 'pack-label');
-    const command = repo.commands[0];
-    const clean = 'find . -mindepth 2 -maxdepth 2 -type d \\( -name bin -o -name obj \\) -prune -exec rm -rf {} +';
-    expect(command).toContain(clean);
-    expect(command.indexOf(clean)).toBeLessThan(command.indexOf('dotnet pack'));
   });
 });

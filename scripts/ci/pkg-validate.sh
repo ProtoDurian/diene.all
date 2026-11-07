@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-./scripts/ci/setup.sh
-
 version="$(xmlstarlet sel -t -v '/Project/PropertyGroup/Version' Version.props)"
 artifacts="artifacts/package"
 
@@ -37,9 +35,25 @@ printf '%s\n' \
   'problem.Should().HaveId("entity_not_found");' \
   'catalog.StatusOf(problem).Should().Be(404);' \
   'typeUris.Build(problem.Version, problem.Id).AbsoluteUri.Should().EndWith("/v1/entity_not_found");' >"${scratch}/Program.cs"
-dotnet restore "${scratch}" \
-  --source "$(pwd)/${artifacts}" \
-  --source https://api.nuget.org/v3/index.json >/dev/null
+cat >"${scratch}/nuget.config" <<EOF
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="local" value="$(pwd)/${artifacts}" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="local">
+      <package pattern="AtomiCloud.Diene.Problems" />
+      <package pattern="AtomiCloud.Diene.Problems.TestHelper" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+EOF
+dotnet restore "${scratch}" --packages "${scratch}/packages" >/dev/null
 dotnet build "${scratch}" -c Release --no-restore >/dev/null
 
 echo "✅ Package validation and scratch consumption passed"

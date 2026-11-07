@@ -1,34 +1,37 @@
-### nix-root
-#### source: main
-.direnv/
+### dotnet-base
+**/bin/
+**/obj/
+TestResults/
+reports/
+
+### nix-init
+.direnv
 .pre-commit-config.yaml
 /result
 /result-*
 
-### workspace
-#### source: workspace
-.env
-.env.*
-!.env.example
-.kagent/
-.kloop/
-*.log
-*.swo
-*.swp
-*~
-.DS_Store
+### os-editors
 ._*
+.DS_Store
 .idea/
 .vscode/
 Thumbs.db
 desktop.ini
 
-### dotnet-base
-#### source: dotnet-base
-**/bin/
-**/obj/
-TestResults/
+### secrets
+.env
+.env.*
+
+### secrets-keep
+!.env.example
+
+### tooling
+*.log
+*.swo
+*.swp
+*~
+.kagent/
+.kloop/
 
 ### dotnet-lib
-#### source: dotnet-lib
 artifacts/

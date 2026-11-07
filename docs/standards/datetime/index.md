@@ -19,7 +19,7 @@ A specific point on the global timeline. Instants are timezone-agnostic—they r
 - Scheduling future events
 - Measuring elapsed time
 
-**Example:** `2024-03-15T14:30:00Z` is the same instant whether you're in New York or Tokyo.
+**Example:** `2024-03-15T14:30:00.000Z` is the same instant whether you're in New York or Tokyo.
 
 ### Date
 
@@ -178,59 +178,45 @@ When the user moves to "Europe/London", update the user's timezone once—all al
 
 ### 1. Timezone Confusion
 
-`new Date()` is not itself the hazard: it captures the current epoch instant and
-carries no timezone. The hazards are the APIs around it that silently substitute
-the machine's timezone — parsing an offset-less string, the local getters, and
+Reading the current instant is not itself the hazard: an instant carries no
+timezone. The hazards are the APIs around it that silently substitute the
+machine's timezone — parsing an offset-less string, the local getters, and
 local display.
 
-```typescript
-// WRONG - a timestamp string with no offset is parsed in the machine's
-// timezone, so the same source text becomes a different instant per machine
-const startsAt = new Date('2026-03-15T09:00');
-
-// WRONG - the instant may be right, but the getters reinterpret it in the
-// machine's timezone, so the calendar day can come out off by one
-const dayShown = startsAt.getDate();
-
-// RIGHT - the zone is part of the value instead of inherited from the machine
-const starts = Temporal.PlainDateTime.from('2026-03-15T09:00').toZonedDateTime('Asia/Singapore');
-const day = starts.day;
+```text
+WRONG  parse "2026-03-15T09:00" straight into an instant
+       -> read in the machine's timezone: a different instant per machine
+WRONG  take the calendar day of an instant with the local getters
+       -> reinterpreted in the machine's timezone: can be off by one day
+RIGHT  parse "2026-03-15T09:00" as a local date-time, then attach "Asia/Singapore"
+       -> the zone is part of the value instead of inherited from the machine
 ```
 
 ### 2. DST Transitions
 
 During DST "spring forward," 2:00 AM becomes 3:00 AM—some times don't exist. During "fall back," 2:00 AM happens twice.
 
-```csharp
-// WRONG - DateTime.Now has ambiguous Kind = Local
-var now = DateTime.Now;
-var nextDay = now.AddDays(1);
-
-// RIGHT - Use DateTimeOffset for unambiguous UTC representation
-var nextDay = DateTimeOffset.UtcNow.AddDays(1);
+```text
+WRONG  now = local date-time; next day = now + 1 day
+       -> the local clock is ambiguous or missing across a DST change
+RIGHT  now = current instant in UTC; next day = now + 1 day
 ```
 
 ### 3. Birthday Timezone Problem
 
 If a user's birthday is March 15, it should remain March 15 regardless of timezone.
 
-```go
-// Go has NO true DateOnly type. Use time.Time at UTC midnight with convention.
-birthday := time.Date(1990, 3, 15, 0, 0, 0, 0, time.UTC)
+```text
+birthday = Date 1990-03-15   (date-only: no time, no timezone)
 ```
 
-> ⚠️ **Go Limitation**: Unlike C# (`DateOnly`) and TypeScript (`Temporal.PlainDate`), Go has no true date-only type. Always use `time.Time` at midnight UTC.
+### 4. Ambiguous "now"
 
-### 4. Ambiguous `DateTime.Now`
+A local "now" carries the machine's timezone implicitly, which is ambiguous.
 
-In C#, `DateTime.Now` has `Kind = Local`, which is ambiguous.
-
-```csharp
-// WRONG - Kind is Local, ambiguous
-var now = DateTime.Now;
-
-// RIGHT - Unambiguous UTC
-var now = DateTimeOffset.UtcNow;
+```text
+WRONG  now = local date-time         -> zone is implicit, ambiguous
+RIGHT  now = current instant in UTC  -> unambiguous
 ```
 
 ---
@@ -262,13 +248,13 @@ This ensures:
 
 **For Dates (birthdays, holidays):**
 
-- [ ] Use Date-only type (PlainDate, DateOnly) — or `time.Time` at UTC midnight for Go
-- [ ] No time component (or midnight UTC convention for Go)
+- [ ] Use Date-only type
+- [ ] No time component
 - [ ] No timezone component
 
 **For Times (daily schedules):**
 
-- [ ] Use Time-only type (PlainTime, TimeOnly) — or string/duration convention for Go
+- [ ] Use Time-only type
 - [ ] Consider timezone for display
 
 **For Durations:**
@@ -278,14 +264,20 @@ This ensures:
 
 ---
 
+## Wire Format
+
+Instants, dates, times, zoned values and durations cross the wire in the forms set by
+[Wire Format](../wire-format/index.md).
+
+---
+
 ## Language Implementations
 
 Language bases add their implementation guides in their own branch deltas. This
 shared standard defines only the language-agnostic contract.
 
-- [C#/.NET](languages/csharp.md)
-
 ## Related Articles
 
 - [Domain Modeling](../domain-driven-design/index.md) — Date/time as domain types
 - [Validation](../validation/index.md) — Validating date inputs
+- [Wire Format](../wire-format/index.md) — Date and time values in JSON

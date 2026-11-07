@@ -53,19 +53,19 @@ stays at `1.0.0` in-branch, `probes/dotnet-lib-api-compatibility.ts` packs with
 
 ## Testing tiers
 
-- `pls test:unit` measures the real `AtomiCloud.Diene.Problems` assembly plus the
+- `task test:unit` measures the real `AtomiCloud.Diene.Problems` assembly plus the
   inherited `[Lib*]*` scaling wildcard at 100%, and explicitly excludes
   `*.TestHelper` assemblies. The scope guard in
   `scripts/local/dotnet-test.sh` reads the allowed assembly names from the
   `AssemblyName` each `Lib*` project declares, so it scales with a renamed
   library instead of naming one.
-- `pls test:int` exercises the in-process ASP.NET Core boundary and measures only
+- `task test:int` exercises the in-process ASP.NET Core boundary and measures only
   `[App*]*`.
-- `pls test:meta` independently measures `[*.TestHelper]*` at 100%. Its tests
+- `task test:meta` independently measures `[*.TestHelper]*` at 100%. Its tests
   include known-good and known-bad assertion cases.
 
-Codecov uploads the `unit`, `int`, and `meta` ledgers as informational flags;
-the local merged thresholds remain authoritative.
+CI uploads each tier's Cobertura report as a build artifact; the local merged
+thresholds are authoritative.
 
 ## Release and publish
 
@@ -89,7 +89,7 @@ A materialized library changes only these owned surfaces:
 - shared author/company/repository URLs in `Directory.Build.props`;
 - README badges, install snippet, icon, and illustrative source/tests;
 - unit/meta thresholds when the shipped surface justifies a stricter value;
-- `skills/diene-dotnet-problems-usage/` to the materialized library's namespaced
+- `skills/diene-dotnet-note-usage/` to the materialized library's namespaced
   usage skill.
 
 `scripts/local/dotnet-test.sh`, `scripts/validate/dotnet-package.sh`, and the
