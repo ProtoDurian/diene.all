@@ -3,6 +3,18 @@ version: '3'
 includes:
   docker: tasks/Taskfile.docker.yaml
   helm: tasks/Taskfile.helm.yaml
+  test:unit:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: unit
+  test:int:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: int
+  test:meta:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: meta
 
 tasks:
   setup:
@@ -14,3 +26,41 @@ tasks:
     desc: Run all repository gates
     cmds:
       - pre-commit run --all-files
+  clean:
+    desc: Remove Bun build, dependency, and coverage artifacts
+    cmds:
+      - ./scripts/local/clean.sh
+
+  build:
+    desc: Build the Bun bundle to dist/
+    cmds:
+      - ./scripts/local/build.sh
+
+  deadcode:
+    desc: Review dead code with the LLM Knip views
+    cmds:
+      - ./scripts/local/deadcode.sh
+
+  test:
+    desc: Run unit, integration, and meta suites without coverage
+    cmds:
+      - task: test:unit
+      - task: test:int
+      - task: test:meta
+
+  test:coverage:
+    desc: Run every coverage-capable suite with coverage
+    cmds:
+      - task: test:unit:coverage
+      - task: test:int:coverage
+
+  run:
+    desc: Run the Bun source entry point
+    cmds:
+      - bun run ./src/index.ts -- {{.CLI_ARGS}}
+
+  preview:
+    desc: Build and run the bundled Bun artifact
+    deps: [build]
+    cmds:
+      - bun run ./dist/index.js -- {{.CLI_ARGS}}

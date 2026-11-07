@@ -92,5 +92,41 @@ pre-commit-lib.run {
       pass_filenames = true;
       language = "system";
     };
+
+    a-biome = {
+      enable = true;
+      name = "Biome lint";
+      entry = "./node_modules/.bin/biome lint --no-errors-on-unmatched";
+      files = "(^biome\\.json$|\\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$)";
+      pass_filenames = true;
+      language = "system";
+    };
+
+    a-deadcode = {
+      enable = true;
+      name = "Knip repository dead code";
+      entry = "./node_modules/.bin/knip";
+      files = "(^package\\.json$|^tsconfig\\.json$|^knip\\.json$|\\.(ts|tsx)$)";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-deadcode-production = {
+      enable = true;
+      name = "Knip production dead code";
+      entry = "./node_modules/.bin/knip --config knip.production.json --production";
+      files = "(^package\\.json$|^tsconfig\\.json$|^knip\\.production\\.json$|\\.(ts|tsx)$)";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    typecheck = {
+      enable = true;
+      name = "TypeScript typecheck";
+      entry = "./node_modules/.bin/tsc --noEmit";
+      files = "(^package\\.json$|^tsconfig\\.json$|\\.(ts|tsx|mts|cts)$)";
+      pass_filenames = false;
+      language = "system";
+    };
   };
 }

@@ -19,10 +19,12 @@ with packages;
   ];
 
   main = [
+    bun
     cyanprint
     git
     go-task
     infisical
+    nodejs
     releaser
     shellcheck
   ];
