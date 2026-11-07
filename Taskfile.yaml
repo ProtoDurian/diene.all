@@ -1,18 +1,7 @@
 version: '3'
 
 includes:
-  test:unit:
-    taskfile: tasks/Taskfile.test.yaml
-    vars:
-      MODE: unit
-  test:int:
-    taskfile: tasks/Taskfile.test.yaml
-    vars:
-      MODE: int
-  test:meta:
-    taskfile: tasks/Taskfile.test.yaml
-    vars:
-      MODE: meta
+  test: tasks/Taskfile.test.yaml
 
 tasks:
   setup:
