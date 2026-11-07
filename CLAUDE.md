@@ -70,10 +70,6 @@ illustrative sample. Follow the Go variants under each standard's
 `languages/go.md` alongside the shared engineering standards. Keep every Go test
 in an external `_test` package and never add `export_test.go`.
 
-# Helm charts and publishing
-
-See [docs/standards/helm/index.md](docs/standards/helm/index.md).
-
 # Infisical and secrets
 
 See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).

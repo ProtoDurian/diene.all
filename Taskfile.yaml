@@ -2,7 +2,6 @@ version: '3'
 
 includes:
   docker: tasks/Taskfile.docker.yaml
-  helm: tasks/Taskfile.helm.yaml
   test:unit:
     taskfile: tasks/Taskfile.test.yaml
     vars:
