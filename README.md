@@ -3,10 +3,8 @@
 Run `task --list` for every available task and its description. The task set is
 declared in [`Taskfile.yaml`](Taskfile.yaml), whose `includes:` block maps each
 namespace to a file under [`tasks/`](tasks); a task shown as `<namespace>:<task>`
-is that key in the included file. Build artifacts — Dockerfiles and Helm charts —
-live under [`infra/`](infra) and may be plural, so their tasks are keyed per
-artifact. See [the Taskfile standard](docs/standards/taskfile/index.md) for the
-conventions.
+is that key in the included file. See
+[the Taskfile standard](docs/standards/taskfile/index.md) for the conventions.
 
 # Development Environment
 

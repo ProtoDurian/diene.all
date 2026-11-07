@@ -23,9 +23,6 @@ writer, `skills-sync sync`. Setup is repair-capable; the pre-commit hook
 (`skills-sync sync --frozen`, which CI runs) refuses rather than silently staging or
 repairing a commit.
 
-Docker tasks are keyed by the artifact they act on — one task set per Dockerfile.
-See [the Docker standard](../docker/index.md) for that naming convention.
-
 ## Rules
 
 1. Keep one- or two-line commands inline in Taskfiles.
