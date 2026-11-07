@@ -23,7 +23,7 @@ internal sealed class CapturingLogger : ILogger
         return new Scope();
     }
 
-    public bool IsEnabled(MsLogLevel logLevel) => true;
+    public bool IsEnabled(MsLogLevel _) => true;
 
     public void Log<TState>(
         MsLogLevel logLevel,

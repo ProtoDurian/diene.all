@@ -1,6 +1,6 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/helpers.ts';
-import { packPackages } from './lib/dotnet-package.ts';
+import { expectGreen } from './lib/dotnet.ts';
+import { PACKAGE_VALIDATE, expectRedBecause, packPackages } from './lib/dotnet-package.ts';
 
 export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
@@ -9,11 +9,7 @@ export default defineGate({
     description: 'Each snupkg independently contains a portable PDB and matching nuspec.',
     async run(repo: any) {
       await packPackages(repo, 'dotnet-lib-symbol-package-pack');
-      await expectGreen(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/dotnet-package.sh symbols',
-        'dotnet-lib-symbol-package',
-      );
+      await expectGreen(repo, `${PACKAGE_VALIDATE} symbols`, 'dotnet-lib-symbol-package');
     },
   },
   mutation: {
@@ -25,11 +21,9 @@ export default defineGate({
       await repo.exec(
         'package="$(find artifacts/package -maxdepth 1 -name \'AtomiCloud.Diene.Note.TestHelper.*.nupkg\' -print -quit)"; symbols="${package%.nupkg}.snupkg"; cp "${package}" "${symbols}"',
       );
-      await expectRed(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/dotnet-package.sh symbols',
-        'dotnet-lib-symbol-package',
-      );
+      await expectRedBecause(repo, `${PACKAGE_VALIDATE} symbols`, 'dotnet-lib-symbol-package', [
+        'symbols package contains no portable PDB',
+      ]);
     },
   },
 });

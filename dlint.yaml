@@ -1,7 +1,7 @@
 schemaVersion: 1
 checks:
   action-pins:
-    trustedPattern: ^AtomiCloud/
+    trustedPattern: ^(AtomiCloud|ProtoDurian|actions)/
     workflowsDir: .github/workflows
   exec-bits:
     globs:
@@ -12,6 +12,7 @@ checks:
     orchestrators:
       - .github/workflows/ci.yaml
       - .github/workflows/release.yaml
+      - .github/workflows/cd.yaml
   toolchain-smoke:
     shell: default
     binaries:
@@ -19,18 +20,12 @@ checks:
       - bash
       - cyanprint
       - dlint
-      - docker
       - git
       - gomplate
-      - hadolint
-      - helm version
-      - helm-docs
       - infisical
       - jq
       - k3d
-      - kubeconform -v
       - kubectl version --client
-      - kyverno version
       - nix
       - pre-commit
       - releaser
@@ -45,3 +40,4 @@ checks:
       - nix/packages.nix
       - nix/env.nix
       - nix/shells.nix
+  release-gating: {}

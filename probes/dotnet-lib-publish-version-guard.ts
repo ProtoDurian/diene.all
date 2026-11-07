@@ -1,5 +1,8 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen } from './lib/dotnet.ts';
+import { expectRedBecause, manifestVersion } from './lib/dotnet-package.ts';
+
+const GUARD = 'nix develop .#ci -c ./scripts/validate/dotnet-publish.sh';
 
 export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
@@ -9,7 +12,7 @@ export default defineGate({
     async run(repo: any) {
       await expectGreen(
         repo,
-        'GITHUB_REF_NAME=v1.0.0 nix develop .#ci -c ./scripts/validate/dotnet-publish.sh',
+        `GITHUB_REF_NAME=v${await manifestVersion(repo)} ${GUARD}`,
         'dotnet-lib-publish-version-guard',
       );
     },
@@ -19,10 +22,11 @@ export default defineGate({
     description: 'A tag and manifest version mismatch exits red before any publish operation.',
     expectedImpact: [],
     async run(repo: any) {
-      await expectRed(
+      await expectRedBecause(
         repo,
-        'GITHUB_REF_NAME=v1.0.1 nix develop .#ci -c ./scripts/validate/dotnet-publish.sh',
+        `GITHUB_REF_NAME=v${await manifestVersion(repo)}-probe-drift ${GUARD}`,
         'dotnet-lib-publish-version-guard',
+        ['!= tag version'],
       );
     },
   },

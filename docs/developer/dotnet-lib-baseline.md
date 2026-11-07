@@ -53,21 +53,21 @@ stays at `1.0.0` in-branch, `probes/dotnet-lib-api-compatibility.ts` packs with
 
 ## Testing tiers
 
-- `pls test:unit` measures the real `AtomiCloud.Diene.Otel` assembly plus the
+- `task test:unit` measures the real `AtomiCloud.Diene.Otel` assembly plus the
   inherited `[Lib*]*` scaling wildcard at 100%, and explicitly excludes
   `*.TestHelper` assemblies. The scope guard in
   `scripts/local/dotnet-test.sh` reads the allowed assembly names from the
   `AssemblyName` each `Lib*` project declares, so it scales with a renamed
   library instead of naming one.
-- `pls test:int` measures only `[App*]*`. The otel engine's integration boundary
+- `task test:int` measures only `[App*]*`. The otel engine's integration boundary
   is the host, not a telemetry backend: there is no collector and no
   Testcontainers, because a wiring test that needs a collector to pass is testing
   the collector.
-- `pls test:meta` independently measures `[*.TestHelper]*` at 100%. Its tests
+- `task test:meta` independently measures `[*.TestHelper]*` at 100%. Its tests
   include known-good and known-bad assertion cases.
 
-Codecov uploads the `unit`, `int`, and `meta` ledgers as informational flags;
-the local merged thresholds remain authoritative.
+CI uploads each tier's Cobertura report as a build artifact; the local merged
+thresholds are authoritative.
 
 ## Release and publish
 

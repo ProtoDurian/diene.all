@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-./scripts/ci/setup.sh
-
 version="$(xmlstarlet sel -t -v '/Project/PropertyGroup/Version' Version.props)"
 artifacts="artifacts/package"
 
@@ -34,7 +32,25 @@ printf '%s\n' \
   'emitter.Emit(record);' \
   'Console.WriteLine(AtomiResource.Map(identity)[AtomiResource.ServiceNameKey]);' \
   'Console.WriteLine(emitter.Records.Count);' >"${scratch}/Program.cs"
-dotnet restore "${scratch}" --source "$(pwd)/${artifacts}" >/dev/null
+cat >"${scratch}/nuget.config" <<EOF
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="local" value="$(pwd)/${artifacts}" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="local">
+      <package pattern="AtomiCloud.Diene.Otel" />
+      <package pattern="AtomiCloud.Diene.Otel.TestHelper" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+EOF
+dotnet restore "${scratch}" --packages "${scratch}/packages" >/dev/null
 dotnet build "${scratch}" -c Release --no-restore >/dev/null
 
 echo "✅ Package validation and scratch consumption passed"

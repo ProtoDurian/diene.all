@@ -1,33 +1,29 @@
-import { expectGreen } from './helpers.ts';
+import { capturedEnvCommand } from './helpers.ts';
 
-export async function runWithRedis(repo: any, name: string, command: string): Promise<void> {
-  const identity = `slot="\${PWD##*/}"; probe_name="${name}-\${slot}"`;
+// A cold .NET restore and build runs past the parent helpers' 240 s cap.
+const DOTNET_TIMEOUT_MS = 600000;
 
-  await repo.exec(`${identity}; docker rm -f "\${probe_name}" >/dev/null 2>&1 || true`);
-  await expectGreen(
-    repo,
-    `${identity}; docker run -d --rm --name "\${probe_name}" -p 127.0.0.1::6379 redis:8.2.1-alpine`,
-    `${name}-start`,
-  );
-  try {
-    await expectGreen(
-      repo,
-      `${identity}; for attempt in $(seq 1 30); do docker exec "\${probe_name}" redis-cli ping 2>/dev/null | rg -q PONG && exit 0; sleep 1; done; exit 1`,
-      `${name}-ready`,
-      60000,
-    );
-    const result = await repo.exec(
-      `${identity}; probe_port="$(docker port "\${probe_name}" 6379/tcp | tail -n 1 | sed 's/.*://')"; test -n "\${probe_port}"; REDIS_CONNECTION="localhost:\${probe_port}" ${command}`,
-      { timeoutMs: 360000 },
-    );
-    if (result.exitCode !== 0) {
-      throw new Error(`${command} failed: ${result.stderr || result.stdout}`);
-    }
-    if (`${result.stdout}\n${result.stderr}`.trim().length === 0) {
-      throw new Error(`${command} produced no observable App process output`);
-    }
-  } finally {
-    await repo.exec(`${identity}; docker rm -f "\${probe_name}" >/dev/null 2>&1 || true`);
+export async function expectGreen(
+  repo: any,
+  command: string,
+  label: string,
+  timeoutMs = DOTNET_TIMEOUT_MS,
+): Promise<void> {
+  const result = await repo.exec(capturedEnvCommand(command, label), { timeoutMs });
+  if (result.exitCode !== 0) {
+    throw new Error(`${label} failed on the healthy repo: ${result.stderr || result.stdout}`);
+  }
+}
+
+export async function expectRed(
+  repo: any,
+  command: string,
+  label: string,
+  timeoutMs = DOTNET_TIMEOUT_MS,
+): Promise<void> {
+  const result = await repo.exec(capturedEnvCommand(command, label), { timeoutMs });
+  if (result.exitCode === 0) {
+    throw new Error(`${label} stayed green after sabotage`);
   }
 }
 
@@ -64,9 +60,7 @@ export async function addSecondUnitProject(repo: any, uncovered: boolean): Promi
   });
 }
 
-// Registers a fully covered project whose assembly name escapes the unit `Lib*` ledger and
-// widens the Coverlet include filter to admit it. Both merged packages sit at 100%, so the
-// merged line threshold still passes and only the Cobertura package-scope parse can fail.
+// Both packages stay at 100%, so only the Cobertura package-scope parse can fail.
 export async function addEscapingUnitProject(repo: any): Promise<void> {
   await repo.write(
     'Escape/Escape.csproj',
