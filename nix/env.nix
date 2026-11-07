@@ -20,6 +20,7 @@ with packages;
 
   main = [
     cyanprint
+    dart
     git
     go-task
     infisical

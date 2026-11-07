@@ -165,6 +165,7 @@ release:
     assets:
       - Changelog.md
       - docs/developer/CommitConventions.md
+      - packages/diene_dart_lib/pubspec.yaml
   github:
     enabled: true
     successComment: 'Released in ${version}.'
@@ -172,5 +173,7 @@ release:
       - released
   hooks:
     # A file a hook writes joins commit.assets in the same edit.
-    prepare: []
+    prepare:
+      - phase: afterWrite
+        command: './scripts/release/bump.sh ${version}'
     success: []
