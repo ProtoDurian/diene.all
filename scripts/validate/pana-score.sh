@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root_dir="$(git rev-parse --show-toplevel)"
-cd "${root_dir}/packages/diene_dart_lib"
+cd "${root_dir}/packages/diene_config"
 
 report="$(mktemp)"
 trap 'rm -f "${report}"' EXIT

@@ -1,7 +1,7 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
 const VALIDATOR = 'nix develop .#ci -c ./scripts/validate/dart-package.sh';
-const MEMBER_PUBSPEC = 'packages/diene_dart_lib/pubspec.yaml';
+const MEMBER_PUBSPEC = 'packages/diene_config/pubspec.yaml';
 
 export default {
   contractVersion: 1,

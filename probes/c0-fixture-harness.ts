@@ -1,6 +1,6 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-const HARNESS = "nix develop .#ci -c bash -c 'cd packages/diene_dart_lib && dart test test/conformance'";
+const HARNESS = "nix develop .#ci -c bash -c 'cd packages/diene_config && dart test test/conformance'";
 
 export default {
   contractVersion: 1,
