@@ -29,7 +29,12 @@ let
     };
 
     settings.formatter.biome = {
-      command = "./scripts/local/biome-format.sh";
+      command = "./node_modules/.bin/biome";
+      options = [
+        "format"
+        "--write"
+        "--no-errors-on-unmatched"
+      ];
       includes = [
         "*.ts"
         "*.tsx"
