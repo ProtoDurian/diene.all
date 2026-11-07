@@ -16,6 +16,7 @@ otel:
       otlp:
         enabled: false
         endpoint: ''
+        protocol: http/protobuf
         headers: {}
         timeout: PT10S
   metrics:
@@ -26,6 +27,7 @@ otel:
       otlp:
         enabled: false
         endpoint: ''
+        protocol: http/protobuf
         headers: {}
         timeout: PT10S
     interval: PT60S
@@ -40,6 +42,7 @@ otel:
       otlp:
         enabled: false
         endpoint: ''
+        protocol: http/protobuf
         headers: {}
         timeout: PT10S
 ```
@@ -50,7 +53,7 @@ Rules:
 
 - The signal keys are exactly `logs`, `metrics` and `traces`.
 - Each exporter is switched by its own `enabled` boolean, not by a string such as `exporter: otlp`.
-- OTLP (the OpenTelemetry Protocol) is always HTTP/protobuf (port 4318 by default); there is no protocol setting.
+- OTLP (the OpenTelemetry Protocol) is always HTTP/protobuf (port 4318 by default). `protocol` accepts only `http/protobuf`; the libraries reject anything else, so keep the line.
 - Durations are ISO 8601 strings: `PT10S` is 10 seconds.
 - The sampler `type` is `parentbased_traceidratio` (follow the caller's sampling decision if there is one, else keep the `ratio` share, 0 to 1, of new traces), `always_on` or `always_off`.
 - An enabled exporter with an empty `endpoint` fails config validation before startup.

@@ -87,6 +87,20 @@ and
   / sum(rate(http_server_request_duration_seconds_count{service="zinc"}[6h])) ) > (6 * 0.001)
 ```
 
+**Log error ratio** (a service whose errors show only in its logs): the same two windows in LogQL, with `datasource: logs`. `| json` turns the log key `http.response.status_code` into the label `http_response_status_code`:
+
+```yaml
+datasource: logs
+expr: |
+  ( sum(count_over_time({service="zinc"} | json | http_response_status_code >= 500 [5m]))
+    / sum(count_over_time({service="zinc"} | json [5m])) ) > (14.4 * 0.001)
+  and
+  ( sum(count_over_time({service="zinc"} | json | http_response_status_code >= 500 [1h]))
+    / sum(count_over_time({service="zinc"} | json [1h])) ) > (14.4 * 0.001)
+```
+
+**Trace signals**: alert on span-derived metrics, the request, error and duration metrics the tracing pipeline writes for each span (e.g. `traces_spanmetrics_calls_total{service="zinc",status_code="STATUS_CODE_ERROR"}`; ask the platform team which names theirs writes), with `datasource: metrics` and the shapes above. Grafana can alert on TraceQL directly, but that is experimental: do not use it for production alerts.
+
 **Seasonal deviation** (traffic below half of last week, smoothed over 1h, and only when last week had real traffic):
 
 ```text
@@ -144,6 +158,6 @@ Before merge:
 
    A test for an `[Nh]` window needs more than N hours of samples. For `warning.yaml` (`[6h]`), use `values: 0+600x600` and `0+0.6x420 312+60x179`, and expect no alert at `eval_time: 420m` and the alert at `600m`. For a threshold alert, one series is enough, e.g. `values: 100x20 6000x20` with `exp_labels` holding the labels its `expr` keeps.
 
-4. **Preview against real data**, for a metric or log stream that already exists. In the landscape's Grafana: Alerting → Alert rules → New alert rule, pick the datasource, paste `expr`, press **Preview**, then leave without saving. It must return data; this catches a misspelled metric or label.
+4. **Preview against real data**, for a metric or log stream that already exists. In the landscape's Grafana: Alerting → Alert rules → New alert rule, pick the datasource, paste `expr`, press **Preview**, then leave without saving. It must return data; this catches a misspelled metric or label. A log alert whose stream does not exist yet can be Previewed the same way in the sandbox's [logs and traces profile](/docs/standards/grafana-dashboards/sandbox.md#logs-and-traces-profile), against lines shaped like the template's logger; that proves the query parses and runs, not that the real lines match.
 
 Say in the PR which of these you ran.

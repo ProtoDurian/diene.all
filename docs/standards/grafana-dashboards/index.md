@@ -43,14 +43,22 @@ Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashbo
 
 - `$landscape` is required on every dashboard, with `refresh: 2` (reload on time change), so one dashboard works whether a Grafana's datasource holds one landscape or several; in a one-landscape Grafana it has one value. Every query selects `landscape="$landscape"`, e.g. `sum by (outcome) (rate(x_total{service="zinc",landscape="$landscape"}[$__rate_interval]))`. Add the datasource variable `prometheus_datasource` labeled `Prometheus data source` and, with log panels, `loki_datasource` labeled `Loki data source`; these names pass strict lint. Set `editable: false`.
 - Log panels also get a `$filter` text variable, applied as `|~ "$filter"`.
-- Link panels to the next view: a log line to its trace (set up by the platform team's logs datasource, not in dashboard JSON), a service tile to `/d/<platform>-<service>-overview`. Carry the scope in the URL: `?var-landscape=${landscape}`.
+- Dashboard links (the links bar at the top) point at `{repo-url}/observability/overview.md` and, on a panel an alert links to, that alert's `{repo-url}/observability/alerts/<slug>/runbook.md`.
+
+### Drill-down
+
+A responder should click from "something is wrong" straight to the detail, not hunt through the folder tree.
+
+- **Panel data links.** A panel that names a subject (a service, a status, a trace id) links to the next view. Use `${__value.raw}` or `${__field.labels.<x>}` in the link, e.g. a status tile links to `/d/<platform>-${__field.labels.service}-overview`, and a trace table links to that trace's logs. A log line links to its trace through the logs datasource's derived fields, which the platform team sets up (the sandbox's Loki datasource has one); that link is not in dashboard JSON.
+- **Overview → deep-dive.** An overview links down to the detail: a `dashlist` panel scoped to the service folder `<platform>-<service>-folder` ([Shipping](/docs/standards/observability/shipping.md#where-things-run)), or stat tiles that link to `/d/<platform>-<service>-overview`. Each service overview links to its own deep-dive dashboards.
+- **Carry context across the link.** Pre-fill the target's variables in the URL so it opens already scoped: `/d/tracker-zinc-retries?var-landscape=${landscape}`. Carry only `var-landscape` plus variables both dashboards have; never `var-service` or a cluster label, which the target does not have.
 
 ## Log and trace panels
 
 The log line in the store is not what the app wrote: the logging library's JSON wrapper changes it, and the collector turns some fields into labels ("label promotion"). So build log panels from real stored lines:
 
-1. **Sample** 50–100 stored lines per stream (a stream is the lines that share one set of log labels) for this service, from the real landscape with Grafana Explore. Include an error window. No access? Mark the panel `UNVERIFIED` in its description, check it after the first deploy, and still create `log-notes.md` (step 9) saying nothing was sampled yet.
-2. **Test the query engine.** LogQL support differs between backend versions. Compare row counts for a raw query, `|~`, `| json`, `| logfmt` and `line_format`, and use only what works. Re-test when the backend is upgraded.
+1. **Sample** 50–100 stored lines per stream (a stream is the lines that share one set of log labels) for this service, from the real landscape with Grafana Explore. Include an error window. No access to the store? Push lines shaped like the template's logger (pino in the Bun template) into the sandbox's [logs and traces profile](/docs/standards/grafana-dashboards/sandbox.md#logs-and-traces-profile) and build the panel there. Mark it `UNVERIFIED` in its description until the real store is sampled, check it after the first deploy, and still create `log-notes.md` (step 9) saying nothing was sampled yet.
+2. **Test the query engine.** LogQL support differs between Loki versions. Compare row counts for a raw query, `|~`, `| json`, `| logfmt` and `line_format`, and use only what works: on the real store, or in the profile pinned to the platform team's Loki version. Re-test when Loki is upgraded.
 3. **Split by label first**: `sum by (module) (count_over_time({service="zinc"}[1h]))`. Parse line bodies only when labels cannot answer.
 4. **Note each stream's format and level encoding**, e.g. `level=error` (logfmt), `"level":"error"` (JSON), `"level":50` (numeric, from pino, the Bun template's JSON logger).
 5. **Filter the noise** with one targeted negative filter per noisy line type, e.g. `!= "grpc.health"`.
@@ -75,14 +83,14 @@ Run this for every new or changed dashboard file. Tools and the sandbox: [Dashbo
    done
    ```
 
-   Fix every finding, or justify it in `observability/dashboards/.lint` (the linter reads `.lint` from the dashboard's folder). Start that file as a copy of `.claude/skills/grafana-dashboards/sandbox/dashboards/.lint`. A dashboard that selects only by LPSM labels (no `job` or `instance`) needs all four of its exclusions. For any exclusion you add beyond them: drop it, lint again, and put it back only if the lint fails.
+   Fix every finding, or justify it in `observability/dashboards/.lint` (the linter reads `.lint` from the dashboard's folder). Start that file as a copy of `.claude/skills/grafana-dashboards/sandbox/dashboards/.lint`. A dashboard that selects only by LPSM labels (no `job` or `instance`) needs its four `job` and `instance` exclusions; keep `target-promql-rule` only for TraceQL panels, listed by title, because the linter reads every target that is not Loki as PromQL. For any exclusion you add beyond them: drop it, lint again, and put it back only if the lint fails.
 
 2. Render in the sandbox with synthetic data and read the PNGs.
 3. Fix what the checklist below finds and repeat from step 1.
 
 ### Visual checklist
 
-- [ ] No "No data" or error panels once synthetic data is loaded, except [`UNVERIFIED`](#log-and-trace-panels) log and trace panels.
+- [ ] No "No data" or error panels once synthetic data is loaded. Log and trace panels need the [logs and traces profile](/docs/standards/grafana-dashboards/sandbox.md#logs-and-traces-profile); only a panel whose lines cannot be made up from the template's logger may stay [`UNVERIFIED`](#log-and-trace-panels).
 - [ ] Units show as units (`1.2k req/s`, `250 ms`), not raw numbers.
 - [ ] Y-axes fit: no clipped peaks, no lines flattened by a wrong scale.
 - [ ] Legends are short and do not swallow the panel.
