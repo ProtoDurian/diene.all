@@ -8,11 +8,13 @@ member_dir="${MEMBER_DIR:-packages/diene_result}"
 test_helper_path="${TEST_HELPER_PATH:-lib/test_helper.dart}"
 meta_test_path="${META_TEST_PATH:-test/meta}"
 
-[[ ${mode} != "unit" && ${mode} != "meta" ]] && echo "❌ usage: $0 <unit|meta> [coverage|no-coverage]" >&2 && exit 2
+[[ ${mode} != "unit" && ${mode} != "meta" && ${mode} != "consumer" ]] && echo "❌ usage: $0 <unit|meta|consumer> [coverage|no-coverage]" >&2 && exit 2
 [[ ${coverage_mode} != "coverage" && ${coverage_mode} != "no-coverage" ]] && echo "❌ coverage mode must be coverage or no-coverage" >&2 && exit 2
 
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
+
+[[ ${mode} == "consumer" ]] && exec ./scripts/ci/consumer-test.sh
 
 if [[ ${mode} == "meta" && ! -f "${member_dir}/${test_helper_path}" ]]; then
   echo "✅ Meta tier inactive: this package has no TestHelper"

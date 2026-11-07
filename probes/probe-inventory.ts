@@ -12,6 +12,7 @@ const MATRIX: Record<string, 'gate' | 'smoke' | 'presence'> = {
   'deadcode-production-only': 'gate',
   'pub-workspace-metadata-validator': 'gate',
   'publish-archive-contents': 'gate',
+  'consumer-test': 'gate',
   'pana-score': 'gate',
   'publish-version-guard': 'gate',
   'publish-tag-policy': 'gate',
