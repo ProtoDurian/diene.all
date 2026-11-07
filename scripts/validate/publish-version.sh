@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root_dir="${PACKAGE_ROOT:-$(git rev-parse --show-toplevel)}"
-member_pubspec="${root_dir}/packages/diene_dart_lib/pubspec.yaml"
+member_pubspec="${root_dir}/packages/diene_auth_engine/pubspec.yaml"
 
 tag="${1:-${GITHUB_REF_NAME:-}}"
 
