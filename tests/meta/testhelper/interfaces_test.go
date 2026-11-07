@@ -8,8 +8,8 @@ import (
 
 	"github.com/AtomiCloud/diene.go-errors-problems/lib/problem"
 	probtest "github.com/AtomiCloud/diene.go-errors-problems/testhelper"
-	"github.com/AtomiCloud/diene.go-interfaces/lib/interfaces"
-	"github.com/AtomiCloud/diene.go-interfaces/testhelper"
+	"github.com/ProtoDurian/diene.go-interfaces/lib/interfaces"
+	"github.com/ProtoDurian/diene.go-interfaces/testhelper"
 )
 
 // canonicalTypePrefix is the fixed testhelper fault type-URI prefix. Every

@@ -6,7 +6,7 @@ import (
 
 	"github.com/AtomiCloud/diene.go-errors-problems/lib/problem"
 	probtest "github.com/AtomiCloud/diene.go-errors-problems/testhelper"
-	"github.com/AtomiCloud/diene.go-interfaces/testhelper/internal/faults"
+	"github.com/ProtoDurian/diene.go-interfaces/testhelper/internal/faults"
 )
 
 const typePrefix = "https://docs.diene.atomicloud.com/docs/diene/go/interfaces/testhelper/v1/"

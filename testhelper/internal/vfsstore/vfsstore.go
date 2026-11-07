@@ -11,8 +11,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/AtomiCloud/diene.go-interfaces/lib/interfaces"
-	"github.com/AtomiCloud/diene.go-interfaces/testhelper/internal/faults"
+	"github.com/ProtoDurian/diene.go-interfaces/lib/interfaces"
+	"github.com/ProtoDurian/diene.go-interfaces/testhelper/internal/faults"
 )
 
 // Store is a byte-backed virtual filesystem. Files map normalized paths to

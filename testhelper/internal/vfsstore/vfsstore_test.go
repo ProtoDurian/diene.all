@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	probtest "github.com/AtomiCloud/diene.go-errors-problems/testhelper"
-	"github.com/AtomiCloud/diene.go-interfaces/lib/interfaces"
-	"github.com/AtomiCloud/diene.go-interfaces/testhelper/internal/vfsstore"
+	"github.com/ProtoDurian/diene.go-interfaces/lib/interfaces"
+	"github.com/ProtoDurian/diene.go-interfaces/testhelper/internal/vfsstore"
 )
 
 // TestNormalize proves path normalization collapses empty segments to the

@@ -5,7 +5,7 @@ description: Use the Diene Go implementation-free interfaces library and its det
 
 # Diene Go interfaces usage
 
-Import `github.com/AtomiCloud/diene.go-interfaces/lib/interfaces` for portable
+Import `github.com/ProtoDurian/diene.go-interfaces/lib/interfaces` for portable
 system, virtual filesystem, terminal, logging, and metrics seams. Depend on the
 interfaces in application code; keep host-backed implementations in the owning
 adapter library.
@@ -20,7 +20,7 @@ adapter library.
   maps or slices need independent ownership.
 
 For consumer tests, import
-`github.com/AtomiCloud/diene.go-interfaces/testhelper`. Its `InMemorySystem`,
+`github.com/ProtoDurian/diene.go-interfaces/testhelper`. Its `InMemorySystem`,
 `InMemoryVfs`, `InMemoryTerminal`, `InMemoryLoggerSink`, and
 `InMemoryMetricsCollector` provide deterministic state, FIFO scripted results,
 and read-only snapshots of recorded inputs. Script errors with the

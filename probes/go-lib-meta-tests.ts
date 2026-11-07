@@ -1,25 +1,33 @@
-import { defineGate } from './lib/definition.ts';
 import { flipMetaAssertion } from './lib/go-library.ts';
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic } from './lib/go.ts';
 
 const gate = 'nix develop .#ci -c ./scripts/local/test.sh meta false false';
 
-export default defineGate({
+export default {
+  contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  baseline: {
-    name: 'baseline-go-lib-meta-tests-green',
-    description: 'The conditional TestHelper meta tier passes through its own task path.',
-    async run(repo: any) {
-      await expectGreen(repo, gate, 'go-lib-meta-tests');
+  probes: [
+    {
+      name: 'baseline-go-lib-meta-tests-green',
+      description: 'The TestHelper meta tests pass.',
+      kind: 'baseline',
+      async run(repo: any) {
+        await expectGreen(repo, gate, 'go-lib-meta-tests');
+      },
     },
-  },
-  mutation: {
-    name: 'mutation-go-lib-meta-tests-caught',
-    description: 'Flipping one TestHelper contract assertion turns the meta tier red.',
-    expectedImpact: [],
-    async run(repo: any) {
-      await flipMetaAssertion(repo);
-      await expectRed(repo, gate, 'go-lib-meta-tests');
+    {
+      name: 'mutation-go-lib-meta-tests-caught',
+      description: 'A flipped meta assertion turns the meta tier red.',
+      kind: 'mutation',
+      async run(repo: any) {
+        await flipMetaAssertion(repo);
+        await expectRedWithDiagnostic(
+          repo,
+          gate,
+          'go-lib-meta-tests',
+          /FAIL: tests\/meta\/testhelper TestMemoryStoreServesTheService/,
+        );
+      },
     },
-  },
-});
+  ],
+};

@@ -1,6 +1,7 @@
-import { expectGreen, expectRedWithDiagnostic } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic } from './lib/go.ts';
 
-const gate = 'nix develop .#ci -c ./scripts/validate/go-workflows.sh';
+const gate = 'nix develop .#ci -c dlint ci-wiring';
+const lanes = ['⚡reusable-build.yaml', '⚡reusable-dead-code.yaml', '⚡reusable-test.yaml', '⚡reusable-vuln.yaml'];
 
 export default {
   contractVersion: 1,
@@ -8,9 +9,14 @@ export default {
   probes: [
     {
       name: 'baseline-go-workflow-wiring-green',
-      description: 'Every Go reusable workflow job resolves to a cached, self-contained CI script.',
+      description: 'Every Go CI job resolves through its reusable workflow to an existing CI script.',
       kind: 'baseline',
       async run(repo: any) {
+        for (const lane of lanes) {
+          if (!(await repo.read(`.github/workflows/${lane}`)).includes('./scripts/ci/')) {
+            throw new Error(`${lane} calls no scripts/ci entrypoint`);
+          }
+        }
         await expectGreen(repo, gate, 'go-workflow-wiring');
       },
     },
@@ -19,37 +25,11 @@ export default {
       description: 'A Go reusable workflow that calls a missing CI script must turn wiring red.',
       kind: 'mutation',
       async run(repo: any) {
-        const paths = (await repo.glob('.github/workflows/⚡reusable-go-*.yaml')).sort();
-        if (paths.length === 0) {
-          throw new Error('no Go reusable workflow target found');
-        }
-        let target = '';
-        let original = '';
-        let script = '';
-        for (const path of paths) {
-          const source = await repo.read(path);
-          const match = source.match(/\.\/scripts\/ci\/[A-Za-z0-9._/-]+[.]sh/)?.[0];
-          if (match) {
-            target = path;
-            original = source;
-            script = match;
-            break;
-          }
-        }
-        if (!target) {
-          throw new Error('no Go workflow script target found');
-        }
-        try {
-          await repo.write(target, original.replace(script, './scripts/ci/probe-missing.sh'));
-          await expectRedWithDiagnostic(
-            repo,
-            gate,
-            'go-workflow-wiring',
-            /references missing script 'scripts\/ci\/probe-missing[.]sh'/,
-          );
-        } finally {
-          await repo.write(target, original);
-        }
+        await repo.patch('.github/workflows/⚡reusable-test.yaml', {
+          find: './scripts/ci/test.sh',
+          replace: './scripts/ci/probe-missing.sh',
+        });
+        await expectRedWithDiagnostic(repo, gate, 'go-workflow-wiring', /probe-missing\.sh/);
       },
     },
   ],

@@ -1,5 +1,5 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
-import { breakAdapter } from './lib/go.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { breakAdapter, expectGreen, expectRedWithDiagnostic } from './lib/go.ts';
 
 const gate = 'nix develop .#ci -c task test:int';
 

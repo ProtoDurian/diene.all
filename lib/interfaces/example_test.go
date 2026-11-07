@@ -3,7 +3,7 @@ package interfaces_test
 import (
 	"fmt"
 
-	"github.com/AtomiCloud/diene.go-interfaces/lib/interfaces"
+	"github.com/ProtoDurian/diene.go-interfaces/lib/interfaces"
 )
 
 // ExampleTerminalOutput_Succeeded shows that a non-zero child exit is captured output.

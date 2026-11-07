@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/AtomiCloud/diene.go-interfaces/lib/interfaces"
-	"github.com/AtomiCloud/diene.go-interfaces/testhelper/internal/faults"
-	"github.com/AtomiCloud/diene.go-interfaces/testhelper/internal/vfsstore"
+	"github.com/ProtoDurian/diene.go-interfaces/lib/interfaces"
+	"github.com/ProtoDurian/diene.go-interfaces/testhelper/internal/faults"
+	"github.com/ProtoDurian/diene.go-interfaces/testhelper/internal/vfsstore"
 )
 
 type scripted[T any] struct {

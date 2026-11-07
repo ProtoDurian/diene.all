@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/AtomiCloud/diene.go-errors-problems/lib/problem"
-	"github.com/AtomiCloud/diene.go-interfaces/lib/interfaces"
-	"github.com/AtomiCloud/diene.go-interfaces/testhelper"
+	"github.com/ProtoDurian/diene.go-interfaces/lib/interfaces"
+	"github.com/ProtoDurian/diene.go-interfaces/testhelper"
 )
 
 // Example shows the five deterministic in-memory seams and problem-typed

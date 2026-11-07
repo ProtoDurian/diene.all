@@ -1,139 +1,72 @@
-# Diene Go interfaces library
+# Commands
 
-<!-- ### go-base-badges -->
-<!-- #### source: go-base -->
+Run `task --list` for every available task and its description. The task set is
+declared in [`Taskfile.yaml`](Taskfile.yaml), whose `includes:` block maps each
+namespace to a file under [`tasks/`](tasks); a task shown as `<namespace>:<task>`
+is that key in the included file. See
+[the Taskfile standard](docs/standards/taskfile/index.md) for the conventions.
 
-[![CI](https://github.com/AtomiCloud/diene.go-interfaces/actions/workflows/ci.yaml/badge.svg)](https://github.com/AtomiCloud/diene.go-interfaces/actions/workflows/ci.yaml)
-[![Unit coverage](https://codecov.io/gh/AtomiCloud/diene.go-interfaces/branch/main/graph/badge.svg?flag=unit)](https://codecov.io/gh/AtomiCloud/diene.go-interfaces)
-[![Integration coverage](https://codecov.io/gh/AtomiCloud/diene.go-interfaces/branch/main/graph/badge.svg?flag=int)](https://codecov.io/gh/AtomiCloud/diene.go-interfaces)
-[![Meta coverage](https://codecov.io/gh/AtomiCloud/diene.go-interfaces/branch/main/graph/badge.svg?flag=meta)](https://codecov.io/gh/AtomiCloud/diene.go-interfaces)
-[![Go Reference](https://pkg.go.dev/badge/github.com/AtomiCloud/diene.go-interfaces.svg)](https://pkg.go.dev/github.com/AtomiCloud/diene.go-interfaces)
-[![Commit activity](https://img.shields.io/github/commit-activity/m/AtomiCloud/diene.go-interfaces)](https://github.com/AtomiCloud/diene.go-interfaces/commits/main)
+# Development Environment
 
-<!-- ### nix-root -->
-<!-- #### source: main -->
+All binaries, tools, and PATH are managed by **Nix**. Do not install tools manually or modify PATH outside of the nix configuration.
 
-Diene's reproducible development environment is managed by Nix. Run `direnv allow` once, then use `task` tasks from the loaded shell.
+## Prerequisites
 
-<!-- ### workspace -->
-<!-- #### source: workspace -->
+1. **[Nix](https://nixos.org/download)** — package manager
+2. **[Docker](https://docs.docker.com/get-docker)** — container runtime
+3. **[direnv](https://direnv.net/docs/installation.html)** — auto-loads the nix shell on `cd`
 
-This repository inherits the all-features workspace baseline: split CI/CD,
-secrets, release configuration, validators, standards, and vendored agent-skill
-synchronization.
-
-## Commands
-
-- `task setup` — synchronize installed diene package skills.
-- `task lint` — run every pre-commit gate.
-- `task skills:sync` — rebuild `.claude/skills/vendor/` from installed packages.
-
-<!-- ### go-lib -->
-<!-- #### source: go-lib -->
-
-## Publishable Go module
-
-`github.com/AtomiCloud/diene.go-interfaces` is the Go family's
-implementation-free seam library. It defines portable system, virtual
-filesystem, terminal, logging, and metrics contracts, with ordinary `(T, error)`
-failure slots. Every non-nil seam error carries a problem-typed error from
-`diene.go-errors-problems`; this module ships deterministic in-memory mocks in
-its consumer-facing `testhelper` package.
+## Getting Started
 
 ```bash
-go get github.com/AtomiCloud/diene.go-interfaces@latest
+direnv allow    # first time only — loads the nix dev shell
 ```
 
-```go
-package main
+Once allowed, direnv automatically loads the development environment whenever you enter the project directory.
 
-import (
-	"context"
-	"fmt"
+## Nix Configuration
 
-	"github.com/AtomiCloud/diene.go-interfaces/testhelper"
-)
+See [docs/standards/nix/index.md](docs/standards/nix/index.md) for the full guide on:
 
-func main() {
-	ctx := context.Background()
-	system := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{})
-	vfs := testhelper.NewInMemoryVfs(testhelper.InMemoryVfsOptions{})
+- File structure (`flake.nix`, `nix/`, `.envrc`)
+- Adding/removing packages
+- Environment groups and shells
+- Formatters and pre-commit hooks
+- Adding registries
 
-	now, err := system.NowUTC()
-	if err != nil {
-		panic(err)
-	}
+# Go base template
 
-	exists, err := vfs.Exists(ctx, "/")
-	if err != nil {
-		panic(err)
-	}
+See the [Go baseline](docs/developer/go-baseline.md) for the language-specific
+toolchain, task surface, test tiers, coverage ledgers, dead-code passes and the
+illustrative Note sample. Go variants accompany the shared standards for
+[date/time](docs/standards/datetime/languages/go.md),
+[domain-driven design](docs/standards/domain-driven-design/languages/go.md),
+[functional practices](docs/standards/functional-practices/languages/go.md),
+[SOLID](docs/standards/solid-principles/languages/go.md),
+[stateless OOP/DI](docs/standards/stateless-oop-di/languages/go.md),
+[testing](docs/standards/testing/languages/go.md),
+[utilities](docs/standards/utilities/languages/go.md), and
+[validation](docs/standards/validation/languages/go.md).
 
-	fmt.Println(now, exists)
-}
-```
+# Go library template
 
-<!-- ### go-base-commands -->
-<!-- #### source: go-base -->
+[![Go Reference](https://pkg.go.dev/badge/github.com/ProtoDurian/diene.go-lib.svg)](https://pkg.go.dev/github.com/ProtoDurian/diene.go-lib)
+[![CI](https://github.com/ProtoDurian/diene.go-lib/actions/workflows/ci.yaml/badge.svg)](https://github.com/ProtoDurian/diene.go-lib/actions/workflows/ci.yaml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Go commands
+This module is `github.com/ProtoDurian/diene.go-lib`. See the
+[Go library baseline](docs/developer/go-lib-baseline.md) for the library shape,
+the TestHelper tier, the library gates (`task validate`) and tag-based
+publication through the Go proxy.
 
-- `task build` — build every package in the module.
-- `task typecheck` — compile every source package without running tests.
-- `task test` / `task test:coverage` — run unit, integration, and active meta tiers.
-- `task deadcode` — run strict whole-repository and production passes plus the LLM-lax report.
-- `task up` / `task down` — start or stop local Redis.
-- `./scripts/ci/pkg-validate.sh all` — run module-path, vet, API, docs, and example validators.
+# Standards
 
-See the [Go baseline](docs/developer/go-baseline.md) for the language contract and
-template-maintenance boundary.
-See the [Go library baseline](docs/developer/go-lib-baseline.md) for promotion,
-testing, compatibility, and publication policy.
+The conventions this repository follows live under
+[`docs/standards/`](docs/standards). Read the standard for the surface you are
+changing before you change it. [`CLAUDE.md`](CLAUDE.md) links the ones an agent
+reaches for most often; it is a convenience, not a required index, and nothing
+checks that it names every surface.
 
-## Standards
+# Workspace baseline
 
-- [CI/CD workflows](docs/standards/ci-cd/index.md)
-- [conventional commits](docs/standards/conventional-commits/index.md)
-- [Infisical and secrets](docs/standards/infisical/index.md)
-- [linting and pre-commit](docs/standards/linting/index.md)
-- [Nix flakes and development shells](docs/standards/nix/index.md)
-- [release automation](docs/standards/semantic-release/index.md)
-- [service-tree identity](docs/standards/service-tree/index.md)
-- [shell scripts](docs/standards/shell-scripts/index.md)
-- [Taskfile conventions](docs/standards/taskfile/index.md)
-
-<!-- ### shared -->
-<!-- #### source: shared -->
-
-## Shared standards
-
-- [Authorization](docs/standards/authorization/index.md)
-- [Contributor documentation](docs/standards/contributor-docs/index.md)
-- [Date and time](docs/standards/datetime/index.md)
-- [Domain-driven design](docs/standards/domain-driven-design/index.md)
-- [Functional practices](docs/standards/functional-practices/index.md)
-- [Software design philosophy](docs/standards/software-design-philosophy/index.md)
-- [SOLID principles](docs/standards/solid-principles/index.md)
-- [Stateless OOP and dependency injection](docs/standards/stateless-oop-di/index.md)
-- [Testing](docs/standards/testing/index.md)
-- [Three-layer architecture](docs/standards/three-layer-architecture/index.md)
-- [Utility libraries](docs/standards/utilities/index.md)
-- [Data validation](docs/standards/validation/index.md)
-
-Domain-specific documentation belongs under [docs/domain/](docs/domain/README.md).
-The `docs/standards/contracts/` location is reserved for the separately owned C0
-contracts standard.
-
-<!-- ### go-base-language-standards -->
-<!-- #### source: go-base -->
-
-## Go language variants
-
-- [Date and time](docs/standards/datetime/languages/go.md)
-- [Domain-driven design](docs/standards/domain-driven-design/languages/go.md)
-- [Functional practices](docs/standards/functional-practices/languages/go.md)
-- [SOLID principles](docs/standards/solid-principles/languages/go.md)
-- [Stateless OOP and dependency injection](docs/standards/stateless-oop-di/languages/go.md)
-- [Testing](docs/standards/testing/languages/go.md)
-- [Utilities](docs/standards/utilities/languages/go.md)
-- [Validation](docs/standards/validation/languages/go.md)
+This tree is the all-features workspace baseline inherited by every downstream sample: split CI/CD, Docker, Helm, secrets, release configuration, validators, and standards.

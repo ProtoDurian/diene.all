@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/AtomiCloud/diene.go-interfaces/lib/interfaces"
+	"github.com/ProtoDurian/diene.go-interfaces/lib/interfaces"
 )
 
 func TestVfsValues(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/AtomiCloud/diene.go-interfaces/lib/interfaces"
+	"github.com/ProtoDurian/diene.go-interfaces/lib/interfaces"
 )
 
 type InMemorySystemOptions struct {

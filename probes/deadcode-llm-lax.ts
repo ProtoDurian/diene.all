@@ -1,6 +1,5 @@
-import { expectGreen } from './lib/helpers.ts';
+import { expectGreen } from './lib/go.ts';
 
-// Every scanner pass records its own completion line, so a header-only or truncated report cannot read as a clean one.
 const passes = [
   'whole-repository staticcheck',
   'whole-repository deadcode',
@@ -8,7 +7,7 @@ const passes = [
   'production deadcode',
 ];
 const evidence = passes.map(pass => `grep -qF '## pass complete: ${pass} (' reports/deadcode-llm.txt`).join(' && ');
-// Drop the artifact first so the evidence can only have come from this run.
+// Remove the old report so a stale one cannot pass.
 const gate = `nix develop .#ci -c bash -lc "rm -f reports/deadcode-llm.txt && ./scripts/local/deadcode.sh lax && ${evidence}"`;
 
 export default {

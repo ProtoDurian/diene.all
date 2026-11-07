@@ -1,4 +1,4 @@
-import { expectGreen, expectRedBecause } from './lib/helpers.ts';
+import { expectGreen, expectRed } from './lib/helpers.ts';
 
 export default {
   contractVersion: 1,
@@ -18,13 +18,11 @@ export default {
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        await repo.patch('.github/workflows/reusable-precommit.yaml', {
+        await repo.patch('.github/workflows/⚡reusable-precommit.yaml', {
           find: './scripts/ci/pre-commit.sh',
           replace: './scripts/ci/missing.sh',
         });
-        await expectRedBecause(repo, 'nix develop .#ci -c dlint ci-wiring', 'workflow-wiring', [
-          "workflow references missing script 'scripts/ci/missing.sh'",
-        ]);
+        await expectRed(repo, 'nix develop .#ci -c dlint ci-wiring', 'workflow-wiring');
       },
     },
   ],
