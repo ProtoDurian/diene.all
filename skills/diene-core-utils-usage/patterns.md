@@ -111,7 +111,7 @@ consumer suites. Then create this lib's TestHelper the bun-family way:
 2. Keep test-framework dependencies out of the helper's runtime code.
 3. Add `tests/meta/**` in the same change: assert-the-asserter, contract parity
    between each fake and its real counterpart, and fixture/builder invariants.
-   `scripts/local/test-meta.sh` refuses a helper without meta tests.
+   With no meta test files the tier passes as empty, so nothing else catches it.
 4. Extend this skill rather than adding a new one.
 
 Until then `pls test:meta` stays an inherited no-op and no `meta` coverage is
