@@ -1,2 +1,4 @@
 api:
   timeoutMs: 30000
+app:
+  name: development

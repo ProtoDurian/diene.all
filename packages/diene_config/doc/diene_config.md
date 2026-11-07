@@ -24,9 +24,9 @@ Configuration is immutable after loading. There is no watch or reload API.
 
 ## Three-layer injection in Dart
 
-Dart has three ways to get values in: YAML text, a flavor or landscape YAML,
-and `--dart-define` values fixed at compile time. The package reads none of
-them by itself:
+Dart has three layers: the base YAML, one flavor or landscape YAML, and
+`--dart-define` values fixed at compile time. The package reads none of them by
+itself:
 
 - YAML comes through `YamlConfigSource(name:, read:)`, where `read` returns the
   text. Flutter passes `rootBundle.loadString`, a command-line app passes
@@ -170,12 +170,14 @@ comma lists, final-only validation) and run each one through the real loader.
 
 ## Parity with the other languages
 
-The same in every language: full base, sparse overlay, development hook,
-injected values last; one validation of the final tree; engine-owned schema
-blocks; indexed lists; no JSON or comma lists; blank is unset.
+The same in every language: full base, sparse overlay, injected values last;
+one validation of the final tree; engine-owned schema blocks; indexed lists; no
+JSON or comma lists; blank is unset.
 
 Different in Dart:
 
+- Dart adds an optional development override, applied after the overlay and
+  before the defines.
 - Defines are enumerated by the app, because Dart cannot list compile-time
   values at run time.
 - There is no standard-config package for Dart, and this package does not stand

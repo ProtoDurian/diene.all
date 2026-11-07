@@ -96,7 +96,7 @@ void main() {
         expect(
           config.slice(appBlock),
           const AppSettings(
-            name: 'lapras',
+            name: 'development',
             retries: 4,
             tags: <String>['landscape'],
           ),

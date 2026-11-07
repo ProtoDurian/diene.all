@@ -41,8 +41,8 @@
       "sha256": "6526efe628a0f9bd105a4e4ae46939efbf8da7dec7b2514b09ad9b26684f9676",
       "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/config.json | jq -cS .cases.layeringAndIndexedList | sha256sum",
       "adaptations": [
-        "landscapeYaml is the overlay and developmentYaml the development override. This package applies the development override after the overlay, while the case lists development before landscape; the expected tree is the same either way, because the defines replace the only keys the development layer sets.",
-        "The test also checks base plus development alone, and all three YAML layers without defines (development wins name and tags, the overlay keeps retries)."
+        "landscapeYaml is the overlay and developmentYaml the development override. The case does not place the development layer (its keys are sorted, not ordered). This package applies it after the overlay and before the defines. The expected tree does not depend on that position, because the defines replace the only keys the development layer sets.",
+        "The test also checks base plus landscape plus defines with no development layer against expected, base plus development alone, and all three YAML layers without defines (development wins name and tags, the overlay keeps retries)."
       ],
       "fileSha256": "07530b482edea4c8199d3fb5c413493403d0c1d54566c2bbde34a06e47739efa"
     },
@@ -60,5 +60,21 @@
     "contracts/c0/cases/identity.json": "No case there is about configuration.",
     "contracts/c0/cases/problem.json": "It has no config problem types; type URIs and Problem envelopes are minted by diene_problems, and this package only passes its ids.",
     "contracts/c0/cases/result-wire.json": "The Result wire form belongs to diene_result."
+  },
+  "release": {
+    "path": "contracts/c0/RELEASE.json",
+    "commit": "fe77520d591f81a9762c40ebf68dc9c0106502d3",
+    "fileSha256": "d38f6e681b61f37e7ca610ae64f52f38e2cfc34a71fa5c85c877e74ec1ec7aea",
+    "releaseId": "c0-fixtures-r2",
+    "contractVersion": 2,
+    "releaseDigest": "0e64439c681a22fb4f02285c082ed8ffb7b465e732fde4e49757e9e3c9a5783e",
+    "reproduce": [
+      "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/RELEASE.json | sha256sum",
+      "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/RELEASE.json | jq -c \"{releaseId, contractVersion, releaseDigest}\""
+    ],
+    "notes": [
+      "Pinned by value, not vendored: the file names internal document paths.",
+      "The upstream case file labels its section with a section sign and a number. The package value c0ConfigContract.provenance.c0Sections is reworded on purpose to the plain words Config precedence."
+    ]
   }
 }

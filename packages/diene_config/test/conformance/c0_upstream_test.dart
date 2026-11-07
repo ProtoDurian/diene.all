@@ -129,6 +129,9 @@ Future<void> _checkCaseInsensitiveKeys(Map<String, Object?> vector) async {
 }
 
 Future<void> _checkLayering(Map<String, Object?> vector) async {
+  final Map<String, Object?> withoutDevelopment = _appOf(
+    await _load(vector, overlayKey: 'landscapeYaml'),
+  );
   final Map<String, Object?> development = _appOf(
     await _load(
       vector,
@@ -165,6 +168,7 @@ Future<void> _checkLayering(Map<String, Object?> vector) async {
     'tags': <Object?>['development'],
   });
   expect(_defines(vector).keys, contains('ACME_APP__TAGS__1'));
+  expect(withoutDevelopment, vector['expected']);
   expect(merged, vector['expected']);
 }
 
@@ -224,6 +228,8 @@ void main() {
   test('manifest pins the source release and every checked case', () {
     // Arrange
     final Map<String, Object?> source = _object(manifest['source']);
+    final Map<String, Object?> release = _object(manifest['release']);
+    final C0ConfigProvenance provenance = c0ConfigContract.provenance;
 
     // Act
     final Set<String> cases = <String>{
@@ -237,6 +243,17 @@ void main() {
     expect(source['path'], c0ConfigContract.provenance.sourceCase);
     expect(vectors.keys.toSet(), _checks.keys.toSet());
     expect(cases, c0ConfigContract.projectedCases.toSet());
+    expect(release['path'], 'contracts/c0/RELEASE.json');
+    expect(release['commit'], source['commit']);
+    expect(release['fileSha256'], hasLength(64));
+    expect(release['releaseId'], provenance.releaseId);
+    expect(release['contractVersion'], provenance.contractVersion);
+    expect(release['releaseDigest'], provenance.releaseDigest);
+    expect(_object(manifest['notVendored']).keys.toSet(), <String>{
+      'contracts/c0/cases/identity.json',
+      'contracts/c0/cases/problem.json',
+      'contracts/c0/cases/result-wire.json',
+    });
     for (final Object? pin in vectors.values) {
       expect(_object(pin)['reproduce'], contains('jq -cS'));
       expect(_object(pin)['adaptations'], isNotEmpty);

@@ -5,8 +5,8 @@ from conventional commits by the repository release workflow.
 
 ## Unreleased (0.0.0)
 
-No public symbol, signature or behaviour change from 1.0.0. One constant value
-changes:
+No public symbol or signature change from 1.0.0. One public constant changes
+value:
 
 - `c0ConfigContract.provenance.c0Sections` is now `['Config precedence']` (was
   a section reference into an internal document). No digest covers it.
