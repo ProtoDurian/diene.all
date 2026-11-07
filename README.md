@@ -45,8 +45,9 @@ Go variants accompany the shared standards for
 [SOLID](docs/standards/solid-principles/languages/go.md),
 [stateless OOP/DI](docs/standards/stateless-oop-di/languages/go.md),
 [testing](docs/standards/testing/languages/go.md),
-[utilities](docs/standards/utilities/languages/go.md), and
-[validation](docs/standards/validation/languages/go.md).
+[utilities](docs/standards/utilities/languages/go.md),
+[validation](docs/standards/validation/languages/go.md), and
+[wire format](docs/standards/wire-format/languages/go.md).
 
 # Go library template
 
