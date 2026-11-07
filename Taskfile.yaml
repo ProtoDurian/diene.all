@@ -1,6 +1,14 @@
 version: '3'
 
+vars:
+  ARTIFACT_PREFIX:
+    sh: jq -r '.bin | to_entries[0].key' package.json
+  ARTIFACT: '{{.ARTIFACT_PREFIX}}-{{OS}}-{{if eq ARCH "arm64"}}arm64{{else}}x64-baseline{{end}}'
+  ENTRY:
+    sh: jq -r '.bin | to_entries[0].value' package.json
+
 includes:
+  compile: tasks/Taskfile.compile.yaml
   docker: tasks/Taskfile.docker.yaml
   test: tasks/Taskfile.test.yaml
 
@@ -30,17 +38,19 @@ tasks:
       - ./scripts/local/deadcode.sh
 
   test:
-    desc: Run unit, integration, and meta suites without coverage
+    desc: Run unit, integration, meta, and SIT suites without coverage
     cmds:
       - task: test:unit
       - task: test:int
       - task: test:meta
+      - task: test:sit
 
   test:coverage:
     desc: Run every coverage-capable suite with coverage
     cmds:
       - ./scripts/local/test.sh unit --coverage
       - ./scripts/local/test.sh int --coverage
+      - task: test:sit:coverage
 
   test:unit:coverage:
     desc: Run the unit suite with coverage
@@ -52,18 +62,35 @@ tasks:
     cmds:
       - ./scripts/local/test.sh int --coverage
 
+  test:sit:coverage:
+    desc: Run SIT journeys in-process and emit the full-system ledger
+    cmds:
+      - rm -rf reports/e2e
+      - SIT_DRIVER=inprocess ./scripts/local/test.sh sit --coverage
+      - test -f reports/e2e/lcov.info
+
   test:watch:
     desc: Watch the fast unit suite
     cmds:
       - ./scripts/local/test.sh unit --watch
 
   run:
-    desc: Run the Bun source entry point
+    desc: Run the CLI source entry point
     cmds:
-      - bun run ./src/index.ts -- {{.CLI_ARGS}}
+      - bun run {{.ENTRY}} -- {{.CLI_ARGS}}
 
   preview:
-    desc: Build and run the bundled Bun artifact
-    deps: [build]
+    desc: Run this host's compiled standalone binary
+    deps: [compile]
     cmds:
-      - bun run ./dist/index.js -- {{.CLI_ARGS}}
+      - ./dist/bin/{{.ARTIFACT}} {{.CLI_ARGS}}
+
+  up:
+    desc: Start the sample Redis dependency in the background
+    cmds:
+      - docker run -d --rm --name {{.ARTIFACT_PREFIX}}-redis -p 6379:6379 redis:7.4.5-alpine
+
+  down:
+    desc: Stop the sample Redis dependency
+    cmds:
+      - docker rm -f {{.ARTIFACT_PREFIX}}-redis

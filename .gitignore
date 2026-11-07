@@ -33,3 +33,7 @@ desktop.ini
 *~
 .kagent/
 .kloop/
+
+### bun-cli
+IncrementalChangelog.md
+prebuilt/

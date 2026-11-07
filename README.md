@@ -12,6 +12,16 @@ boundary. TypeScript variants accompany the shared standards for
 [utilities](docs/standards/utilities/languages/typescript.md), and
 [validation](docs/standards/validation/languages/typescript.md).
 
+## Compiled CLI
+
+This branch turns the Bun foundation into a DI-shaped standalone CLI. The
+single entry point is derived from `package.json`'s `bin` map; `task compile`
+emits Linux x64-baseline, Linux arm64, and Darwin arm64 binaries. Use
+`task run -- <args>` for source execution, `task preview -- <args>` for the
+host binary, and `task test:sit` for black-box journeys through a fresh binary.
+
+Release and installation channels are documented in [INSTALLATION.md](INSTALLATION.md).
+
 # Commands
 
 Run `task --list` for every available task and its description. The task set is

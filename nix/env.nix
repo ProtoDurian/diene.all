@@ -6,6 +6,11 @@ with packages;
     go-task
     infisical
     releaser
+    dpkg
+    gh
+    go
+    goreleaser
+    rpm
   ];
 
   lint = [
@@ -30,6 +35,12 @@ with packages;
   ];
 
   releaser = [
+    dpkg
+    gh
+    git
+    go
+    goreleaser
+    rpm
     releaser
   ];
 

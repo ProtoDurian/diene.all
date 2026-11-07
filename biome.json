@@ -31,7 +31,7 @@
   ],
   "linter": {
     "enabled": true,
-    "includes": ["src/**/*.ts", "tests/**/*.ts"],
+    "includes": ["bin/**/*.ts", "src/**/*.ts", "tests/**/*.ts"],
     "rules": {
       "recommended": true
     }
