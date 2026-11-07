@@ -15,6 +15,46 @@ index 0f315ced..b26ec1d5 100644
 +        patterns:
 +          - '*'
 +    open-pull-requests-limit: 2
+diff --git a/.github/workflows/cd.yaml b/.github/workflows/cd.yaml
+index 6ea70e5b..9bbe671d 100644
+--- a/.github/workflows/cd.yaml
++++ b/.github/workflows/cd.yaml
+@@ -3,7 +3,20 @@ name: CD
+ on:
+   push:
+     tags:
+-      - 'v*.*.*'
++      - 'v[0-9]+.[0-9]+.[0-9]+'
++  workflow_dispatch:
++    inputs:
++      tag:
++        description: Release tag to publish (v*.*.*)
++        required: true
++        type: string
++
++concurrency:
++  group: cd-${{ github.ref }}
++  cancel-in-progress: false
++
++permissions:
++  contents: read
+ 
+ jobs:
+   release:
+@@ -13,4 +26,12 @@ jobs:
+     uses: ./.github/workflows/⚡reusable-release-note.yaml
+     secrets: inherit
+     with:
+-      version: ${{ github.ref_name }}
++      version: ${{ inputs.tag || github.ref_name }}
++  publish:
++    name: Publish to pub.dev
++    permissions:
++      contents: read
++    uses: ./.github/workflows/⚡reusable-publish.yaml
++    secrets: inherit
++    with:
++      tag: ${{ inputs.tag || github.ref_name }}
 diff --git a/.github/workflows/ci.yaml b/.github/workflows/ci.yaml
 index f322e7ce..6180262e 100644
 --- a/.github/workflows/ci.yaml
@@ -179,18 +219,6 @@ index 89749938..b4680cd7 100644
 +    desc: Run TestHelper meta tests with the helper-only coverage ledger
 +    cmds:
 +      - task: meta:coverage
-diff --git a/dlint.yaml b/dlint.yaml
-index 08e14b5e..a8d97fea 100644
---- a/dlint.yaml
-+++ b/dlint.yaml
-@@ -11,6 +11,7 @@ checks:
-     entrypointPattern: scripts/ci/[A-Za-z0-9._-]+[.]sh
-     orchestrators:
-       - .github/workflows/ci.yaml
-+      - .github/workflows/cd.yaml
-       - .github/workflows/release.yaml
-   toolchain-smoke:
-     shell: default
 diff --git a/nix/env.nix b/nix/env.nix
 index 8a80a204..381cda4b 100644
 --- a/nix/env.nix

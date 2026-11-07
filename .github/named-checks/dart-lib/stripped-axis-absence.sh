@@ -36,7 +36,6 @@ H_PATHS=(
   probes/hook-helm-lint.ts
   .helmignore
 )
-# The parent's D/H tokens minus workflows/cd.yaml, which dart-lib re-adds for publish.
 DH_TOKENS=(
   infra/Dockerfile .dockerignore reusable-docker Taskfile.docker docker.sh
   docker-push standards/docker docker/index.md docker-build
@@ -109,7 +108,8 @@ for wf in .github/workflows/ci.yaml .github/workflows/cd.yaml; do
   [[ "$(show "${wf}" | yq '[.jobs[] | select(.uses // "" | test("docker|helm"))] | length')" == 0 ]] || fail "${wf} calls a docker/helm workflow"
   [[ "$(show "${wf}" | yq '[.jobs | keys | .[] | select(test("docker|helm"))] | length')" == 0 ]] || fail "${wf} has a docker/helm job"
 done
-[[ "$(show .github/workflows/cd.yaml | yq '.jobs | keys | join(",")')" == publish ]] || fail "cd.yaml carries a job other than publish"
+[[ "$(show .github/workflows/cd.yaml | yq '.jobs | keys | sort | join(",")')" == publish,release ]] || fail "cd.yaml jobs are not exactly release + publish"
+[[ "$(show .github/workflows/cd.yaml | yq '[.jobs.release.uses, .jobs.publish.uses] | join(",")')" == "./.github/workflows/⚡reusable-release-note.yaml,./.github/workflows/⚡reusable-publish.yaml" ]] || fail "cd.yaml release/publish jobs do not call the release-note/publish workflows"
 [[ "$(show Taskfile.yaml | yq '.includes // {} | (has("docker") or has("helm"))')" == false ]] || fail "Taskfile.yaml includes docker/helm"
 [[ "$(show .github/dependabot.yml | yq '[.updates[] | select(.package-ecosystem == "docker" or .package-ecosystem == "helm")] | length')" == 0 ]] || fail "dependabot.yml has a docker/helm entry"
 [[ "$(show probes/features.json | jq '[.[] | select(.name | test("docker|helm"))] | length')" == 0 ]] || fail "features.json has a docker/helm row"
@@ -137,4 +137,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ stripped-axis-absence: no D/H path, reference or entry (cd.yaml is publish-only); no Flutter/Android/Gradle/CocoaPods/Xcode surface across ${#pubspecs[@]} pubspecs and ${#dart_files[@]} Dart files"
+echo "✅ stripped-axis-absence: no D/H path, reference or entry (cd.yaml is release + publish); no Flutter/Android/Gradle/CocoaPods/Xcode surface across ${#pubspecs[@]} pubspecs and ${#dart_files[@]} Dart files"

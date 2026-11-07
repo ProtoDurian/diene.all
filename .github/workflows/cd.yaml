@@ -19,6 +19,14 @@ permissions:
   contents: read
 
 jobs:
+  release:
+    name: Release
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-release-note.yaml
+    secrets: inherit
+    with:
+      version: ${{ inputs.tag || github.ref_name }}
   publish:
     name: Publish to pub.dev
     permissions:
