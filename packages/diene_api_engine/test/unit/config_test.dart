@@ -30,6 +30,7 @@ Map<String, Object?> _validSlice({
 void main() {
   group('ApiEngineConfig.fromMap', () {
     test('parses a valid slice', () {
+      // Arrange
       // Act
       final ApiEngineConfig config = ApiEngineConfig.fromMap(_validSlice());
 
@@ -45,27 +46,43 @@ void main() {
     });
 
     test('fails fast on zero backends', () {
+      // Arrange
       final Map<String, Object?> slice = _validSlice()
         ..['backends'] = <Object?>[];
+
+      // Act
+      // Assert
       expect(() => ApiEngineConfig.fromMap(slice), throwsFormatException);
     });
 
     test('fails fast on duplicate backend coordinates', () {
+      // Arrange
       final Map<String, Object?> slice = _validSlice(
         modules: <String>['core', 'core'],
       );
+
+      // Act
+      // Assert
       expect(() => ApiEngineConfig.fromMap(slice), throwsFormatException);
     });
 
     test('fails fast on a missing rescue block', () {
+      // Arrange
       final Map<String, Object?> slice = _validSlice()..remove('rescue');
+
+      // Act
+      // Assert
       expect(() => ApiEngineConfig.fromMap(slice), throwsFormatException);
     });
   });
 
   group('engine-owned schema', () {
     test('describes the block and is stable under schemaEquals', () {
+      // Arrange
+      // Act
       final Map<String, Object?> schema = ApiEngineConfig.schema;
+
+      // Assert
       expect(schema[r'$id'], 'urn:diene:config-block:api-engine');
       expect(
         (schema['required'] as List<Object?>),

@@ -1,16 +1,3 @@
-/// The GENERATED OA3 model codecs.
-///
-/// These were the largest hole in the unit ledger — `problem_details.g.dart` at
-/// 0/14 lines and `user_profile.g.dart` at 4/9 — because nothing in the suite
-/// ever decoded or encoded them. Generated code is still SHIPPED code: it is
-/// exported through `lib/src/generated/export.dart`, so a consumer can decode a
-/// `UserProfile` off the wire, and an untested codec is an untested public
-/// surface.
-///
-/// The alternative was a `coverage:ignore-file` marker, which the sibling
-/// `export.dart` already carries. That was deliberately NOT taken: masking a
-/// ledger is forbidden here, and an excluded codec cannot tell you when the
-/// generator's output stops round-tripping after a `swagger_parser` bump.
 library;
 
 import 'package:diene_api_engine/src/generated/export.dart';
@@ -18,15 +5,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('UserProfile codec', () {
-    test('decodes a full payload and round-trips byte-equal', () {
+    test('decodes a full user profile and round-trips byte-equal', () {
+      // Arrange
       const Map<String, Object?> wire = <String, Object?>{
         'id': 'usr_42',
         'email': 'a@example.test',
         'displayName': 'Ada',
       };
 
+      // Act
       final UserProfile decoded = UserProfile.fromJson(wire);
 
+      // Assert
       expect(decoded.id, 'usr_42');
       expect(decoded.email, 'a@example.test');
       expect(decoded.displayName, 'Ada');
@@ -34,15 +24,16 @@ void main() {
     });
 
     test('the optional displayName decodes as null and survives encoding', () {
-      // The nullable branch is a separate line in the generated codec; without
-      // this case the generator's null handling is unexercised.
+      // Arrange
       const Map<String, Object?> wire = <String, Object?>{
         'id': 'usr_43',
         'email': 'b@example.test',
       };
 
+      // Act
       final UserProfile decoded = UserProfile.fromJson(wire);
 
+      // Assert
       expect(decoded.displayName, isNull);
       expect(decoded.toJson(), <String, Object?>{
         'id': 'usr_43',
@@ -53,7 +44,8 @@ void main() {
   });
 
   group('ProblemDetails codec', () {
-    test('decodes a full payload and round-trips byte-equal', () {
+    test('decodes full problem details and round-trips byte-equal', () {
+      // Arrange
       const Map<String, Object?> wire = <String, Object?>{
         'type': 'https://docs.example.test/docs/l/p/s/m/v1/entity_not_found',
         'title': 'Entity not found',
@@ -62,8 +54,10 @@ void main() {
         'instance': '/user/42',
       };
 
+      // Act
       final ProblemDetails decoded = ProblemDetails.fromJson(wire);
 
+      // Assert
       expect(decoded.type, wire['type']);
       expect(decoded.title, 'Entity not found');
       expect(decoded.status, 404);
@@ -73,41 +67,45 @@ void main() {
     });
 
     test('both optional fields decode as null', () {
+      // Arrange
       const Map<String, Object?> wire = <String, Object?>{
         'type': 'urn:example:problem',
         'title': 'Bad request',
         'status': 400,
       };
 
+      // Act
       final ProblemDetails decoded = ProblemDetails.fromJson(wire);
 
+      // Assert
       expect(decoded.detail, isNull);
       expect(decoded.instance, isNull);
     });
 
     test('a numeric status arriving as a double is coerced to int', () {
-      // The generator emits `(json['status'] as num).toInt()`, so a JSON number
-      // that parses as a double must not throw. This is exactly the kind of
-      // generated-code behaviour an excluded file would never prove.
+      // Arrange
+      // Act
       final ProblemDetails decoded = ProblemDetails.fromJson(<String, Object?>{
         'type': 'urn:example:problem',
         'title': 'Server error',
         'status': 500.0,
       });
 
+      // Assert
       expect(decoded.status, 500);
       expect(decoded.status, isA<int>());
     });
 
     test('the const constructor builds an equivalent object', () {
-      // The hand-written half of the generated pair — the constructor and the
-      // fields — is public surface too.
+      // Arrange
+      // Act
       const ProblemDetails built = ProblemDetails(
         type: 'urn:example:problem',
         title: 'Conflict',
         status: 409,
       );
 
+      // Assert
       expect(built.toJson(), <String, Object?>{
         'type': 'urn:example:problem',
         'title': 'Conflict',

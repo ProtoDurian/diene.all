@@ -1,26 +1,9 @@
-/// Containment of a transport that violates the never-throw contract, and WHERE
-/// that containment lives.
-///
-/// `HttpTransport` documents that it never throws — a hard failure is returned as
-/// `NetworkFailure`. It is a PUBLIC seam of this package, so a third-party
-/// implementation that violates the contract is a real possibility, and the
-/// router must degrade rather than crash a caller mid-request.
-///
-/// CONTAINMENT IS AT ONE POINT PER PATH:
-///   * document fetches  -> `_sendOrNull`, scoped per host
-///   * candidate probes   -> `_probeWithinBudget`'s `onError` arm
-///
-/// `probeHealthy` deliberately does NOT catch. An earlier revision caught there
-/// too, and that second containment point made the `onError` arm unreachable — a
-/// handler that could never run. So this file asserts BOTH that a probe's future
-/// rejects AND that the rejection is contained one level up.
 library;
 
 import 'package:diene_api_engine/diene_api_engine.dart';
 import 'package:diene_api_engine/test_helper.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Violates the contract on every call.
 class _ThrowingTransport implements HttpTransport {
   int calls = 0;
 
@@ -31,8 +14,6 @@ class _ThrowingTransport implements HttpTransport {
   }
 }
 
-/// Violates the contract on the PROBE only, so the document fetches succeed and
-/// the scan actually reaches the probe stage.
 class _ProbeThrowingTransport implements HttpTransport {
   int heads = 0;
 
@@ -61,7 +42,6 @@ class _ProbeThrowingTransport implements HttpTransport {
   }
 }
 
-/// Throws for one host only, so a later host can still answer.
 class _PartiallyThrowingTransport implements HttpTransport {
   _PartiallyThrowingTransport(this._throwOnHost, this._responder);
 
@@ -104,8 +84,9 @@ RescueRouter _router(HttpTransport transport, {List<String>? hosts}) =>
 void main() {
   group('containment lives at ONE point per path', () {
     test('probeHealthy REJECTS — it does not contain, by design', () async {
-      // If this ever starts resolving instead of throwing, someone has added a
-      // second containment point and made the onError arm dead again.
+      // Arrange
+      // Act
+      // Assert
       await expectLater(
         _router(
           _ThrowingTransport(),
@@ -117,23 +98,27 @@ void main() {
     test(
       'a throwing PROBE is contained by the onError arm, not propagated',
       () async {
-        // The scan reaches the probe stage (documents fetch fine), every probe
-        // throws, and the caller still gets an outcome rather than an error.
+        // Arrange
         final _ProbeThrowingTransport transport = _ProbeThrowingTransport();
 
+        // Act
         final RescueOutcome outcome = await _router(transport).rescue(_core);
 
+        // Assert
         expect(outcome, isA<RescueUnavailable>());
-        // Non-vacuous: the probe stage was actually exercised.
+
         expect(transport.heads, greaterThan(0));
       },
     );
 
     test('a throwing FETCH is contained by _sendOrNull', () async {
+      // Arrange
       final _ThrowingTransport transport = _ThrowingTransport();
 
+      // Act
       final RescueOutcome outcome = await _router(transport).rescue(_core);
 
+      // Assert
       expect(outcome, isA<RescueUnavailable>());
       expect((outcome as RescueUnavailable).reason, isNotEmpty);
       expect(transport.calls, greaterThan(0));
@@ -142,10 +127,13 @@ void main() {
     test(
       'a WELL-BEHAVED transport still works, so nothing was broken to fix it',
       () async {
+        // Arrange
+        // Act
         final RescueOutcome outcome = await _router(
           FakeHttpTransport((HttpRequest _) => networkFailure('down')),
         ).rescue(_core);
 
+        // Assert
         expect(outcome, isA<RescueUnavailable>());
       },
     );
@@ -155,6 +143,7 @@ void main() {
     test(
       'one throwing mirror does not abort a scan another seed can satisfy',
       () async {
+        // Arrange
         final _PartiallyThrowingTransport transport =
             _PartiallyThrowingTransport('broken.example.com', (HttpRequest r) {
               if (r.url.path == '/fleet.json') {
@@ -168,6 +157,7 @@ void main() {
               return Received(const HttpResponse(status: 404, body: ''));
             });
 
+        // Act
         final RescueOutcome outcome = await _router(
           transport,
           hosts: <String>[
@@ -176,8 +166,9 @@ void main() {
           ],
         ).rescue(_core);
 
+        // Assert
         expect(outcome, isA<RescueUnavailable>());
-        // Decisive: the scan reached the SECOND host after the first threw.
+
         expect(
           transport.sent.map((Uri u) => u.host),
           containsAllInOrder(<String>[

@@ -1,11 +1,3 @@
-/// Engine paths the inherited suite never exercised.
-///
-/// `engine.dart` was the largest hole in the unit ledger at 95/122. The
-/// uncovered lines were not dead code — they are real behaviour the goal
-/// contract names: pin-until-primary-heals, the rescue trip and its second
-/// attempt, the Dio adapter's request-body handling, and the default
-/// construction branches of `ApiEngine.fromConfig`. Each is covered here by
-/// asserting the behaviour, never by masking the ledger.
 library;
 
 import 'package:diene_api_engine/diene_api_engine.dart';
@@ -49,8 +41,7 @@ ApiEngineConfig _config(RescueConfig rescue) => ApiEngineConfig(
 void main() {
   group('pin-until-primary-heals', () {
     test('a healthy primary response while pinned CLEARS the pin', () async {
-      // Arrange: a pin is already on disk, and both the primary probe and the
-      // call succeed.
+      // Arrange
       final FakeRescueStore store = FakeRescueStore(<String, String>{
         'pin.${_coord('a').key}': 'https://rescue.example.com',
       });
@@ -72,7 +63,7 @@ void main() {
         rescueOverride: router,
       );
 
-      // Act.
+      // Act
       final Result<Map<String, Object?>> result = await engine
           .backend(_coord('a'))!
           .call<Map<String, Object?>>(
@@ -81,16 +72,13 @@ void main() {
             decode: _id,
           );
 
-      // Assert: the call succeeded AND the pin is gone, which is the whole
-      // point of pin-until-primary-heals. Asserting only the call would leave
-      // the heal path unproven.
+      // Assert
       expect(result.isOk, isTrue);
       expect(await router.pinnedFor(_coord('a')), isNull);
     });
 
     test('a 5xx while pinned does NOT clear the pin', () async {
-      // A received 5xx is not evidence the primary healed, so the pin must
-      // survive. This is the negative half of the same branch.
+      // Arrange
       final FakeRescueStore store = FakeRescueStore(<String, String>{
         'pin.${_coord('a').key}': 'https://rescue.example.com',
       });
@@ -112,6 +100,7 @@ void main() {
         rescueOverride: router,
       );
 
+      // Act
       final Result<Map<String, Object?>> result = await engine
           .backend(_coord('a'))!
           .call<Map<String, Object?>>(
@@ -120,6 +109,7 @@ void main() {
             decode: _id,
           );
 
+      // Assert
       expect(result.isErr, isTrue);
       expect(
         await router.pinnedFor(_coord('a')),
@@ -129,36 +119,39 @@ void main() {
   });
 
   group('rescue trip', () {
-    test('a hard failure with NO router returns the transport reason', () async {
-      // rescue disabled -> fromConfig builds no router, so the failure must be
-      // reported as-is rather than swallowed.
-      final FakeHttpTransport transport = FakeHttpTransport(
-        (HttpRequest _) => networkFailure('connection refused'),
-      );
-      final ApiEngine engine = ApiEngine.fromConfig(
-        _config(_disabledRescue()),
-        transport: transport,
-      );
+    test(
+      'a hard failure with NO router returns the transport reason',
+      () async {
+        // Arrange
+        final FakeHttpTransport transport = FakeHttpTransport(
+          (HttpRequest _) => networkFailure('connection refused'),
+        );
+        final ApiEngine engine = ApiEngine.fromConfig(
+          _config(_disabledRescue()),
+          transport: transport,
+        );
 
-      final Result<Map<String, Object?>> result = await engine
-          .backend(_coord('a'))!
-          .call<Map<String, Object?>>(
-            method: HttpMethod.get,
-            path: '/thing',
-            decode: _id,
-          );
+        // Act
+        final Result<Map<String, Object?>> result = await engine
+            .backend(_coord('a'))!
+            .call<Map<String, Object?>>(
+              method: HttpMethod.get,
+              path: '/thing',
+              decode: _id,
+            );
 
-      final Problem problem = expectErr(result);
-      expect(problem.type, BridgeProblems.transportFailure);
-      expect(problem.data['reason'], contains('connection refused'));
-      expect(engine.rescue, isNull);
-    });
+        // Assert
+        final Problem problem = expectErr(result);
+        expect(problem.type, BridgeProblems.transportFailure);
+        expect(problem.data['reason'], contains('connection refused'));
+        expect(engine.rescue, isNull);
+      },
+    );
 
     test(
       'a router that cannot rescue still reports the ORIGINAL failure',
       () async {
-        // The rescue router is live but has no candidate, so the caller must see
-        // the original transport failure rather than a rescue-shaped one.
+        // Arrange
         final FakeHttpTransport transport = FakeHttpTransport(
           (HttpRequest _) => networkFailure('primary down'),
         );
@@ -176,6 +169,7 @@ void main() {
           rescueOverride: router,
         );
 
+        // Act
         final Result<Map<String, Object?>> result = await engine
             .backend(_coord('a'))!
             .call<Map<String, Object?>>(
@@ -184,6 +178,7 @@ void main() {
               decode: _id,
             );
 
+        // Assert
         expect(expectErr(result).data['reason'], contains('primary down'));
       },
     );
@@ -193,6 +188,7 @@ void main() {
     test(
       'query parameters merge onto a base that already carries some',
       () async {
+        // Arrange
         final FakeHttpTransport transport = FakeHttpTransport(
           (HttpRequest _) => okJson(<String, Object?>{'ok': true}),
         );
@@ -200,8 +196,7 @@ void main() {
           backends: <BackendConfig>[
             BackendConfig(
               coordinate: _coord('a'),
-              // A base URL carrying BOTH a trailing-slash path and an existing
-              // query — the two branches the inherited suite never hit.
+
               baseUrl: Uri.parse(
                 'https://primary.example.com/api/?tenant=acme',
               ),
@@ -214,6 +209,7 @@ void main() {
           transport: transport,
         );
 
+        // Act
         await engine
             .backend(_coord('a'))!
             .call<Map<String, Object?>>(
@@ -223,15 +219,17 @@ void main() {
               decode: _id,
             );
 
+        // Assert
         final Uri sent = transport.sent.single.url;
         expect(sent.queryParameters['tenant'], 'acme');
         expect(sent.queryParameters['page'], '2');
-        // The trailing slash must not produce a doubled separator.
+
         expect(sent.path, '/api/thing');
       },
     );
 
     test('headers and a body are carried onto the request', () async {
+      // Arrange
       final FakeHttpTransport transport = FakeHttpTransport(
         (HttpRequest _) => okJson(<String, Object?>{'ok': true}),
       );
@@ -240,6 +238,7 @@ void main() {
         transport: transport,
       );
 
+      // Act
       await engine
           .backend(_coord('a'))!
           .call<Map<String, Object?>>(
@@ -250,6 +249,7 @@ void main() {
             decode: _id,
           );
 
+      // Assert
       final HttpRequest sent = transport.sent.single;
       expect(sent.headers['x-trace'], 'abc');
       expect(sent.body, '{"a":1}');
@@ -259,18 +259,18 @@ void main() {
 
   group('ApiEngine.fromConfig default construction', () {
     test('with rescue ENABLED and no override it builds its own router', () {
-      // Exercises the default-store + default-router branch rather than the
-      // injected one every other test uses.
+      // Arrange
+      // Act
       final ApiEngine engine = ApiEngine.fromConfig(_config(_liveRescue()));
 
+      // Assert
       expect(engine.rescue, isNotNull);
       expect(engine.rescue!.bakedIssuer, _liveRescue().issuer);
       expect(engine.tree.contains(_coord('a')), isTrue);
     });
 
     test('a duplicate coordinate throws a StateError naming the conflict', () {
-      // The registration-failure branch is a throw, so it can only be covered
-      // by actually provoking it.
+      // Arrange
       final ApiEngineConfig dupes = ApiEngineConfig(
         backends: <BackendConfig>[
           BackendConfig(
@@ -285,6 +285,8 @@ void main() {
         rescue: _disabledRescue(),
       );
 
+      // Act
+      // Assert
       expect(
         () => ApiEngine.fromConfig(dupes),
         throwsA(
@@ -300,8 +302,11 @@ void main() {
 
   group('client tree', () {
     test('resolve returns null for an unregistered coordinate', () {
+      // Arrange
       final ApiEngine engine = ApiEngine.fromConfig(_config(_disabledRescue()));
 
+      // Act
+      // Assert
       expect(engine.backend(_coord('nope')), isNull);
       expect(engine.tree.resolve(_coord('nope')), isNull);
       expect(engine.tree.contains(_coord('nope')), isFalse);

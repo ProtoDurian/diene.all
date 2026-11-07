@@ -4,9 +4,6 @@ import 'dart:io' as io;
 import 'package:diene_api_engine/diene_api_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Exercises the pure-Dart [IoHttpTransport] against a real loopback server:
-/// every verb arm, request-body write, header pass-through, and the
-/// connection-failure → [NetworkFailure] path.
 void main() {
   late io.HttpServer server;
   late Uri base;
@@ -42,9 +39,11 @@ void main() {
   });
 
   test('sends every verb, writes the body, and passes headers', () async {
+    // Arrange
     final IoHttpTransport transport = IoHttpTransport();
     addTearDown(transport.close);
 
+    // Act
     for (final HttpMethod method in HttpMethod.values) {
       final TransportOutcome outcome = await transport.send(
         HttpRequest(
@@ -56,6 +55,8 @@ void main() {
               : 'payload-${method.name}',
         ),
       );
+
+      // Assert
       expect(outcome, isA<Received>());
       final Received received = outcome as Received;
       expect(received.response.status, 200);
@@ -72,16 +73,21 @@ void main() {
   });
 
   test('a refused connection is a NetworkFailure', () async {
+    // Arrange
     final IoHttpTransport transport = IoHttpTransport(
       timeout: const Duration(seconds: 2),
     );
     addTearDown(transport.close);
+
+    // Act
     final TransportOutcome outcome = await transport.send(
       HttpRequest(
         method: HttpMethod.get,
         url: Uri.parse('http://127.0.0.1:$deadPort/x'),
       ),
     );
+
+    // Assert
     expect(outcome, isA<NetworkFailure>());
   });
 }

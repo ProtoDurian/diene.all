@@ -18,7 +18,6 @@ LpsmCoordinate _coordOf({
 
 final LpsmCoordinate _coord = _coordOf();
 
-// Scoped Doc-C cache keys (platform × landscape) — must match router.dart.
 String _dc(LpsmCoordinate c) => 'docc.${c.platform}.${c.landscape}';
 String _dcv(LpsmCoordinate c) => 'docc.version.${c.platform}.${c.landscape}';
 
@@ -62,19 +61,27 @@ RescueRouter _router(
 
 void main() {
   test('issuer is the baked config issuer, never doc-sourced', () {
+    // Arrange
     final RescueRouter router = _router(
       FakeRescueStore(),
       FakeHttpTransport.byHost(const {}),
     );
+
+    // Act
+    // Assert
     expect(router.bakedIssuer, Uri.parse('https://auth.atomi.cloud'));
   });
 
   group('allowlist enforcement', () {
     test('accepts baked suffix, rejects foreign host', () {
+      // Arrange
       final RescueRouter router = _router(
         FakeRescueStore(),
         FakeHttpTransport.byHost(const {}),
       );
+
+      // Act
+      // Assert
       expect(
         router.isAllowed(Uri.parse('https://a.cluster.atomi.cloud')),
         isTrue,
@@ -83,6 +90,7 @@ void main() {
     });
 
     test('a non-allowlisted Doc-C candidate is filtered out', () async {
+      // Arrange
       final DocC docC = DocC(
         version: 3,
         candidates: <String, List<String>>{
@@ -99,12 +107,16 @@ void main() {
           'evil.example.com': okJson(<String, Object?>{}),
         }),
       );
+
+      // Act
+      // Assert
       expect(await router.rescue(_coord), isA<RescueUnavailable>());
     });
 
     test(
-      'P1#1: a poisoned Doc A cannot redirect the Doc-C fetch off baked roots',
+      'a poisoned Doc A cannot redirect the Doc-C fetch off baked roots',
       () async {
+        // Arrange
         final FakeHttpTransport transport = FakeHttpTransport.byHost(
           <String, TransportOutcome>{
             'fleet.catalogs.atomi.cloud': okJson(<String, Object?>{
@@ -126,8 +138,10 @@ void main() {
           transport,
         );
 
+        // Act
         final RescueOutcome outcome = await router.rescue(_coord);
 
+        // Assert
         expect(outcome, isA<RescueUnavailable>());
         expect(
           transport.sent.any(
@@ -140,17 +154,22 @@ void main() {
   });
 
   test('disabled router stays dormant', () async {
+    // Arrange
     final RescueRouter router = _router(
       FakeRescueStore(),
       FakeHttpTransport.byHost(const {}),
       config: _cfg(enabled: false),
     );
+
+    // Act
+    // Assert
     expect(await router.rescue(_coord), isA<RescueUnavailable>());
   });
 
   test(
     'monotonic versions: an older fetched Doc C never replaces the cache',
     () async {
+      // Arrange
       final DocC cached = DocC(
         version: 10,
         candidates: <String, List<String>>{
@@ -180,14 +199,18 @@ void main() {
         }),
       );
 
+      // Act
       final RescueOutcome outcome = await router.rescue(_coord);
+
+      // Assert
       expect(outcome, isA<Rescued>());
       expect((outcome as Rescued).baseUrl.host, 'c10.cluster.atomi.cloud');
     },
   );
 
-  test('P1#4: Doc-C cache is scoped per platform — a 2nd platform never reuses '
+  test('Doc-C cache is scoped per platform — a 2nd platform never reuses '
       "the 1st platform's catalog, even at the same Doc A version", () async {
+    // Arrange
     final LpsmCoordinate a = _coordOf(platform: 'plata');
     final LpsmCoordinate b = _coordOf(platform: 'platb');
 
@@ -195,10 +218,10 @@ void main() {
       switch (req.url.host) {
         case 'a.cluster.atomi.cloud':
         case 'b.cluster.atomi.cloud':
-          return okJson(<String, Object?>{}); // healthy probe
+          return okJson(<String, Object?>{});
         case 'fleet.catalogs.atomi.cloud':
           return okJson(<String, Object?>{
-            'version': 5, // fleet Doc A stays at v5 across both rescues
+            'version': 5,
             'catalogHosts': <String>['cat.catalogs.atomi.cloud'],
           });
         case 'cat.catalogs.atomi.cloud':
@@ -230,14 +253,15 @@ void main() {
     final FakeRescueStore store = FakeRescueStore();
     final RescueRouter router = _router(store, transport);
 
-    // Platform A rescues first and caches its own catalog (advancing Doc A → 5).
+    // Act
     final RescueOutcome oa = await router.rescue(a);
-    // Platform B rescues while Doc A is unchanged at v5.
+
     final RescueOutcome ob = await router.rescue(b);
 
+    // Assert
     expect((oa as Rescued).baseUrl.host, 'a.cluster.atomi.cloud');
     expect((ob as Rescued).baseUrl.host, 'b.cluster.atomi.cloud');
-    // Each platform cached under its OWN scope key; no cross-reuse.
+
     expect(await store.read(_dc(a)), isNotNull);
     expect(await store.read(_dc(b)), isNotNull);
     expect(await store.read(_dc(a)), isNot(await store.read(_dc(b))));
@@ -246,6 +270,7 @@ void main() {
   test(
     'last-known-good is kept forever and used when no candidate is healthy',
     () async {
+      // Arrange
       final DocC docC = DocC(
         version: 4,
         candidates: <String, List<String>>{
@@ -264,7 +289,10 @@ void main() {
         }),
       );
 
+      // Act
       final RescueOutcome outcome = await router.rescue(_coord);
+
+      // Assert
       expect(outcome, isA<Rescued>());
       final Rescued rescued = outcome as Rescued;
       expect(rescued.fromLastKnownGood, isTrue);
@@ -275,6 +303,7 @@ void main() {
   test(
     'same-landscape only: a foreign-landscape key is never consulted',
     () async {
+      // Arrange
       final LpsmCoordinate foreign = _coordOf(landscape: 'pichu');
       final DocC docC = DocC(
         version: 7,
@@ -292,11 +321,15 @@ void main() {
           'pichu.cluster.atomi.cloud': okJson(<String, Object?>{}),
         }),
       );
+
+      // Act
+      // Assert
       expect(await router.rescue(_coord), isA<RescueUnavailable>());
     },
   );
 
   test('pin can be cleared once the primary heals', () async {
+    // Arrange
     final FakeRescueStore store = FakeRescueStore(<String, String>{
       'pin.${_coord.key}': 'https://good.cluster.atomi.cloud',
     });
@@ -306,6 +339,9 @@ void main() {
         'primary.example.com': okJson(<String, Object?>{}),
       }),
     );
+
+    // Act
+    // Assert
     expect(
       await router.probeHealthy(Uri.parse('https://primary.example.com')),
       isTrue,
@@ -314,8 +350,9 @@ void main() {
     expect(await router.pinnedFor(_coord), isNull);
   });
 
-  group('P1#2: jitter + strict budgets', () {
+  group('jitter + strict budgets', () {
     test('production jitter is drawn from [0, maxJitter]', () {
+      // Arrange
       final RescueRouter router = _router(
         FakeRescueStore(),
         FakeHttpTransport.byHost(const {}),
@@ -323,7 +360,10 @@ void main() {
         jitter: null,
         random: Random(1234),
       );
+
+      // Act
       for (var i = 0; i < 50; i++) {
+        // Assert
         expect(router.nextJitter().inMilliseconds, inInclusiveRange(0, 200));
       }
     });
@@ -331,6 +371,7 @@ void main() {
     test(
       'a hanging probe cannot exceed the GLOBAL scan budget (fail-closed)',
       () async {
+        // Arrange
         final DocC docC = DocC(
           version: 1,
           candidates: <String, List<String>>{
@@ -358,8 +399,10 @@ void main() {
           jitter: noJitter,
         );
 
+        // Act
         final RescueOutcome outcome = await router.rescue(_coord);
 
+        // Assert
         expect(outcome, isA<RescueUnavailable>());
         expect(clock.nowMs(), lessThanOrEqualTo(8000));
         expect(transport.sent.length, lessThan(5));
@@ -367,6 +410,7 @@ void main() {
     );
 
     test('perCandidateTimeout bounds a single hanging probe', () async {
+      // Arrange
       final DocC docC = DocC(
         version: 1,
         candidates: <String, List<String>>{
@@ -391,7 +435,10 @@ void main() {
         jitter: noJitter,
       );
 
+      // Act
       await router.rescue(_coord);
+
+      // Assert
       expect(clock.nowMs(), 3000);
     });
   });

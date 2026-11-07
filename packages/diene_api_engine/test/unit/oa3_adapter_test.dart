@@ -43,6 +43,7 @@ void main() {
     test(
       '200 → Ok(typed) with the backend base URL + per-resource token',
       () async {
+        // Arrange
         final FakeHttpTransport transport = FakeHttpTransport.byHost(
           <String, TransportOutcome>{
             'svc.example.com': okJson(<String, Object?>{
@@ -59,20 +60,22 @@ void main() {
         );
         final ServiceSdk sdk = engine.backend(_coord)!.sdk(ServiceSdk.new);
 
+        // Act
         final Result<UserProfile> result = await const ResultSdk().call(
           () => sdk.users.getUser(id: '1'),
         );
 
+        // Assert
         final UserProfile user = expectOk(result);
         expect(user.id, '1');
-        // The generated call went through the backend's base URL and carried its
-        // per-resource token (production wiring, not an isolated adapter).
+
         expect(transport.sent.single.url.host, 'svc.example.com');
         expect(transport.sent.single.headers['Authorization'], 'Bearer tok');
       },
     );
 
     test('404 problem body → Err(that Problem)', () async {
+      // Arrange
       final FakeHttpTransport transport =
           FakeHttpTransport.byHost(<String, TransportOutcome>{
             'svc.example.com': problemResponse(
@@ -86,14 +89,17 @@ void main() {
         transport,
       ).backend(_coord)!.sdk(ServiceSdk.new);
 
+      // Act
       final Result<UserProfile> result = await const ResultSdk().call(
         () => sdk.users.getUser(id: '404'),
       );
 
+      // Assert
       expect(expectErr(result).type, 'urn:diene:problem:entity-not-found');
     });
 
     test('retry-once then success → Ok (backend retry-once profile)', () async {
+      // Arrange
       final FakeHttpTransport transport = FakeHttpTransport.sequence(
         <TransportOutcome>[
           networkFailure('reset'),
@@ -104,10 +110,12 @@ void main() {
         transport,
       ).backend(_coord)!.sdk(ServiceSdk.new);
 
+      // Act
       final Result<UserProfile> result = await const ResultSdk().call(
         () => sdk.users.getUser(id: '2'),
       );
 
+      // Assert
       expect(expectOk(result).id, '2');
       expect(transport.callCount, 2);
     });
@@ -115,6 +123,7 @@ void main() {
     test(
       'hard failure trips the backend rescue router → Ok from rescued host',
       () async {
+        // Arrange
         final DocC docC = DocC(
           version: 1,
           candidates: <String, List<String>>{
@@ -154,10 +163,12 @@ void main() {
         );
         final ServiceSdk sdk = engine.backend(_coord)!.sdk(ServiceSdk.new);
 
+        // Act
         final Result<UserProfile> result = await const ResultSdk().call(
           () => sdk.users.getUser(id: '3'),
         );
 
+        // Assert
         expect(expectOk(result).id, '3');
         expect(
           transport.sent.any(
@@ -169,6 +180,7 @@ void main() {
     );
 
     test('token failure → Err (fail-closed), no HTTP attempted', () async {
+      // Arrange
       final FakeHttpTransport transport = FakeHttpTransport.byHost(
         <String, TransportOutcome>{
           'svc.example.com': okJson(<String, Object?>{
@@ -179,13 +191,15 @@ void main() {
       );
       final ServiceSdk sdk = _engine(
         transport,
-        auth: FakeAuth(<String, String>{}), // no token for the resource key
+        auth: FakeAuth(<String, String>{}),
       ).backend(_coord)!.sdk(ServiceSdk.new);
 
+      // Act
       final Result<UserProfile> result = await const ResultSdk().call(
         () => sdk.users.getUser(id: '1'),
       );
 
+      // Assert
       expect(result.isErr, isTrue);
       expect(transport.callCount, 0);
     });

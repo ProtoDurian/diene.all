@@ -42,10 +42,16 @@ void main() {
     });
 
     test('resolve returns null for an unregistered coordinate', () {
+      // Arrange
+      // Act
+      // Assert
       expect(ClientTree().resolve(_backend('missing', 'x').coordinate), isNull);
     });
 
     test('LPSM key is landscape.platform.service.module', () {
+      // Arrange
+      // Act
+      // Assert
       expect(
         _backend('core', 'a').coordinate.key,
         'lapras.platform.service.core',

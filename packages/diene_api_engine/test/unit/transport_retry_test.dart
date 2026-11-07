@@ -27,24 +27,34 @@ void main() {
     test(
       'surfaces a hard failure after exactly two network failures',
       () async {
+        // Arrange
         final FakeHttpTransport inner = FakeHttpTransport.sequence(
           <TransportOutcome>[networkFailure(), networkFailure()],
         );
+
+        // Act
         final TransportOutcome outcome = await RetryOnceTransport(
           inner,
         ).send(_req());
+
+        // Assert
         expect(outcome, isA<NetworkFailure>());
         expect(inner.callCount, 2);
       },
     );
 
     test('never retries a received status, even 5xx', () async {
+      // Arrange
       final FakeHttpTransport inner = FakeHttpTransport.sequence(
         <TransportOutcome>[nonJsonResponse(status: 500)],
       );
+
+      // Act
       final TransportOutcome outcome = await RetryOnceTransport(
         inner,
       ).send(_req());
+
+      // Assert
       expect(outcome, isA<Received>());
       expect(inner.callCount, 1);
     });

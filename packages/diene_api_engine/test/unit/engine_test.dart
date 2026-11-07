@@ -20,63 +20,67 @@ RescueConfig _disabledRescue() => RescueConfig(
 
 void main() {
   group('multi-backend', () {
-    test('each backend carries its OWN per-resource token — no bleed', () async {
-      // Arrange: two backends, each with its own resourceName (M slot).
-      final ApiEngineConfig config = ApiEngineConfig(
-        backends: <BackendConfig>[
-          BackendConfig(
-            coordinate: _coord('a'),
-            baseUrl: Uri.parse('https://a.example.com'),
-            resourceName: 'a',
-          ),
-          BackendConfig(
-            coordinate: _coord('b'),
-            baseUrl: Uri.parse('https://b.example.com'),
-            resourceName: 'b',
-          ),
-        ],
-        rescue: _disabledRescue(),
-      );
-      final FakeHttpTransport transport = FakeHttpTransport.byHost(
-        <String, TransportOutcome>{
-          'a.example.com': okJson(<String, Object?>{'who': 'a'}),
-          'b.example.com': okJson(<String, Object?>{'who': 'b'}),
-        },
-      );
-      // Tokens keyed by ResourceKey.mapKey = platform/landscape/service/resource.
-      final FakeAuth auth = FakeAuth(<String, String>{
-        'platform/lapras/service/a': 'token-a',
-        'platform/lapras/service/b': 'token-b',
-      });
-      final ApiEngine engine = ApiEngine.fromConfig(
-        config,
-        auth: auth,
-        transport: transport,
-      );
+    test(
+      'each backend carries its OWN per-resource token — no bleed',
+      () async {
+        // Arrange
+        final ApiEngineConfig config = ApiEngineConfig(
+          backends: <BackendConfig>[
+            BackendConfig(
+              coordinate: _coord('a'),
+              baseUrl: Uri.parse('https://a.example.com'),
+              resourceName: 'a',
+            ),
+            BackendConfig(
+              coordinate: _coord('b'),
+              baseUrl: Uri.parse('https://b.example.com'),
+              resourceName: 'b',
+            ),
+          ],
+          rescue: _disabledRescue(),
+        );
+        final FakeHttpTransport transport = FakeHttpTransport.byHost(
+          <String, TransportOutcome>{
+            'a.example.com': okJson(<String, Object?>{'who': 'a'}),
+            'b.example.com': okJson(<String, Object?>{'who': 'b'}),
+          },
+        );
 
-      // Act
-      final Result<Map<String, Object?>> a = await engine
-          .backend(_coord('a'))!
-          .call(method: HttpMethod.get, path: '/me', decode: _id);
-      final Result<Map<String, Object?>> b = await engine
-          .backend(_coord('b'))!
-          .call(method: HttpMethod.get, path: '/me', decode: _id);
+        final FakeAuth auth = FakeAuth(<String, String>{
+          'platform/lapras/service/a': 'token-a',
+          'platform/lapras/service/b': 'token-b',
+        });
+        final ApiEngine engine = ApiEngine.fromConfig(
+          config,
+          auth: auth,
+          transport: transport,
+        );
 
-      // Assert
-      expect(expectOk(a)['who'], 'a');
-      expect(expectOk(b)['who'], 'b');
-      expect(transport.sent[0].headers['Authorization'], 'Bearer token-a');
-      expect(transport.sent[1].headers['Authorization'], 'Bearer token-b');
-      // Each backend queried only its OWN resource key.
-      expect(auth.queried, <String>[
-        'platform/lapras/service/a',
-        'platform/lapras/service/b',
-      ]);
-    });
+        // Act
+        final Result<Map<String, Object?>> a = await engine
+            .backend(_coord('a'))!
+            .call(method: HttpMethod.get, path: '/me', decode: _id);
+        final Result<Map<String, Object?>> b = await engine
+            .backend(_coord('b'))!
+            .call(method: HttpMethod.get, path: '/me', decode: _id);
+
+        // Assert
+        expect(expectOk(a)['who'], 'a');
+        expect(expectOk(b)['who'], 'b');
+        expect(transport.sent[0].headers['Authorization'], 'Bearer token-a');
+        expect(transport.sent[1].headers['Authorization'], 'Bearer token-b');
+
+        expect(auth.queried, <String>[
+          'platform/lapras/service/a',
+          'platform/lapras/service/b',
+        ]);
+      },
+    );
 
     test(
       'a token-resolution failure IS the call error (fail-closed)',
       () async {
+        // Arrange
         final ApiEngineConfig config = ApiEngineConfig(
           backends: <BackendConfig>[
             BackendConfig(
@@ -92,19 +96,21 @@ void main() {
             'a.example.com': okJson(<String, Object?>{'who': 'a'}),
           },
         );
-        // No token for the key → FakeAuth returns Err.
+
         final ApiEngine engine = ApiEngine.fromConfig(
           config,
           auth: FakeAuth(<String, String>{}),
           transport: transport,
         );
 
+        // Act
         final Result<Map<String, Object?>> r = await engine
             .backend(_coord('a'))!
             .call(method: HttpMethod.get, path: '/me', decode: _id);
 
+        // Assert
         expectErr(r);
-        // The HTTP call was never attempted because the token failed.
+
         expect(transport.callCount, 0);
       },
     );
@@ -114,6 +120,7 @@ void main() {
     test(
       'hard failure trips the router, pins a rescued address, succeeds',
       () async {
+        // Arrange
         final LpsmCoordinate coord = _coord('core');
         final DocC docC = DocC(
           version: 5,
@@ -160,10 +167,12 @@ void main() {
           rescueOverride: router,
         );
 
+        // Act
         final Result<Map<String, Object?>> result = await engine
             .backend(coord)!
             .call(method: HttpMethod.get, path: '/me', decode: _id);
 
+        // Assert
         expect(expectOk(result)['ok'], true);
         expect(
           await store.read('pin.${coord.key}'),
