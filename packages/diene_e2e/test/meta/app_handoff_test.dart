@@ -15,6 +15,20 @@ void main() {
   tearDown(() => h.close());
 
   group('AppHandoffStub', () {
+    test('a user built at runtime is active and present by default', () {
+      // Arrange
+      final String sub = <String>['u', '9'].join();
+
+      // Act
+      final AppHandoffUser user = AppHandoffUser(sub: sub, primaryEmail: null);
+
+      // Assert
+      expect(user.sub, 'u9');
+      expect(user.primaryEmail, isNull);
+      expect(user.isSuspended, isFalse);
+      expect(user.deleted, isFalse);
+    });
+
     test('mint then redeem gives a one-time token for the user', () async {
       // Arrange
       final HttpReply mint = await h.mintReply();
