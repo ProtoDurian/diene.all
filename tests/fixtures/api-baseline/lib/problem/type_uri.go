@@ -6,12 +6,12 @@ import (
 )
 
 // ErrorPortal is the service-tree config block the problem type-URI template is
-// fed from (C0 §2). The LPSM segments (Landscape/Platform/Service/Module) are
+// fed from. The LPSM segments (Landscape/Platform/Service/Module) are
 // the declaring identity that also derives public hostnames, so a type URI is
 // stable, addressable, and never hand-authored per row.
 //
 // Real services supply their build-time portal (sourced from config, never
-// hardcoded per R4); [LocalErrorPortal] is the fallback for client-local errors
+// hardcoded by design); [LocalErrorPortal] is the fallback for client-local errors
 // that have no backend context.
 type ErrorPortal struct {
 	// Scheme is the URI scheme, conventionally `https`.
@@ -60,7 +60,7 @@ func (e *InvalidSegmentError) Error() string {
 
 // TypeURI builds the RFC 9457 `type` URI from an [ErrorPortal] block.
 //
-// This is the single source of the C0 §2 template
+// This is the single source of the type-URI template
 // `{scheme}://{host}/docs/{landscape}/{platform}/{service}/{module}/{version}/{id}`.
 // Every problem — catalog entries, runtime envelopes, local errors — resolves
 // its `type` through this function. Each segment must be a non-empty single

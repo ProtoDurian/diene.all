@@ -17,7 +17,7 @@ func (e CatalogEndpoint) ToContent() map[string]any {
 	}
 }
 
-// CatalogEntry is one per-endpoint catalog entry (C0 §14 `problems[]` shape).
+// CatalogEntry is one per-endpoint catalog entry (`problems[]` shape).
 //
 // The TypeURI is built in exactly ONE place; callers pass a URI minted by
 // [TypeURI] (typically via [Registry.TypeURIFor] or
@@ -39,7 +39,7 @@ type CatalogEntry struct {
 	Endpoints []CatalogEndpoint
 }
 
-// ToCRDContent renders the entry as its Problem CR content member (C0 §14):
+// ToCRDContent renders the entry as its Problem CR content member:
 // `{id, type, title, status, recoverable, data, endpoints[]}`.
 func (e CatalogEntry) ToCRDContent() map[string]any {
 	endpoints := make([]map[string]any, 0, len(e.Endpoints))
@@ -149,7 +149,7 @@ func (c *Catalog) Entries() []CatalogEntry {
 	return entries
 }
 
-// ToCRDContent emits the full Problem CR content payload (C0 §14): the
+// ToCRDContent emits the full Problem CR content payload: the
 // `problems[]` list rendered per row by the service's primordial chart.
 func (c *Catalog) ToCRDContent() []map[string]any {
 	content := make([]map[string]any, 0, len(c.order))

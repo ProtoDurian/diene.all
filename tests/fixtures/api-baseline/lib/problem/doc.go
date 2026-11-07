@@ -1,5 +1,5 @@
 // Package problem implements the AtomiCloud RFC 9457 problem-details contract
-// (C0 §2/§14) in Go idiom.
+// in Go idiom.
 //
 // Unlike the TypeScript/Dart/C# siblings, the Go family has NO result monad:
 // fallible APIs return the idiomatic (T, error) pair and carry problem metadata
@@ -9,7 +9,7 @@
 //
 // The RFC 9457 `type` URI is minted in exactly ONE place — [TypeURI] —
 // from an [ErrorPortal] service-tree block, with the `{version}` segment kept
-// (D8). Every envelope, registry entry, catalog row, and local error resolves
+// Every envelope, registry entry, catalog row, and local error resolves
 // its `type` through that single builder, which is the duplication this package
 // exists to prevent.
 //
@@ -20,7 +20,7 @@
 //     single-source type-URI builder and its boundary validation.
 //   - [Type] / [Registry] and the [GenericProblems] baseline set.
 //   - [CatalogEntry] / [CatalogEndpoint] / [Catalog] — the catalog
-//     export producing per-row Problem CR content (C0 §14).
+//     export producing per-row Problem CR content.
 //   - [Error] and [FromObject] — the problem-typed error and the
 //     total value→Problem transformer.
 //   - [LocalError] / [ErrorSink] — unexpected-error wrapping into a

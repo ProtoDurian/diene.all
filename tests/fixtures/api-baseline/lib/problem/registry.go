@@ -1,7 +1,7 @@
 package problem
 
 // Type is a versioned problem-type declaration. Version is part of the
-// contract identity (C0 §2): bumping it mints a NEW problem type URI rather than
+// contract identity: bumping it mints a NEW problem type URI rather than
 // mutating an existing one.
 type Type struct {
 	// ID is the stable identifier, e.g. "entity-not-found".
@@ -12,7 +12,7 @@ type Type struct {
 	Version string
 	// Status is the default HTTP status hint (0 means "no default").
 	Status int
-	// Recoverable reports whether the frontend may offer a retry (C0 §2/§14).
+	// Recoverable reports whether the frontend may offer a retry.
 	Recoverable bool
 	// DataSchema is the JSON Schema describing the `data` extension payload.
 	DataSchema map[string]any
@@ -45,7 +45,7 @@ func (e *UnknownTypeError) Error() string {
 // Registry is an enumerable registry of [Type]s bound to an
 // [ErrorPortal]. The portal supplies the LPSM segments every type URI is built
 // from, so a registry is the per-service×landscape source of truth the catalog
-// emitter renders into Problem CR content (C0 §14).
+// emitter renders into Problem CR content.
 type Registry struct {
 	portal ErrorPortal
 	types  map[string]Type

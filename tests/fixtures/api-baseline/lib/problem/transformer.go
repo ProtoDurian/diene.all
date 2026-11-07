@@ -39,7 +39,7 @@ func DefaultTransformOptions() TransformOptions {
 //   - When options.Registry recognises a `problemId` carried on a
 //     map[string]any value, the registry's type/title/status/recoverable are
 //     used and the value's `data` map is preserved.
-//   - Otherwise an uncatalogued problem (C0 §14) is produced with the
+//   - Otherwise an uncatalogued problem is produced with the
 //     [UncataloguedProblemID] fallback type.
 func FromObject(value any, options TransformOptions) Problem {
 	if envelope, ok := value.(Problem); ok {

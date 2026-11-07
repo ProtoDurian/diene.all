@@ -7,7 +7,7 @@ import (
 )
 
 // UncataloguedProblemID is the id carried by an unexpected/uncatalogued problem
-// (C0 §14 uncatalogued ⇒ 5xx ⇒ catalog-loop rule). It is used as the fallback
+// (uncatalogued ⇒ 5xx ⇒ catalog-loop rule). It is used as the fallback
 // id when no concrete registry entry is known.
 const UncataloguedProblemID = "uncatalogued"
 
@@ -19,7 +19,7 @@ const (
 )
 
 // Problem is an RFC 9457 problem-details envelope plus the AtomiCloud `data`
-// and `recoverable` extensions (C0 §2).
+// and `recoverable` extensions.
 //
 // The standard RFC 9457 members are Type, Title, Status, Detail, and Instance.
 // The extensions are Data (the typed payload whose schema is published per
@@ -46,7 +46,7 @@ type Problem struct {
 	// Instance is the RFC 9457 URI identifying the specific occurrence. It is
 	// optional with the same nil-omitted / present-emitted semantics as Detail.
 	Instance *string
-	// Recoverable reports whether the frontend may offer a retry (C0 §2/§14).
+	// Recoverable reports whether the frontend may offer a retry.
 	Recoverable bool
 	// Data is the typed payload extension (schema published per problem).
 	Data map[string]any
