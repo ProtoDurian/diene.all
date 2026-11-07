@@ -1,5 +1,5 @@
 import type { ProbeRepo } from '@cyanprint/contracts';
-import { plantGoFile } from './go.ts';
+import { type FlippedAssertion, flipComparisonAssertion, plantGoFile } from './go.ts';
 
 async function sources(repo: ProbeRepo, glob: string): Promise<string[]> {
   return (await repo.glob(glob)).filter(path => !path.endsWith('_test.go')).sort();
@@ -49,15 +49,8 @@ export async function breakExampleOutput(repo: ProbeRepo): Promise<string> {
   throw new Error('no Go example with checked output found');
 }
 
-export async function flipMetaAssertion(repo: ProbeRepo): Promise<string> {
-  for (const path of (await repo.glob('tests/meta/**/*_test.go')).sort()) {
-    const source = await repo.read(path);
-    if (source.includes('if got != created {')) {
-      await repo.write(path, source.replace('if got != created {', 'if got == created {'));
-      return path;
-    }
-  }
-  throw new Error('no meta assertion target found');
+export async function flipMetaAssertion(repo: ProbeRepo): Promise<FlippedAssertion> {
+  return flipComparisonAssertion(repo, 'tests/meta/**/*_test.go');
 }
 
 export async function plantUncoveredTestHelper(repo: ProbeRepo): Promise<string> {

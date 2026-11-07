@@ -48,16 +48,58 @@ async function first(repo: ProbeRepo, glob: string): Promise<string> {
   return paths[0];
 }
 
-export async function flipGoAssertion(repo: ProbeRepo): Promise<string> {
-  const paths = (await repo.glob('tests/unit/**/*_test.go')).sort();
-  for (const path of paths) {
-    const source = await repo.read(path);
-    if (source.includes('; got != ')) {
-      await repo.write(path, source.replace('; got != ', '; got == '));
-      return path;
+export interface FlippedAssertion {
+  path: string;
+  // The gotestsum `=== FAIL: <package> <Test>` line the flipped assertion must produce.
+  failure: RegExp;
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Flip the first `a != b` comparison (not an error check) in an `if` guard that sits directly in a top-level
+// test body and guards a t.Fatal/t.Error call, so exactly that test fails by name. The guard may be an `||` chain:
+// on a passing test every operand is false, so flipping one comparison fires it.
+function flipGuard(line: string): string | undefined {
+  const condition = line.match(/^\tif (.+) \{$/)?.[1];
+  if (!condition || /&&|;|:=/.test(condition)) {
+    return undefined;
+  }
+  const operands = condition.split(' || ');
+  const index = operands.findIndex(operand => {
+    const sides = operand.match(/^([^=!&|]+) != ([^=!&|]+)$/);
+    return sides !== null && sides[1] !== 'nil' && sides[2] !== 'nil';
+  });
+  if (index < 0) {
+    return undefined;
+  }
+  operands[index] = operands[index].replace(' != ', ' == ');
+  return `\tif ${operands.join(' || ')} {`;
+}
+
+export async function flipComparisonAssertion(repo: ProbeRepo, glob: string): Promise<FlippedAssertion> {
+  for (const path of (await repo.glob(glob)).sort()) {
+    const lines = (await repo.read(path)).split('\n');
+    let test = '';
+    for (let index = 0; index < lines.length - 1; index++) {
+      if (lines[index].startsWith('func ')) {
+        test = lines[index].match(/^func (Test[A-Za-z0-9_]*)\(t \*testing\.T\) \{$/)?.[1] ?? '';
+        continue;
+      }
+      const flipped = test ? flipGuard(lines[index]) : undefined;
+      if (flipped && /^\t\tt\.(Fatal|Fatalf|Error|Errorf)\(/.test(lines[index + 1])) {
+        lines[index] = flipped;
+        await repo.write(path, lines.join('\n'));
+        return { path, failure: new RegExp(`FAIL: ${escapeRegExp(directory(path))} ${test} `) };
+      }
     }
   }
-  throw new Error('no structural Go assertion target found');
+  throw new Error(`no structural Go assertion target found in ${glob}`);
+}
+
+export async function flipGoAssertion(repo: ProbeRepo): Promise<FlippedAssertion> {
+  return flipComparisonAssertion(repo, 'tests/unit/**/*_test.go');
 }
 
 export async function plantWhiteBoxTest(repo: ProbeRepo): Promise<string> {
