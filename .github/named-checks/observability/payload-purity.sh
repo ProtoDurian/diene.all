@@ -6,7 +6,7 @@ git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch 
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ parent commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 
 skills='observability-check|grafana-dashboards|grafana-alert|grafana-alert-set|grafana-runbook'
-added_pattern="^(docs/standards/(observability|grafana-dashboards)/[^/]+\.md|\.claude/skills/(${skills})/.+|observability/.+|probes/observability-[^/]+|\.github/named-checks/observability/[^/]+)$"
+added_pattern="^(docs/standards/(observability|grafana-dashboards)/[^/]+\.md|\.claude/skills/(${skills})/.+|observability/.+|probes/observability-[^/]+|\.github/named-checks/observability/(lib/)?[^/]+)$"
 insert_only_pattern='^(CLAUDE\.md|probes/features\.json|nix/packages\.nix|nix/env\.nix)$'
 
 # index tree == HEAD in CI; keeps local staged mutations visible
