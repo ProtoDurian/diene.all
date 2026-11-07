@@ -22,9 +22,9 @@ final InMemoryVfs vfs = InMemoryVfs(
 ```
 
 `InMemoryTerminal.run` has no default: unscripted, it fails with
-`unexpected_call`. Each fake records what it saw (`requestedDelays`, `commands`,
-`writes`, `reads`, `records`, `flushCount`, `files`, `directories`); the
-snapshots are unmodifiable.
+`unexpected_call`. `InMemoryVfs.files` and `directories` are unmodifiable
+snapshots. The call records (`requestedDelays`, `commands`, `writes`, `reads`,
+`records`) and `flushCount` are plain mutable fields.
 
 ## Assert port failures
 
