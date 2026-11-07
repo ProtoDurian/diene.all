@@ -1,0 +1,10 @@
+{
+  "contract": "diene.e2e.local.v1",
+  "authority": "local-regression-only",
+  "provenance": "Local regression fixtures for the helper bundle membership and the redeem failure modes; not part of the shared vectors.",
+  "algorithm": "sha256",
+  "fixtures": {
+    "helper_bundle.json": "e30f30e68bbfc38c050810f2391193a59fb90cad45674d336d7a12820df3181a",
+    "redeem_failures.json": "446304f20f91c56ad484b3727a6ee80f7d9ca5eb3507480bae869a18698f5ec7"
+  }
+}

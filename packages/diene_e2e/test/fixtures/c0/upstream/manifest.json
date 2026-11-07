@@ -1,0 +1,98 @@
+{
+  "authority": "c0-fixtures-r2",
+  "commit": "fe77520d591f81a9762c40ebf68dc9c0106502d3",
+  "sources": {
+    "contracts/c0/cases/identity.json": "add399f33101bd68b98ac6aea3f073d6f7e852410cba5e846c7311ce2028ac59",
+    "contracts/c0/cases/problem.json": "a8c02554c198627df9badc6c2377218556ec8bd3a0b1edcdb20aedeebe43f988"
+  },
+  "algorithm": "sha256 of the subtree printed by jq -cS (sorted keys, no whitespace, trailing newline)",
+  "fileAlgorithm": "sha256 of the vendored file bytes as committed",
+  "vectors": {
+    "app_handoff.json": {
+      "path": "contracts/c0/cases/identity.json",
+      "pointer": "/cases/appHandoff",
+      "sha256": "2c17af752ff43d6cf8ea00811aff47b9a26f0784d7a71926ff3a4958d8a63169",
+      "fileSha256": "b74acfefc5176e783b2adcbd0d0f77826b9b5600260e9e4245a41462e5a6461a",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/identity.json | jq -cS .cases.appHandoff | sha256sum",
+      "adaptations": [
+        "The vector nonce is only checked by the carrier codec. The stub redeems only nonces it minted, so each redeem body is sent with a freshly minted nonce in place of the vector's.",
+        "Every carrier is parsed by this package's codec and by the auth engine's AppHandoffCarrier; both must give the same nonce, or both none.",
+        "The mint and redeem routes are exercised on the stub at the default mount and at a non-default mount.",
+        "The expiry problem is matched on title, status, detail and data, and its id is the problemId. Its type is the URI the stub is built with."
+      ]
+    },
+    "problem_extensions.json": {
+      "path": "contracts/c0/cases/problem.json",
+      "pointer": "/cases/extensions",
+      "sha256": "b8600f6c023ba3b1af2ee5271d540b00fbd33b527ab0a67a3dd4cdf0dc519d66",
+      "fileSha256": "f79302409485acebe47118897eb5f760469c0061142b814683c0f68d9bb58856",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/problem.json | jq -cS .cases.extensions | sha256sum",
+      "adaptations": ["Together with the RFC 9457 members, these are the only keys the stub's expiry body may carry."]
+    },
+    "problem_members.json": {
+      "path": "contracts/c0/cases/problem.json",
+      "pointer": "/cases/rfc9457Members",
+      "sha256": "f5c61c06a73d3bf74b1d95ef91d635aa337ab76d93654e4487d207a2ebcc633d",
+      "fileSha256": "613bf2521d32b0b433f94b4c5e72671179ebe376840b3c957af122f51dc2fe0c",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/problem.json | jq -cS .cases.rfc9457Members | sha256sum",
+      "adaptations": ["The expiry body carries no instance member: absent, never null."]
+    }
+  },
+  "skipped": [
+    {
+      "path": "contracts/c0/cases/identity.json",
+      "pointer": "/cases/docB",
+      "reason": "Doc B is read by the auth engine; this package has no Doc B code."
+    },
+    {
+      "path": "contracts/c0/cases/identity.json",
+      "pointer": "/cases/homeClaim",
+      "reason": "Auth engine only."
+    },
+    {
+      "path": "contracts/c0/cases/identity.json",
+      "pointer": "/cases/onboardingClaim",
+      "reason": "Auth engine only."
+    },
+    {
+      "path": "contracts/c0/cases/identity.json",
+      "pointer": "/cases/resourceAudience",
+      "reason": "Auth and API engines only."
+    },
+    {
+      "path": "contracts/c0/cases/identity.json",
+      "pointer": "/cases/tokenLifetimes",
+      "reason": "Auth engine only."
+    },
+    {
+      "path": "contracts/c0/cases/problem.json",
+      "pointer": "/cases/envelopes",
+      "reason": "Problem parsing belongs to the problems library; this package parses no problems."
+    },
+    {
+      "path": "contracts/c0/cases/problem.json",
+      "pointer": "/cases/typeUri",
+      "reason": "The expiry type URI is passed in by the caller; this package builds no type URIs."
+    },
+    {
+      "path": "contracts/c0/cases/problem.json",
+      "pointer": "/cases/typeUriTemplate",
+      "reason": "Same as typeUri."
+    },
+    {
+      "path": "contracts/c0/cases/problem.json",
+      "pointer": "/cases/catalogEntry",
+      "reason": "Problem catalog entries are published by services."
+    },
+    {
+      "path": "contracts/c0/cases/config.json",
+      "pointer": "/cases",
+      "reason": "Config layering belongs to the config library."
+    },
+    {
+      "path": "contracts/c0/cases/result-wire.json",
+      "pointer": "/cases",
+      "reason": "The Result wire form belongs to the result library."
+    }
+  ]
+}

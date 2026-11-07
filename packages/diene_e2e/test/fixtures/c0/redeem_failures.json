@@ -1,0 +1,20 @@
+[
+  { "name": "unknown nonce", "case": "unknown" },
+  { "name": "expired nonce", "case": "expired" },
+  { "name": "replayed nonce", "case": "replayed" },
+  { "name": "deleted user", "case": "deleted" },
+  { "name": "suspended user", "case": "suspended" },
+  { "name": "email changed since mint", "case": "rebound" },
+  { "name": "user without an email", "case": "noEmail" },
+  { "name": "body is not JSON", "case": "notJson" },
+  { "name": "body is a JSON array", "case": "notObject" },
+  { "name": "empty body", "case": "empty" },
+  { "name": "unknown top-level key", "case": "extraKey" },
+  { "name": "unknown device key", "case": "extraDeviceKey" },
+  { "name": "missing device", "case": "noDevice" },
+  { "name": "device is not an object", "case": "deviceNotObject" },
+  { "name": "missing platform", "case": "noPlatform" },
+  { "name": "unknown platform", "case": "badPlatform" },
+  { "name": "nonce is not a string", "case": "nonceNotString" },
+  { "name": "optional device field is not a string", "case": "badOptional" }
+]

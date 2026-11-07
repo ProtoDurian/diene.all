@@ -1,71 +1,57 @@
-/// Deferred-login (app-handoff) carrier codec — C0 §7 wire shapes.
-///
-/// C0 defines the WIRE SHAPES for the deferred-login attribution carrier;
-/// `diene_e2e` ships the pure-value codec so the shared fixture and consumer
-/// journeys agree on exactly one encoding. No server is implemented here — the
-/// mint/redeem behaviour is mounted on a generic stub server by the test
-/// harness (`AppHandoffStub`), never re-built as a second app-handoff server.
+/// App-handoff (deferred-login) carrier codec.
 library;
 
-/// Scheme prefix of the canonical carrier text (C0 §7, Q-I48).
+import 'package:diene_auth_engine/diene_auth_engine.dart'
+    show AppHandoffCarrier;
+
+/// Scheme prefix of the canonical carrier text.
 const String appHandoffCarrierScheme = 'atomi-app-handoff';
 
-/// Carrier wire version (C0 §7, Q-I48).
+/// Carrier wire version.
 const String appHandoffCarrierVersion = 'v1';
 
 /// The Android Play Install Referrer field name that carries the nonce.
 const String appHandoffReferrerField = 'app_handoff';
 
 /// Number of ASCII characters in a valid nonce: 32 random bytes encoded as
-/// RFC 4648 base64url WITHOUT padding (C0 §7).
+/// RFC 4648 base64url without padding.
 const int appHandoffNonceLength = 43;
 
-final RegExp _base64UrlUnpadded = RegExp(r'^[A-Za-z0-9_-]+$');
+const String _prefix = '$appHandoffCarrierScheme:$appHandoffCarrierVersion:';
 
-/// Whether [nonce] is syntactically a valid C0 §7 nonce: exactly
-/// [appHandoffNonceLength] characters from the base64url (unpadded) alphabet.
-///
-/// This is a shape check only — the nonce is opaque and Logto-meaningless, so
-/// no semantic meaning is decoded from it.
+/// Whether [nonce] is syntactically a valid nonce: exactly
+/// [appHandoffNonceLength] characters from the unpadded base64url alphabet.
 bool isValidAppHandoffNonce(String nonce) =>
-    nonce.length == appHandoffNonceLength && _base64UrlUnpadded.hasMatch(nonce);
+    AppHandoffCarrier.parseCanonical('$_prefix$nonce') != null;
 
-/// Builds the canonical carrier text `atomi-app-handoff:v1:<nonce>` for a
-/// syntactically valid [nonce].
+/// Builds the canonical carrier text `atomi-app-handoff:v1:<nonce>`.
 ///
-/// Throws [ArgumentError] if [nonce] is not a valid C0 §7 nonce — the carrier
-/// is never allowed to advertise a malformed nonce.
+/// Throws [ArgumentError] if [nonce] is not a valid nonce.
 String buildAppHandoffCarrier(String nonce) {
-  if (!isValidAppHandoffNonce(nonce)) {
+  final AppHandoffCarrier? carrier = AppHandoffCarrier.parseCanonical(
+    '$_prefix$nonce',
+  );
+  if (carrier == null) {
     throw ArgumentError.value(
       nonce,
       'nonce',
       'not a valid C0 app-handoff nonce',
     );
   }
-  return '$appHandoffCarrierScheme:$appHandoffCarrierVersion:$nonce';
+  return carrier.canonicalText;
 }
 
 /// Parses the canonical carrier text and returns the nonce, or `null` when the
 /// text is absent or does not match `atomi-app-handoff:v1:<valid-nonce>`.
-///
-/// Per C0 §7 an invalid carrier is treated exactly like an absent one — the
-/// client falls back to normal interactive login — so a malformed carrier
-/// returns `null` rather than throwing.
-String? parseAppHandoffCarrier(String? carrier) {
-  if (carrier == null) return null;
-  const String prefix = '$appHandoffCarrierScheme:$appHandoffCarrierVersion:';
-  if (!carrier.startsWith(prefix)) return null;
-  final String nonce = carrier.substring(prefix.length);
-  return isValidAppHandoffNonce(nonce) ? nonce : null;
-}
+String? parseAppHandoffCarrier(String? carrier) =>
+    carrier == null ? null : AppHandoffCarrier.parseCanonical(carrier)?.nonce;
 
 /// Builds an Android Play Install Referrer string carrying [nonce] as one
 /// `application/x-www-form-urlencoded` field `app_handoff=<percent-encoded
-/// canonical carrier>` (C0 §7).
+/// canonical carrier>`.
 ///
-/// [extraFields] models coexisting campaign parameters (utm_source, …); they
-/// are appended verbatim after the mandatory `app_handoff` field.
+/// [extraFields] (campaign parameters such as `utm_source`) follow the
+/// `app_handoff` field.
 String buildAppHandoffInstallReferrer(
   String nonce, {
   Map<String, String> extraFields = const <String, String>{},
@@ -80,33 +66,38 @@ String buildAppHandoffInstallReferrer(
 }
 
 /// Extracts the nonce from an Android Play Install Referrer [referrer], or
-/// `null` when it is absent/invalid.
+/// `null` when it is absent or invalid.
 ///
-/// Per C0 §7 zero or duplicate `app_handoff` fields are treated as absent, and
-/// any other campaign fields are ignored.
+/// Zero or duplicate `app_handoff` fields count as absent; other campaign
+/// fields are ignored.
 String? parseAppHandoffInstallReferrer(String? referrer) {
   if (referrer == null || referrer.isEmpty) return null;
-  final List<String> values = <String>[];
+  final List<String?> values = <String?>[];
   for (final String pair in referrer.split('&')) {
     if (pair.isEmpty) continue;
     final int eq = pair.indexOf('=');
     final String key = eq < 0 ? pair : pair.substring(0, eq);
-    if (Uri.decodeQueryComponent(key) != appHandoffReferrerField) continue;
-    final String rawValue = eq < 0 ? '' : pair.substring(eq + 1);
-    values.add(Uri.decodeQueryComponent(rawValue));
+    if (_decodeQueryComponent(key) != appHandoffReferrerField) continue;
+    values.add(_decodeQueryComponent(eq < 0 ? '' : pair.substring(eq + 1)));
   }
-  // Exactly one occurrence is required; zero or duplicates → absent.
   if (values.length != 1) return null;
   return parseAppHandoffCarrier(values.single);
 }
 
-/// Extracts the nonce from iOS clipboard [contents], or `null` when
-/// absent/invalid.
-///
-/// Per C0 §7 the clipboard holds the canonical carrier text and leading/
-/// trailing ASCII whitespace may be trimmed before parsing.
+/// Extracts the nonce from iOS clipboard [contents], or `null` when absent or
+/// invalid. Leading and trailing ASCII whitespace is trimmed first.
 String? parseAppHandoffClipboard(String? contents) =>
     parseAppHandoffCarrier(_trimAscii(contents));
+
+String? _decodeQueryComponent(String component) {
+  try {
+    return Uri.decodeQueryComponent(component);
+  } on ArgumentError {
+    return null;
+  } on FormatException {
+    return null;
+  }
+}
 
 String? _trimAscii(String? value) {
   if (value == null) return null;

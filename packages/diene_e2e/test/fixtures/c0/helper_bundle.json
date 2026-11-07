@@ -1,0 +1,21 @@
+{
+  "runtime": [
+    "diene_api_engine",
+    "diene_auth_engine",
+    "diene_config",
+    "diene_core_utils",
+    "diene_interfaces",
+    "diene_problems",
+    "diene_result"
+  ],
+  "passthroughs": {
+    "diene_api_engine": ["FakeAuth", "expectErr", "expectOk"],
+    "diene_auth_engine": [],
+    "diene_config": [],
+    "diene_interfaces": [],
+    "diene_problems": [],
+    "diene_result": []
+  },
+  "withoutHelper": ["diene_core_utils"],
+  "notInDart": ["diene_otel", "diene_standard_config"]
+}

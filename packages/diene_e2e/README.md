@@ -1,52 +1,40 @@
-# diene_dart_lib
+# diene_e2e
 
-[![pub package](https://img.shields.io/pub/v/diene_dart_lib.svg)](https://pub.dev/packages/diene_dart_lib)
-[![CI](https://github.com/AtomiCloud/diene.dart_lib/actions/workflows/ci.yaml/badge.svg)](https://github.com/AtomiCloud/diene.dart_lib/actions/workflows/ci.yaml)
-[![unit coverage](https://codecov.io/gh/AtomiCloud/diene.dart_lib/graph/badge.svg?flag=unit)](https://codecov.io/gh/AtomiCloud/diene.dart_lib)
-[![meta coverage](https://codecov.io/gh/AtomiCloud/diene.dart_lib/graph/badge.svg?flag=meta)](https://codecov.io/gh/AtomiCloud/diene.dart_lib)
+[![pub package](https://img.shields.io/pub/v/diene_e2e.svg)](https://pub.dev/packages/diene_e2e)
 
-The generic, pure-Dart **library template** for the Diene family. It ships a
-small, replaceable sample domain — a `Note` value type with a JSON wire codec
-and a pure summariser — inside the reusable template machinery (strict analysis,
-targeted coverage, a dependency-light TestHelper, a C0 fixture harness, package
-hygiene, and a shipped usage skill).
+The test harness for the Diene Dart family. One dev dependency gives your
+integration and end-to-end tests:
+
+- the TestHelpers of `diene_result`, `diene_interfaces`, `diene_problems`,
+  `diene_config`, `diene_auth_engine` and `diene_api_engine`, from one import;
+- an in-process loopback `StubServer` to point your clients at;
+- `Journey`, a small driver for named, ordered test steps;
+- the app-handoff (deferred-login) fixture, `AppHandoffStub`, and a client
+  driver, `DeferredLoginJourney`;
+- plain-throw assertions that need no test framework.
 
 ```dart
-import 'package:diene_dart_lib/diene_dart_lib.dart';
+import 'package:diene_e2e/diene_e2e.dart';
+import 'package:diene_e2e/test_helper.dart';
 
-const Note note = Note(title: 'Release', body: 'Ship the template.');
+final StubServer server = await StubServer.start();
+final AppHandoffStub handoff =
+    AppHandoffStub(problemTypeUri: 'https://api.example.com/AppHandoffExpired')
+      ..addUser(const AppHandoffUser(sub: 'u1', primaryEmail: 'a@b.com'))
+      ..mintingUser = const AppHandoffUser(sub: 'u1', primaryEmail: 'a@b.com');
+handoff.mount(server);
 
-final String summary = summarizeNote(note);        // 'Release — Ship the template.'
-final Note decoded = Note.fromJson(note.toJson());  // round-trips through JSON
+final DeferredLoginJourney driver = DeferredLoginJourney(
+  baseUrl: server.baseUrl,
+  platform: 'android',
+);
+final DeferredLoginResult result = await driver.redeemCarrier(installReferrer);
+// result.outcome is redeemed or interactiveFallback.
 ```
 
-## Public surface
+`package:diene_e2e/diene_e2e.dart` also re-exports the runtime API of all
+seven family libraries, as 1.0.0 did.
 
-- `Note` — immutable `title`/`body` value type with value equality and a JSON
-  wire codec (`Note.fromJson` / `toJson`).
-- `summarizeNote(note, {maxLength})` — a pure single-line summariser.
-- `defaultSummaryLength` — the default summary cap.
-
-## TestHelper
-
-Consumer tests may import `package:diene_dart_lib/test_helper.dart` for
-`assertNoteSummary`, a dependency-light assertion that throws
-`NoteAssertionFailure` on mismatch and pulls in no test framework.
-
-Read the [package doc](doc/diene_dart_lib.md) for the full API, wire contract,
-C0 harness, and guidance on replacing the sample.
-
-## Using this template
-
-This is a template: a materialized child retokenizes the package identity to
-`diene_<name>` / `AtomiCloud/diene.dart_<name>`, replaces `lib/src/**` with its
-own domain, and re-points the barrel exports. See
-`skills/diene-dart-lib-usage/patterns.md`.
-
-## Development
-
-- `task setup` resolves the workspace dependencies.
-- `task test` runs the unit, C0 conformance, and TestHelper meta suites.
-- `task test:coverage` enforces the separate unit and meta ledgers.
-- `task deadcode` runs the repository and production-only dead-code passes.
-- `task package:validate` runs the release guard, publish dry-run, and pana.
+Read the [package doc](doc/diene_e2e.md) for what is bundled, when to import a
+member helper directly, how to drive journeys, the deferred-login driver, the
+differences from the Bun harness and the known limits of 1.0.

@@ -1,72 +1,158 @@
-# diene_e2e — version-train and consumer test-harness
+# diene_e2e
 
-`diene_e2e` is the single package a consumer of the L-dart family depends on. It
-plays two roles, mirroring `lib/bun/e2e`:
+`diene_e2e` is the family test harness for Diene Flutter apps. It is glue: it
+bundles the member TestHelpers and adds the wiring that integration and
+end-to-end tests would otherwise repeat. Engine behaviour stays in the engines.
 
-1. **Version train** — one dependency pins a coherent set of the family
-   libraries, so a consumer upgrades one version instead of reconciling seven.
-2. **Consumer test-harness** — bundles every family member's `test_helper.dart`
-   that exists, plus this package's own harness glue.
+## Two imports
 
-## Import roots
+| Import                               | What it gives you                                                                                         |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `package:diene_e2e/test_helper.dart` | The six member TestHelpers, `StubServer`, `Journey`, `AppHandoffStub`, `DeferredLoginJourney`, assertions |
+| `package:diene_e2e/diene_e2e.dart`   | The runtime API of all seven family libraries, plus the app-handoff carrier codec and wire models         |
 
-- `package:diene_e2e/diene_e2e.dart` — the runtime version-train re-exports
-  (integration-held; see below) and the pure-value C0 §7 app-handoff
-  (deferred-login) contract models this package owns (carrier codec + mint/redeem
-  wire shapes).
-- `package:diene_e2e/test_helper.dart` — the **dependency-light** test harness:
-  `StubServer`, the shared `AppHandoffStub` fixture, `Journey`/
-  `DeferredLoginJourney` drivers, and plain-throw assertion helpers, plus the
-  member `test_helper.dart` re-exports that exist. It has no test-framework
-  dependency, so importing it never pulls `test`/`matcher` into a consumer's
-  production graph.
+The TestHelper import has no test framework in it (no `test`, `matcher` or
+mocking package). Its assertions throw `JourneyAssertionError`, so they work
+under any runner.
 
-## The shared deferred-login fixture
+## What is bundled
 
-There is exactly ONE app-handoff fixture, defined by the C0 §7 contract. This
-package **consumes** it — it ships the carrier codec + wire models and a
-canonical `AppHandoffStub` that MOUNTS the mint/redeem behaviour onto the generic
-`StubServer`. It deliberately does not build a second, dedicated app-handoff
-server. The stub enforces the contract that matters for consumer journeys:
-single-use nonces and one indistinguishable `AppHandoffExpired` (410) response
-for every failure mode (missing, expired, replayed, deleted, suspended, or
-email-rebound), so no account-state oracle leaks.
+| Member              | Runtime API | TestHelper passthrough                                       |
+| ------------------- | ----------- | ------------------------------------------------------------ |
+| `diene_result`      | yes         | yes                                                          |
+| `diene_interfaces`  | yes         | yes                                                          |
+| `diene_problems`    | yes         | yes                                                          |
+| `diene_config`      | yes         | yes                                                          |
+| `diene_auth_engine` | yes         | yes                                                          |
+| `diene_api_engine`  | yes         | yes, without `FakeAuth`, `expectOk`, `expectErr`             |
+| `diene_core_utils`  | yes         | no: it ships no TestHelper (pure functions, nothing to fake) |
 
-## Usage sketch
+Two names are declared by two members. The bundle keeps the owner's:
 
-```dart
-import 'package:diene_e2e/diene_e2e.dart';
-import 'package:diene_e2e/test_helper.dart';
+- `expectOk` and `expectErr` come from `diene_result`, which owns `Result`.
+  They throw `TestHelperFailure`.
+- `FakeAuth` comes from `diene_auth_engine`, which owns `IAuth`. It takes
+  batches of token maps and counts fetches.
 
-final server = await StubServer.start();
-final stub = AppHandoffStub(problemTypeUri: '<c0 §2 type uri>')
-  ..addUser(const AppHandoffUser(sub: 'u1', primaryEmail: 'a@b.com'))
-  ..mintingUser = const AppHandoffUser(sub: 'u1', primaryEmail: 'a@b.com');
-stub.mount(server);
+## When to import a member helper directly
 
-final driver = DeferredLoginJourney(baseUrl: server.baseUrl, platform: 'android');
-final result = await driver.redeemCarrier(installReferrerString);
-// result.outcome is redeemed or interactiveFallback.
-```
+- You want the `diene_api_engine` variants: its `FakeAuth` (one flat map of
+  token strings
+  that records which keys were asked for) or its `expectOk`/`expectErr` with a
+  `because:` label. Import it with a prefix:
 
-## Deliberate deltas vs `lib/bun/e2e`
+  ```dart
+  import 'package:diene_api_engine/test_helper.dart' as api;
 
-The dart e2e is the frontend-only twin of the bun e2e. Documented differences:
+  final api.FakeAuth auth = api.FakeAuth(<String, String>{'users': 'token'});
+  ```
 
-| Dimension             | `lib/bun/e2e`                                           | `diene_e2e` (this package)                                                                                                               |
-| --------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Members bundled       | 9 (incl. `otel`, `standard-config`)                     | 7 — NO `otel`, NO `standard-config` (dart is frontend-only; telemetry rides Faro; engine-owned config blocks, no standard-config member) |
-| Re-export mechanism   | subpath exports (`@atomicloud/diene.e2e/result`)        | Dart libraries: runtime barrel `diene_e2e.dart`; helper barrel `test_helper.dart`                                                        |
-| Test-helper packaging | subpath `…/test-helper`, optional peerDeps              | dependency-light sub-library `package:diene_e2e/test_helper.dart` (no test-framework deps)                                               |
-| Harness glue          | Garden preview-env resolver + Bruno env glue            | consumer fixtures, stub server, journey drivers, and the shared C0 app-handoff fixture consumption                                       |
-| Telemetry harness     | otel interface mocks re-exported (no FakeOtlpCollector) | none — no otel member at all                                                                                                             |
-| Version-train ranges  | tilde (`~`) npm ranges                                  | pub caret/version constraints (wired at integration)                                                                                     |
+- The test touches one member only. Depend on that member and its TestHelper;
+  you do not need the whole harness.
 
-## Integration-held seams
+Member fakes and assertions are documented in each member's own doc and skill.
 
-The seven L-dart members are built on parallel branches and are not yet published
-packages, so their runtime re-exports (`diene_e2e.dart`) and test-helper
-re-exports (`test_helper.dart`) are documented seams, not live `export` lines.
-Wiring them — and the flutter-base E4 dogfood swap-in that deletes the in-app
-copies — is conductor-owned integration work performed once the member packages
-land and are stacked.
+## Driving journeys
+
+1. Start a server: `final StubServer server = await StubServer.start();`
+2. Register routes: `server.on('GET', '/health', (StubRequest r) =>
+StubResponse.json(<String, Object?>{'ok': true}));` A request with no route
+   gets 404. `StubResponse.json` sets `Content-Type: application/json` and
+   `Cache-Control: no-store`.
+3. Point the client under test at `server.baseUrl`.
+4. Write the flow as a `Journey` of named `JourneyStep`s. `run()` stops at the
+   first step that returns `false` or throws.
+5. Assert with `expectJourneyOk(result)` or
+   `expectJourneyFailedAt(result, 'step name')`, and check what the client sent
+   in `server.requests`.
+6. `await server.close()` in tear-down.
+
+`server.handlerFor(method, path)` returns a registered handler so you can call
+it directly. Use it to test what a handler throws (see Known limits).
+
+## The deferred-login (app-handoff) fixture
+
+`AppHandoffStub` is the Dart host for the shared app-handoff contract. Mount it
+on your `StubServer`:
+
+- `POST {mount}` mints a nonce for `mintingUser` (set it first; the stub throws
+  a `StateError` without it). The default mount is `/app-handoff`.
+- `POST {mount}/redeem` redeems it: `200 {token, email, expiresIn: 120}`.
+- A nonce works once and lives 15 minutes. Pass `now:` to `mount` to control
+  the clock.
+- Every failure gets the same `410` `AppHandoffExpired` body: unknown, expired
+  or replayed nonce; deleted or suspended user; an email that changed since the
+  mint; a body that is not JSON, has an unknown key or a bad device field. A
+  bad body never uses up the nonce.
+
+Drive the client half with `DeferredLoginJourney`:
+
+- `redeemCarrier(raw)` reads an Install Referrer (`platform: 'android'`) or
+  clipboard text (any other platform), then redeems.
+- `redeemNonce(nonce)` redeems a nonce you already have.
+- Any carrier problem or non-200 answer gives `interactiveFallback`; no request
+  is sent for a carrier that does not parse.
+
+To test the production client itself, run `diene_auth_engine`'s
+`DeferredLoginClient` with `HttpAppHandoffApi` against the same stub. The
+package's conformance tests do exactly that.
+
+The conformance tests check the stub, the driver and the carrier codec against
+the shared app-handoff vectors.
+
+## Boundaries: no OpenTelemetry, no standard-config
+
+The Dart family has no OpenTelemetry library and no `standard-config` library,
+so this harness has no passthrough or helper for either, and none should be
+added to mimic Bun. Telemetry fakes and config fakes come only from the members
+that exist (`diene_config` for config).
+
+## Differences from the Bun harness
+
+- **Eight Dart packages:** seven libraries (`diene_result`,
+  `diene_interfaces`, `diene_problems`, `diene_core_utils`, `diene_config`,
+  `diene_auth_engine`, `diene_api_engine`) plus this harness.
+- **No OpenTelemetry and no `standard-config` member**, as above.
+- **Dart libraries instead of subpath exports:** one runtime import and one
+  TestHelper import.
+- **Production re-export and version train: open.** 1.0.0 re-exports every
+  member's runtime API from `diene_e2e.dart`, and this release keeps that. It
+  is not decided whether `diene_e2e` should act as a coordinated version train
+  the way the Bun harness does; do not rely on it moving members in lockstep.
+  Each member keeps its own version, and this package depends on caret ranges
+  of the published releases.
+
+## Known limits of 1.0
+
+These are kept for 1.0 compatibility and are candidates for 2.0.
+
+- **Carrier codec overlap.** `diene_auth_engine` owns the carrier format
+  (`AppHandoffCarrier`). Here `isValidAppHandoffNonce`,
+  `buildAppHandoffCarrier` and `parseAppHandoffCarrier` use it, but
+  `parseAppHandoffInstallReferrer` and `parseAppHandoffClipboard` keep their
+  1.0.0 rules, which differ from the auth engine's in three ways:
+  - a percent-encoded field name such as `app%5Fhandoff` counts as
+    `app_handoff` here, not in the auth engine;
+  - a bare `app_handoff` with no `=` counts as a field here (so with a real
+    field it is a duplicate and the carrier is absent); the auth engine skips
+    it;
+  - the clipboard trims only ASCII space, tab, CR and LF here; the auth engine
+    also trims other whitespace (for example a no-break space).
+- **Wire model overlap.** `AppHandoffDevice`, `AppHandoffRedeemResponse` and
+  `AppHandoffExpired` repeat the auth engine's `DeviceInfo`, `RedeemResult` and
+  `appHandoffExpired()`. The auth engine's problem has a fixed `type`; here the
+  `type` is passed in.
+- **The driver repeats the client flow.** `DeferredLoginJourney` does not mark
+  the referrer processed or clear the clipboard, as `DeferredLoginClient` does.
+- **A throwing handler stops the server.** A `StubServer` handler that throws
+  (including the mint route without `mintingUser`) never answers that request;
+  the error escapes as an uncaught async error and the server stops serving.
+- **The driver can throw.** `redeemNonce` throws on a network failure, or on a
+  `200` whose body is not a redeem JSON object.
+- **Members are built from their 1.0 releases.** Building against releases of
+  the members published from their next climbs is not done yet.
+
+## Release
+
+The version in `pubspec.yaml` is `0.0.0` in source and is stamped only by the
+release workflow.
