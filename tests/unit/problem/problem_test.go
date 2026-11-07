@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/AtomiCloud/diene.go-errors-problems/lib/problem"
+	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
 )
 
 func TestMarshalJSONOmitsEmptyDetailAndInstance(t *testing.T) {

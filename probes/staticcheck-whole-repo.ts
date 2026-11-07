@@ -1,9 +1,8 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic } from './lib/go.ts';
 
-// The whole-repository staticcheck component, invoked directly rather than through the composite dispatcher.
 const gate = 'nix develop .#ci -c ./scripts/local/staticcheck-whole.sh';
 
-// A discarded pure result is invisible to deadcode and to a pass that skips tests, so only `staticcheck -tests=true` catches it.
 const discardedPureResult = [
   'import (',
   '\t"strings"',
@@ -16,7 +15,7 @@ const discardedPureResult = [
   '}',
 ].join('\n');
 
-// plantGoFile skips `_test.go` targets, so the test-tier fixture resolves its own package.
+// plantGoFile skips `_test.go` targets.
 async function plantUnitTestFile(repo: any, filename: string, declaration: string): Promise<string> {
   const paths = ((await repo.glob('tests/unit/**/*_test.go')) as string[]).sort();
   if (paths.length === 0) {

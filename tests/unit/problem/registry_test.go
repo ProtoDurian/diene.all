@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/AtomiCloud/diene.go-errors-problems/lib/problem"
+	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
 )
 
 func testPortal() problem.ErrorPortal {

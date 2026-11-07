@@ -5,7 +5,7 @@ description: Use the diene Go errors-problems library (RFC 9457 Problem envelope
 
 # Diene Go errors-problems usage
 
-`github.com/AtomiCloud/diene.go-errors-problems/lib/problem` is the Go family's
+`github.com/ProtoDurian/diene.go-errors-problems/lib/problem` is the Go family's
 result slot: **no monad — idiomatic `(T, error)`** where the error carries an
 RFC 9457 `Problem` (C0 §2/§14). Read the compiling examples in
 `lib/problem/example_test.go` and the package docs on pkg.go.dev.
@@ -37,7 +37,7 @@ version, id)` (or `Registry.TypeURIFor`). The `{version}` segment is part of
 
 ## TestHelper
 
-Import `github.com/AtomiCloud/diene.go-errors-problems/testhelper` in tests to
+Import `github.com/ProtoDurian/diene.go-errors-problems/testhelper` in tests to
 stop repeating `errors.As` + field-by-field Problem checks:
 
 - `testhelper.AssertError(t, err, testhelper.ExpectID("entity-not-found"),

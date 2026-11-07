@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/AtomiCloud/diene.go-errors-problems/lib/problem"
-	"github.com/AtomiCloud/diene.go-errors-problems/testhelper"
+	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
+	"github.com/ProtoDurian/diene.go-errors-problems/testhelper"
 )
 
 // recordingT is a TestingT double: it records the first Fatalf so the meta tier

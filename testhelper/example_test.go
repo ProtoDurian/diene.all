@@ -3,8 +3,8 @@ package testhelper_test
 import (
 	"fmt"
 
-	"github.com/AtomiCloud/diene.go-errors-problems/lib/problem"
-	"github.com/AtomiCloud/diene.go-errors-problems/testhelper"
+	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
+	"github.com/ProtoDurian/diene.go-errors-problems/testhelper"
 )
 
 // ExampleCheckError shows the consumer pattern: a fallible API returns

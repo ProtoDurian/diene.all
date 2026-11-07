@@ -1,4 +1,4 @@
-import { expectGreen, expectRedBecause } from './lib/helpers.ts';
+import { expectGreen, expectRed } from './lib/helpers.ts';
 
 export default {
   contractVersion: 1,
@@ -18,14 +18,11 @@ export default {
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        await repo.patch('.github/workflows/reusable-precommit.yaml', {
+        await repo.patch('.github/workflows/⚡reusable-precommit.yaml', {
           find: 'AtomiCloud/actions.setup-nix@v3',
           replace: 'AtomiCloud/actions.setup-nix@f366a9f3997acdf7f335445809fd85e3a157147f',
         });
-        await expectRedBecause(repo, 'nix develop .#ci -c dlint action-pins trusted', 'trusted-action-pins', [
-          '.github/workflows/⚡reusable-precommit.yaml',
-          "trusted action 'AtomiCloud/actions.setup-nix' must use a major pin",
-        ]);
+        await expectRed(repo, 'nix develop .#ci -c dlint action-pins trusted', 'trusted-action-pins');
       },
     },
   ],

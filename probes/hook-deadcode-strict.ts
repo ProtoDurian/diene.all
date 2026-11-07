@@ -1,11 +1,9 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
-import { plantProductionOnlySymbol } from './lib/go.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic, plantProductionOnlySymbol } from './lib/go.ts';
 
-// The blocking hook is its own enforcement mechanism: registration, runtime and sequencing are only proven here.
 const gate = 'nix develop .#ci -c pre-commit run a-deadcode --all-files';
 const gateTimeoutMs = 600000;
 
-// A test-only symbol clears the first three strict components so only the hook's final production deadcode pass can red.
 const productionOnlyFinding = /"Name": "ProbeProductionOnly",[\s\S]*?"File": "[^"]*probe_production_only\.go"/;
 
 export default {

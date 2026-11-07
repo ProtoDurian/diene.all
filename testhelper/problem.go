@@ -1,5 +1,5 @@
 // Package testhelper ships the Problem assertion helpers and builders that
-// consumers of github.com/AtomiCloud/diene.go-errors-problems would otherwise
+// consumers of github.com/ProtoDurian/diene.go-errors-problems would otherwise
 // repeat in every test: recovering a [problem.Problem] from a (T, error) result
 // via errors.As, matching it field by field, and minting valid fixtures whose
 // type URIs come from the single-source builder.
@@ -15,7 +15,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/AtomiCloud/diene.go-errors-problems/lib/problem"
+	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
 )
 
 // TestingT is the minimal subset of *testing.T the assertion helpers use. Any

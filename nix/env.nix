@@ -11,33 +11,29 @@ with packages;
   lint = [
     actionlint
     dlint
+    go-tools
+    gofumpt
+    golangci-lint
+    gotools
     infralint
     pre-commit
     shellcheck
     skills-sync
     treefmt
-
-    deadcode
-    gofumpt
-    golangci-lint
-    staticcheck
   ];
 
   main = [
     cyanprint
     git
-    go-task
-    infisical
-    shellcheck
-
-    # ### go-lib-main
-    # #### source: go-lib
-    gorelease
-    zip
-
     go
+    gorelease
+    go-task
     gotestsum
     govulncheck
+    infisical
+    releaser
+    shellcheck
+    zip
   ];
 
   releaser = [

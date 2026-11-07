@@ -3,7 +3,7 @@ package problem_test
 import (
 	"testing"
 
-	"github.com/AtomiCloud/diene.go-errors-problems/lib/problem"
+	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
 )
 
 func TestCatalogEndpointToContent(t *testing.T) {

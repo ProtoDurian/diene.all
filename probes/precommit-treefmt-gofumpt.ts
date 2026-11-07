@@ -1,9 +1,8 @@
-import { expectGreen, expectRedWithDiagnostic, restoreProbeState } from './lib/helpers.ts';
-import { unformatGo } from './lib/go.ts';
+import { restoreProbeState } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic, unformatGo } from './lib/go.ts';
 
 const gate = 'nix develop .#ci -c pre-commit run treefmt --all-files';
 
-// Accept treefmt's path-after-verb diagnostic, gofumpt's reformat diagnostic, and the older path-before-verb shape.
 const goFormatting = /(file has changed path=|would reformat )\S+[.]go|[.]go.*(formatted|changed)/i;
 
 export default {

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/AtomiCloud/diene.go-errors-problems/lib/problem"
-	"github.com/AtomiCloud/diene.go-errors-problems/testhelper"
+	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
+	"github.com/ProtoDurian/diene.go-errors-problems/testhelper"
 )
 
 func TestSampleErrorPortalIsValid(t *testing.T) {

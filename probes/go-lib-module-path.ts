@@ -1,27 +1,35 @@
-import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRedWithDiagnostic } from './lib/go.ts';
 
 const gate = 'nix develop .#ci -c ./scripts/validate/go-module-path.sh';
 
-export default defineGate({
+export default {
+  contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  baseline: {
-    name: 'baseline-go-lib-module-path-green',
-    description: 'The Go module path matches the configured mirror identity.',
-    async run(repo: any) {
-      await expectGreen(repo, gate, 'go-lib-module-path');
+  probes: [
+    {
+      name: 'baseline-go-lib-module-path-green',
+      description: 'The declared Go module path is the mirror repository path.',
+      kind: 'baseline',
+      async run(repo: any) {
+        await expectGreen(repo, gate, 'go-lib-module-path');
+      },
     },
-  },
-  mutation: {
-    name: 'mutation-go-lib-module-path-caught',
-    description: 'Changing only the declared module path turns identity validation red.',
-    expectedImpact: [],
-    async run(repo: any) {
-      await repo.patch('go.mod', {
-        find: 'module github.com/AtomiCloud/diene.go-lib',
-        replace: 'module github.com/AtomiCloud/diene.go-wrong',
-      });
-      await expectRed(repo, gate, 'go-lib-module-path');
+    {
+      name: 'mutation-go-lib-module-path-caught',
+      description: 'Changing only the declared module path turns the module-path gate red.',
+      kind: 'mutation',
+      async run(repo: any) {
+        await repo.patch('go.mod', {
+          find: 'module github.com/ProtoDurian/diene.go-errors-problems',
+          replace: 'module github.com/ProtoDurian/diene.go-wrong',
+        });
+        await expectRedWithDiagnostic(
+          repo,
+          gate,
+          'go-lib-module-path',
+          /module path 'github\.com\/ProtoDurian\/diene\.go-wrong' must be/,
+        );
+      },
     },
-  },
-});
+  ],
+};

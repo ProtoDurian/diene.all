@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/AtomiCloud/diene.go-errors-problems/lib/problem"
+	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
 )
 
 func TestErrorWithoutWrap(t *testing.T) {

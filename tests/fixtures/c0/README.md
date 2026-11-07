@@ -5,7 +5,7 @@
 
 These JSON fixtures are the shapes the C0 conformance test
 (`tests/unit/problem/c0_conformance_test.go`) consumes: the test loads them at
-runtime and validates `github.com/AtomiCloud/diene.go-errors-problems/lib/problem`
+runtime and validates `github.com/ProtoDurian/diene.go-errors-problems/lib/problem`
 against them, instead of hard-coding illustrative values in Go.
 
 ## Provenance (honest)
