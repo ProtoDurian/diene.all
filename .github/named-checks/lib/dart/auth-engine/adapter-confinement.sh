@@ -3,7 +3,8 @@ set -euo pipefail
 
 # Platform imports (dart:io/ui/ffi/isolate, package:http, package:flutter/,
 # package:logto_dart_sdk) live only in the adapter layer lib/src/logto/; the
-# rest of lib/ neither imports them nor reaches into the adapter layer.
+# rest of lib/ neither imports them nor reaches into the adapter layer
+# (only the public barrel exports it).
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -11,7 +12,8 @@ tree="$(git write-tree)"
 pkg="packages/diene_auth_engine"
 adapter="${pkg}/lib/src/logto/"
 # SessionController extends ChangeNotifier in the published 1.0.2 surface.
-allowed=("${pkg}/lib/src/auth/session_controller.dart package:flutter/foundation.dart")
+# The TestHelper FakeRedeemHttpClient stub extends http.BaseClient.
+allowed=("${pkg}/lib/src/auth/session_controller.dart package:flutter/foundation.dart" "${pkg}/lib/test_helper.dart package:http/http.dart")
 failed=0
 
 fail() {
@@ -70,7 +72,7 @@ judge() {
   *:*) return ;;
   *) target="$(realpath -m -s "/$(dirname "${file}")/${uri}")" ;;
   esac
-  [[ ${file} == "${pkg}/lib/src/"* && ${target} == "/${adapter}"* ]] && echo "reaches into the adapter layer (${uri})"
+  [[ ${file} != "${pkg}/lib/diene_auth_engine.dart" && ${target} == "/${adapter}"* ]] && echo "reaches into the adapter layer (${uri})"
   return 0
 }
 
@@ -83,6 +85,9 @@ judge() {
 [[ -n "$(judge "${pkg}/lib/src/deferred/a.dart" ../logto/http_app_handoff_api.dart)" ]] || fail "control: a core -> adapter import is not caught"
 [[ -n "$(judge "${pkg}/lib/src/a.dart" package:diene_auth_engine/src/logto/x.dart)" ]] || fail "control: a core -> adapter package import is not caught"
 [[ -z "$(judge "${pkg}/lib/src/onboarding/a.dart" package:diene_result/diene_result.dart)" ]] || fail "control: a diene_result import is flagged"
+[[ -n "$(judge "${pkg}/lib/test_helper.dart" package:http/retry.dart)" ]] || fail "control: the TestHelper http allowance widens to other http libraries"
+[[ -n "$(judge "${pkg}/lib/test_helper.dart" src/logto/logto_auth_provider.dart)" ]] || fail "control: a TestHelper -> adapter import is not caught"
+[[ -z "$(judge "${pkg}/lib/diene_auth_engine.dart" src/logto/logto_auth_provider.dart)" ]] || fail "control: the barrel export of the adapter layer is flagged"
 
 mapfile -t lib_files < <(git ls-tree -r --name-only "${tree}" -- "${pkg}/lib/" | grep -E '\.dart$' || true)
 [[ ${#lib_files[@]} -gt 0 ]] || fail "control: ${pkg}/lib has no Dart sources"

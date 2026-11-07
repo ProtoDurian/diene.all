@@ -2,14 +2,16 @@
 set -euo pipefail
 
 # The `app-handoff` path segment appears in lib/ code only as the config
-# default (AppHandoffConstants.defaultMount), and only the config reads that
-# default, so no client hardcodes it or appends it to a configured mount.
+# default (AppHandoffConstants.defaultMount), and only the config (and the
+# TestHelper redeem stub, by that constant) reads that default, so no client
+# hardcodes it or appends it to a configured mount.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"
 pkg="packages/diene_auth_engine"
 config="${pkg}/lib/src/config/auth_engine_config.dart"
+helper="${pkg}/lib/test_helper.dart"
 default_line="static const String defaultMount = '/app-handoff';"
 SEGMENT_RE='(^|[^A-Za-z0-9_.:-])app-handoff([^A-Za-z0-9_:-]|$)'
 failed=0
@@ -71,7 +73,7 @@ for f in "${lib_files[@]}"; do
   while IFS=: read -r line text; do
     [[ -z ${line} ]] && continue
     refs=$((refs + 1))
-    [[ ${f} == "${config}" ]] || fail "${f}:${line} reads the default mount outside the config: $(trim <<<"${text}")"
+    [[ ${f} == "${config}" || (${f} == "${helper}" && ${text} == *AppHandoffConstants.defaultMount*) ]] || fail "${f}:${line} reads the default mount outside the config: $(trim <<<"${text}")"
   done < <(grep -nwE 'defaultMount' <<<"${code}" || true)
 done
 [[ ${segments} -eq 1 ]] || fail "the app-handoff segment appears ${segments} times in lib/ code, want once (the config default)"
@@ -81,4 +83,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ no-default-mount-hardcode: app-handoff appears once in lib/ code (the config default); defaultMount is read only by the config (${refs} references)"
+echo "✅ no-default-mount-hardcode: app-handoff appears once in lib/ code (the config default); defaultMount is read only by the config and the TestHelper stub (${refs} references)"

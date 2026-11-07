@@ -14,7 +14,7 @@ fail() {
 }
 
 SHAPE_RE="^${pkg}/((lib|test|example|tool|doc|skills/diene-auth-engine-usage)/.+|pubspec\.yaml|README\.md|CHANGELOG\.md|LICENSE|analysis_options\.yaml|\.pubignore)$"
-ARTIFACT_RE='(^|/)(\.dart_tool|build|coverage|reports|\.pub-cache|\.pub)/|(^|/)(pubspec\.lock|pubspec_overrides\.yaml|package_config\.json|\.packages|lcov\.info)$|\.(g|freezed|mocks)\.dart$'
+ARTIFACT_RE='(^|/)(\.dart_tool|build|coverage|reports|\.pub-cache|\.pub)/|(^|/)(pubspec\.lock|pubspec_overrides\.yaml|package_config\.json|\.packages|\.flutter-plugins(-dependencies)?|lcov\.info)$|\.(g|freezed|mocks)\.dart$'
 
 # Drops // and nested /* */ comments outside string literals (Dart source on stdin).
 strip_comments() {
@@ -95,7 +95,9 @@ done
 [[ -z "$(judge "${pkg}/lib/src/a/b.dart" ../c/d.dart)" ]] || fail "control: an in-lib relative import is flagged"
 [[ "$(printf "/// import 'package:x/y.dart';\nimport 'a.dart'\n    show A;\nexport \"b.dart\";\n" | directive_uris | tr '\n' ' ')" == "a.dart b.dart " ]] || fail "control: the directive parser misreads a canary"
 [[ "$(printf "/* doc */ import 'package:test/test.dart';\n/* a /* nested */ still */import 'c.dart';\n/*\n import 'package:hidden/x.dart';\n*/\n@Tag('a//b /* c') import 'd.dart';\n" | directive_uris | tr '\n' ' ')" == "package:test/test.dart c.dart d.dart " ]] || fail "control: the directive parser misses an import after a block comment"
-echo "${pkg}/.dart_tool/package_config.json" | grep -qE "${ARTIFACT_RE}" || fail "control: the artifact matcher misses a canary"
+for canary in "${pkg}/.dart_tool/package_config.json" "${pkg}/.flutter-plugins-dependencies"; do
+  grep -qE "${ARTIFACT_RE}" <<<"${canary}" || fail "control: the artifact matcher misses ${canary}"
+done
 
 mapfile -t pkg_files < <(git ls-tree -r --name-only "${tree}" -- "${pkg}/")
 mapfile -t lib_files < <(printf '%s\n' "${pkg_files[@]}" | grep -E "^${pkg}/lib/.*\.dart$" || true)

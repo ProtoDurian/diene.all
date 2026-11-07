@@ -252,6 +252,7 @@ test_helper.dart class FakeAuthProvider
 test_helper.dart class FakeClipboardCarrierSource
 test_helper.dart class FakeInstallReferrerSource
 test_helper.dart class FakeLandscapeSelectorSource
+test_helper.dart class FakeRedeemHttpClient
 test_helper.dart class FakeRegionPinger
 test_helper.dart class FakeUserDirectory
 test_helper.dart class MemoryHomeClaimStore
@@ -262,6 +263,7 @@ test_helper.dart ctor FakeAuthProvider.new
 test_helper.dart ctor FakeClipboardCarrierSource.new
 test_helper.dart ctor FakeInstallReferrerSource.new
 test_helper.dart ctor FakeLandscapeSelectorSource.new
+test_helper.dart ctor FakeRedeemHttpClient.new
 test_helper.dart ctor FakeRegionPinger.new
 test_helper.dart ctor FakeUserDirectory.new
 test_helper.dart ctor MemoryHomeClaimStore.new
@@ -285,6 +287,12 @@ test_helper.dart field FakeInstallReferrerSource.referrer
 test_helper.dart field FakeLandscapeSelectorSource.doc
 test_helper.dart field FakeLandscapeSelectorSource.error
 test_helper.dart field FakeLandscapeSelectorSource.fetchCount
+test_helper.dart field FakeRedeemHttpClient.bodies
+test_helper.dart field FakeRedeemHttpClient.email
+test_helper.dart field FakeRedeemHttpClient.mount
+test_helper.dart field FakeRedeemHttpClient.requests
+test_helper.dart field FakeRedeemHttpClient.status
+test_helper.dart field FakeRedeemHttpClient.token
 test_helper.dart field FakeRegionPinger.latencies
 test_helper.dart field FakeRegionPinger.pinged
 test_helper.dart field FakeUserDirectory.getCount
@@ -326,6 +334,8 @@ test_helper.dart method FakeClipboardCarrierSource.read
 test_helper.dart method FakeInstallReferrerSource.markProcessed
 test_helper.dart method FakeInstallReferrerSource.read
 test_helper.dart method FakeLandscapeSelectorSource.fetch
+test_helper.dart method FakeRedeemHttpClient.acceptsBody
+test_helper.dart method FakeRedeemHttpClient.send
 test_helper.dart method FakeRegionPinger.ping
 test_helper.dart method FakeUserDirectory.getUserMe
 test_helper.dart method FakeUserDirectory.postUser

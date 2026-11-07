@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # The public names of the barrel and test_helper.dart must equal
-# package-surface.txt (the published 1.0.2 surface): one line per library,
+# package-surface.txt (the published 1.0.2 surface plus the accepted TestHelper
+# FakeRedeemHttpClient): one line per library,
 # kind and name, members qualified by their type.
 
 cd "$(git rev-parse --show-toplevel)"
@@ -125,7 +126,7 @@ int member(int k, int end, String? owner) {
     }
     if (s == '=' || s == ';' || s == ',') {
       if (last != null) add(owner == null ? 'variable' : 'field', owner, last);
-      if (s == '=') k = skipTo(k, {',', ';'});
+      if (s == '=') k = skipTo(t[k + 1] == '<' ? skipAngle(k + 1) : k, {',', ';'});
       if (t[k] == ';') return k + 1;
       last = null;
       k++;
@@ -234,4 +235,4 @@ if [[ ${got} != "$(cat "${want}")" ]]; then
   exit 1
 fi
 
-echo "✅ package-surface: barrel and test_helper.dart expose exactly the $(wc -l <"${want}") published names"
+echo "✅ package-surface: barrel and test_helper.dart expose exactly the $(wc -l <"${want}") accepted names"
