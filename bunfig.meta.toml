@@ -6,4 +6,7 @@ coverageSkipTestFiles = true
 # Meta ledger = TestHelper code only; all current non-helper source tiers and tests never count.
 coveragePathIgnorePatterns = ["src/adapters/**", "src/index.ts", "src/lib/**", "tests/**"]
 
+# Imports every src/test-helper module so an untested one is measured at 0% rather than absent.
+preload = ["./tests/support/meta-ledger.ts"]
+
 coverageThreshold = 1.0

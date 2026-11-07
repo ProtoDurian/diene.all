@@ -1,44 +1,50 @@
 import { expectBunGreen, expectBunRed } from './lib/bun-command.ts';
 
+const command = "nix develop .#ci -c bash -lc './scripts/local/setup.sh && task test:int'";
+
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
   probes: [
     {
       name: 'baseline-bun-integration-tests-green',
-      description: 'The Bun integration tier proves the Redis adapter with Testcontainers.',
+      description: 'The empty Bun integration tier (no adapters, no tests) is a green no-op.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectBunGreen(
-          repo,
-          "nix develop .#ci -c bash -lc './scripts/local/setup.sh && task test:int'",
-          'bun-integration-tests',
-        );
+        await expectBunGreen(repo, command, 'bun-integration-tests');
       },
     },
     {
       name: 'mutation-bun-integration-tests-caught',
-      description: 'A broken adapter return turns the integration tier red.',
+      description: 'A paired adapter and failing integration test turn the tier red, so the tier really runs.',
       kind: 'mutation',
-      expectedImpact: ['bun-integration-coverage'],
+      expectedImpact: ['bun-integration-coverage', 'bun-deadcode'],
       async run(repo: any) {
-        const paths = await repo.glob('src/adapters/**/*.ts');
-        for (const path of paths) {
-          const source = await repo.read(path);
-          if (source.includes('return this.client.get(key);')) {
-            await repo.write(
-              path,
-              source.replace('return this.client.get(key);', 'return key.length === 0 ? this.client.get(key) : null;'),
-            );
-            await expectBunRed(
-              repo,
-              "nix develop .#ci -c bash -lc './scripts/local/setup.sh && task test:int'",
-              'bun-integration-tests',
-            );
-            return;
-          }
-        }
-        throw new Error('no structural Redis adapter target found');
+        await repo.write(
+          'src/adapters/__probe_red__.ts',
+          'export class ProbeRedAdapter {\n  value(): number {\n    return 1;\n  }\n}\n',
+        );
+        await repo.write(
+          'tests/integration/__probe_red__.test.ts',
+          [
+            "import { it } from 'bun:test';",
+            "import 'should';",
+            "import { ProbeRedAdapter } from '../../src/adapters/__probe_red__';",
+            '',
+            "it('fails on purpose', () => {",
+            '  // Arrange',
+            '  const adapter = new ProbeRedAdapter();',
+            '',
+            '  // Act',
+            '  const actual = adapter.value();',
+            '',
+            '  // Assert',
+            '  actual.should.equal(2);',
+            '});',
+            '',
+          ].join('\n'),
+        );
+        await expectBunRed(repo, command, 'bun-integration-tests');
       },
     },
   ],

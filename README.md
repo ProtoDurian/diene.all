@@ -14,41 +14,47 @@ boundary. TypeScript variants accompany the shared standards for
 
 ## Library package
 
-`@atomicloud/diene.bun-lib` is the publishable Bun library baseline: a small
-TypeScript package shipped as dual **ESM + CommonJS** with bundled type
-declarations, validated on every push and published on `v*.*.*` tags. Library
-children rescope the package name, description, keywords, and badge URLs from
-this scaffold.
+`@atomicloud/diene.problems` is the Bun family's RFC 9457 Problem Details
+machinery: the `Problem` envelope with its typed `data` extension, a Zod-typed
+registry, the error and HTTP transformer, the single versioned type URI
+builder, the six generic problems, and the emitters that publish a service's
+catalog as a manifest and as per-row `Problem` resources. Every member is a
+stateless class; `tryRegister` returns a `Result` from
+`@atomicloud/diene.result`. The `@atomicloud/diene.problems/test-helper`
+subpath ships the `expectProblem` matcher and registry-aware builders. It ships
+dual **ESM + CommonJS** with bundled type declarations. See the
+[problems standard](docs/standards/problems/index.md) and the shipped
+[usage skill](skills/diene-problems-usage/SKILL.md).
 
-See the [npm release runbook](https://github.com/AtomiCloud/diene.bun-lib/blob/main/docs/developer/npm-release.md)
-for tag publishing, API-key rotation, retry behavior, and the deliberate
-no-provenance policy.
+See the [npm release runbook](docs/developer/npm-release.md) for tag publishing.
 
-[![npm version](https://img.shields.io/npm/v/@atomicloud/diene.bun-lib)](https://www.npmjs.com/package/@atomicloud/diene.bun-lib)
-[![npm downloads](https://img.shields.io/npm/dm/@atomicloud/diene.bun-lib)](https://www.npmjs.com/package/@atomicloud/diene.bun-lib)
-[![CI](https://github.com/AtomiCloud/diene.bun-lib/actions/workflows/ci.yaml/badge.svg)](https://github.com/AtomiCloud/diene.bun-lib/actions/workflows/ci.yaml)
+[![npm version](https://img.shields.io/npm/v/@atomicloud/diene.problems)](https://www.npmjs.com/package/@atomicloud/diene.problems)
+[![npm downloads](https://img.shields.io/npm/dm/@atomicloud/diene.problems)](https://www.npmjs.com/package/@atomicloud/diene.problems)
+[![CI](https://github.com/AtomiCloud/diene.bun-problems/actions/workflows/ci.yaml/badge.svg)](https://github.com/AtomiCloud/diene.bun-problems/actions/workflows/ci.yaml)
 
 ### Installation
 
 ```bash
-bun add @atomicloud/diene.bun-lib
+bun add @atomicloud/diene.problems
 # or
-npm install @atomicloud/diene.bun-lib
+npm install @atomicloud/diene.problems
 ```
-
-`ioredis`, `pino` and `zod` are runtime dependencies and are installed automatically.
 
 ### Usage
 
 ```ts
-// ESM
-import { KeyComposer, RedisKeyValueStore, SampleService } from '@atomicloud/diene.bun-lib';
-import type { IKeyValueStore, RedisConnection } from '@atomicloud/diene.bun-lib';
+import { GenericProblemCatalog, ProblemFactory } from '@atomicloud/diene.problems';
+import { ProblemTestHelper } from '@atomicloud/diene.problems/test-helper';
+
+const registry = new GenericProblemCatalog().createGenericProblemRegistry(portal);
+const problem = new ProblemFactory().createProblem(registry.require('entity_not_found'), {
+  data: { entityType: 'Note', id: '42' },
+});
+new ProblemTestHelper().expectProblem(problem).toBe(registry.require('entity_not_found'));
 ```
 
 ```js
-// CommonJS
-const { KeyComposer, RedisKeyValueStore, SampleService } = require('@atomicloud/diene.bun-lib');
+const { GenericProblemCatalog } = require('@atomicloud/diene.problems');
 ```
 
 # Commands

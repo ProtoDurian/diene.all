@@ -73,6 +73,12 @@ See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).
 
 See [docs/standards/linting/index.md](docs/standards/linting/index.md).
 
+# Problems
+
+See [docs/standards/problems/index.md](docs/standards/problems/index.md) before
+changing the Problem envelope, registry, transformer, type URI builder, generic
+catalog, publication emitters or TestHelper.
+
 # Release automation
 
 See [docs/standards/semantic-release/index.md](docs/standards/semantic-release/index.md).
