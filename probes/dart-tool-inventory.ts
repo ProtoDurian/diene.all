@@ -1,7 +1,7 @@
 import { expectGreen } from './lib/helpers.ts';
 
 const INVENTORY =
-  "nix develop .#ci -c bash -c 'set -euo pipefail; dart --version; cd packages/diene_dart_lib; " +
+  "nix develop .#ci -c bash -c 'set -euo pipefail; dart --version; cd packages/diene_api_engine; " +
   '{ dart run pana --help 2>&1 || true; } | grep -q -- --dartdoc-version; dart run coverage:format_coverage --help >/dev/null; ' +
   "dart run dart_code_linter:metrics --help >/dev/null; dart test --help >/dev/null'";
 
