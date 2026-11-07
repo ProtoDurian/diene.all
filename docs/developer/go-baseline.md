@@ -63,16 +63,10 @@ production packages only. The production deadcode component therefore rejects
 a symbol reachable only from tests. None of the components has an exclusion
 list. Govulncheck is a blocking CI-only job.
 
-## Docker
-
-The Dockerfile builds a static binary and runs it from
-`gcr.io/distroless/static-debian12:nonroot` as UID/GID 65532.
-
 ## Template-maintenance boundary
 
 Downstream authors may adapt package/module identity, sample domain code,
-coverage thresholds after adding real surface and the Docker entrypoint.
+coverage thresholds after adding real surface.
 They must preserve black-box tests, tier scoping,
 all four staticcheck/deadcode components, the CI-only vulnerability gate, one
-composition root, distroless nonroot runtime policy, and generated hook/probe
-coverage.
+composition root, and generated hook/probe coverage.
