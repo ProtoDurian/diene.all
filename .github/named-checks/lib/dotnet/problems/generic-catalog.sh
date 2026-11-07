@@ -22,6 +22,31 @@ validation_error 400 true"
 extras="entity_conflict 409 true
 multiple_entity_not_found 404 false"
 
+# the JSON names of the public properties a problem class puts on the wire, sorted
+wire_fields() {
+  awk '
+    /^[[:space:]]*\/\/\// { next }
+    /^[[:space:]]*\[/ { attrs = attrs $0; next }
+    /^[[:space:]]*public [^(]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*(=>|\{)/ && !/[[:space:]](class|record|struct|interface|enum)[[:space:]]/ {
+      line = $0
+      sub(/[[:space:]]*(=>|\{).*/, "", line)
+      n = split(line, parts, /[[:space:]]+/)
+      name = parts[n]
+      if (attrs !~ /JsonIgnore/) {
+        if (match(attrs, /JsonPropertyName\("[^"]+"\)/)) {
+          wire = substr(attrs, RSTART + 18, RLENGTH - 20)
+        } else {
+          wire = tolower(substr(name, 1, 1)) substr(name, 2)
+        }
+        print wire
+      }
+      attrs = ""
+      next
+    }
+    NF { attrs = "" }
+  ' "$1" | LC_ALL=C sort | paste -sd' ' -
+}
+
 baseline="$(awk '/AddBaseline\(\) =>/ { on = 1 } on { print } on && /;[[:space:]]*$/ { exit }' "${builder}")"
 [[ -n ${baseline} ]] || { echo "❌ ${builder} declares no AddBaseline() expression" >&2 && exit 1; }
 
@@ -32,10 +57,14 @@ while read -r type status recoverable; do
   id="$(sed -nE 's/.*string Id => "([^"]+)";.*/\1/p' "${file}" | head -n 1)"
   [[ -n ${id} ]] || { fail "${file} declares no literal Id" && continue; }
   rows+="${id} ${status} ${recoverable}"$'\n'
-  if [[ ${id} == entity_not_found || ${id} == conflict ]]; then
-    grep -q 'public string EntityType' "${file}" || fail "${id}: data has no entityType"
-    grep -q '\[JsonPropertyName("id")\]' "${file}" || fail "${id}: data has no id"
-  fi
+  fields="$(wire_fields "${file}")"
+  case "${id}" in
+  entity_not_found | conflict) expect="entityType id" ;;
+  validation_error) expect="issues" ;;
+  unauthenticated | unauthorized | invalid_json) expect="" ;;
+  *) continue ;;
+  esac
+  [[ ${fields} == "${expect}" ]] || fail "${id}: wire data fields are '${fields}', want '${expect}'"
 done < <(grep -oE 'Add<[A-Za-z]+>\([0-9]+, (true|false)' <<<"${baseline}" | sed -E 's/Add<([A-Za-z]+)>\(([0-9]+), (true|false)/\1 \2 \3/')
 
 rows="$(sed '/^$/d' <<<"${rows}" | LC_ALL=C sort)"
@@ -47,4 +76,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ generic-catalog: AddBaseline registers the six generic ids with their status and recoverable flags; conflict and entity_not_found carry {entityType, id}"
+echo "✅ generic-catalog: AddBaseline registers the six generic ids with their status and recoverable flags; their public properties put exactly the contract data fields on the wire"
