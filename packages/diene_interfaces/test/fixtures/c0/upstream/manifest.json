@@ -5,7 +5,7 @@
     "path": "contracts/c0/cases/problem.json",
     "sha256": "a8c02554c198627df9badc6c2377218556ec8bd3a0b1edcdb20aedeebe43f988"
   },
-  "algorithm": "sha256 of the subtree printed by jq -cS (sorted keys, no whitespace, trailing newline)",
+  "algorithm": "sha256 of the subtree printed by jq -cS (sorted keys, no whitespace, trailing newline); fileSha256 is the sha256 of the stored file bytes",
   "vectors": {
     "envelopes.json": {
       "pointer": "/cases/envelopes",
@@ -15,7 +15,8 @@
         "None for the codec: the hosted diene_problems 0.1.1 decodes and encodes each valid envelope back unchanged.",
         "Every member a port problem puts on the wire must appear in the sample envelope. Port problems never set instance; 0.1.1 always writes recoverable and data, and port problems always carry data.",
         "The sample data ({ id, resource } for entity-not-found) is not compared: that shape belongs to diene_problems, and port problems carry { port, code, operation } plus details."
-      ]
+      ],
+      "fileSha256": "16c79b9d895a31b958068052e255e3a076ef631f85ba78d166ac2e7f4770fe21"
     },
     "type_uri.json": {
       "pointer": "/cases/typeUri",
@@ -24,7 +25,8 @@
       "adaptations": [
         "The id is spelled in snake case: entity-not-found becomes entity_not_found, in the id and in the last segment of the expected URI; the hosted 0.1.1 builder rejects the kebab-case id.",
         "Port problems are minted on the sample's portal and version, with the id replaced by <port>_<code> (for example vfs_not_found); everything before the last segment must equal the expected URI."
-      ]
+      ],
+      "fileSha256": "73497fb47585fef158a21542a6526bb52cefd39390d0ef99af5022db2bb65b23"
     }
   }
 }

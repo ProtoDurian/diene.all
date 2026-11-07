@@ -131,16 +131,22 @@ void main() {
     vectors.forEach((String name, Object? pin) {
       test(name, () {
         // Arrange
-        final Object? vector = jsonDecode(
-          File('$_upstreamPath/$name').readAsStringSync(),
-        );
+        final List<int> bytes = File('$_upstreamPath/$name').readAsBytesSync();
+        final Object? vector = jsonDecode(utf8.decode(bytes));
 
         // Act
+        final String fileDigest = sha256.convert(bytes).toString();
         final String digest = sha256
             .convert(utf8.encode(_canonical(vector)))
             .toString();
 
         // Assert
+        expect(
+          fileDigest,
+          _object(pin)['fileSha256'],
+          reason:
+              'upstream vector file "$name" digest drifted from the manifest',
+        );
         expect(
           digest,
           _object(pin)['sha256'],
