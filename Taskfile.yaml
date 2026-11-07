@@ -9,6 +9,10 @@ includes:
     taskfile: tasks/Taskfile.test.yaml
     vars:
       MODE: meta
+  consumer:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: consumer
 
 tasks:
   setup:
@@ -48,10 +52,11 @@ tasks:
       - ./scripts/ci/package-validate.sh
 
   test:
-    desc: Run unit/C0 and TestHelper meta suites without coverage
+    desc: Run unit/C0, TestHelper meta and consumer tiers without coverage
     cmds:
       - task: unit:default
       - task: meta:default
+      - task: consumer:default
 
   test:unit:
     desc: Run unit and C0 conformance suites without coverage
@@ -62,6 +67,11 @@ tasks:
     desc: Run assert-the-asserter tests for TestHelper
     cmds:
       - task: meta:default
+
+  test:consumer:
+    desc: Pack the package, install the local archive in a fresh project, then import, run, compile and type-check it
+    cmds:
+      - task: consumer:default
 
   test:coverage:
     desc: Run every coverage-capable tier with its isolated ledger
