@@ -16,7 +16,7 @@ index 0f315ced..b26ec1d5 100644
 +          - '*'
 +    open-pull-requests-limit: 2
 diff --git a/.github/workflows/cd.yaml b/.github/workflows/cd.yaml
-index 6ea70e5b..9bbe671d 100644
+index 6ea70e5b..a733001c 100644
 --- a/.github/workflows/cd.yaml
 +++ b/.github/workflows/cd.yaml
 @@ -3,7 +3,20 @@ name: CD
@@ -41,12 +41,10 @@ index 6ea70e5b..9bbe671d 100644
  
  jobs:
    release:
-@@ -13,4 +26,12 @@ jobs:
-     uses: ./.github/workflows/⚡reusable-release-note.yaml
+@@ -14,3 +27,11 @@ jobs:
      secrets: inherit
      with:
--      version: ${{ github.ref_name }}
-+      version: ${{ inputs.tag || github.ref_name }}
+       version: ${{ github.ref_name }}
 +  publish:
 +    name: Publish to pub.dev
 +    permissions:

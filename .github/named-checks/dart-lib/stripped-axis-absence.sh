@@ -110,6 +110,12 @@ for wf in .github/workflows/ci.yaml .github/workflows/cd.yaml; do
 done
 [[ "$(show .github/workflows/cd.yaml | yq '.jobs | keys | sort | join(",")')" == publish,release ]] || fail "cd.yaml jobs are not exactly release + publish"
 [[ "$(show .github/workflows/cd.yaml | yq '[.jobs.release.uses, .jobs.publish.uses] | join(",")')" == "./.github/workflows/⚡reusable-release-note.yaml,./.github/workflows/⚡reusable-publish.yaml" ]] || fail "cd.yaml release/publish jobs do not call the release-note/publish workflows"
+parent_sha="$(cat .github/named-checks/dart-lib/parent.sha)"
+git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
+[[ "$(show .github/workflows/cd.yaml | yq -o=json -I=0 .jobs.release)" == "$(git show "${parent_sha}:.github/workflows/cd.yaml" | yq -o=json -I=0 .jobs.release)" ]] || fail "cd.yaml release job differs from the parent's"
+for f in '.github/workflows/⚡reusable-release-note.yaml' scripts/ci/release-note.sh; do
+  [[ "$(git rev-parse "${tree}:${f}")" == "$(git rev-parse "${parent_sha}:${f}")" ]] || fail "${f} differs from the parent's"
+done
 [[ "$(show Taskfile.yaml | yq '.includes // {} | (has("docker") or has("helm"))')" == false ]] || fail "Taskfile.yaml includes docker/helm"
 [[ "$(show .github/dependabot.yml | yq '[.updates[] | select(.package-ecosystem == "docker" or .package-ecosystem == "helm")] | length')" == 0 ]] || fail "dependabot.yml has a docker/helm entry"
 [[ "$(show probes/features.json | jq '[.[] | select(.name | test("docker|helm"))] | length')" == 0 ]] || fail "features.json has a docker/helm row"
