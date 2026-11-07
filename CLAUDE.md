@@ -75,10 +75,6 @@ See **[docs/standards/nix/index.md](docs/standards/nix/index.md)** for the full 
 
 See [docs/standards/docker/index.md](docs/standards/docker/index.md).
 
-# Helm charts and publishing
-
-See [docs/standards/helm/index.md](docs/standards/helm/index.md).
-
 # Infisical and secrets
 
 See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).
