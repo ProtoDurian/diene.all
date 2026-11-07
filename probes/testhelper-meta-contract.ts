@@ -5,7 +5,9 @@ const META = 'nix develop .#ci -c ./scripts/ci/test.sh meta no-coverage';
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
+  setup: {
+    post: ['nix develop .#ci -c flutter pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'],
+  },
   probes: [
     {
       name: 'baseline-testhelper-meta-contract-green',
@@ -17,7 +19,7 @@ export default {
     },
     {
       name: 'mutation-testhelper-meta-contract-caught',
-      description: 'the meta suite fails once the TestHelper mismatch check is inverted',
+      description: 'the meta suite fails once the TestHelper problem-type check is inverted',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
@@ -26,7 +28,7 @@ export default {
           throw new Error('testhelper-meta-contract: no lib/test_helper.dart to sabotage');
         }
         await withCleanProbeState(repo, [target], async () => {
-          await repo.patch(target, { find: 'if (actual != expected) {', replace: 'if (actual == expected) {' });
+          await repo.patch(target, { find: 'if (problem.type != type) {', replace: 'if (problem.type == type) {' });
           await expectRedBecause(repo, META, 'testhelper-meta-contract', ['Some tests failed']);
         });
       },

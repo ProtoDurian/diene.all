@@ -1,13 +1,15 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
 const PANA =
-  "nix develop .#ci -c bash -c 'cd packages/diene_api_engine && dart doc --dry-run && ../../scripts/validate/pana-score.sh'";
+  'nix develop .#ci -c bash -c \'export FLUTTER_ROOT=$(dirname "$(dirname "$(command -v flutter)")"); cd packages/diene_api_engine && dart doc --dry-run && ../../scripts/validate/pana-score.sh\'';
 const MEMBER_PUBSPEC = 'packages/diene_api_engine/pubspec.yaml';
 
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
+  setup: {
+    post: ['nix develop .#ci -c flutter pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'],
+  },
   probes: [
     {
       name: 'baseline-pana-score-green',
@@ -25,7 +27,7 @@ export default {
       async run(repo: any) {
         await withCleanProbeState(repo, [MEMBER_PUBSPEC], async () => {
           const source = await repo.read(MEMBER_PUBSPEC);
-          const stripped = source.replace(/^description:.*\n/m, '');
+          const stripped = source.replace(/^description:.*\n(?:[ \t]+.*\n)*/m, '');
           if (stripped === source) {
             throw new Error('pana-score: no description field to remove');
           }
