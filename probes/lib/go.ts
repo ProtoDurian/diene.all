@@ -58,8 +58,26 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Flip the first single `if a != b {` comparison (not an error check) that sits directly in a top-level
-// test body and guards a t.Fatal/t.Error call, so exactly that test fails by name.
+// Flip the first `a != b` comparison (not an error check) in an `if` guard that sits directly in a top-level
+// test body and guards a t.Fatal/t.Error call, so exactly that test fails by name. The guard may be an `||` chain:
+// on a passing test every operand is false, so flipping one comparison fires it.
+function flipGuard(line: string): string | undefined {
+  const condition = line.match(/^\tif (.+) \{$/)?.[1];
+  if (!condition || /&&|;|:=/.test(condition)) {
+    return undefined;
+  }
+  const operands = condition.split(' || ');
+  const index = operands.findIndex(operand => {
+    const sides = operand.match(/^([^=!&|]+) != ([^=!&|]+)$/);
+    return sides !== null && sides[1] !== 'nil' && sides[2] !== 'nil';
+  });
+  if (index < 0) {
+    return undefined;
+  }
+  operands[index] = operands[index].replace(' != ', ' == ');
+  return `\tif ${operands.join(' || ')} {`;
+}
+
 export async function flipComparisonAssertion(repo: ProbeRepo, glob: string): Promise<FlippedAssertion> {
   for (const path of (await repo.glob(glob)).sort()) {
     const lines = (await repo.read(path)).split('\n');
@@ -69,14 +87,9 @@ export async function flipComparisonAssertion(repo: ProbeRepo, glob: string): Pr
         test = lines[index].match(/^func (Test[A-Za-z0-9_]*)\(t \*testing\.T\) \{$/)?.[1] ?? '';
         continue;
       }
-      const comparison = lines[index].match(/^\tif ([^=!&|;]+) != ([^=!&|;{]+) \{$/);
-      if (
-        test &&
-        comparison &&
-        comparison[2] !== 'nil' &&
-        /^\t\tt\.(Fatal|Fatalf|Error|Errorf)\(/.test(lines[index + 1])
-      ) {
-        lines[index] = `\tif ${comparison[1]} == ${comparison[2]} {`;
+      const flipped = test ? flipGuard(lines[index]) : undefined;
+      if (flipped && /^\t\tt\.(Fatal|Fatalf|Error|Errorf)\(/.test(lines[index + 1])) {
+        lines[index] = flipped;
         await repo.write(path, lines.join('\n'));
         return { path, failure: new RegExp(`FAIL: ${escapeRegExp(directory(path))} ${test} `) };
       }
