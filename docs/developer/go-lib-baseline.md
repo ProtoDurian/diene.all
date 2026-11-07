@@ -1,9 +1,9 @@
 # Go library baseline
 
-This template publishes the Go module `github.com/ProtoDurian/diene.go-interfaces`. The
-module path is the mirror repository path. A library generated from it replaces
-the final `go-lib` token with its own name in `go.mod`, `.config/go-lib.yaml`,
-imports, `README.md` (text and badges), the API baseline fixture,
+This library publishes the Go module `github.com/ProtoDurian/diene.go-interfaces`. The
+module path is the mirror repository path. The template's `go-lib` token was
+replaced with `go-interfaces` in `go.mod`, `.config/go-lib.yaml`, imports,
+`README.md` (text and badges), the API baseline fixture,
 `tests/fixtures/deadcode-consumer.go.txt` and this document. Mirrors are single-module
 unless a library proves it needs more.
 
