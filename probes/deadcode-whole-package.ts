@@ -1,39 +1,47 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-// Gate: the whole-package dead-code pass (`dart_code_linter` check-unused-code /
-// check-unused-files over lib+test+example) forbids unreferenced declarations.
-// Sabotage appends an unused private production member and proves the pass flags
-// it as dead code.
-const MEMBER = 'packages/diene_core_utils';
-const WHOLE_PASS =
-  "nix develop .#ci --no-write-lock-file -c bash -lc 'cd packages/diene_core_utils && dart run dart_code_linter:metrics check-unused-code lib test example && dart run dart_code_linter:metrics check-unused-files lib test example'";
+const DEADCODE = 'nix develop .#ci -c ./scripts/ci/deadcode.sh';
+const CLASS_DECLARATION = /^(?:final |base |sealed |abstract )*class \w+[^{\n]*\{\n/m;
+
+async function findClassFile(repo: any): Promise<string> {
+  for (const candidate of (await repo.glob('packages/*/lib/src/*.dart')).sort()) {
+    if (CLASS_DECLARATION.test(await repo.read(candidate))) {
+      return candidate;
+    }
+  }
+  throw new Error('deadcode-whole-package: no shipped class declaration found under lib/src');
+}
 
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: {
-    post: ['nix develop .#ci --no-write-lock-file -c dart pub get --offline'],
-  },
+  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
   probes: [
     {
       name: 'baseline-deadcode-whole-package-green',
-      description: 'the whole-package dead-code pass is clean on the pristine template',
+      description: 'both no-exclusion dead-code views are clean',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, WHOLE_PASS, 'deadcode-whole-package');
+        await expectGreen(repo, DEADCODE, 'deadcode-whole-package');
       },
     },
     {
       name: 'mutation-deadcode-whole-package-caught',
-      description: 'the whole-package dead-code pass flags an unused private member',
+      description: 'the whole-package view flags an unused private member of a used shipped class',
       kind: 'mutation',
-      expectedImpact: ['deadcode-production-only'],
+      expectedImpact: [],
       async run(repo: any) {
-        // Drop an orphan source under the member's lib/src that nothing
-        // references. dart_code_linter surfaces it as unused code AND an unused
-        // file, so the whole-package pass reddens.
-        await repo.write(`${MEMBER}/lib/src/__probe_dead_whole.dart`, 'int probeDeadWhole() => 1;\n');
-        await expectRed(repo, WHOLE_PASS, 'deadcode-whole-package');
+        const target = await findClassFile(repo);
+        await withCleanProbeState(repo, [target], async () => {
+          const source = await repo.read(target);
+          await repo.write(
+            target,
+            source.replace(CLASS_DECLARATION, match => `${match}  int _probeUnused() => 1;\n\n`),
+          );
+          await expectRedBecause(repo, DEADCODE, 'deadcode-whole-package', ['unused method _probeUnused'], {
+            forbidden: ['Production dead-code pass'],
+          });
+        });
       },
     },
   ],

@@ -1,18 +1,6 @@
 schemaVersion: 2
 
 types:
-  # This node keeps its own pre-merge vocabulary in BOTH directions: `amend` was
-  # restored after the shared-wo-docker cascade dropped it, and the `merge` type
-  # the same cascade added was removed again. The parent renames
-  # atomi_release.yaml to release.yaml, and the rename hid the exchange from a
-  # count check — 17 pairs before, 17 after, one lost and one gained. The set
-  # here is exactly the pre-merge set: nothing added, nothing missing.
-  - type: amend
-    desc: Small amendments and typo fixes
-    scopes:
-      default:
-        desc: Amend existing work
-        release: false
   - type: build
     desc: Build-system changes
     scopes:
@@ -77,6 +65,12 @@ types:
       default:
         desc: Fix a bug
         release: patch
+  - type: merge
+    desc: Branch merges
+    scopes:
+      default:
+        desc: Merge a branch
+        release: false
   - type: perf
     desc: Performance improvements
     section: 🚀 Performance Improvement 🚀
@@ -161,37 +155,25 @@ release:
     - main
   tagFormat: 'v${version}'
   changelog:
-    # This node publishes a pub package, so its changelog is the MEMBER changelog,
-    # not the parent's repo-root Changelog.md. A published package whose shipped
-    # CHANGELOG.md never updates is a consumer-visible regression.
-    path: packages/diene_core_utils/CHANGELOG.md
-    # R-E33: the title must be the file's exact leading bytes, or the generated
-    # entry is prepended ABOVE the heading and the heading is duplicated.
-    title: |-
-      # Changelog
-
-      All notable changes to this package are documented here. Releases are managed
-      from conventional commits by the repository release workflow.
+    path: Changelog.md
+    title: '# Changelog'
   commit:
     message: |-
       release: ${version}
 
       ${notes}
     assets:
-      - packages/diene_core_utils/CHANGELOG.md
-      - packages/diene_core_utils/pubspec.yaml
-      - VERSION
+      - Changelog.md
       - docs/developer/CommitConventions.md
+      - packages/diene_dart_lib/pubspec.yaml
   github:
     enabled: true
     successComment: 'Released in ${version}.'
     releasedLabels:
       - released
   hooks:
-    # Unlike the parent workspace, this node DOES version a manifest: bump.sh
-    # stamps both the root VERSION file and the member pubspec.yaml, so both are
-    # listed in commit.assets above, in the same edit as the command writing them.
+    # A file a hook writes joins commit.assets in the same edit.
     prepare:
       - phase: afterWrite
-        command: './scripts/release/bump.sh ${version} && ./scripts/release/format-changelog.sh'
+        command: './scripts/release/bump.sh ${version}'
     success: []

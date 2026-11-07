@@ -1,25 +1,21 @@
 import { expectGreen } from './lib/helpers.ts';
 
-// Smoke: the offline-safe archive-builder mode completes cleanly, proving the
-// package is packable without advisory or pub.dev network access. Repository
-// validators and the hermetic Pana gate own semantic validation separately.
+const DRY_RUN =
+  "nix develop .#ci -c bash -c 'set -euo pipefail; cd packages/diene_dart_lib; " +
+  'out=$(dart pub publish --dry-run --skip-validation 2>&1); printf "%s\\n" "$out"; ' +
+  'printf "%s\\n" "$out" | grep -Fx "Package has 0 warnings."\'';
+
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: {
-    post: ['nix develop .#ci --no-write-lock-file -c dart pub get --offline'],
-  },
+  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
   probes: [
     {
       name: 'baseline-publish-dry-run-green',
-      description: 'dart pub publish builds the dry-run archive without remote validation',
+      description: 'the publishable member builds its dry-run archive with zero warnings',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(
-          repo,
-          "nix develop .#ci --no-write-lock-file -c bash -lc 'cd packages/diene_core_utils && dart pub publish --dry-run --skip-validation'",
-          'publish-dry-run',
-        );
+        await expectGreen(repo, DRY_RUN, 'publish-dry-run');
       },
     },
   ],

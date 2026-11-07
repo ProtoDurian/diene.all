@@ -52,34 +52,24 @@
             env
             ;
         };
-        pre-commit-offline = import ./nix/pre-commit.nix {
-          inherit
-            packages
-            pkgs
-            pre-commit-lib
-            formatter
-            env
-            ;
-          offline = true;
-        };
         formatter = import ./nix/fmt.nix {
           inherit treefmt-nix pkgs;
         };
         packages = import ./nix/packages.nix {
-          inherit pkgs-2605 pkgs-unstable atomi;
+          inherit
+            pkgs-2605
+            pkgs-unstable
+            atomi
+            ;
         };
         env = import ./nix/env.nix {
           inherit pkgs packages;
         };
         devShells = import ./nix/shells.nix {
           inherit pkgs env packages;
-          shellHook = pre-commit.shellHook;
+          shellHook = checks.pre-commit-check.shellHook;
         };
         checks = {
-          # ONLINE binding, restored from this node's pre-merge tip. The parent
-          # binds `pre-commit-offline` here, whose hook set OMITS the a-dart-*
-          # hooks entirely — so it returns green without ever running them. A
-          # green from a battery that never ran the Dart hooks is not a green.
           pre-commit-check = pre-commit;
           format = formatter;
         };

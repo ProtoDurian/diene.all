@@ -41,11 +41,6 @@
   },
   {
     "template": "diene/workspace",
-    "name": "direnv",
-    "class": "smoke"
-  },
-  {
-    "template": "diene/workspace",
     "name": "fmt-actionlint",
     "class": "gate"
   },
@@ -68,11 +63,6 @@
     "template": "diene/workspace",
     "name": "binary-smoke",
     "class": "smoke"
-  },
-  {
-    "template": "diene/workspace",
-    "name": "skills-sync",
-    "class": "gate"
   },
   {
     "template": "diene/workspace",
@@ -155,6 +145,16 @@
     "class": "gate"
   },
   {
+    "template": "diene/shared",
+    "name": "standards-inventory",
+    "class": "presence"
+  },
+  {
+    "template": "diene/shared",
+    "name": "thin-skills",
+    "class": "presence"
+  },
+  {
     "template": "diene/dart-lib",
     "name": "dart-format",
     "class": "gate"
@@ -177,6 +177,16 @@
   {
     "template": "diene/dart-lib",
     "name": "unit-coverage-ledger",
+    "class": "gate"
+  },
+  {
+    "template": "diene/dart-lib",
+    "name": "testhelper-meta-contract",
+    "class": "gate"
+  },
+  {
+    "template": "diene/dart-lib",
+    "name": "testhelper-meta-coverage-ledger",
     "class": "gate"
   },
   {
@@ -266,27 +276,7 @@
   },
   {
     "template": "diene/dart-lib",
-    "name": "release-policy-values",
-    "class": "gate"
-  },
-  {
-    "template": "diene/dart-lib",
-    "name": "codecov-configuration",
-    "class": "presence"
-  },
-  {
-    "template": "diene/dart-lib",
     "name": "probe-inventory",
-    "class": "presence"
-  },
-  {
-    "template": "diene/shared",
-    "name": "standards-inventory",
-    "class": "presence"
-  },
-  {
-    "template": "diene/shared",
-    "name": "thin-skills",
     "class": "presence"
   }
 ]

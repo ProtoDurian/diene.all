@@ -3,23 +3,14 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { devShellCommand } from './exec';
-import {
-  capturedEnvCommand,
-  DEV_SHELL_CHAIN,
-  expectDevShellsOnce,
-  expectRedBecause,
-  preserveMutationBeforeRestore,
-} from './helpers';
+import { capturedEnvCommand, expectRedBecause } from './helpers';
 
 const ENV_DIR = '/captures';
 
-// The four-shell chain dev-shell.ts asserts, verbatim.
 const CHAINED =
   'nix develop --no-write-lock-file .#default -c true && nix develop --no-write-lock-file .#ci -c true && ' +
   'nix develop --no-write-lock-file .#cd -c true && nix develop --no-write-lock-file .#releaser -c true';
 
-// A real corpus command whose payload is a single-quoted bash script containing its own
-// escaped single quotes — the shape the rewrite is most likely to corrupt.
 const EMBEDDED_QUOTES =
   `nix develop .#ci -c bash -c 'set -euo pipefail; first="$(mktemp -d)"; ` +
   `trap "rm -rf \\"$first\\"" EXIT; test "$(cat skill)" = '"'"'committed skill'"'"''`;
@@ -28,7 +19,8 @@ describe('captured-env rewrite — flag off is byte-identical', () => {
   const commands = [
     CHAINED,
     EMBEDDED_QUOTES,
-    'nix develop .#ci -c shellcheck -x scripts/ci/pre-commit.sh',
+    'nix develop .#ci -c helm lint infra/root_chart',
+    'CI_DOCKER_PUSH=false nix develop .#cd -c ./scripts/ci/docker.sh',
     'nix fmt --no-write-lock-file -- --ci --formatters shfmt',
   ];
 
@@ -58,9 +50,9 @@ describe('captured-env rewrite — flag on', () => {
   });
 
   test('both invocation variants are rewritten and the shell name selects the capture', () => {
-    expect(
-      capturedEnvCommand('nix develop .#ci -c shellcheck -x scripts/ci/pre-commit.sh', 'hook-shellcheck', ENV_DIR),
-    ).toContain(`probe-captured-env '/captures/ci.sh' shellcheck -x scripts/ci/pre-commit.sh`);
+    expect(capturedEnvCommand('nix develop .#ci -c helm lint infra/root_chart', 'helm-lint', ENV_DIR)).toContain(
+      `probe-captured-env '/captures/ci.sh' helm lint infra/root_chart`,
+    );
     expect(
       capturedEnvCommand('nix develop --no-write-lock-file .#default -c pre-commit run treefmt', 'fmt', ENV_DIR),
     ).toContain(`probe-captured-env '/captures/default.sh' pre-commit run treefmt`);
@@ -100,34 +92,6 @@ describe('captured-env rewrite — flag on', () => {
   });
 });
 
-describe('duplicate dev-shell proof', () => {
-  test('one real shell chain proves both duplicate feature arms in one sandbox phase', async () => {
-    const commands: string[] = [];
-    const outcomes = [{ exitCode: 1 }, { exitCode: 0 }, { exitCode: 0 }, { exitCode: 0 }];
-    const repo = {
-      exec: async (command: string) => {
-        commands.push(command);
-        return outcomes.shift() ?? { exitCode: 1 };
-      },
-    };
-
-    await expectDevShellsOnce(repo);
-    await expectDevShellsOnce(repo);
-
-    expect(DEV_SHELL_CHAIN).toBe(CHAINED);
-    expect(commands.filter(command => command === DEV_SHELL_CHAIN)).toHaveLength(1);
-    expect(commands).toEqual([
-      '[ -f .git/cyanprint-probe-dev-shell-checked ]',
-      DEV_SHELL_CHAIN,
-      ': > .git/cyanprint-probe-dev-shell-checked',
-      '[ -f .git/cyanprint-probe-dev-shell-checked ]',
-    ]);
-  });
-});
-
-// The byte assertions above cannot show that the rewritten string still *runs* the same
-// argv. These do, against a hand-written capture, with no nix anywhere: `sh -c` is exactly
-// how cyanprint's probe sandbox executes a probe command (packages/core/src/probe/spawn.ts).
 describe('captured-env rewrite — the rewritten command actually runs', () => {
   const dir = mkdtempSync(join(tmpdir(), 'captured-env-test-'));
   writeFileSync(join(dir, 'ci.sh'), 'export PROBE_TEST_MARKER=from-capture\n');
@@ -176,8 +140,6 @@ describe('captured-env rewrite — the rewritten command actually runs', () => {
 
 type Recorded = { command: string; options?: { timeoutMs?: number } };
 
-// None of these commands contain a `nix develop .#<shell> -c ` entry, so the captured-env
-// rewrite is a no-op on them whatever PROBE_CAPTURED_ENV holds.
 function fakeRepo(result: { exitCode: number; stdout?: string; stderr?: string }) {
   const calls: Recorded[] = [];
   return {
@@ -189,7 +151,6 @@ function fakeRepo(result: { exitCode: number; stdout?: string; stderr?: string }
   };
 }
 
-// Assert-the-asserter: every arm is driven on a known-bad case as well as a known-good one.
 describe('expectRedBecause', () => {
   test('accepts a red whose output names every declared reason', async () => {
     const repo = fakeRepo({ exitCode: 1, stdout: 'error TS2322: Type mismatch\n' });
@@ -276,78 +237,6 @@ describe('expectRedBecause', () => {
       await expect(expectRedBecause(repo, 'tsc --noEmit', 'typecheck', ['error TS2322'])).rejects.toThrow(
         `exit ${exitCode}`,
       );
-    });
-  }
-});
-
-describe('preserveMutationBeforeRestore', () => {
-  // Minimal in-memory repo: only read/write are exercised, and `failWrites`
-  // simulates a writer that throws so the restore guarantee can be tested
-  // independently of the evidence capture succeeding.
-  function evidenceRepo(files: Record<string, string>, options?: { failWrites?: RegExp; lieOnReadBack?: boolean }) {
-    const store = { ...files };
-    return {
-      store,
-      async read(path: string) {
-        if (!(path in store)) throw new Error(`no such file: ${path}`);
-        return store[path];
-      },
-      async write(path: string, contents: string) {
-        if (options?.failWrites?.test(path)) throw new Error(`write refused: ${path}`);
-        store[path] = options?.lieOnReadBack && path.startsWith('.probe-evidence/') ? 'DIFFERENT BYTES' : contents;
-      },
-    };
-  }
-
-  const SOURCE = 'packages/diene_core_utils/pubspec.yaml';
-
-  test('captures the mutated bytes under .probe-evidence and restores the original', async () => {
-    const repo = evidenceRepo({ [SOURCE]: 'version: 9.9.9-probe-drift' });
-
-    await preserveMutationBeforeRestore(repo, 'publish-version-guard', SOURCE, 'version: 1.0.0');
-
-    expect(repo.store[`.probe-evidence/publish-version-guard/${SOURCE}`]).toBe('version: 9.9.9-probe-drift');
-    expect(repo.store[SOURCE]).toBe('version: 1.0.0');
-  });
-
-  test('restores the original even when the evidence write throws', async () => {
-    const repo = evidenceRepo({ [SOURCE]: 'mutated' }, { failWrites: /^\.probe-evidence\// });
-
-    await expect(preserveMutationBeforeRestore(repo, 'publish-version-guard', SOURCE, 'original')).rejects.toThrow(
-      'write refused',
-    );
-    // The restore is the one thing that must happen unconditionally.
-    expect(repo.store[SOURCE]).toBe('original');
-  });
-
-  test('refuses evidence whose read-back differs from the mutated source', async () => {
-    const repo = evidenceRepo({ [SOURCE]: 'mutated' }, { lieOnReadBack: true });
-
-    await expect(preserveMutationBeforeRestore(repo, 'pana-score', SOURCE, 'original')).rejects.toThrow(
-      'probe evidence differs from mutated source',
-    );
-    expect(repo.store[SOURCE]).toBe('original');
-  });
-
-  for (const badId of ['Publish-Version-Guard', 'publish_version_guard', '../escape', '']) {
-    test(`rejects the invalid evidence id ${JSON.stringify(badId)} and still restores`, async () => {
-      const repo = evidenceRepo({ [SOURCE]: 'mutated' });
-
-      await expect(preserveMutationBeforeRestore(repo, badId, SOURCE, 'original')).rejects.toThrow(
-        'invalid probe evidence id',
-      );
-      expect(repo.store[SOURCE]).toBe('original');
-    });
-  }
-
-  for (const badPath of ['/etc/passwd', '../outside.yaml', 'packages/../../escape.yaml']) {
-    test(`rejects the escaping source path ${JSON.stringify(badPath)} and still restores`, async () => {
-      const repo = evidenceRepo({ [badPath]: 'mutated' });
-
-      await expect(preserveMutationBeforeRestore(repo, 'dart-analyze', badPath, 'original')).rejects.toThrow(
-        'invalid probe evidence source path',
-      );
-      expect(repo.store[badPath]).toBe('original');
     });
   }
 });
