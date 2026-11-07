@@ -49,7 +49,7 @@ export default {
       name: 'mutation-bun-biome-format-no-install',
       description: 'Without installed dependencies the Biome member must fail and point at the setup task.',
       kind: 'mutation',
-      expectedImpact: treefmtImpact,
+      expectedImpact: ['binary-smoke', ...treefmtImpact],
       async run(repo: any) {
         const removed = await repo.exec('rm -rf node_modules');
         if (removed.exitCode !== 0) throw new Error(`failed to remove node_modules: ${removed.stderr}`);
