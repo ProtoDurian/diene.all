@@ -21,7 +21,6 @@
 /skills-sync.yaml
 /.prettierrc.yaml
 /release.yaml
-/codecov.yml
 /flake.lock
 /flake.nix
 /swagger_parser.yaml
