@@ -267,42 +267,6 @@ if (!result.success) {
 
 ## Integration Patterns
 
-### Express Request Validation
-
-```typescript
-import { z } from 'zod';
-import { Request, Response } from 'express';
-
-const CreateUserSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  age: z.number().int().positive().optional(),
-});
-
-// Express handler
-async function createUser(req: Request, res: Response) {
-  const result = CreateUserSchema.safeParse(req.body);
-
-  if (!result.success) {
-    return res
-      .status(400)
-      .type('application/problem+json')
-      .json({
-        type: 'https://errors.atomi.cloud/docs/lapras/nitroso/zinc/api/v1/validation_error',
-        title: 'The request is invalid',
-        status: 400,
-        errors: result.error.issues.map(e => ({
-          field: e.path.join('.'),
-          message: e.message,
-        })),
-      });
-  }
-
-  const user = result.data; // typed!
-  // ...
-}
-```
-
 ### Bun/Fetch Request Validation
 
 ```typescript
