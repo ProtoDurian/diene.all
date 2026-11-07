@@ -110,8 +110,10 @@ for wf in .github/workflows/ci.yaml .github/workflows/cd.yaml; do
 done
 [[ "$(show .github/workflows/cd.yaml | yq '.jobs | keys | sort | join(",")')" == publish,release ]] || fail "cd.yaml jobs are not exactly release + publish"
 [[ "$(show .github/workflows/cd.yaml | yq '[.jobs.release.uses, .jobs.publish.uses] | join(",")')" == "./.github/workflows/⚡reusable-release-note.yaml,./.github/workflows/⚡reusable-publish.yaml" ]] || fail "cd.yaml release/publish jobs do not call the release-note/publish workflows"
+[[ "$(show .github/workflows/cd.yaml | yq -o=json -I=0 '[(.on | keys), (.on.push | keys)]')" == '[["push","workflow_dispatch"],["tags"]]' ]] || fail "cd.yaml triggers are not exactly tag pushes + workflow_dispatch"
 parent_sha="$(cat .github/named-checks/dart-lib/parent.sha)"
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
+git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ shared-wo-docker-helm .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 [[ "$(show .github/workflows/cd.yaml | yq -o=json -I=0 .jobs.release)" == "$(git show "${parent_sha}:.github/workflows/cd.yaml" | yq -o=json -I=0 .jobs.release)" ]] || fail "cd.yaml release job differs from the parent's"
 for f in '.github/workflows/⚡reusable-release-note.yaml' scripts/ci/release-note.sh; do
   [[ "$(git rev-parse "${tree}:${f}")" == "$(git rev-parse "${parent_sha}:${f}")" ]] || fail "${f} differs from the parent's"
