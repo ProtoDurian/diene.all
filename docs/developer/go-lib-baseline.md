@@ -1,6 +1,6 @@
 # Go library baseline
 
-This template publishes the Go module `github.com/ProtoDurian/diene.go-lib`. The
+This template publishes the Go module `github.com/ProtoDurian/diene.go-interfaces`. The
 module path is the mirror repository path. A library generated from it replaces
 the final `go-lib` token with its own name in `go.mod`, `.config/go-lib.yaml`,
 imports, `README.md` (text and badges), the API baseline fixture,
@@ -27,8 +27,9 @@ system-integration tier.
 The README's library section carries one badge block: pkg.go.dev reference, the mirror's `CI`
 workflow status and the license.
 
-The `lib/note` sample and the `adapters/kv` Redis adapter sit between
-`DOMAIN WIRING` fences for wholesale replacement.
+This library ships `lib/interfaces` (the System, Vfs, Terminal, LoggerSink and
+MetricsCollector ports) and `testhelper` (an in-memory double of each port). It
+has no adapters, so the int tier is empty.
 
 ## Test pyramid and TestHelper
 

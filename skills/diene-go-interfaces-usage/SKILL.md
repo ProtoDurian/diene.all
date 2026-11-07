@@ -1,29 +1,38 @@
 ---
 name: diene-go-interfaces-usage
-description: Use the Diene Go implementation-free interfaces library and its deterministic in-memory test helpers.
+description: Use the Diene Go effect ports (System, Vfs, Terminal, LoggerSink, MetricsCollector) and their in-memory test doubles.
 ---
 
 # Diene Go interfaces usage
 
-Import `github.com/ProtoDurian/diene.go-interfaces/lib/interfaces` for portable
-system, virtual filesystem, terminal, logging, and metrics seams. Depend on the
-interfaces in application code; keep host-backed implementations in the owning
-adapter library.
+The package docs are the reference: `go doc github.com/ProtoDurian/diene.go-interfaces/lib/interfaces`
+and `go doc github.com/ProtoDurian/diene.go-interfaces/testhelper` (or pkg.go.dev). Every export has a
+runnable `Example`.
 
-- Return ordinary `(T, error)` pairs. Every non-nil error must carry a
-  `*problem.Error` from
-  `github.com/AtomiCloud/diene.go-errors-problems/lib/problem`.
-- Pass `context.Context` first to terminal, VFS, and delay operations.
-- Treat a non-zero `TerminalOutput.ExitCode` as captured command output, not a
-  launch error.
-- Use `NewTerminalCommand`, `NewLogRecord`, and `NewMetricRecord` when caller
-  maps or slices need independent ownership.
+## Ports
 
-For consumer tests, import
-`github.com/ProtoDurian/diene.go-interfaces/testhelper`. Its `InMemorySystem`,
-`InMemoryVfs`, `InMemoryTerminal`, `InMemoryLoggerSink`, and
-`InMemoryMetricsCollector` provide deterministic state, FIFO scripted results,
-and read-only snapshots of recorded inputs. Script errors with the
-`Enqueue…Result` methods. Plain injected errors are normalized into
-`*problem.Error` values while preserving `errors.Is`; already problem-typed
-errors are returned unchanged.
+Import `github.com/ProtoDurian/diene.go-interfaces/lib/interfaces` and depend on the port, never on a
+host type. Concrete adapters live in the consuming runtime, not here.
+
+- `System` (environment, working directory, UTC clock, delay), `Vfs` (files and directories),
+  `Terminal` (process runs), `LoggerSink` and `MetricsCollector` (telemetry emission).
+- Every fallible method returns `(T, error)`; a non-nil error carries a `*problem.Error` from
+  `github.com/AtomiCloud/diene.go-errors-problems/lib/problem`. Recover it with `errors.As`.
+- `System.Environment` returns nil for an unset variable and a pointer to `""` for an empty one.
+- A non-zero `TerminalOutput.ExitCode` is captured output, not an error; only a launch failure is.
+- Build values with `NewTerminalCommand`, `NewLogRecord`, `NewMetricRecord` and `NewVfsEntry` so
+  caller slices and maps are copied and times are UTC.
+
+## Test doubles
+
+Import `github.com/ProtoDurian/diene.go-interfaces/testhelper` in tests only.
+
+- `NewInMemorySystem`, `NewInMemoryVfs`, `NewInMemoryTerminal`, `NewInMemoryLoggerSink` and
+  `NewInMemoryMetricsCollector` return deterministic doubles; seed them through their options.
+- Script the next results with the `Enqueue…Result` methods (FIFO). A scripted plain error comes back
+  as a `*problem.Error` that still matches the original with `errors.Is`; a problem error is returned
+  unchanged.
+- An unscripted `InMemoryTerminal.Run` fails with a 500 problem, so script every run you expect.
+- Inspect what happened with `RequestedDelays`, `Files`, `Directories`, `Commands` and `Records`;
+  each returns a copy.
+- `InMemorySystem.Delay` never sleeps and ignores the context.
