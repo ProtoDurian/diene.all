@@ -1,0 +1,11 @@
+{
+  "contract": "diene.core-utils.temporal-wire.v1",
+  "authority": "local-regression-only",
+  "provenance": "Locally written temporal wire fixtures; the shared C0 release has no temporal case file.",
+  "algorithm": "sha256",
+  "fixtures": {
+    "temporal_vectors.json": "f99be2f85a051e6aba683f98d43ea3e5ddcfada4d6b3ff007d2d70caa7c8737b",
+    "wire_forms.json": "b47bf5afa45e04130b9dd0ca35246906d9955d3a8cf90eb6e6da45d2497e8fdc",
+    "wire_problem.json": "0a0ca1d09c7e0c221f462083cb6d9058f6b457631d388a00a27c7205645864a6"
+  }
+}

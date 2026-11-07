@@ -22,221 +22,10 @@ import 'package:diene_problems/diene_problems.dart';
 import 'package:diene_result/diene_result.dart';
 import 'package:test/test.dart';
 
-/// C0 §1 temporal conformance, driven from the SHARED contract this package
-/// owns and exports at `package:diene_core_utils/c0_temporal.dart`.
-///
-/// Release `c0-fixtures-r2` declares only the `config`, `identity`, `problem`,
-/// and `result-wire` domains — there is no temporal case file to project — so
-/// the vectors live in `c0TemporalContract`, whose provenance pins the C0 source
-/// document AND the official IANA release. Downstream Dart-family packages drive
-/// their own temporal conformance from the same value rather than restating
-/// cases, so this suite is what keeps the family's single temporal contract
-/// honest.
-///
-/// No host clock and no host IANA data is read anywhere below: every instant is
-/// injected from the contract, and timezone membership resolves against the
-/// vendored release baked into `isIanaTimeZone`.
-void main() {
-  const C0TemporalContract contract = c0TemporalContract;
-  const WireCodec codec = WireCodec();
+const C0TemporalContract _contract = c0TemporalContract;
+const WireCodec _codec = WireCodec();
 
-  group('contract provenance', () {
-    test('the recorded digest authenticates the committed vectors', () {
-      // Stale-fixture detection: any vector edit changes digestPayload, so the
-      // recorded contentSha256 must be updated deliberately alongside it.
-      final String actual = sha256
-          .convert(utf8.encode(contract.digestPayload()))
-          .toString();
-      expect(
-        actual,
-        contract.provenance.contentSha256,
-        reason:
-            'temporal vectors changed without updating '
-            'provenance.contentSha256 (expected $actual)',
-      );
-    });
-
-    test(
-      'provenance pins the C0 source and the IANA release actually baked in',
-      () {
-        expect(contract.provenance.contractVersion, '1');
-        expect(contract.provenance.c0Section, 'C0 §1 Serialization');
-        expect(contract.provenance.c0Source, 'goals/c0-contracts.md');
-        expect(contract.provenance.ianaRelease, ianaTimeZoneRelease);
-        expect(
-          contract.provenance.ianaArchiveUrl,
-          'https://data.iana.org/time-zones/releases/tzdata2026b.tar.gz',
-        );
-        expect(
-          contract.provenance.ianaArchiveSha256,
-          matches(RegExp(r'^[0-9a-f]{64}$')),
-        );
-      },
-    );
-
-    test('every vector list carries cases, so no group below is vacuous', () {
-      final Map<String, C0Cases> domains = <String, C0Cases>{
-        'dates': contract.dates,
-        'times': contract.times,
-        'durations': contract.durations,
-        'timezones': contract.timezones,
-      };
-      domains.forEach((String name, C0Cases cases) {
-        expect(cases.valid, isNotEmpty, reason: '$name has no valid cases');
-        expect(cases.invalid, isNotEmpty, reason: '$name has no invalid cases');
-      });
-      expect(contract.instants, isNotEmpty);
-      expect(contract.invalidInstants, isNotEmpty);
-    });
-  });
-
-  group('C0 §1 calendar dates', () {
-    test('every valid case round-trips through the canonical wire form', () {
-      for (final String wire in contract.dates.valid) {
-        final Result<WireDate> parsed = WireDate.parse(wire);
-        expect(parsed.isOk, isTrue, reason: '$wire: ${_describe(parsed)}');
-        expect(codec.encodeDate(parsed.unwrap()), wire);
-        expect(codec.decodeDate(wire).unwrap(), parsed.unwrap());
-      }
-    });
-
-    test('every invalid case is rejected as a Problem, never thrown', () {
-      for (final String wire in contract.dates.invalid) {
-        final Result<WireDate> parsed = WireDate.parse(wire);
-        expect(parsed.isErr, isTrue, reason: '$wire was accepted');
-        _expectWireProblem(parsed, wireDateGrammar, wire, exactGrammar: false);
-      }
-    });
-  });
-
-  group('C0 §1 wall-clock times', () {
-    test('every valid case round-trips through the canonical wire form', () {
-      for (final String wire in contract.times.valid) {
-        final Result<WireTime> parsed = WireTime.parse(wire);
-        expect(parsed.isOk, isTrue, reason: '$wire: ${_describe(parsed)}');
-        expect(codec.encodeTime(parsed.unwrap()), wire);
-        expect(codec.decodeTime(wire).unwrap(), parsed.unwrap());
-      }
-    });
-
-    test('every invalid case is rejected as a Problem', () {
-      for (final String wire in contract.times.invalid) {
-        final Result<WireTime> parsed = WireTime.parse(wire);
-        expect(parsed.isErr, isTrue, reason: '$wire was accepted');
-        _expectWireProblem(parsed, wireTimeGrammar, wire, exactGrammar: false);
-      }
-    });
-  });
-
-  group('C0 §1 durations', () {
-    test('every valid designation is preserved without lossy conversion', () {
-      for (final String wire in contract.durations.valid) {
-        final Result<IsoDuration> parsed = IsoDuration.parse(wire);
-        expect(parsed.isOk, isTrue, reason: '$wire: ${_describe(parsed)}');
-        expect(codec.encodeDuration(parsed.unwrap()), wire);
-      }
-    });
-
-    test('every invalid designation is rejected as a Problem', () {
-      for (final String wire in contract.durations.invalid) {
-        final Result<IsoDuration> parsed = IsoDuration.parse(wire);
-        expect(parsed.isErr, isTrue, reason: '$wire was accepted');
-        _expectWireProblem(parsed, wireDurationGrammar, wire);
-      }
-    });
-  });
-
-  group('C0 §1 IANA timezone identifiers', () {
-    test('the contract settles legacy ids and aliases, not host membership', () {
-      // The contract deliberately fixes EST/GMT (genuine IANA entries) as valid
-      // and PST (an abbreviation only) as invalid, so the answer does not depend
-      // on whichever tzdata the host happens to carry.
-      expect(contract.timezones.valid, contains('EST'));
-      expect(contract.timezones.valid, contains('GMT'));
-      expect(contract.timezones.valid, contains('US/Eastern'));
-      expect(contract.timezones.invalid, contains('PST'));
-
-      for (final String id in contract.timezones.valid) {
-        final Result<IanaTimezone> parsed = IanaTimezone.parse(id);
-        expect(parsed.isOk, isTrue, reason: '$id: ${_describe(parsed)}');
-        expect(codec.encodeTimezone(parsed.unwrap()), id);
-        expect(isIanaTimeZone(id), isTrue);
-      }
-    });
-
-    test('offsets, wrong case, traversal, and unknown names are rejected', () {
-      for (final String id in contract.timezones.invalid) {
-        final Result<IanaTimezone> parsed = IanaTimezone.parse(id);
-        expect(parsed.isErr, isTrue, reason: '$id was accepted');
-        _expectWireProblem(parsed, wireTimezoneGrammar, id);
-        expect(isIanaTimeZone(id), isFalse);
-      }
-    });
-  });
-
-  group('C0 §1 instants', () {
-    test('every vector normalises to its canonical UTC spelling', () {
-      for (final C0InstantVector vector in contract.instants) {
-        final Result<String> normalized = normalizeRfc3339ToUtc(vector.input);
-        expect(
-          normalized.isOk,
-          isTrue,
-          reason: '${vector.input}: ${_describe(normalized)}',
-        );
-        expect(normalized.unwrap(), vector.canonicalUtc);
-
-        // The canonical spelling must itself be accepted by the STRICT parser,
-        // so normalisation is idempotent at the wire boundary.
-        final Result<DateTime> reparsed = parseRfc3339Utc(vector.canonicalUtc);
-        expect(reparsed.isOk, isTrue, reason: _describe(reparsed));
-        expect(reparsed.unwrap().isUtc, isTrue);
-        expect(
-          codec.encodeInstant(reparsed.unwrap()).unwrap(),
-          vector.canonicalUtc,
-        );
-      }
-    });
-
-    test('the strict parser rejects every non-canonical spelling', () {
-      // This is the whole point of the surface: +00:00 denotes the SAME instant
-      // as Z and is still rejected, because C0 fixes ONE spelling so two
-      // services can compare wire bytes.
-      expect(contract.invalidInstants, contains('2026-07-21T01:02:03+00:00'));
-      for (final String wire in contract.invalidInstants) {
-        final Result<DateTime> parsed = parseRfc3339Utc(wire);
-        expect(parsed.isErr, isTrue, reason: '$wire was accepted');
-        _expectWireProblem(
-          parsed,
-          wireInstantGrammar,
-          wire,
-          exactGrammar: false,
-        );
-      }
-    });
-
-    test(
-      'an offset-carrying instant is accepted only at the ingress helper',
-      () {
-        const String offset = '2026-07-21T09:02:03+08:00';
-        expect(parseRfc3339Utc(offset).isErr, isTrue);
-        expect(codec.decodeInstant(offset).isErr, isTrue);
-        expect(
-          codec.normalizeInstant(offset).unwrap(),
-          '2026-07-21T01:02:03.000Z',
-        );
-      },
-    );
-  });
-}
-
-/// The grammars a temporal rejection is allowed to name.
-///
-/// A well-shaped instant whose DATE or TIME components are impossible is
-/// rejected by the component grammar, not the instant grammar — that is more
-/// useful to a caller than a blanket "not an instant". [_expectWireProblem]
-/// therefore accepts any declared grammar unless the caller pins one, while
-/// still requiring the envelope to name the value the caller actually passed.
-const Set<String> _declaredGrammars = <String>{
+const Set<String> _grammars = <String>{
   wireDateGrammar,
   wireTimeGrammar,
   wireInstantGrammar,
@@ -246,38 +35,268 @@ const Set<String> _declaredGrammars = <String>{
 
 void _expectWireProblem(
   Result<Object?> result,
-  String expectedGrammar,
-  String rejectedValue, {
-  bool exactGrammar = true,
+  String rejected, {
+  String? grammar,
 }) {
+  expect(result.isErr, isTrue, reason: '$rejected was accepted');
   final Problem problem = result.unwrapErr();
+  final Map<String, Object?> data = problem.data;
   expect(problem.status, 400);
   expect(problem.recoverable, isFalse);
-  final Map<String, Object?> data = problem.data;
   expect(data['util'], 'wire');
   expect(data['code'], 'invalid_format');
-  if (exactGrammar) {
-    expect(data['expected'], expectedGrammar);
-    expect(problem.title, 'expected $expectedGrammar');
-  } else {
-    expect(
-      _declaredGrammars,
-      contains(data['expected']),
-      reason: 'rejection named an undeclared grammar: ${data['expected']}',
-    );
-    expect(problem.title, 'expected ${data['expected']}');
-  }
-  // The rejected value must be what the CALLER passed, not a re-rendering of
-  // parsed components: a re-rendering silently changes the diagnostic (and hid a
-  // real defect here until the conformance vectors caught it).
-  expect(data['value'], rejectedValue);
-  // C0 §2: the type URI is minted by the ONE builder, so it must be the shape
-  // that builder produces rather than a hand-formatted string.
-  expect(problem.type, contains('/v1/'));
-  expect(problem.type, endsWith('wire_invalid_format'));
+  // Impossible components report their own grammar, not the outer one.
+  expect(data['expected'], grammar ?? isIn(_grammars));
+  expect(problem.title, 'expected ${data['expected']}');
+  expect(data['value'], rejected);
+  expect(problem.type, endsWith('/v1/wire_invalid_format'));
 }
 
-String _describe(Result<Object?> result) => result.match(
-  ok: (Object? value) => 'ok($value)',
-  err: (Problem problem) => 'err(${problem.title}: ${problem.detail})',
-);
+void main() {
+  group('contract provenance', () {
+    test('the recorded digest matches the vectors', () {
+      // Arrange
+      final String payload = _contract.digestPayload();
+
+      // Act
+      final String digest = sha256.convert(utf8.encode(payload)).toString();
+
+      // Assert
+      expect(digest, _contract.provenance.contentSha256);
+    });
+
+    test('provenance names the source and the bundled IANA release', () {
+      // Arrange
+      const C0TemporalProvenance provenance = C0TemporalProvenance(
+        contractVersion: '1',
+        c0Section: 'Serialization',
+        c0Source: 'C0 contracts',
+        ianaRelease: ianaTimeZoneRelease,
+        ianaArchiveUrl:
+            'https://data.iana.org/time-zones/releases/tzdata2026b.tar.gz',
+        ianaArchiveSha256:
+            '114543d9f19a6bfeb5bca43686aea173d38755a3db1f2eec112647ae92c6f544',
+        contentSha256: '',
+      );
+
+      // Act
+      final C0TemporalProvenance actual = _contract.provenance;
+
+      // Assert
+      expect(actual.contractVersion, provenance.contractVersion);
+      expect(actual.c0Section, provenance.c0Section);
+      expect(actual.c0Source, provenance.c0Source);
+      expect(actual.ianaRelease, provenance.ianaRelease);
+      expect(actual.ianaArchiveUrl, provenance.ianaArchiveUrl);
+      expect(actual.ianaArchiveSha256, provenance.ianaArchiveSha256);
+    });
+
+    test('every vector list has cases', () {
+      // Arrange
+      final Map<String, C0Cases> domains = <String, C0Cases>{
+        'dates': _contract.dates,
+        'times': _contract.times,
+        'durations': _contract.durations,
+        'timezones': _contract.timezones,
+      };
+
+      // Act
+      final List<String> empty = <String>[
+        for (final MapEntry<String, C0Cases> entry in domains.entries)
+          if (entry.value.valid.isEmpty || entry.value.invalid.isEmpty)
+            entry.key,
+      ];
+
+      // Assert
+      expect(empty, isEmpty);
+      expect(_contract.instants, isNotEmpty);
+      expect(_contract.invalidInstants, isNotEmpty);
+    });
+  });
+
+  group('calendar dates', () {
+    test('valid cases round-trip through the wire form', () {
+      // Arrange
+      final List<String> valid = _contract.dates.valid;
+
+      // Act
+      final List<Result<WireDate>> parsed = valid.map(WireDate.parse).toList();
+
+      // Assert
+      for (int i = 0; i < valid.length; i += 1) {
+        expect(parsed[i].isOk, isTrue, reason: valid[i]);
+        expect(_codec.encodeDate(parsed[i].unwrap()), valid[i]);
+        expect(_codec.decodeDate(valid[i]).unwrap(), parsed[i].unwrap());
+      }
+    });
+
+    test('invalid cases are problems, never throws', () {
+      // Arrange
+      final List<String> invalid = _contract.dates.invalid;
+
+      // Act
+      final List<Result<WireDate>> parsed = invalid
+          .map(WireDate.parse)
+          .toList();
+
+      // Assert
+      for (int i = 0; i < invalid.length; i += 1) {
+        _expectWireProblem(parsed[i], invalid[i]);
+      }
+    });
+  });
+
+  group('wall-clock times', () {
+    test('valid cases round-trip through the wire form', () {
+      // Arrange
+      final List<String> valid = _contract.times.valid;
+
+      // Act
+      final List<Result<WireTime>> parsed = valid.map(WireTime.parse).toList();
+
+      // Assert
+      for (int i = 0; i < valid.length; i += 1) {
+        expect(parsed[i].isOk, isTrue, reason: valid[i]);
+        expect(_codec.encodeTime(parsed[i].unwrap()), valid[i]);
+        expect(_codec.decodeTime(valid[i]).unwrap(), parsed[i].unwrap());
+      }
+    });
+
+    test('invalid cases are problems', () {
+      // Arrange
+      final List<String> invalid = _contract.times.invalid;
+
+      // Act
+      final List<Result<WireTime>> parsed = invalid
+          .map(WireTime.parse)
+          .toList();
+
+      // Assert
+      for (int i = 0; i < invalid.length; i += 1) {
+        _expectWireProblem(parsed[i], invalid[i]);
+      }
+    });
+  });
+
+  group('durations', () {
+    test('valid designations are kept as written', () {
+      // Arrange
+      final List<String> valid = _contract.durations.valid;
+
+      // Act
+      final List<Result<IsoDuration>> parsed = valid
+          .map(IsoDuration.parse)
+          .toList();
+
+      // Assert
+      for (int i = 0; i < valid.length; i += 1) {
+        expect(parsed[i].isOk, isTrue, reason: valid[i]);
+        expect(_codec.encodeDuration(parsed[i].unwrap()), valid[i]);
+      }
+    });
+
+    test('invalid designations are problems', () {
+      // Arrange
+      final List<String> invalid = _contract.durations.invalid;
+
+      // Act
+      final List<Result<IsoDuration>> parsed = invalid
+          .map(IsoDuration.parse)
+          .toList();
+
+      // Assert
+      for (int i = 0; i < invalid.length; i += 1) {
+        _expectWireProblem(parsed[i], invalid[i], grammar: wireDurationGrammar);
+      }
+    });
+  });
+
+  group('IANA timezone identifiers', () {
+    test('legacy ids and aliases are valid, PST is not', () {
+      // Arrange
+      final List<String> valid = _contract.timezones.valid;
+
+      // Act
+      final List<Result<IanaTimezone>> parsed = valid
+          .map(IanaTimezone.parse)
+          .toList();
+
+      // Assert
+      expect(valid, containsAll(<String>['EST', 'GMT', 'US/Eastern']));
+      expect(_contract.timezones.invalid, contains('PST'));
+      for (int i = 0; i < valid.length; i += 1) {
+        expect(parsed[i].isOk, isTrue, reason: valid[i]);
+        expect(_codec.encodeTimezone(parsed[i].unwrap()), valid[i]);
+        expect(isIanaTimeZone(valid[i]), isTrue);
+      }
+    });
+
+    test('offsets, wrong case, traversal and unknown names are rejected', () {
+      // Arrange
+      final List<String> invalid = _contract.timezones.invalid;
+
+      // Act
+      final List<Result<IanaTimezone>> parsed = invalid
+          .map(IanaTimezone.parse)
+          .toList();
+
+      // Assert
+      for (int i = 0; i < invalid.length; i += 1) {
+        _expectWireProblem(parsed[i], invalid[i], grammar: wireTimezoneGrammar);
+        expect(isIanaTimeZone(invalid[i]), isFalse);
+      }
+    });
+  });
+
+  group('instants', () {
+    test('every vector normalises to its canonical UTC form', () {
+      // Arrange
+      final List<C0InstantVector> vectors = _contract.instants;
+
+      // Act
+      final List<Result<String>> normalized = <Result<String>>[
+        for (final C0InstantVector vector in vectors)
+          normalizeRfc3339ToUtc(vector.input),
+      ];
+
+      // Assert
+      for (int i = 0; i < vectors.length; i += 1) {
+        final String canonical = vectors[i].canonicalUtc;
+        expect(normalized[i].unwrap(), canonical);
+        final DateTime reparsed = parseRfc3339Utc(canonical).unwrap();
+        expect(reparsed.isUtc, isTrue);
+        expect(_codec.encodeInstant(reparsed).unwrap(), canonical);
+      }
+    });
+
+    test('the strict parser rejects every other spelling', () {
+      // Arrange
+      final List<String> invalid = _contract.invalidInstants;
+
+      // Act
+      final List<Result<DateTime>> parsed = invalid
+          .map(parseRfc3339Utc)
+          .toList();
+
+      // Assert
+      expect(invalid, contains('2026-07-21T01:02:03+00:00'));
+      for (int i = 0; i < invalid.length; i += 1) {
+        _expectWireProblem(parsed[i], invalid[i]);
+      }
+    });
+
+    test('an offset is accepted only by the normalising helper', () {
+      // Arrange
+      const String offset = '2026-07-21T09:02:03+08:00';
+
+      // Act
+      final Result<DateTime> strict = _codec.decodeInstant(offset);
+      final Result<String> normalized = _codec.normalizeInstant(offset);
+
+      // Assert
+      expect(parseRfc3339Utc(offset).isErr, isTrue);
+      expect(strict.isErr, isTrue);
+      expect(normalized.unwrap(), '2026-07-21T01:02:03.000Z');
+    });
+  });
+}

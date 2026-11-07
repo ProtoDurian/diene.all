@@ -1,0 +1,20 @@
+{
+  "rejected": [
+    {
+      "baseYaml": "app:\n  name: service\n  retries: 1\n  tags: []\n",
+      "defines": {
+        "ACME_APP__TAGS": "[\"first\",\"second\"]"
+      },
+      "name": "JSON",
+      "prefix": "ACME_"
+    },
+    {
+      "baseYaml": "app:\n  name: service\n  retries: 1\n  tags: []\n",
+      "defines": {
+        "ACME_APP__TAGS": "first,second"
+      },
+      "name": "comma-separated",
+      "prefix": "ACME_"
+    }
+  ]
+}

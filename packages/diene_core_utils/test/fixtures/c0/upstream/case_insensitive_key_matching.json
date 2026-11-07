@@ -1,0 +1,18 @@
+{
+  "baseYaml": "app-settings:\n  displayName: base\n",
+  "prefix": "ACME_",
+  "variants": [
+    {
+      "defineKey": "ACME_APP_SETTINGS__DISPLAY_NAME",
+      "expectedValue": "snake"
+    },
+    {
+      "defineKey": "acme_app-settings__display-name",
+      "expectedValue": "kebab"
+    },
+    {
+      "defineKey": "AcMe_AppSettings__DisplayName",
+      "expectedValue": "pascal"
+    }
+  ]
+}

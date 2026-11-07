@@ -1,0 +1,14 @@
+{
+  "type": "https://local.atomi.cloud/docs/local/flutter/app/core/v1/wire_invalid_format",
+  "title": "expected a YYYY-MM-DD calendar date",
+  "status": 400,
+  "detail": "wire.WireDate.parse: expected a YYYY-MM-DD calendar date",
+  "recoverable": false,
+  "data": {
+    "util": "wire",
+    "code": "invalid_format",
+    "operation": "WireDate.parse",
+    "expected": "a YYYY-MM-DD calendar date",
+    "value": "2026-02-30"
+  }
+}

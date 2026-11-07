@@ -1,0 +1,13 @@
+{
+  "baseYaml": "app:\n  name: base\n  retries: 1\n  tags: [base]\n",
+  "defines": {
+    "ACME_APP__NAME": "",
+    "ACME_APP__TAGS__0": ""
+  },
+  "expected": {
+    "name": "base",
+    "retries": 1,
+    "tags": ["base"]
+  },
+  "prefix": "ACME_"
+}

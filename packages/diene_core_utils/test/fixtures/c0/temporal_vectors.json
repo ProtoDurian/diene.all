@@ -1,0 +1,30 @@
+{
+  "dates": {
+    "valid": ["2026-07-21", "2000-02-29", "0001-01-01", "9999-12-31"],
+    "invalid": ["21-07-2026", "2026-02-30", "2026-13-01", "2026-7-1", "2026/07/21"]
+  },
+  "times": {
+    "valid": ["00:00:00", "01:02:03", "23:59:59"],
+    "invalid": ["24:00:00", "01:60:00", "01:02:60", "1:02:03", "01:02"]
+  },
+  "durations": {
+    "valid": ["P1DT2H3M4.5S", "PT0.5S", "P1Y2M3DT4H5M6S", "P1W"],
+    "invalid": ["10 minutes", "P", "PT", "1DT2H", "P1H"]
+  },
+  "timezones": {
+    "valid": ["Asia/Singapore", "America/Argentina/Buenos_Aires", "Etc/UTC", "UTC", "US/Eastern", "EST", "GMT"],
+    "invalid": ["Area/NotAnIanaZone", "+08:00", "asia/singapore", "Area/../Location", "PST", ""]
+  },
+  "instants": [
+    { "input": "2026-07-21T09:02:03+08:00", "canonicalUtc": "2026-07-21T01:02:03.000Z" },
+    { "input": "2026-07-21T01:02:03Z", "canonicalUtc": "2026-07-21T01:02:03.000Z" },
+    { "input": "2026-07-21T01:02:03.456Z", "canonicalUtc": "2026-07-21T01:02:03.456Z" }
+  ],
+  "invalidInstants": [
+    "2026-07-21T01:02:03+00:00",
+    "2026-07-21T01:02:03+08:00",
+    "2026-07-21T01:02:03",
+    "2026-02-30T01:02:03Z",
+    "2026-07-21 01:02:03Z"
+  ]
+}
