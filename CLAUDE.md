@@ -58,10 +58,6 @@ See **[docs/standards/nix/index.md](docs/standards/nix/index.md)** for the full 
 - Formatters and pre-commit hooks
 - Adding registries
 
-# Docker build and publishing
-
-See [docs/standards/docker/index.md](docs/standards/docker/index.md).
-
 # Go base template
 
 Read [the Go baseline](docs/developer/go-baseline.md) before changing the Go

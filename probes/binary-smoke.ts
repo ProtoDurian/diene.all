@@ -78,12 +78,6 @@ actionlint "$tmp/workflow.yaml"
 
 dlint exec-bits >/dev/null
 
-docker --version >/dev/null
-docker info --format '{{.ServerVersion}}' >/dev/null
-
-hadolint --version >/dev/null
-hadolint infra/Dockerfile
-
 infisical --version >/dev/null
 git -C "$tmp" init -q
 git -C "$tmp" config user.email smoke@example.invalid
