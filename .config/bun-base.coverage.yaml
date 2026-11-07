@@ -7,4 +7,4 @@ tiers:
     scope: src/adapters/
   meta:
     tests: tests/meta
-    scope: ''
+    scope: src/test-helper/

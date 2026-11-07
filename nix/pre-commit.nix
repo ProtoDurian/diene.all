@@ -7,6 +7,9 @@
 }:
 let
   envPath = pkgs.lib.makeBinPath (env.system ++ env.main ++ env.lint ++ env.dev);
+  validator =
+    command:
+    "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH exec ${packages.atomiutils}/bin/bash ${command}'";
 in
 pre-commit-lib.run {
   src = ../.;
@@ -107,6 +110,15 @@ pre-commit-lib.run {
       name = "Knip production dead code";
       entry = "./node_modules/.bin/knip --config knip.production.json --production";
       files = "(^package\\.json$|^tsconfig\\.json$|^knip\\.production\\.json$|\\.(ts|tsx)$)";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-package-metadata = {
+      enable = true;
+      name = "Package metadata agreement";
+      entry = validator "scripts/validate/package-metadata.sh";
+      files = "^(package\\.json$|LICENSE$)";
       pass_filenames = false;
       language = "system";
     };

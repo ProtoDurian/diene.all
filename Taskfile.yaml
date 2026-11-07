@@ -19,7 +19,7 @@ tasks:
       - ./scripts/local/clean.sh
 
   build:
-    desc: Build the Bun bundle to dist/
+    desc: Build the publishable library (ESM + CJS + types) to dist/
     cmds:
       - ./scripts/local/build.sh
 
