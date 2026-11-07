@@ -13,10 +13,10 @@ Problem _problem({
 void main() {
   group('expectPortProblem accepts known-good envelopes', () {
     test('matches seam, code, status, recoverable flag, and operation', () {
-      // Arrange.
+      // Arrange
       final Problem problem = _problem();
 
-      // Act.
+      // Act
       final Problem returned = expectPortProblem(
         problem,
         port: PortName.vfs,
@@ -24,44 +24,59 @@ void main() {
         operation: 'readText',
       );
 
-      // Assert.
+      // Assert
       expect(returned, same(problem));
     });
 
     test('leaves the operation unchecked when none is supplied', () {
-      // Arrange & Act & Assert.
-      expect(
-        expectPortProblem(
-          _problem(operation: 'anything'),
-          port: PortName.vfs,
-          code: PortErrorCode.notFound,
-        ),
-        isNotNull,
+      // Arrange
+      final Problem problem = _problem(operation: 'anything');
+
+      // Act
+      final Problem returned = expectPortProblem(
+        problem,
+        port: PortName.vfs,
+        code: PortErrorCode.notFound,
       );
+
+      // Assert
+      expect(returned, isNotNull);
     });
 
     test('accepts a recoverable code', () {
-      // Arrange & Act & Assert.
-      expect(
-        expectPortProblem(
-          _problem(port: PortName.terminal, code: PortErrorCode.timeout),
-          port: PortName.terminal,
-          code: PortErrorCode.timeout,
-        ),
-        isNotNull,
+      // Arrange
+      final Problem problem = _problem(
+        port: PortName.terminal,
+        code: PortErrorCode.timeout,
       );
+
+      // Act
+      final Problem returned = expectPortProblem(
+        problem,
+        port: PortName.terminal,
+        code: PortErrorCode.timeout,
+      );
+
+      // Assert
+      expect(returned, isNotNull);
     });
   });
 
   group('expectPortProblem FAILS on known-bad envelopes', () {
     test('rejects a mismatched seam', () {
-      // Arrange & Act & Assert.
+      // Arrange
+      final Problem problem = _problem();
+
+      // Act
+      Problem check() => expectPortProblem(
+        problem,
+        port: PortName.system,
+        code: PortErrorCode.notFound,
+      );
+
+      // Assert
       expect(
-        () => expectPortProblem(
-          _problem(),
-          port: PortName.system,
-          code: PortErrorCode.notFound,
-        ),
+        check,
         throwsA(
           isA<SeamAssertionFailure>().having(
             (SeamAssertionFailure failure) => failure.message,
@@ -73,26 +88,35 @@ void main() {
     });
 
     test('rejects a mismatched code', () {
-      // Arrange & Act & Assert.
-      expect(
-        () => expectPortProblem(
-          _problem(),
-          port: PortName.vfs,
-          code: PortErrorCode.io,
-        ),
-        throwsA(isA<SeamAssertionFailure>()),
+      // Arrange
+      final Problem problem = _problem();
+
+      // Act
+      Problem check() => expectPortProblem(
+        problem,
+        port: PortName.vfs,
+        code: PortErrorCode.io,
       );
+
+      // Assert
+      expect(check, throwsA(isA<SeamAssertionFailure>()));
     });
 
     test('rejects a mismatched operation', () {
-      // Arrange & Act & Assert.
+      // Arrange
+      final Problem problem = _problem();
+
+      // Act
+      Problem check() => expectPortProblem(
+        problem,
+        port: PortName.vfs,
+        code: PortErrorCode.notFound,
+        operation: 'writeText',
+      );
+
+      // Assert
       expect(
-        () => expectPortProblem(
-          _problem(),
-          port: PortName.vfs,
-          code: PortErrorCode.notFound,
-          operation: 'writeText',
-        ),
+        check,
         throwsA(
           isA<SeamAssertionFailure>().having(
             (SeamAssertionFailure failure) => failure.message,
@@ -104,7 +128,7 @@ void main() {
     });
 
     test('rejects an envelope whose status was tampered with', () {
-      // Arrange.
+      // Arrange
       final Problem tampered = Problem(
         type: _problem().type,
         title: 'boom',
@@ -112,13 +136,16 @@ void main() {
         data: _problem().data,
       );
 
-      // Act & Assert.
+      // Act
+      Problem check() => expectPortProblem(
+        tampered,
+        port: PortName.vfs,
+        code: PortErrorCode.notFound,
+      );
+
+      // Assert
       expect(
-        () => expectPortProblem(
-          tampered,
-          port: PortName.vfs,
-          code: PortErrorCode.notFound,
-        ),
+        check,
         throwsA(
           isA<SeamAssertionFailure>().having(
             (SeamAssertionFailure failure) => failure.message,
@@ -130,7 +157,7 @@ void main() {
     });
 
     test('rejects an envelope whose recoverable flag was tampered with', () {
-      // Arrange.
+      // Arrange
       final Problem source = _problem(code: PortErrorCode.timeout);
       final Problem tampered = Problem(
         type: source.type,
@@ -139,13 +166,16 @@ void main() {
         data: source.data,
       );
 
-      // Act & Assert.
+      // Act
+      Problem check() => expectPortProblem(
+        tampered,
+        port: PortName.vfs,
+        code: PortErrorCode.timeout,
+      );
+
+      // Assert
       expect(
-        () => expectPortProblem(
-          tampered,
-          port: PortName.vfs,
-          code: PortErrorCode.timeout,
-        ),
+        check,
         throwsA(
           isA<SeamAssertionFailure>().having(
             (SeamAssertionFailure failure) => failure.message,
@@ -158,10 +188,13 @@ void main() {
   });
 
   test('SeamAssertionFailure renders its diagnostic', () {
-    // Arrange & Act & Assert.
-    expect(
-      const SeamAssertionFailure('nope').toString(),
-      'SeamAssertionFailure: nope',
-    );
+    // Arrange
+    const SeamAssertionFailure failure = SeamAssertionFailure('nope');
+
+    // Act
+    final String diagnostic = failure.toString();
+
+    // Assert
+    expect(diagnostic, 'SeamAssertionFailure: nope');
   });
 }

@@ -2,8 +2,6 @@ import 'package:diene_interfaces/diene_interfaces.dart';
 import 'package:diene_interfaces/test_helper.dart';
 import 'package:diene_result/diene_result.dart';
 
-/// A component that depends on the narrow seams it actually needs, not on
-/// `dart:io`. Every fallible call is handled as a `Result` — no try/catch.
 Future<Result<String>> describeConfig(Vfs vfs, System system) async {
   final Result<String> path = system
       .environment('CONFIG_PATH')
@@ -23,7 +21,6 @@ Future<Result<String>> describeConfig(Vfs vfs, System system) async {
   };
 }
 
-/// Demonstrates the clean consumer path using the shipped in-memory fakes.
 Future<void> main() async {
   final InMemorySystem system = InMemorySystem(
     environment: <String, String>{'CONFIG_PATH': '/etc/app.yaml'},
@@ -35,14 +32,12 @@ Future<void> main() async {
   final Result<String> found = await describeConfig(vfs, system);
   assert(found.unwrap() == 'landscape: lapras', 'the seam reads the file');
 
-  // The failure path is a value, so there is nothing to catch.
   final Result<String> missing = await describeConfig(
     InMemoryVfs(),
     InMemorySystem(),
   );
   assert(missing.isErr, 'an unset variable is reported as a Problem');
 
-  // Telemetry emits through the same Result discipline.
   final InMemoryLoggerSink logger = InMemoryLoggerSink();
   final Result<void> emitted = logger.emit(
     LogRecord(

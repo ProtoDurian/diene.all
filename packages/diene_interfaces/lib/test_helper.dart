@@ -1,13 +1,5 @@
-/// Dependency-light in-memory implementations of every `diene_interfaces` seam.
-///
-/// This sub-library deliberately depends on NO test framework, matcher library,
-/// mocking package, Flutter, or exporter — only on the seams themselves,
-/// `diene_result`, and `diene_problems`. It therefore adds nothing to a
-/// consumer's production dependency graph (family DEPENDENCY-LIGHT rule).
-///
-/// Every fake is stateful and deterministic, and every fallible member accepts
-/// FIFO *scripted* results so a consumer can exercise failure paths without a
-/// mocking framework and without exceptions.
+/// In-memory fakes for every port, with FIFO scripted results, and plain-throw
+/// assertions; no test framework is imported.
 library;
 
 import 'dart:collection';
@@ -18,9 +10,7 @@ import 'package:diene_result/diene_result.dart';
 
 import 'diene_interfaces.dart';
 
-/// A deterministic [System] with mutable in-memory process state.
 final class InMemorySystem implements System {
-  /// Creates a system fake seeded with [environment], [directory], and [now].
   InMemorySystem({
     Map<String, String> environment = const <String, String>{},
     this.directory = '/',
@@ -29,10 +19,8 @@ final class InMemorySystem implements System {
        now = (now ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true))
            .toUtc();
 
-  /// Mutable environment the fake answers from.
   final Map<String, String> environmentVariables;
 
-  /// Every duration passed to [delay], in call order.
   final List<Duration> requestedDelays = <Duration>[];
 
   final Queue<Result<String?>> _environmentResults = Queue<Result<String?>>();
@@ -40,28 +28,22 @@ final class InMemorySystem implements System {
   final Queue<Result<DateTime>> _clockResults = Queue<Result<DateTime>>();
   final Queue<Result<void>> _delayResults = Queue<Result<void>>();
 
-  /// Working directory the fake answers from.
   String directory;
 
-  /// Instant the fake's clock answers with.
   DateTime now;
 
-  /// Scripts the next [environment] answer.
   void enqueueEnvironmentResult(Result<String?> result) {
     _environmentResults.add(result);
   }
 
-  /// Scripts the next [currentDirectory] answer.
   void enqueueDirectoryResult(Result<String> result) {
     _directoryResults.add(result);
   }
 
-  /// Scripts the next [nowUtc] answer.
   void enqueueClockResult(Result<DateTime> result) {
     _clockResults.add(result);
   }
 
-  /// Scripts the next [delay] answer.
   void enqueueDelayResult(Result<void> result) {
     _delayResults.add(result);
   }
@@ -90,12 +72,8 @@ final class InMemorySystem implements System {
   }
 }
 
-/// A stateful, byte-backed [Vfs].
-///
-/// Scripted results are FIFO and short-circuit the corresponding operation,
-/// which supports deterministic fault injection without a mocking framework.
+/// A byte-backed [Vfs]; a scripted result replaces the real operation once.
 final class InMemoryVfs implements Vfs {
-  /// Creates a filesystem fake seeded with [files] and [directories].
   InMemoryVfs({
     Map<String, List<int>> files = const <String, List<int>>{},
     Iterable<String> directories = const <String>['/'],
@@ -129,56 +107,44 @@ final class InMemoryVfs implements Vfs {
   final Queue<Result<void>> _createDirectoryResults = Queue<Result<void>>();
   final Queue<Result<void>> _deleteResults = Queue<Result<void>>();
 
-  /// Modified instant reported for every entry.
   final DateTime modifiedAt;
 
-  /// Snapshot of the stored files, deeply unmodifiable.
   Map<String, List<int>> get files =>
       UnmodifiableMapView<String, List<int>>(<String, List<int>>{
         for (final MapEntry<String, List<int>> entry in _files.entries)
           entry.key: List<int>.unmodifiable(entry.value),
       });
 
-  /// Snapshot of the stored directories.
   Set<String> get directories => Set<String>.unmodifiable(_directories);
 
-  /// Scripts the next [exists] answer.
   void enqueueExistsResult(Result<bool> result) => _existsResults.add(result);
 
-  /// Scripts the next [stat] answer.
   void enqueueStatResult(Result<VfsStat> result) => _statResults.add(result);
 
-  /// Scripts the next [readBytes] answer.
   void enqueueReadBytesResult(Result<List<int>> result) {
     _readBytesResults.add(result);
   }
 
-  /// Scripts the next [readText] answer.
   void enqueueReadTextResult(Result<String> result) {
     _readTextResults.add(result);
   }
 
-  /// Scripts the next [writeBytes] answer.
   void enqueueWriteBytesResult(Result<void> result) {
     _writeBytesResults.add(result);
   }
 
-  /// Scripts the next [writeText] answer.
   void enqueueWriteTextResult(Result<void> result) {
     _writeTextResults.add(result);
   }
 
-  /// Scripts the next [list] answer.
   void enqueueListResult(Result<List<VfsEntry>> result) {
     _listResults.add(result);
   }
 
-  /// Scripts the next [createDirectory] answer.
   void enqueueCreateDirectoryResult(Result<void> result) {
     _createDirectoryResults.add(result);
   }
 
-  /// Scripts the next [delete] answer.
   void enqueueDeleteResult(Result<void> result) {
     _deleteResults.add(result);
   }
@@ -415,9 +381,6 @@ final class InMemoryVfs implements Vfs {
   }
 
   /// Collapses empty segments and forces a leading slash.
-  ///
-  /// The real `Vfs` contract leaves normalisation to implementations; this fake
-  /// declares its own rule so consumer tests are deterministic.
   static String normalizePath(String path) {
     final Iterable<String> segments = path
         .split('/')
@@ -426,21 +389,17 @@ final class InMemoryVfs implements Vfs {
   }
 }
 
-/// A FIFO-scripted [Terminal] that records every command, write, and read.
+/// An unscripted [run] fails with `unexpected_call`; every call is recorded.
 final class InMemoryTerminal implements Terminal {
-  /// Creates a terminal fake.
   InMemoryTerminal({
     this.interactive = true,
     List<String> input = const <String>[],
   }) : _input = Queue<String>.of(input);
 
-  /// Every invocation passed to [run], in call order.
   final List<TerminalCommand> commands = <TerminalCommand>[];
 
-  /// Every write passed to [write], in call order.
   final List<TerminalWrite> writes = <TerminalWrite>[];
 
-  /// Every read request passed to [readLine], in call order.
   final List<TerminalRead> reads = <TerminalRead>[];
 
   final Queue<String> _input;
@@ -452,13 +411,10 @@ final class InMemoryTerminal implements Terminal {
   @override
   final bool interactive;
 
-  /// Scripts the next [run] answer.
   void enqueue(Result<TerminalOutput> result) => _results.add(result);
 
-  /// Scripts the next [write] answer.
   void enqueueWriteResult(Result<void> result) => _writeResults.add(result);
 
-  /// Scripts the next [readLine] answer.
   void enqueueReadResult(Result<String?> result) => _readResults.add(result);
 
   @override
@@ -495,21 +451,16 @@ final class InMemoryTerminal implements Terminal {
   }
 }
 
-/// An in-memory [LoggerSink] with FIFO fault injection.
 final class InMemoryLoggerSink implements LoggerSink {
-  /// Every record accepted by [emit], in call order.
   final List<LogRecord> records = <LogRecord>[];
 
   final Queue<Result<void>> _results = Queue<Result<void>>();
   final Queue<Result<void>> _flushResults = Queue<Result<void>>();
 
-  /// How many times [flush] was called.
   int flushCount = 0;
 
-  /// Scripts the next [emit] answer.
   void enqueue(Result<void> result) => _results.add(result);
 
-  /// Scripts the next [flush] answer.
   void enqueueFlushResult(Result<void> result) => _flushResults.add(result);
 
   @override
@@ -530,21 +481,16 @@ final class InMemoryLoggerSink implements LoggerSink {
   }
 }
 
-/// An in-memory [MetricsCollector] with FIFO fault injection.
 final class InMemoryMetricsCollector implements MetricsCollector {
-  /// Every sample accepted by [emit], in call order.
   final List<MetricRecord> records = <MetricRecord>[];
 
   final Queue<Result<void>> _results = Queue<Result<void>>();
   final Queue<Result<void>> _flushResults = Queue<Result<void>>();
 
-  /// How many times [flush] was called.
   int flushCount = 0;
 
-  /// Scripts the next [emit] answer.
   void enqueue(Result<void> result) => _results.add(result);
 
-  /// Scripts the next [flush] answer.
   void enqueueFlushResult(Result<void> result) => _flushResults.add(result);
 
   @override
@@ -565,25 +511,16 @@ final class InMemoryMetricsCollector implements MetricsCollector {
   }
 }
 
-/// Thrown when a dependency-light `diene_interfaces` assertion fails.
-///
-/// Mirrors `diene_result`'s `TestHelperFailure`: a plain exception, so the
-/// helpers work with `package:test`, `flutter_test`, or any other runner.
 final class SeamAssertionFailure implements Exception {
-  /// Creates an assertion failure with a consumer-facing diagnostic.
   const SeamAssertionFailure(this.message);
 
-  /// Failure diagnostic.
   final String message;
 
   @override
   String toString() => 'SeamAssertionFailure: $message';
 }
 
-/// Requires [problem] to be the envelope this library mints for [port]/[code].
-///
-/// Consumers assert seam failures constantly; without this they would re-derive
-/// the type URI, status, `recoverable` flag, and `data` shape in every test.
+/// Throws [SeamAssertionFailure] unless [problem] matches [port] and [code].
 Problem expectPortProblem(
   Problem problem, {
   required PortName port,

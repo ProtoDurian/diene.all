@@ -1,6 +1,3 @@
-/// The metrics emit seam.
-library;
-
 import 'dart:collection';
 
 import 'package:diene_result/diene_result.dart';
@@ -8,27 +5,12 @@ import 'package:diene_result/diene_result.dart';
 import 'port_problem.dart';
 import 'telemetry.dart';
 
-/// The kind of instrument a sample belongs to.
-enum MetricKind {
-  /// Monotonically increasing total.
-  counter,
+enum MetricKind { counter, gauge, histogram }
 
-  /// Point-in-time value.
-  gauge,
-
-  /// Distribution observation.
-  histogram,
-}
-
-/// Name shape shared with the `lib/bun/interfaces` sibling.
 final RegExp metricNamePattern = RegExp(r'^[A-Za-z][A-Za-z0-9_.\-/]{0,254}$');
 
-/// One metric sample emitted by an application.
 final class MetricRecord {
-  /// Creates a metric sample.
-  ///
-  /// [attributes] is copied and exposed unmodifiable so an emitted sample
-  /// cannot be mutated after the fact.
+  /// [attributes] is copied and exposed unmodifiable.
   MetricRecord({
     required this.timestamp,
     required this.name,
@@ -40,42 +22,31 @@ final class MetricRecord {
          Map<String, Object?>.of(attributes),
        );
 
-  /// When the sample was taken.
   final DateTime timestamp;
 
-  /// Instrument name.
   final String name;
 
-  /// Instrument kind.
   final MetricKind kind;
 
-  /// Observed value.
   final num value;
 
-  /// Unit of measure, when one applies.
   final String? unit;
 
-  /// Structured attributes attached to the sample.
   final TelemetryAttributes attributes;
 
   @override
   String toString() => 'MetricRecord($name, ${kind.name}, $value)';
 }
 
-/// Receives application metric samples.
-///
-/// Dart ships no OTel implementation of this seam. Flutter adapters route
-/// samples through the frontend Faro path (RB-19); this library owns the seam
-/// and its in-memory fake, never an exporter.
+/// Receives metric samples; adapters (for example Faro in Flutter) live elsewhere.
 abstract interface class MetricsCollector {
-  /// Emits one sample.
   Result<void> emit(MetricRecord record);
 
-  /// Flushes any buffered samples.
   Future<Result<void>> flush();
 }
 
-/// Validates a sample before an implementation emits it.
+/// Requires a valid name, UTC timestamp, finite value (non-negative for
+/// counters), no blank unit and valid attributes.
 Result<MetricRecord> checkMetricRecord(
   MetricRecord record, {
   String operation = 'emit',

@@ -17,47 +17,64 @@ InMemoryVfs _seeded() => InMemoryVfs(
 void main() {
   group('InMemoryVfs seeding and normalisation', () {
     test('normalises seeded paths and materialises their parents', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs(
         files: <String, List<int>>{'a//b/c.txt': utf8.encode('x')},
       );
 
-      // Act.
-      final bool exists = expectOk(await vfs.exists('/a/b/c.txt'));
+      // Act
+      final result = await vfs.exists('/a/b/c.txt');
 
-      // Assert.
-      expect(exists, isTrue);
+      // Assert
+      expect(expectOk(result), isTrue);
       expect(vfs.directories, containsAll(<String>['/', '/a', '/a/b']));
       expect(vfs.files.keys, <String>['/a/b/c.txt']);
     });
 
     test('collapses a blank path to the root', () {
-      // Arrange & Act & Assert.
-      expect(InMemoryVfs.normalizePath(''), '/');
-      expect(InMemoryVfs.normalizePath('//'), '/');
-      expect(InMemoryVfs.normalizePath('a/b'), '/a/b');
+      // Arrange
+      const String blank = '';
+      const String slashes = '//';
+      const String relative = 'a/b';
+
+      // Act
+      final String blankPath = InMemoryVfs.normalizePath(blank);
+      final String slashesPath = InMemoryVfs.normalizePath(slashes);
+      final String relativePath = InMemoryVfs.normalizePath(relative);
+
+      // Assert
+      expect(blankPath, '/');
+      expect(slashesPath, '/');
+      expect(relativePath, '/a/b');
     });
 
     test('exposes deeply unmodifiable snapshots', () {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = _seeded();
 
-      // Act.
+      // Act
       final Map<String, List<int>> files = vfs.files;
+      void clearFiles() => files.clear();
+      void mutateBytes() => files['/a/one.txt']!.add(0);
+      void addDirectory() => vfs.directories.add('/x');
 
-      // Assert.
-      expect(() => files.clear(), throwsUnsupportedError);
-      expect(() => files['/a/one.txt']!.add(0), throwsUnsupportedError);
-      expect(() => vfs.directories.add('/x'), throwsUnsupportedError);
+      // Assert
+      expect(clearFiles, throwsUnsupportedError);
+      expect(mutateBytes, throwsUnsupportedError);
+      expect(addDirectory, throwsUnsupportedError);
     });
 
     test('seeds extra directories', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs(directories: <String>['/only']);
 
-      // Act & Assert.
-      expect(expectOk(await vfs.exists('/only')), isTrue);
-      expect(expectOk(await vfs.exists('/absent')), isFalse);
+      // Act
+      final present = await vfs.exists('/only');
+      final absent = await vfs.exists('/absent');
+
+      // Assert
+      expect(expectOk(present), isTrue);
+      expect(expectOk(absent), isFalse);
     });
   });
 
@@ -65,25 +82,28 @@ void main() {
     test(
       'reads bytes and text, and rejects a missing path as a value',
       () async {
-        // Arrange.
+        // Arrange
         final InMemoryVfs vfs = _seeded();
 
-        // Act.
-        final List<int> bytes = expectOk(await vfs.readBytes('/a/one.txt'));
-        final String text = expectOk(await vfs.readText('/a/b/two.txt'));
+        // Act
+        final bytesResult = await vfs.readBytes('/a/one.txt');
+        final textResult = await vfs.readText('/a/b/two.txt');
+        void mutate() => expectOk(bytesResult).add(0);
+        final missingBytes = await vfs.readBytes('/absent');
+        final missingText = await vfs.readText('/absent');
 
-        // Assert.
-        expect(utf8.decode(bytes), 'one');
-        expect(text, 'two');
-        expect(() => bytes.add(0), throwsUnsupportedError);
+        // Assert
+        expect(utf8.decode(expectOk(bytesResult)), 'one');
+        expect(expectOk(textResult), 'two');
+        expect(mutate, throwsUnsupportedError);
         expectPortProblem(
-          expectErr(await vfs.readBytes('/absent')),
+          expectErr(missingBytes),
           port: PortName.vfs,
           code: PortErrorCode.notFound,
           operation: 'readBytes',
         );
         expectPortProblem(
-          expectErr(await vfs.readText('/absent')),
+          expectErr(missingText),
           port: PortName.vfs,
           code: PortErrorCode.notFound,
           operation: 'readText',
@@ -92,36 +112,39 @@ void main() {
     );
 
     test('decodes malformed bytes instead of throwing', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs(
         files: <String, List<int>>{
           '/bad.bin': <int>[0xff, 0xfe],
         },
       );
 
-      // Act.
-      final String text = expectOk(await vfs.readText('/bad.bin'));
+      // Act
+      final result = await vfs.readText('/bad.bin');
 
-      // Assert.
-      expect(text, isNotEmpty);
+      // Assert
+      expect(expectOk(result), isNotEmpty);
     });
 
     test('stats files, directories, and absent paths', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = _seeded();
 
-      // Act.
-      final VfsStat file = expectOk(await vfs.stat('/a/one.txt'));
-      final VfsStat directory = expectOk(await vfs.stat('/a'));
+      // Act
+      final fileResult = await vfs.stat('/a/one.txt');
+      final directoryResult = await vfs.stat('/a');
+      final absentResult = await vfs.stat('/absent');
 
-      // Assert.
+      // Assert
+      final VfsStat file = expectOk(fileResult);
+      final VfsStat directory = expectOk(directoryResult);
       expect(file.type, VfsEntryType.file);
       expect(file.size, 3);
       expect(file.modifiedAt, DateTime.utc(2026, 7, 25));
       expect(directory.type, VfsEntryType.directory);
       expect(directory.size, 0);
       expectPortProblem(
-        expectErr(await vfs.stat('/absent')),
+        expectErr(absentResult),
         port: PortName.vfs,
         code: PortErrorCode.notFound,
         operation: 'stat',
@@ -131,67 +154,87 @@ void main() {
 
   group('InMemoryVfs writes', () {
     test('writes bytes and text into an existing directory', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = _seeded();
 
-      // Act.
-      expectOk(await vfs.writeBytes('/a/three.bin', <int>[1, 2]));
-      expectOk(await vfs.writeText('/a/four.txt', 'four'));
+      // Act
+      final writeBytesResult = await vfs.writeBytes('/a/three.bin', <int>[
+        1,
+        2,
+      ]);
+      final writeTextResult = await vfs.writeText('/a/four.txt', 'four');
+      final readBytesResult = await vfs.readBytes('/a/three.bin');
+      final readTextResult = await vfs.readText('/a/four.txt');
 
-      // Assert.
-      expect(expectOk(await vfs.readBytes('/a/three.bin')), <int>[1, 2]);
-      expect(expectOk(await vfs.readText('/a/four.txt')), 'four');
+      // Assert
+      expectOk(writeBytesResult);
+      expectOk(writeTextResult);
+      expect(expectOk(readBytesResult), <int>[1, 2]);
+      expect(expectOk(readTextResult), 'four');
     });
 
     test('refuses a missing parent unless createParents is set', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = _seeded();
 
-      // Act & Assert.
+      // Act
+      final missingBytes = await vfs.writeBytes('/new/deep/x.bin', <int>[1]);
+      final missingText = await vfs.writeText('/new/deep/x.txt', 'x');
+      final created = await vfs.writeText(
+        '/new/deep/x.txt',
+        'x',
+        createParents: true,
+      );
+
+      // Assert
       expectPortProblem(
-        expectErr(await vfs.writeBytes('/new/deep/x.bin', <int>[1])),
+        expectErr(missingBytes),
         port: PortName.vfs,
         code: PortErrorCode.notFound,
         operation: 'writeBytes',
       );
       expectPortProblem(
-        expectErr(await vfs.writeText('/new/deep/x.txt', 'x')),
+        expectErr(missingText),
         port: PortName.vfs,
         code: PortErrorCode.notFound,
         operation: 'writeText',
       );
-      expectOk(
-        await vfs.writeText('/new/deep/x.txt', 'x', createParents: true),
-      );
+      expectOk(created);
       expect(vfs.directories, containsAll(<String>['/new', '/new/deep']));
     });
 
     test('copies written bytes so the caller cannot mutate storage', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs();
       final List<int> bytes = <int>[1];
 
-      // Act.
-      expectOk(await vfs.writeBytes('/x.bin', bytes));
+      // Act
+      final writeResult = await vfs.writeBytes('/x.bin', bytes);
       bytes.add(2);
+      final readResult = await vfs.readBytes('/x.bin');
 
-      // Assert.
-      expect(expectOk(await vfs.readBytes('/x.bin')), <int>[1]);
+      // Assert
+      expectOk(writeResult);
+      expect(expectOk(readResult), <int>[1]);
     });
   });
 
   group('InMemoryVfs listing', () {
     test('lists a directory shallowly and recursively, sorted', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = _seeded();
 
-      // Act.
-      final List<VfsEntry> shallow = expectOk(await vfs.list('/a'));
-      final List<VfsEntry> deep = expectOk(
-        await vfs.list('/a', recursive: true),
-      );
+      // Act
+      final shallowResult = await vfs.list('/a');
+      final deepResult = await vfs.list('/a', recursive: true);
+      void mutate() {
+        final List<VfsEntry> entries = expectOk(shallowResult);
+        entries.add(entries.first);
+      }
 
-      // Assert.
+      // Assert
+      final List<VfsEntry> shallow = expectOk(shallowResult);
+      final List<VfsEntry> deep = expectOk(deepResult);
       expect(shallow.map((VfsEntry entry) => entry.path), <String>[
         '/a/b',
         '/a/one.txt',
@@ -202,26 +245,34 @@ void main() {
         '/a/one.txt',
       ]);
       expect(shallow.first.type, VfsEntryType.directory);
-      expect(() => shallow.add(shallow.first), throwsUnsupportedError);
+      expect(mutate, throwsUnsupportedError);
     });
 
     test('lists the root', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs(
         files: <String, List<int>>{'/top.txt': utf8.encode('t')},
       );
 
-      // Act.
-      final List<VfsEntry> entries = expectOk(await vfs.list('/'));
+      // Act
+      final result = await vfs.list('/');
 
-      // Assert.
-      expect(entries.map((VfsEntry entry) => entry.path), <String>['/top.txt']);
+      // Assert
+      expect(expectOk(result).map((VfsEntry entry) => entry.path), <String>[
+        '/top.txt',
+      ]);
     });
 
     test('rejects listing an unknown directory as a value', () async {
-      // Arrange & Act & Assert.
+      // Arrange
+      final InMemoryVfs vfs = InMemoryVfs();
+
+      // Act
+      final result = await vfs.list('/absent');
+
+      // Assert
       expectPortProblem(
-        expectErr(await InMemoryVfs().list('/absent')),
+        expectErr(result),
         port: PortName.vfs,
         code: PortErrorCode.notFound,
         operation: 'list',
@@ -231,42 +282,50 @@ void main() {
 
   group('InMemoryVfs directory creation and deletion', () {
     test('creates a directory beside an existing parent', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = _seeded();
 
-      // Act.
-      expectOk(await vfs.createDirectory('/a/c'));
+      // Act
+      final result = await vfs.createDirectory('/a/c');
 
-      // Assert.
+      // Assert
+      expectOk(result);
       expect(vfs.directories, contains('/a/c'));
     });
 
     test('refuses a missing parent unless recursive', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs();
 
-      // Act & Assert.
+      // Act
+      final rejected = await vfs.createDirectory('/x/y');
+      final accepted = await vfs.createDirectory('/x/y', recursive: true);
+
+      // Assert
       expectPortProblem(
-        expectErr(await vfs.createDirectory('/x/y')),
+        expectErr(rejected),
         port: PortName.vfs,
         code: PortErrorCode.notFound,
         operation: 'createDirectory',
       );
-      expectOk(await vfs.createDirectory('/x/y', recursive: true));
+      expectOk(accepted);
       expect(vfs.directories, containsAll(<String>['/x', '/x/y']));
     });
 
     test('deletes a file, and reports an unknown path as a value', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = _seeded();
 
-      // Act.
-      expectOk(await vfs.delete('/a/one.txt'));
+      // Act
+      final deleted = await vfs.delete('/a/one.txt');
+      final exists = await vfs.exists('/a/one.txt');
+      final absent = await vfs.delete('/a/one.txt');
 
-      // Assert.
-      expect(expectOk(await vfs.exists('/a/one.txt')), isFalse);
+      // Assert
+      expectOk(deleted);
+      expect(expectOk(exists), isFalse);
       expectPortProblem(
-        expectErr(await vfs.delete('/a/one.txt')),
+        expectErr(absent),
         port: PortName.vfs,
         code: PortErrorCode.notFound,
         operation: 'delete',
@@ -274,41 +333,46 @@ void main() {
     });
 
     test('refuses a non-empty directory unless recursive', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = _seeded();
 
-      // Act.
-      final Object problem = expectErr(await vfs.delete('/a'));
+      // Act
+      final first = await vfs.delete('/a');
+      final second = await vfs.delete('/a');
+      final deleted = await vfs.delete('/a', recursive: true);
+      final directoryExists = await vfs.exists('/a');
+      final fileExists = await vfs.exists('/a/b/two.txt');
 
-      // Assert.
+      // Assert
       expectPortProblem(
-        expectErr(await vfs.delete('/a')),
+        expectErr(second),
         port: PortName.vfs,
         code: PortErrorCode.directoryNotEmpty,
         operation: 'delete',
       );
-      expect(problem, isNotNull);
-      expectOk(await vfs.delete('/a', recursive: true));
-      expect(expectOk(await vfs.exists('/a')), isFalse);
-      expect(expectOk(await vfs.exists('/a/b/two.txt')), isFalse);
+      expect(expectErr(first), isNotNull);
+      expectOk(deleted);
+      expect(expectOk(directoryExists), isFalse);
+      expect(expectOk(fileExists), isFalse);
       expect(vfs.directories, <String>{'/'});
     });
 
     test('deletes an empty directory without the recursive flag', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs(directories: <String>['/empty']);
 
-      // Act.
-      expectOk(await vfs.delete('/empty'));
+      // Act
+      final result = await vfs.delete('/empty');
 
-      // Assert.
+      // Assert
+      expectOk(result);
       expect(vfs.directories, <String>{'/'});
     });
   });
 
   group('InMemoryVfs scripted results', () {
     test('every fallible member honours one scripted answer', () async {
-      // Arrange.
+      // Arrange
       final InMemoryVfs vfs = _seeded()
         ..enqueueExistsResult(const Ok<bool>(true))
         ..enqueueStatResult(
@@ -322,18 +386,29 @@ void main() {
         ..enqueueCreateDirectoryResult(const Ok<void>(null))
         ..enqueueDeleteResult(const Ok<void>(null));
 
-      // Act & Assert.
-      expect(expectOk(await vfs.exists('/whatever')), isTrue);
-      expect(expectOk(await vfs.stat('/whatever')).type, VfsEntryType.link);
-      expect(expectOk(await vfs.readBytes('/whatever')), <int>[9]);
-      expect(expectOk(await vfs.readText('/whatever')), 'scripted');
-      expectOk(await vfs.writeBytes('/nowhere/x', <int>[1]));
-      expectOk(await vfs.writeText('/nowhere/x', 'x'));
-      expect(expectOk(await vfs.list('/nowhere')), isEmpty);
-      expectOk(await vfs.createDirectory('/nowhere/deep'));
-      expectOk(await vfs.delete('/nowhere'));
-      // The scripts are consumed, so real behaviour resumes.
-      expect(expectOk(await vfs.exists('/absent')), isFalse);
+      // Act
+      final exists = await vfs.exists('/whatever');
+      final stat = await vfs.stat('/whatever');
+      final bytes = await vfs.readBytes('/whatever');
+      final text = await vfs.readText('/whatever');
+      final writeBytes = await vfs.writeBytes('/nowhere/x', <int>[1]);
+      final writeText = await vfs.writeText('/nowhere/x', 'x');
+      final list = await vfs.list('/nowhere');
+      final create = await vfs.createDirectory('/nowhere/deep');
+      final delete = await vfs.delete('/nowhere');
+      final absent = await vfs.exists('/absent');
+
+      // Assert
+      expect(expectOk(exists), isTrue);
+      expect(expectOk(stat).type, VfsEntryType.link);
+      expect(expectOk(bytes), <int>[9]);
+      expect(expectOk(text), 'scripted');
+      expectOk(writeBytes);
+      expectOk(writeText);
+      expect(expectOk(list), isEmpty);
+      expectOk(create);
+      expectOk(delete);
+      expect(expectOk(absent), isFalse);
     });
   });
 }

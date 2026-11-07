@@ -14,36 +14,40 @@ Result<TelemetryAttributes> _check(TelemetryAttributes? attributes) =>
 void main() {
   group('checkTelemetryAttributes', () {
     test('treats a null bag as the empty bag', () {
-      // Arrange & Act.
-      final TelemetryAttributes accepted = expectOk(
-        checkTelemetryAttributes(
-          null,
-          port: PortName.metrics,
-          operation: 'emit',
-        ),
-      );
+      // Arrange
+      const TelemetryAttributes? attributes = null;
 
-      // Assert.
+      // Act
+      final result = checkTelemetryAttributes(
+        attributes,
+        port: PortName.metrics,
+        operation: 'emit',
+      );
+      void mutate() => expectOk(result)['x'] = 1;
+
+      // Assert
+      final TelemetryAttributes accepted = expectOk(result);
       expect(accepted, isEmpty);
-      expect(() => accepted['x'] = 1, throwsUnsupportedError);
+      expect(mutate, throwsUnsupportedError);
     });
 
     test('treats an empty bag as the empty bag', () {
-      // Arrange & Act.
-      final TelemetryAttributes accepted = expectOk(
-        checkTelemetryAttributes(
-          const <String, Object?>{},
-          port: PortName.metrics,
-          operation: 'emit',
-        ),
+      // Arrange
+      const TelemetryAttributes attributes = <String, Object?>{};
+
+      // Act
+      final result = checkTelemetryAttributes(
+        attributes,
+        port: PortName.metrics,
+        operation: 'emit',
       );
 
-      // Assert.
-      expect(accepted, isEmpty);
+      // Assert
+      expect(expectOk(result), isEmpty);
     });
 
     test('accepts finite primitives and key-sorts the result', () {
-      // Arrange.
+      // Arrange
       final TelemetryAttributes input = <String, Object?>{
         'zebra': 'z',
         'alpha': 1,
@@ -51,90 +55,112 @@ void main() {
         'ratio': 1.5,
       };
 
-      // Act.
-      final TelemetryAttributes accepted = expectOk(
-        checkTelemetryAttributes(
-          input,
-          port: PortName.logging,
-          operation: 'emit',
-        ),
+      // Act
+      final result = checkTelemetryAttributes(
+        input,
+        port: PortName.logging,
+        operation: 'emit',
       );
+      void clear() => expectOk(result).clear();
 
-      // Assert.
+      // Assert
+      final TelemetryAttributes accepted = expectOk(result);
       expect(accepted.keys, <String>['alpha', 'mid', 'ratio', 'zebra']);
-      expect(() => accepted.clear(), throwsUnsupportedError);
+      expect(clear, throwsUnsupportedError);
     });
 
     test('rejects a blank key', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkTelemetryAttributes(
-          const <String, Object?>{'  ': 1},
-          port: PortName.logging,
-          operation: 'emit',
-        ),
+      // Arrange
+      final TelemetryAttributes attributes = const <String, Object?>{'  ': 1};
+
+      // Act
+      final result = checkTelemetryAttributes(
+        attributes,
+        port: PortName.logging,
+        operation: 'emit',
       );
 
-      // Assert.
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['field'], 'attributes');
       expect(problem.status, 400);
     });
 
     test('rejects a NUL-bearing key', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkTelemetryAttributes(
-          <String, Object?>{'na${String.fromCharCode(0)}me': 1},
-          port: PortName.logging,
-          operation: 'emit',
-        ),
+      // Arrange
+      final TelemetryAttributes attributes = <String, Object?>{
+        'na${String.fromCharCode(0)}me': 1,
+      };
+
+      // Act
+      final result = checkTelemetryAttributes(
+        attributes,
+        port: PortName.logging,
+        operation: 'emit',
       );
 
-      // Assert.
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['field'], 'attributes');
     });
 
     test('rejects a non-primitive value', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkTelemetryAttributes(
-          const <String, Object?>{'nested': <String, Object?>{}},
-          port: PortName.metrics,
-          operation: 'emit',
-        ),
+      // Arrange
+      final TelemetryAttributes attributes = const <String, Object?>{
+        'nested': <String, Object?>{},
+      };
+
+      // Act
+      final result = checkTelemetryAttributes(
+        attributes,
+        port: PortName.metrics,
+        operation: 'emit',
       );
 
-      // Assert.
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['field'], 'attributes.nested');
     });
 
     test('rejects a non-finite number', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkTelemetryAttributes(
-          const <String, Object?>{'ratio': double.nan},
-          port: PortName.metrics,
-          operation: 'emit',
-        ),
+      // Arrange
+      final TelemetryAttributes attributes = const <String, Object?>{
+        'ratio': double.nan,
+      };
+
+      // Act
+      final result = checkTelemetryAttributes(
+        attributes,
+        port: PortName.metrics,
+        operation: 'emit',
       );
 
-      // Assert.
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['field'], 'attributes.ratio');
     });
 
     test('rejects a null value', () {
-      // Arrange & Act & Assert.
-      expect(
-        expectErr(
-          _check(const <String, Object?>{'absent': null}),
-        ).data['field'],
-        'attributes.absent',
-      );
+      // Arrange
+      const TelemetryAttributes attributes = <String, Object?>{'absent': null};
+
+      // Act
+      final result = _check(attributes);
+
+      // Assert
+      final Problem problem = expectErr(result);
+      expect(problem.data['field'], 'attributes.absent');
     });
   });
 
   test('emptyTelemetryAttributes is unmodifiable', () {
-    // Arrange & Act & Assert.
-    expect(() => emptyTelemetryAttributes['x'] = 1, throwsUnsupportedError);
+    // Arrange
+    final TelemetryAttributes attributes = emptyTelemetryAttributes;
+
+    // Act
+    void mutate() => attributes['x'] = 1;
+
+    // Assert
+    expect(mutate, throwsUnsupportedError);
   });
 }

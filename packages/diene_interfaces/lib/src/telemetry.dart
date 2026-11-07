@@ -1,33 +1,16 @@
-/// Shared attribute rules for the logging and metrics emit seams.
-///
-/// Both telemetry seams carry the same attribute bag, so the validation lives
-/// here once instead of twice. Dart/Flutter telemetry rides Faro at runtime —
-/// this library ships no exporter and no OTel implementer (RB-19).
-library;
-
 import 'dart:collection';
 
 import 'package:diene_result/diene_result.dart';
 
 import 'port_problem.dart';
 
-/// A validated telemetry attribute bag.
-///
-/// Values are restricted to finite primitives so any downstream transport
-/// (Faro, a log formatter, a metrics registry) can render them without
-/// negotiating a schema.
 typedef TelemetryAttributes = Map<String, Object?>;
 
-/// The empty, unmodifiable attribute bag.
 final TelemetryAttributes emptyTelemetryAttributes =
     UnmodifiableMapView<String, Object?>(const <String, Object?>{});
 
-/// Validates and canonicalises a telemetry attribute bag.
-///
-/// Accepts a `null` bag as the empty bag. Rejects blank or NUL-bearing keys and
-/// any value that is not a finite `num`, `bool`, or `String`. On success the
-/// returned map is key-sorted and unmodifiable, so two equal bags always render
-/// identically.
+/// Allows non-blank, NUL-free keys and finite `num`, `bool` or `String`
+/// values; returns a key-sorted unmodifiable copy (`null` is the empty bag).
 Result<TelemetryAttributes> checkTelemetryAttributes(
   TelemetryAttributes? attributes, {
   required PortName port,

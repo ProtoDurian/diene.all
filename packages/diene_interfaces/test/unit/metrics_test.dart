@@ -22,10 +22,10 @@ MetricRecord _sample({
 void main() {
   group('MetricRecord', () {
     test('copies and freezes its attributes', () {
-      // Arrange.
+      // Arrange
       final Map<String, Object?> attributes = <String, Object?>{'route': '/a'};
 
-      // Act.
+      // Act
       final MetricRecord record = _sample(
         name: 'latency',
         kind: MetricKind.histogram,
@@ -34,20 +34,24 @@ void main() {
         attributes: attributes,
       );
       attributes['injected'] = true;
+      void mutate() => record.attributes.remove('route');
 
-      // Assert.
+      // Assert
       expect(record.attributes, <String, Object?>{'route': '/a'});
-      expect(() => record.attributes.remove('route'), throwsUnsupportedError);
+      expect(mutate, throwsUnsupportedError);
       expect(record.unit, 'ms');
       expect(record.toString(), 'MetricRecord(latency, histogram, 12.5)');
       expect(MetricKind.values, hasLength(3));
     });
 
     test('defaults to no unit and no attributes', () {
-      // Arrange & Act.
-      final MetricRecord record = _sample();
+      // Arrange
+      const String name = 'requests.total';
 
-      // Assert.
+      // Act
+      final MetricRecord record = _sample(name: name);
+
+      // Assert
       expect(record.unit, isNull);
       expect(record.attributes, isEmpty);
       expect(record.timestamp, DateTime.utc(2026));
@@ -56,92 +60,123 @@ void main() {
 
   group('checkMetricRecord', () {
     test('accepts a well-formed counter sample', () {
-      // Arrange.
+      // Arrange
       final MetricRecord record = _sample(
         attributes: <String, Object?>{'ok': true},
       );
 
-      // Act & Assert.
-      expect(expectOk(checkMetricRecord(record)), same(record));
+      // Act
+      final result = checkMetricRecord(record);
+
+      // Assert
+      expect(expectOk(result), same(record));
     });
 
     test('accepts a negative gauge', () {
-      // Arrange & Act & Assert.
-      expect(
-        expectOk(
-          checkMetricRecord(
-            _sample(name: 'queue.depth', kind: MetricKind.gauge, value: -3),
-          ),
-        ).value,
-        -3,
+      // Arrange
+      final MetricRecord record = _sample(
+        name: 'queue.depth',
+        kind: MetricKind.gauge,
+        value: -3,
       );
+
+      // Act
+      final result = checkMetricRecord(record);
+
+      // Assert
+      expect(expectOk(result).value, -3);
     });
 
     test('rejects a name that breaks the shared pattern', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkMetricRecord(_sample(name: '1bad')),
-      );
+      // Arrange
+      final MetricRecord record = _sample(name: '1bad');
 
-      // Assert.
+      // Act
+      final result = checkMetricRecord(record);
+
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['field'], 'name');
       expect(problem.data['port'], 'metrics');
     });
 
     test('rejects a non-UTC timestamp', () {
-      // Arrange & Act & Assert.
-      expect(
-        expectErr(
-          checkMetricRecord(_sample(timestamp: DateTime(2026, 7, 25))),
-        ).data['field'],
-        'timestamp',
-      );
+      // Arrange
+      final MetricRecord record = _sample(timestamp: DateTime(2026, 7, 25));
+
+      // Act
+      final result = checkMetricRecord(record);
+
+      // Assert
+      final Problem problem = expectErr(result);
+      expect(problem.data['field'], 'timestamp');
     });
 
     test('rejects a non-finite value', () {
-      // Arrange & Act & Assert.
-      expect(
-        expectErr(
-          checkMetricRecord(
-            _sample(kind: MetricKind.gauge, value: double.infinity),
-          ),
-        ).title,
-        'Metric value must be finite',
+      // Arrange
+      final MetricRecord record = _sample(
+        kind: MetricKind.gauge,
+        value: double.infinity,
       );
+
+      // Act
+      final result = checkMetricRecord(record);
+
+      // Assert
+      final Problem problem = expectErr(result);
+      expect(problem.title, 'Metric value must be finite');
     });
 
     test('rejects a negative counter', () {
-      // Arrange & Act & Assert.
-      expect(
-        expectErr(checkMetricRecord(_sample(value: -1))).title,
-        'Counter samples must not be negative',
-      );
+      // Arrange
+      final MetricRecord record = _sample(value: -1);
+
+      // Act
+      final result = checkMetricRecord(record);
+
+      // Assert
+      final Problem problem = expectErr(result);
+      expect(problem.title, 'Counter samples must not be negative');
     });
 
     test('rejects a blank unit', () {
-      // Arrange & Act & Assert.
-      expect(
-        expectErr(checkMetricRecord(_sample(unit: ' '))).data['field'],
-        'unit',
-      );
+      // Arrange
+      final MetricRecord record = _sample(unit: ' ');
+
+      // Act
+      final result = checkMetricRecord(record);
+
+      // Assert
+      final Problem problem = expectErr(result);
+      expect(problem.data['field'], 'unit');
     });
 
     test('rejects invalid attributes through the shared telemetry rule', () {
-      // Arrange & Act & Assert.
-      expect(
-        expectErr(
-          checkMetricRecord(
-            _sample(attributes: <String, Object?>{'bad': Object()}),
-          ),
-        ).data['field'],
-        'attributes.bad',
+      // Arrange
+      final MetricRecord record = _sample(
+        attributes: <String, Object?>{'bad': Object()},
       );
+
+      // Act
+      final result = checkMetricRecord(record);
+
+      // Assert
+      final Problem problem = expectErr(result);
+      expect(problem.data['field'], 'attributes.bad');
     });
   });
 
   test('metricNamePattern accepts the documented shape', () {
-    // Arrange & Act & Assert.
-    expect(metricNamePattern.hasMatch('http.server/duration-ms'), isTrue);
-    expect(metricNamePattern.hasMatch('has space'), isFalse);
+    // Arrange
+    const String valid = 'http.server/duration-ms';
+    const String invalid = 'has space';
+
+    // Act
+    final bool validMatches = metricNamePattern.hasMatch(valid);
+    final bool invalidMatches = metricNamePattern.hasMatch(invalid);
+
+    // Assert
+    expect(validMatches, isTrue);
+    expect(invalidMatches, isFalse);
   });
 }

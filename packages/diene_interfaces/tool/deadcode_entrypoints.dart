@@ -1,20 +1,10 @@
-// Production dead-code root for the published diene_interfaces surface.
-//
-// This is tooling, not a test. dart_code_linter otherwise treats only the
-// public barrel (diene_interfaces.dart) as an entrypoint and incorrectly
-// reports the test_helper.dart public members as unused. Referencing every
-// public export here keeps the production-only dead-code pass honest without
-// any exclusion list. deadcode.sh copies this file to bin/main.dart inside the
-// production-only sandbox, so it lives in the member package where
-// `package:diene_interfaces` resolves cleanly (and is excluded from the
-// published archive by .pubignore).
+// Production dead-code root: references every public export so test_helper.dart counts as used.
 import 'package:diene_interfaces/diene_interfaces.dart';
 import 'package:diene_interfaces/test_helper.dart';
 import 'package:diene_problems/diene_problems.dart';
 import 'package:diene_result/diene_result.dart';
 
 Future<void> main() async {
-  // The seam vocabulary and the ONE type-URI builder.
   final Problem problem = portProblem(
     port: PortName.vfs,
     code: PortErrorCode.notFound,
@@ -41,7 +31,6 @@ Future<void> main() async {
     throw StateError('unexpected invalid-input status');
   }
 
-  // Every seam validator.
   final System system = InMemorySystem();
   final Vfs vfs = InMemoryVfs();
   final Terminal terminal = InMemoryTerminal(input: <String>['line']);
@@ -100,7 +89,6 @@ Future<void> main() async {
     throw StateError('unexpected telemetry constants');
   }
 
-  // Every seam member, through the shipped fakes.
   system.environment('HOME').unwrap();
   system.currentDirectory().unwrap();
   (await system.delay(Duration.zero)).unwrap();
@@ -140,7 +128,6 @@ Future<void> main() async {
   metrics.emit(metric).unwrap();
   (await metrics.flush()).unwrap();
 
-  // The fakes' scripting and assertion surface.
   final InMemorySystem scriptedSystem =
       InMemorySystem(
           environment: const <String, String>{'A': 'b'},
@@ -208,7 +195,6 @@ Future<void> main() async {
     throw StateError('unexpected telemetry transcript');
   }
 
-  // Accept a known-good envelope through the shipped assertion...
   expectPortProblem(
     problem,
     port: PortName.vfs,
@@ -216,7 +202,6 @@ Future<void> main() async {
     operation: 'readText',
   );
 
-  // ...and prove the failure type is reachable by rejecting a known-bad one.
   try {
     expectPortProblem(
       problem,

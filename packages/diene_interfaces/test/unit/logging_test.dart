@@ -6,10 +6,10 @@ import 'package:test/test.dart';
 void main() {
   group('LogRecord', () {
     test('copies and freezes its attributes', () {
-      // Arrange.
+      // Arrange
       final Map<String, Object?> attributes = <String, Object?>{'route': '/a'};
 
-      // Act.
+      // Act
       final LogRecord record = LogRecord(
         timestamp: DateTime.utc(2026, 7, 25, 6),
         level: LogLevel.error,
@@ -19,24 +19,28 @@ void main() {
         stackTrace: '#0 main',
       );
       attributes['injected'] = true;
+      void mutate() => record.attributes['x'] = 1;
 
-      // Assert.
+      // Assert
       expect(record.attributes, <String, Object?>{'route': '/a'});
-      expect(() => record.attributes['x'] = 1, throwsUnsupportedError);
+      expect(mutate, throwsUnsupportedError);
       expect(record.error, 'SocketException');
       expect(record.stackTrace, '#0 main');
       expect(record.toString(), 'LogRecord(error, request failed)');
     });
 
     test('defaults to no attributes, error, or stack trace', () {
-      // Arrange & Act.
+      // Arrange
+      final DateTime timestamp = DateTime.utc(2026);
+
+      // Act
       final LogRecord record = LogRecord(
-        timestamp: DateTime.utc(2026),
+        timestamp: timestamp,
         level: LogLevel.trace,
         message: 'tick',
       );
 
-      // Assert.
+      // Assert
       expect(record.attributes, isEmpty);
       expect(record.error, isNull);
       expect(record.stackTrace, isNull);
@@ -46,7 +50,7 @@ void main() {
 
   group('checkLogRecord', () {
     test('accepts a UTC record with valid attributes', () {
-      // Arrange.
+      // Arrange
       final LogRecord record = LogRecord(
         timestamp: DateTime.utc(2026),
         level: LogLevel.info,
@@ -54,59 +58,62 @@ void main() {
         attributes: <String, Object?>{'attempt': 1},
       );
 
-      // Act & Assert.
-      expect(expectOk(checkLogRecord(record)), same(record));
+      // Act
+      final result = checkLogRecord(record);
+
+      // Assert
+      expect(expectOk(result), same(record));
     });
 
     test('rejects a blank message', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkLogRecord(
-          LogRecord(
-            timestamp: DateTime.utc(2026),
-            level: LogLevel.debug,
-            message: '   ',
-          ),
-        ),
+      // Arrange
+      final LogRecord record = LogRecord(
+        timestamp: DateTime.utc(2026),
+        level: LogLevel.debug,
+        message: '   ',
       );
 
-      // Assert.
+      // Act
+      final result = checkLogRecord(record);
+
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['field'], 'message');
       expect(problem.data['port'], 'logging');
     });
 
     test('rejects a non-UTC timestamp', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkLogRecord(
-          LogRecord(
-            timestamp: DateTime(2026, 7, 25),
-            level: LogLevel.fatal,
-            message: 'crash',
-          ),
-        ),
+      // Arrange
+      final LogRecord record = LogRecord(
+        timestamp: DateTime(2026, 7, 25),
+        level: LogLevel.fatal,
+        message: 'crash',
       );
 
-      // Assert.
+      // Act
+      final result = checkLogRecord(record);
+
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['field'], 'timestamp');
     });
 
     test('rejects invalid attributes through the shared telemetry rule', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkLogRecord(
-          LogRecord(
-            timestamp: DateTime.utc(2026),
-            level: LogLevel.warning,
-            message: 'odd',
-            attributes: <String, Object?>{
-              'nested': <int>[1],
-            },
-          ),
-        ),
+      // Arrange
+      final LogRecord record = LogRecord(
+        timestamp: DateTime.utc(2026),
+        level: LogLevel.warning,
+        message: 'odd',
+        attributes: <String, Object?>{
+          'nested': <int>[1],
+        },
       );
 
-      // Assert.
+      // Act
+      final result = checkLogRecord(record);
+
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['field'], 'attributes.nested');
       expect(problem.data['port'], 'logging');
     });

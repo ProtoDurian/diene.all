@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 void main() {
   group('InMemoryTerminal.run', () {
     test('records commands and serves scripted outputs FIFO', () async {
-      // Arrange.
+      // Arrange
       final InMemoryTerminal terminal = InMemoryTerminal()
         ..enqueue(
           const Ok<TerminalOutput>(
@@ -20,17 +20,17 @@ void main() {
           ),
         );
 
-      // Act.
-      final TerminalOutput first = expectOk(
-        await terminal.run(TerminalCommand(executable: 'git')),
+      // Act
+      final firstResult = await terminal.run(
+        TerminalCommand(executable: 'git'),
       );
-      final TerminalOutput second = expectOk(
-        await terminal.run(
-          TerminalCommand(executable: 'git', arguments: <String>['bogus']),
-        ),
+      final secondResult = await terminal.run(
+        TerminalCommand(executable: 'git', arguments: <String>['bogus']),
       );
 
-      // Assert.
+      // Assert
+      final TerminalOutput first = expectOk(firstResult);
+      final TerminalOutput second = expectOk(secondResult);
       expect(first.stdout, 'first');
       expect(second.exitCode, 2);
       expect(
@@ -48,18 +48,18 @@ void main() {
     test(
       'an unscripted run is an unexpected-call failure, not a throw',
       () async {
-        // Arrange.
+        // Arrange
         final InMemoryTerminal terminal = InMemoryTerminal();
+        final TerminalCommand command = TerminalCommand(executable: 'missing');
 
-        // Act.
-        final Object problem = expectErr(
-          await terminal.run(TerminalCommand(executable: 'missing')),
-        );
+        // Act
+        final firstResult = await terminal.run(command);
+        final secondResult = await terminal.run(command);
 
-        // Assert.
-        expect(problem, isNotNull);
+        // Assert
+        expect(expectErr(firstResult), isNotNull);
         expectPortProblem(
-          expectErr(await terminal.run(TerminalCommand(executable: 'missing'))),
+          expectErr(secondResult),
           port: PortName.terminal,
           code: PortErrorCode.unexpectedCall,
           operation: 'run',
@@ -68,7 +68,7 @@ void main() {
     );
 
     test('a scripted launch failure crosses as a value', () async {
-      // Arrange.
+      // Arrange
       final InMemoryTerminal terminal = InMemoryTerminal()
         ..enqueue(
           portFailure<TerminalOutput>(
@@ -78,10 +78,14 @@ void main() {
             message: 'Executable not permitted',
           ),
         );
+      final TerminalCommand command = TerminalCommand(executable: 'sudo');
 
-      // Act & Assert.
+      // Act
+      final result = await terminal.run(command);
+
+      // Assert
       expectPortProblem(
-        expectErr(await terminal.run(TerminalCommand(executable: 'sudo'))),
+        expectErr(result),
         port: PortName.terminal,
         code: PortErrorCode.permissionDenied,
       );
@@ -90,26 +94,25 @@ void main() {
 
   group('InMemoryTerminal stdio', () {
     test('records writes and succeeds by default', () async {
-      // Arrange.
+      // Arrange
       final InMemoryTerminal terminal = InMemoryTerminal();
-
-      // Act.
-      expectOk(
-        await terminal.write(
-          const TerminalWrite(channel: TerminalChannel.stdout, text: 'hello'),
-        ),
+      const TerminalWrite first = TerminalWrite(
+        channel: TerminalChannel.stdout,
+        text: 'hello',
       );
-      expectOk(
-        await terminal.write(
-          const TerminalWrite(
-            channel: TerminalChannel.stderr,
-            text: 'oops',
-            newline: false,
-          ),
-        ),
+      const TerminalWrite second = TerminalWrite(
+        channel: TerminalChannel.stderr,
+        text: 'oops',
+        newline: false,
       );
 
-      // Assert.
+      // Act
+      final firstResult = await terminal.write(first);
+      final secondResult = await terminal.write(second);
+
+      // Assert
+      expectOk(firstResult);
+      expectOk(secondResult);
       expect(terminal.writes.map((TerminalWrite write) => write.text), <String>[
         'hello',
         'oops',
@@ -118,7 +121,7 @@ void main() {
     });
 
     test('scripts a write failure', () async {
-      // Arrange.
+      // Arrange
       final InMemoryTerminal terminal = InMemoryTerminal()
         ..enqueueWriteResult(
           portFailure<void>(
@@ -128,50 +131,54 @@ void main() {
             message: 'Stream closed',
           ),
         );
+      const TerminalWrite first = TerminalWrite(
+        channel: TerminalChannel.stdout,
+        text: 'x',
+      );
+      const TerminalWrite second = TerminalWrite(
+        channel: TerminalChannel.stdout,
+        text: 'y',
+      );
 
-      // Act & Assert.
+      // Act
+      final rejected = await terminal.write(first);
+      final accepted = await terminal.write(second);
+
+      // Assert
       expectPortProblem(
-        expectErr(
-          await terminal.write(
-            const TerminalWrite(channel: TerminalChannel.stdout, text: 'x'),
-          ),
-        ),
+        expectErr(rejected),
         port: PortName.terminal,
         code: PortErrorCode.closed,
       );
-      expectOk(
-        await terminal.write(
-          const TerminalWrite(channel: TerminalChannel.stdout, text: 'y'),
-        ),
-      );
+      expectOk(accepted);
     });
 
     test(
       'drains seeded input, then reports end of input as Ok(null)',
       () async {
-        // Arrange.
+        // Arrange
         final InMemoryTerminal terminal = InMemoryTerminal(
           input: <String>['alice', 'bob'],
         );
 
-        // Act.
-        final String? first = expectOk(await terminal.readLine());
-        final String? second = expectOk(
-          await terminal.readLine(const TerminalRead(prompt: 'name? ')),
+        // Act
+        final first = await terminal.readLine();
+        final second = await terminal.readLine(
+          const TerminalRead(prompt: 'name? '),
         );
-        final String? third = expectOk(await terminal.readLine());
+        final third = await terminal.readLine();
 
-        // Assert.
-        expect(first, 'alice');
-        expect(second, 'bob');
-        expect(third, isNull);
+        // Assert
+        expect(expectOk(first), 'alice');
+        expect(expectOk(second), 'bob');
+        expect(expectOk(third), isNull);
         expect(terminal.reads, hasLength(3));
         expect(terminal.reads[1].prompt, 'name? ');
       },
     );
 
     test('scripts a read failure', () async {
-      // Arrange.
+      // Arrange
       final InMemoryTerminal terminal = InMemoryTerminal()
         ..enqueueReadResult(
           portFailure<String?>(
@@ -182,18 +189,31 @@ void main() {
           ),
         );
 
-      // Act & Assert.
+      // Act
+      final result = await terminal.readLine();
+
+      // Assert
       expectPortProblem(
-        expectErr(await terminal.readLine()),
+        expectErr(result),
         port: PortName.terminal,
         code: PortErrorCode.unsupported,
       );
     });
 
     test('reports the configured interactivity', () {
-      // Arrange & Act & Assert.
-      expect(InMemoryTerminal().interactive, isTrue);
-      expect(InMemoryTerminal(interactive: false).interactive, isFalse);
+      // Arrange
+      final InMemoryTerminal defaultTerminal = InMemoryTerminal();
+      final InMemoryTerminal noninteractiveTerminal = InMemoryTerminal(
+        interactive: false,
+      );
+
+      // Act
+      final bool defaultInteractive = defaultTerminal.interactive;
+      final bool configuredInteractive = noninteractiveTerminal.interactive;
+
+      // Assert
+      expect(defaultInteractive, isTrue);
+      expect(configuredInteractive, isFalse);
     });
   });
 }

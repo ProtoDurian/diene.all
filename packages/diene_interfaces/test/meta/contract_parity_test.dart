@@ -1,12 +1,4 @@
-// Contract-parity tier: ONE shared behavioural suite is applied to each fake.
-//
-// The family meta rule asks for a shared behavioural suite run against BOTH the
-// real implementation and the fake. `diene_interfaces` ships NO real
-// implementation on purpose — it is the seam package, and the concrete
-// `dart:io`/Flutter adapters live downstream (see doc/interfaces.md, S33
-// extraction boundary). So the parity subject here is the CONTRACT ITSELF: the
-// behaviour every implementation, real or fake, must exhibit. Downstream
-// adapters re-run this same suite against their real implementation.
+// No real adapter ships here; fakes and downstream adapters run this suite.
 
 import 'package:diene_interfaces/diene_interfaces.dart';
 import 'package:diene_interfaces/test_helper.dart';
@@ -14,38 +6,66 @@ import 'package:diene_result/diene_result.dart';
 import 'package:diene_result/test_helper.dart';
 import 'package:test/test.dart';
 
-/// Behaviour every [System] implementation must exhibit.
 void systemContract(String label, System Function() build) {
   group('System contract ($label)', () {
     test('an absent variable is Ok(null), never a failure', () {
-      // Arrange & Act & Assert.
-      expect(expectOk(build().environment('__DIENE_ABSENT__')), isNull);
+      // Arrange
+      final System system = build();
+
+      // Act
+      final result = system.environment('__DIENE_ABSENT__');
+
+      // Assert
+      expect(expectOk(result), isNull);
     });
 
     test('the clock always answers in UTC', () {
-      // Arrange & Act & Assert.
-      expect(expectOk(build().nowUtc()).isUtc, isTrue);
+      // Arrange
+      final System system = build();
+
+      // Act
+      final result = system.nowUtc();
+
+      // Assert
+      expect(expectOk(result).isUtc, isTrue);
     });
 
     test('the working directory is absolute', () {
-      // Arrange & Act & Assert.
-      expect(expectOk(build().currentDirectory()), startsWith('/'));
+      // Arrange
+      final System system = build();
+
+      // Act
+      final result = system.currentDirectory();
+
+      // Assert
+      expect(expectOk(result), startsWith('/'));
     });
 
     test('a zero delay completes', () async {
-      // Arrange & Act & Assert.
-      expectOk(await build().delay(Duration.zero));
+      // Arrange
+      final System system = build();
+
+      // Act
+      final result = await system.delay(Duration.zero);
+
+      // Assert
+      expectOk(result);
     });
   });
 }
 
-/// Behaviour every [Vfs] implementation must exhibit.
 void vfsContract(String label, Vfs Function() build) {
   group('Vfs contract ($label)', () {
     test('a missing path is a not-found VALUE, never a throw', () async {
-      // Arrange & Act & Assert.
+      // Arrange
+      final Vfs vfs = build();
+
+      // Act
+      final result = await vfs.readText('/__diene_absent__');
+
+      // Assert
       expectPortProblem(
-        expectErr(await build().readText('/__diene_absent__')),
+        expectErr(result),
         port: PortName.vfs,
         code: PortErrorCode.notFound,
       );
@@ -54,119 +74,140 @@ void vfsContract(String label, Vfs Function() build) {
     test(
       'exists answers false for a missing path rather than failing',
       () async {
-        // Arrange & Act & Assert.
-        expect(expectOk(await build().exists('/__diene_absent__')), isFalse);
+        // Arrange
+        final Vfs vfs = build();
+
+        // Act
+        final result = await vfs.exists('/__diene_absent__');
+
+        // Assert
+        expect(expectOk(result), isFalse);
       },
     );
 
     test('a written file reads back byte-identically', () async {
-      // Arrange.
+      // Arrange
       final Vfs vfs = build();
 
-      // Act.
-      expectOk(await vfs.writeText('/parity.txt', 'round trip'));
+      // Act
+      final writeResult = await vfs.writeText('/parity.txt', 'round trip');
+      final readResult = await vfs.readText('/parity.txt');
+      final statResult = await vfs.stat('/parity.txt');
 
-      // Assert.
-      expect(expectOk(await vfs.readText('/parity.txt')), 'round trip');
-      expect(expectOk(await vfs.stat('/parity.txt')).type, VfsEntryType.file);
+      // Assert
+      expectOk(writeResult);
+      expect(expectOk(readResult), 'round trip');
+      expect(expectOk(statResult).type, VfsEntryType.file);
     });
 
     test('a directory created recursively becomes listable', () async {
-      // Arrange.
+      // Arrange
       final Vfs vfs = build();
 
-      // Act.
-      expectOk(await vfs.createDirectory('/deep/tree', recursive: true));
+      // Act
+      final createResult = await vfs.createDirectory(
+        '/deep/tree',
+        recursive: true,
+      );
+      final listResult = await vfs.list('/deep');
 
-      // Assert.
-      expect(expectOk(await vfs.list('/deep')), hasLength(1));
+      // Assert
+      expectOk(createResult);
+      expect(expectOk(listResult), hasLength(1));
     });
   });
 }
 
-/// Behaviour every [Terminal] implementation must exhibit.
 void terminalContract(String label, Terminal Function() build) {
   group('Terminal contract ($label)', () {
     test(
       'a non-zero exit is captured output, not a transport failure',
       () async {
-        // Arrange.
+        // Arrange
         final Terminal terminal = build();
 
-        // Act.
+        // Act
         final Result<TerminalOutput> result = await terminal.run(
           TerminalCommand(executable: '__diene_nonzero__'),
         );
 
-        // Assert.
+        // Assert
         expect(expectOk(result).succeeded, isFalse);
       },
     );
 
     test('a write succeeds on both channels', () async {
-      // Arrange.
+      // Arrange
       final Terminal terminal = build();
 
-      // Act & Assert.
+      // Act
+      final List<Result<void>> results = <Result<void>>[];
       for (final TerminalChannel channel in TerminalChannel.values) {
-        expectOk(
+        results.add(
           await terminal.write(TerminalWrite(channel: channel, text: 'parity')),
         );
+      }
+
+      // Assert
+      for (final Result<void> result in results) {
+        expectOk(result);
       }
     });
 
     test('reading past the end of input is Ok(null)', () async {
-      // Arrange & Act & Assert.
-      expect(expectOk(await build().readLine()), isNull);
+      // Arrange
+      final Terminal terminal = build();
+
+      // Act
+      final result = await terminal.readLine();
+
+      // Assert
+      expect(expectOk(result), isNull);
     });
   });
 }
 
-/// Behaviour every [LoggerSink] implementation must exhibit.
 void loggerContract(String label, LoggerSink Function() build) {
   group('LoggerSink contract ($label)', () {
     test('a valid record is accepted and flushing succeeds', () async {
-      // Arrange.
+      // Arrange
       final LoggerSink sink = build();
-
-      // Act.
-      expectOk(
-        sink.emit(
-          LogRecord(
-            timestamp: DateTime.utc(2026),
-            level: LogLevel.info,
-            message: 'parity',
-          ),
-        ),
+      final LogRecord record = LogRecord(
+        timestamp: DateTime.utc(2026),
+        level: LogLevel.info,
+        message: 'parity',
       );
 
-      // Assert.
-      expectOk(await sink.flush());
+      // Act
+      final emitResult = sink.emit(record);
+      final flushResult = await sink.flush();
+
+      // Assert
+      expectOk(emitResult);
+      expectOk(flushResult);
     });
   });
 }
 
-/// Behaviour every [MetricsCollector] implementation must exhibit.
 void metricsContract(String label, MetricsCollector Function() build) {
   group('MetricsCollector contract ($label)', () {
     test('a valid sample is accepted and flushing succeeds', () async {
-      // Arrange.
+      // Arrange
       final MetricsCollector collector = build();
-
-      // Act.
-      expectOk(
-        collector.emit(
-          MetricRecord(
-            timestamp: DateTime.utc(2026),
-            name: 'parity.total',
-            kind: MetricKind.counter,
-            value: 1,
-          ),
-        ),
+      final MetricRecord record = MetricRecord(
+        timestamp: DateTime.utc(2026),
+        name: 'parity.total',
+        kind: MetricKind.counter,
+        value: 1,
       );
 
-      // Assert.
-      expectOk(await collector.flush());
+      // Act
+      final emitResult = collector.emit(record);
+      final flushResult = await collector.flush();
+
+      // Assert
+      expectOk(emitResult);
+      expectOk(flushResult);
     });
   });
 }

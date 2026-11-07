@@ -19,14 +19,16 @@ MetricRecord _metric([num value = 1]) => MetricRecord(
 void main() {
   group('InMemoryLoggerSink', () {
     test('captures emitted records in call order', () {
-      // Arrange.
+      // Arrange
       final InMemoryLoggerSink sink = InMemoryLoggerSink();
 
-      // Act.
-      expectOk(sink.emit(_log()));
-      expectOk(sink.emit(_log(LogLevel.error)));
+      // Act
+      final first = sink.emit(_log());
+      final second = sink.emit(_log(LogLevel.error));
 
-      // Assert.
+      // Assert
+      expectOk(first);
+      expectOk(second);
       expect(sink.records.map((LogRecord record) => record.level), <LogLevel>[
         LogLevel.info,
         LogLevel.error,
@@ -34,7 +36,7 @@ void main() {
     });
 
     test('a scripted failure crosses as a value and is not captured', () {
-      // Arrange.
+      // Arrange
       final InMemoryLoggerSink sink = InMemoryLoggerSink()
         ..enqueue(
           portFailure<void>(
@@ -45,21 +47,30 @@ void main() {
           ),
         );
 
-      // Act.
+      // Act
+      final rejected = sink.emit(_log());
+      final List<LogRecord> recordsAfterFailure = List<LogRecord>.of(
+        sink.records,
+      );
+      final accepted = sink.emit(_log());
+
+      // Assert
       expectPortProblem(
-        expectErr(sink.emit(_log())),
+        expectErr(rejected),
         port: PortName.logging,
         code: PortErrorCode.io,
       );
-
-      // Assert.
-      expect(sink.records, isEmpty, reason: 'a rejected record is not stored');
-      expectOk(sink.emit(_log()));
+      expect(
+        recordsAfterFailure,
+        isEmpty,
+        reason: 'a rejected record is not stored',
+      );
+      expectOk(accepted);
       expect(sink.records, hasLength(1));
     });
 
     test('counts flushes and honours a scripted flush failure', () async {
-      // Arrange.
+      // Arrange
       final InMemoryLoggerSink sink = InMemoryLoggerSink()
         ..enqueueFlushResult(
           portFailure<void>(
@@ -70,29 +81,33 @@ void main() {
           ),
         );
 
-      // Act.
+      // Act
+      final rejected = await sink.flush();
+      final accepted = await sink.flush();
+
+      // Assert
       expectPortProblem(
-        expectErr(await sink.flush()),
+        expectErr(rejected),
         port: PortName.logging,
         code: PortErrorCode.unavailable,
       );
-      expectOk(await sink.flush());
-
-      // Assert.
+      expectOk(accepted);
       expect(sink.flushCount, 2);
     });
   });
 
   group('InMemoryMetricsCollector', () {
     test('captures emitted samples in call order', () {
-      // Arrange.
+      // Arrange
       final InMemoryMetricsCollector collector = InMemoryMetricsCollector();
 
-      // Act.
-      expectOk(collector.emit(_metric()));
-      expectOk(collector.emit(_metric(4)));
+      // Act
+      final first = collector.emit(_metric());
+      final second = collector.emit(_metric(4));
 
-      // Assert.
+      // Assert
+      expectOk(first);
+      expectOk(second);
       expect(
         collector.records.map((MetricRecord record) => record.value),
         <num>[1, 4],
@@ -100,7 +115,7 @@ void main() {
     });
 
     test('a scripted failure crosses as a value and is not captured', () {
-      // Arrange.
+      // Arrange
       final InMemoryMetricsCollector collector = InMemoryMetricsCollector()
         ..enqueue(
           portFailure<void>(
@@ -111,21 +126,26 @@ void main() {
           ),
         );
 
-      // Act.
+      // Act
+      final rejected = collector.emit(_metric());
+      final List<MetricRecord> recordsAfterFailure = List<MetricRecord>.of(
+        collector.records,
+      );
+      final accepted = collector.emit(_metric());
+
+      // Assert
       expectPortProblem(
-        expectErr(collector.emit(_metric())),
+        expectErr(rejected),
         port: PortName.metrics,
         code: PortErrorCode.io,
       );
-
-      // Assert.
-      expect(collector.records, isEmpty);
-      expectOk(collector.emit(_metric()));
+      expect(recordsAfterFailure, isEmpty);
+      expectOk(accepted);
       expect(collector.records, hasLength(1));
     });
 
     test('counts flushes and honours a scripted flush failure', () async {
-      // Arrange.
+      // Arrange
       final InMemoryMetricsCollector collector = InMemoryMetricsCollector()
         ..enqueueFlushResult(
           portFailure<void>(
@@ -136,15 +156,17 @@ void main() {
           ),
         );
 
-      // Act.
+      // Act
+      final rejected = await collector.flush();
+      final accepted = await collector.flush();
+
+      // Assert
       expectPortProblem(
-        expectErr(await collector.flush()),
+        expectErr(rejected),
         port: PortName.metrics,
         code: PortErrorCode.timeout,
       );
-      expectOk(await collector.flush());
-
-      // Assert.
+      expectOk(accepted);
       expect(collector.flushCount, 2);
     });
   });

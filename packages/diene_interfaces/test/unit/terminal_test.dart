@@ -8,11 +8,11 @@ final String _nul = String.fromCharCode(0);
 void main() {
   group('TerminalCommand', () {
     test('copies and freezes its arguments and environment', () {
-      // Arrange.
+      // Arrange
       final List<String> arguments = <String>['--version'];
       final Map<String, String> environment = <String, String>{'LC_ALL': 'C'};
 
-      // Act.
+      // Act
       final TerminalCommand command = TerminalCommand(
         executable: 'git',
         arguments: arguments,
@@ -23,12 +23,14 @@ void main() {
       );
       arguments.add('--mutated');
       environment['INJECTED'] = '1';
+      void mutateArguments() => command.arguments.add('x');
+      void mutateEnvironment() => command.environment['x'] = 'y';
 
-      // Assert.
+      // Assert
       expect(command.arguments, <String>['--version']);
       expect(command.environment, <String, String>{'LC_ALL': 'C'});
-      expect(() => command.arguments.add('x'), throwsUnsupportedError);
-      expect(() => command.environment['x'] = 'y', throwsUnsupportedError);
+      expect(mutateArguments, throwsUnsupportedError);
+      expect(mutateEnvironment, throwsUnsupportedError);
       expect(command.workingDirectory, '/repo');
       expect(command.includeParentEnvironment, isFalse);
       expect(command.runInShell, isTrue);
@@ -36,10 +38,13 @@ void main() {
     });
 
     test('defaults to an inherited environment and no shell', () {
-      // Arrange & Act.
-      final TerminalCommand command = TerminalCommand(executable: 'ls');
+      // Arrange
+      const String executable = 'ls';
 
-      // Assert.
+      // Act
+      final TerminalCommand command = TerminalCommand(executable: executable);
+
+      // Assert
       expect(command.arguments, isEmpty);
       expect(command.environment, isEmpty);
       expect(command.workingDirectory, isNull);
@@ -50,19 +55,23 @@ void main() {
 
   group('TerminalOutput', () {
     test('reports success only for a zero exit code', () {
-      // Arrange & Act.
+      // Arrange
+      const int successExitCode = 0;
+      const int failureExitCode = 1;
+
+      // Act
       const TerminalOutput ok = TerminalOutput(
-        exitCode: 0,
+        exitCode: successExitCode,
         stdout: 'out',
         stderr: '',
       );
       const TerminalOutput failed = TerminalOutput(
-        exitCode: 1,
+        exitCode: failureExitCode,
         stdout: '',
         stderr: 'err',
       );
 
-      // Assert.
+      // Assert
       expect(ok.succeeded, isTrue);
       expect(ok.stdout, 'out');
       expect(failed.succeeded, isFalse);
@@ -73,13 +82,16 @@ void main() {
 
   group('TerminalWrite and TerminalRead', () {
     test('a write defaults to a trailing newline', () {
-      // Arrange & Act.
+      // Arrange
+      const String text = 'boom';
+
+      // Act
       const TerminalWrite write = TerminalWrite(
         channel: TerminalChannel.stderr,
-        text: 'boom',
+        text: text,
       );
 
-      // Assert.
+      // Assert
       expect(write.channel, TerminalChannel.stderr);
       expect(write.newline, isTrue);
       expect(write.toString(), 'TerminalWrite(stderr, 4 chars)');
@@ -87,92 +99,103 @@ void main() {
     });
 
     test('a read carries an optional prompt', () {
-      // Arrange & Act.
-      const TerminalRead read = TerminalRead(prompt: 'name? ');
+      // Arrange
+      const String prompt = 'name? ';
 
-      // Assert.
+      // Act
+      const TerminalRead read = TerminalRead(prompt: prompt);
+      const TerminalRead defaultRead = TerminalRead();
+
+      // Assert
       expect(read.prompt, 'name? ');
       expect(read.toString(), 'TerminalRead(name? )');
-      expect(const TerminalRead().prompt, isNull);
+      expect(defaultRead.prompt, isNull);
     });
   });
 
   group('checkTerminalCommand', () {
     test('accepts a well-formed invocation', () {
-      // Arrange.
+      // Arrange
       final TerminalCommand command = TerminalCommand(
         executable: 'git',
         arguments: <String>['status'],
         environment: <String, String>{'LC_ALL': 'C'},
       );
 
-      // Act & Assert.
-      expect(expectOk(checkTerminalCommand(command)), same(command));
+      // Act
+      final result = checkTerminalCommand(command);
+
+      // Assert
+      expect(expectOk(result), same(command));
     });
 
     test('rejects a blank executable', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkTerminalCommand(TerminalCommand(executable: '  ')),
-      );
+      // Arrange
+      final TerminalCommand command = TerminalCommand(executable: '  ');
 
-      // Assert.
+      // Act
+      final result = checkTerminalCommand(command);
+
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['field'], 'executable');
       expect(problem.title, 'Executable must be non-blank');
     });
 
     test('rejects a NUL-bearing executable', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkTerminalCommand(TerminalCommand(executable: 'g${_nul}it')),
-      );
+      // Arrange
+      final TerminalCommand command = TerminalCommand(executable: 'g${_nul}it');
 
-      // Assert.
+      // Act
+      final result = checkTerminalCommand(command);
+
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.title, 'Executable must not contain a NUL byte');
     });
 
     test('rejects a NUL-bearing argument', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkTerminalCommand(
-          TerminalCommand(
-            executable: 'git',
-            arguments: <String>['ok', 'ba${_nul}d'],
-          ),
-        ),
+      // Arrange
+      final TerminalCommand command = TerminalCommand(
+        executable: 'git',
+        arguments: <String>['ok', 'ba${_nul}d'],
       );
 
-      // Assert.
+      // Act
+      final result = checkTerminalCommand(command);
+
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['field'], 'arguments');
     });
 
     test('rejects a blank environment name', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkTerminalCommand(
-          TerminalCommand(
-            executable: 'git',
-            environment: <String, String>{' ': 'x'},
-          ),
-        ),
+      // Arrange
+      final TerminalCommand command = TerminalCommand(
+        executable: 'git',
+        environment: <String, String>{' ': 'x'},
       );
 
-      // Assert.
+      // Act
+      final result = checkTerminalCommand(command);
+
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['field'], 'environment');
     });
 
     test('rejects an environment name containing an equals sign', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkTerminalCommand(
-          TerminalCommand(
-            executable: 'git',
-            environment: <String, String>{'A=B': 'x'},
-          ),
-        ),
+      // Arrange
+      final TerminalCommand command = TerminalCommand(
+        executable: 'git',
+        environment: <String, String>{'A=B': 'x'},
       );
 
-      // Assert.
+      // Act
+      final result = checkTerminalCommand(command);
+
+      // Assert
+      final Problem problem = expectErr(result);
       expect(
         problem.title,
         'Environment names must be non-blank and free of "="',
@@ -182,74 +205,89 @@ void main() {
 
   group('checkTerminalOutput', () {
     test('accepts an in-range exit code', () {
-      // Arrange.
+      // Arrange
       const TerminalOutput output = TerminalOutput(
         exitCode: 255,
         stdout: '',
         stderr: '',
       );
 
-      // Act & Assert.
-      expect(expectOk(checkTerminalOutput(output)), same(output));
+      // Act
+      final result = checkTerminalOutput(output);
+
+      // Assert
+      expect(expectOk(result), same(output));
     });
 
     test('rejects a negative exit code', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(
-        checkTerminalOutput(
-          const TerminalOutput(exitCode: -1, stdout: '', stderr: ''),
-        ),
+      // Arrange
+      const TerminalOutput output = TerminalOutput(
+        exitCode: -1,
+        stdout: '',
+        stderr: '',
       );
 
-      // Assert.
+      // Act
+      final result = checkTerminalOutput(output);
+
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['field'], 'exitCode');
     });
 
     test('rejects an out-of-range exit code', () {
-      // Arrange & Act & Assert.
-      expect(
-        expectErr(
-          checkTerminalOutput(
-            const TerminalOutput(exitCode: 256, stdout: '', stderr: ''),
-          ),
-        ).title,
-        'Exit code must be within 0..255',
+      // Arrange
+      const TerminalOutput output = TerminalOutput(
+        exitCode: 256,
+        stdout: '',
+        stderr: '',
       );
+
+      // Act
+      final result = checkTerminalOutput(output);
+
+      // Assert
+      final Problem problem = expectErr(result);
+      expect(problem.title, 'Exit code must be within 0..255');
     });
   });
 
   group('checkTerminalWrite and checkTerminalRead', () {
     test('accept clean payloads', () {
-      // Arrange & Act & Assert.
-      expect(
-        expectOk(
-          checkTerminalWrite(
-            const TerminalWrite(channel: TerminalChannel.stdout, text: 'hi'),
-          ),
-        ).text,
-        'hi',
+      // Arrange
+      const TerminalWrite write = TerminalWrite(
+        channel: TerminalChannel.stdout,
+        text: 'hi',
       );
-      expect(expectOk(checkTerminalRead(const TerminalRead())).prompt, isNull);
-      expect(
-        expectOk(checkTerminalRead(const TerminalRead(prompt: 'go'))).prompt,
-        'go',
-      );
+      const TerminalRead defaultRead = TerminalRead();
+      const TerminalRead promptedRead = TerminalRead(prompt: 'go');
+
+      // Act
+      final writeResult = checkTerminalWrite(write);
+      final defaultResult = checkTerminalRead(defaultRead);
+      final promptedResult = checkTerminalRead(promptedRead);
+
+      // Assert
+      expect(expectOk(writeResult).text, 'hi');
+      expect(expectOk(defaultResult).prompt, isNull);
+      expect(expectOk(promptedResult).prompt, 'go');
     });
 
     test('reject NUL-bearing payloads', () {
-      // Arrange & Act.
-      final Problem writeProblem = expectErr(
-        checkTerminalWrite(
-          TerminalWrite(channel: TerminalChannel.stdout, text: 'a${_nul}b'),
-        ),
+      // Arrange
+      final TerminalWrite write = TerminalWrite(
+        channel: TerminalChannel.stdout,
+        text: 'a${_nul}b',
       );
-      final Problem readProblem = expectErr(
-        checkTerminalRead(TerminalRead(prompt: 'a${_nul}b')),
-      );
+      final TerminalRead read = TerminalRead(prompt: 'a${_nul}b');
 
-      // Assert.
-      expect(writeProblem.data['field'], 'text');
-      expect(readProblem.data['field'], 'prompt');
+      // Act
+      final writeResult = checkTerminalWrite(write);
+      final readResult = checkTerminalRead(read);
+
+      // Assert
+      expect(expectErr(writeResult).data['field'], 'text');
+      expect(expectErr(readResult).data['field'], 'prompt');
     });
   });
 }

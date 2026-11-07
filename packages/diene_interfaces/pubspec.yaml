@@ -1,9 +1,9 @@
 name: diene_interfaces
 description: Result-based System, VFS, Terminal, logging, and metrics seams for Dart applications, with dependency-light in-memory fakes.
-version: 1.0.0
-repository: https://github.com/AtomiCloud/diene.dart_interfaces
-issue_tracker: https://github.com/AtomiCloud/diene.dart_interfaces/issues
-homepage: https://github.com/AtomiCloud/diene.dart_interfaces
+version: 0.0.0
+repository: https://github.com/ProtoDurian/diene.dart_interfaces
+issue_tracker: https://github.com/ProtoDurian/diene.dart_interfaces/issues
+homepage: https://github.com/ProtoDurian/diene.dart_interfaces
 
 topics:
   - interfaces

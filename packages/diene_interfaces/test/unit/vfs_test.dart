@@ -6,15 +6,18 @@ import 'package:test/test.dart';
 void main() {
   group('VfsEntry', () {
     test('describes a file entry', () {
-      // Arrange & Act.
+      // Arrange
+      final DateTime modifiedAt = DateTime.utc(2026, 7, 25);
+
+      // Act
       final VfsEntry entry = VfsEntry(
         path: '/a/b.txt',
         type: VfsEntryType.file,
         size: 12,
-        modifiedAt: DateTime.utc(2026, 7, 25),
+        modifiedAt: modifiedAt,
       );
 
-      // Assert.
+      // Assert
       expect(entry.path, '/a/b.txt');
       expect(entry.type, VfsEntryType.file);
       expect(entry.size, 12);
@@ -23,14 +26,17 @@ void main() {
     });
 
     test('omits a modified instant when the host reports none', () {
-      // Arrange & Act.
+      // Arrange
+      const String path = '/link';
+
+      // Act
       const VfsEntry entry = VfsEntry(
-        path: '/link',
+        path: path,
         type: VfsEntryType.link,
         size: 0,
       );
 
-      // Assert.
+      // Assert
       expect(entry.modifiedAt, isNull);
       expect(VfsEntryType.values, hasLength(3));
     });
@@ -38,10 +44,13 @@ void main() {
 
   group('VfsStat', () {
     test('describes a directory without listing its parent', () {
-      // Arrange & Act.
-      const VfsStat stat = VfsStat(type: VfsEntryType.directory, size: 0);
+      // Arrange
+      const VfsEntryType type = VfsEntryType.directory;
 
-      // Assert.
+      // Act
+      const VfsStat stat = VfsStat(type: type, size: 0);
+
+      // Assert
       expect(stat.type, VfsEntryType.directory);
       expect(stat.size, 0);
       expect(stat.modifiedAt, isNull);
@@ -51,39 +60,52 @@ void main() {
 
   group('checkVfsPath', () {
     test('accepts an absolute path', () {
-      // Arrange & Act & Assert.
-      expect(expectOk(checkVfsPath('/etc/hosts')), '/etc/hosts');
+      // Arrange
+      const String path = '/etc/hosts';
+
+      // Act
+      final result = checkVfsPath(path);
+
+      // Assert
+      expect(expectOk(result), '/etc/hosts');
     });
 
     test('rejects a blank path', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(checkVfsPath('   '));
+      // Arrange
+      const String path = '   ';
 
-      // Assert.
+      // Act
+      final result = checkVfsPath(path);
+
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.status, 400);
       expect(problem.data['field'], 'path');
       expect(problem.data['operation'], 'path');
     });
 
     test('rejects a NUL-bearing path', () {
-      // Arrange.
+      // Arrange
       final String path = '/a${String.fromCharCode(0)}b';
 
-      // Act.
-      final Problem problem = expectErr(
-        checkVfsPath(path, operation: 'readText'),
-      );
+      // Act
+      final result = checkVfsPath(path, operation: 'readText');
 
-      // Assert.
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.data['operation'], 'readText');
       expect(problem.title, 'Path must not contain a NUL byte');
     });
 
     test('rejects a relative path', () {
-      // Arrange & Act.
-      final Problem problem = expectErr(checkVfsPath('relative/file'));
+      // Arrange
+      const String path = 'relative/file';
 
-      // Assert.
+      // Act
+      final result = checkVfsPath(path);
+
+      // Assert
+      final Problem problem = expectErr(result);
       expect(problem.title, 'Path must be absolute');
     });
   });
