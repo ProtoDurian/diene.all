@@ -20,7 +20,7 @@ export default {
       kind: 'mutation',
       async run(repo: any) {
         await repo.patch('go.mod', {
-          find: 'module github.com/ProtoDurian/diene.go-lib',
+          find: 'module github.com/ProtoDurian/diene.go-errors-problems',
           replace: 'module github.com/ProtoDurian/diene.go-wrong',
         });
         await expectRedWithDiagnostic(

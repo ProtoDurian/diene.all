@@ -1,5 +1,5 @@
-module: github.com/ProtoDurian/diene.go-lib
-mirror: ProtoDurian/diene.go-lib
+module: github.com/ProtoDurian/diene.go-errors-problems
+mirror: ProtoDurian/diene.go-errors-problems
 apiBaseline: v1.0.0
 apiCandidate: v1.1.0
 proxy: https://proxy.golang.org

@@ -1,0 +1,22 @@
+{
+  "rfc9457Members": ["type", "title", "status", "detail", "instance"],
+  "extensions": ["data", "recoverable"],
+  "sample": {
+    "type": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/go/user/api/v1/entity_not_found",
+    "title": "Entity Not Found",
+    "status": 404,
+    "detail": "User 42 does not exist",
+    "instance": "/user/42",
+    "recoverable": false,
+    "data": {
+      "entityType": "user",
+      "id": "42"
+    }
+  },
+  "sampleWithoutData": {
+    "type": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/go/user/api/v1/unauthorized",
+    "title": "Unauthorized",
+    "status": 403,
+    "recoverable": false
+  }
+}
