@@ -1,3 +1,9 @@
+### dotnet-base
+**/bin
+**/obj
+TestResults
+reports
+
 ### nix
 result
 result-*

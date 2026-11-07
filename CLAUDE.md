@@ -1,8 +1,21 @@
+# .NET base template
+
+Read [the .NET baseline](docs/developer/dotnet-baseline.md) before changing the
+.NET toolchain, task surface, test tiers, coverage ledgers, dead-code passes, or
+illustrative sample. Follow the C# variants linked from that baseline alongside
+the shared engineering standards. Keep `dotnet-base.slnx`,
+`.config/dotnet-base.test.yaml`, and the `AtomiCloud.DotnetBase.*` root
+namespaces base-named.
+
 # Agent skills
 
 `.claude/skills/vendor/` is tool-owned and is never hand-edited. Nothing in this
 tree writes it: the tool that does is consumed per-template from the Nix registry,
 and this tree declares no packages for it to vendor.
+
+# Authorization
+
+See [docs/standards/authorization/index.md](docs/standards/authorization/index.md).
 
 # CI/CD workflows
 

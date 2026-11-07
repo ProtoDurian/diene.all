@@ -11,6 +11,8 @@ with packages;
   lint = [
     actionlint
     dlint
+    dn-inspect
+    dotnetlint
     infralint
     pre-commit
     shellcheck
@@ -20,11 +22,13 @@ with packages;
 
   main = [
     cyanprint
+    dotnet-sdk_10
     git
     go-task
     infisical
     releaser
     shellcheck
+    xmlstarlet
   ];
 
   releaser = [
