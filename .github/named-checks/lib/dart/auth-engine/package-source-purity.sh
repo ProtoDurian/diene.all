@@ -13,7 +13,7 @@ fail() {
   failed=1
 }
 
-SHAPE_RE="^${pkg}/((lib|test|example|tool|doc|skills/diene-auth-engine-usage)/.+|pubspec\.yaml|README\.md|CHANGELOG\.md|LICENSE|analysis_options\.yaml|\.pubignore)$"
+SHAPE_RE="^${pkg}/((lib|test|example|tool|doc|skills/diene-auth-engine-usage)/.+|pubspec\.yaml|README\.md|CHANGELOG\.md|LICENSE|analysis_options\.yaml|\.pubignore|\.gitignore)$"
 ARTIFACT_RE='(^|/)(\.dart_tool|build|coverage|reports|\.pub-cache|\.pub)/|(^|/)(pubspec\.lock|pubspec_overrides\.yaml|package_config\.json|\.packages|\.flutter-plugins(-dependencies)?|lcov\.info)$|\.(g|freezed|mocks)\.dart$'
 
 # Drops // and nested /* */ comments outside string literals (Dart source on stdin).
@@ -109,6 +109,11 @@ mapfile -t lib_files < <(printf '%s\n' "${pkg_files[@]}" | grep -E "^${pkg}/lib/
 for f in "${pkg_files[@]}"; do
   [[ ${f} =~ ${SHAPE_RE} ]] || fail "outside the package shape: ${f}"
 done
+
+# the member .gitignore exists only to keep flutter pub get's plugin lists untracked
+if [[ " ${pkg_files[*]} " == *" ${pkg}/.gitignore "* ]]; then
+  git show "${tree}:${pkg}/.gitignore" | grep -qxE '/?\.flutter-plugins-dependencies' || fail "${pkg}/.gitignore does not ignore .flutter-plugins-dependencies"
+fi
 
 # --- no generated or build artifacts anywhere in the tree ----------------------
 hits="$(git ls-tree -r --name-only "${tree}" | grep -E "${ARTIFACT_RE}" || true)"
