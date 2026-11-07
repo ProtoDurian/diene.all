@@ -6,11 +6,12 @@ tag="${1:-${GITHUB_REF_NAME:-}}"
 ./scripts/validate/publish-version.sh "${tag}"
 
 root_dir="$(git rev-parse --show-toplevel)"
+export FLUTTER_ROOT="${FLUTTER_ROOT:-$(dirname "$(dirname "$(command -v flutter)")")}"
 cd "${root_dir}"
 dart pub get
-cd "${root_dir}/packages/diene_dart_lib"
+cd "${root_dir}/packages/diene_auth_engine"
 
-echo "🚀 Publishing diene_dart_lib ${tag#v} to pub.dev..."
+echo "🚀 Publishing diene_auth_engine ${tag#v} to pub.dev..."
 dart pub publish --force
 
-echo "✅ Published diene_dart_lib ${tag#v}"
+echo "✅ Published diene_auth_engine ${tag#v}"

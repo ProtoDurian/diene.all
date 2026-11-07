@@ -4,7 +4,7 @@ set -euo pipefail
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
-member_dir="packages/diene_dart_lib"
+member_dir="packages/diene_auth_engine"
 member_pubspec="${member_dir}/pubspec.yaml"
 
 [[ -f ${member_pubspec} ]] || {
@@ -12,27 +12,32 @@ member_pubspec="${member_dir}/pubspec.yaml"
   exit 1
 }
 
-[[ $(yq -r '.name' "${member_pubspec}") != "diene_dart_lib" ]] && echo "❌ member pubspec name must be diene_dart_lib" >&2 && exit 1
-[[ $(yq -r '.repository' "${member_pubspec}") != "https://github.com/ProtoDurian/diene.dart_lib" ]] && echo "❌ member pubspec repository is not the snaked mirror" >&2 && exit 1
-[[ $(yq -r '.issue_tracker' "${member_pubspec}") != "https://github.com/ProtoDurian/diene.dart_lib/issues" ]] && echo "❌ member pubspec issue_tracker is not the mirror's issues page" >&2 && exit 1
+[[ $(yq -r '.name' "${member_pubspec}") != "diene_auth_engine" ]] && echo "❌ member pubspec name must be diene_auth_engine" >&2 && exit 1
+[[ $(yq -r '.repository' "${member_pubspec}") != "https://github.com/ProtoDurian/diene.dart_auth_engine" ]] && echo "❌ member pubspec repository is not the snaked mirror" >&2 && exit 1
+[[ $(yq -r '.issue_tracker' "${member_pubspec}") != "https://github.com/ProtoDurian/diene.dart_auth_engine/issues" ]] && echo "❌ member pubspec issue_tracker is not the mirror's issues page" >&2 && exit 1
 sdk_range='^>=3[.][0-9]+[.][0-9]+ <4[.]0[.]0$'
 [[ ! $(yq -r '.environment.sdk // ""' "${member_pubspec}") =~ ${sdk_range} ]] && echo "❌ member pubspec environment.sdk must be a >=3.x.y <4.0.0 range" >&2 && exit 1
 [[ $(yq -r '.topics // [] | length' "${member_pubspec}") -lt 1 ]] && echo "❌ member pubspec declares no pub.dev topics" >&2 && exit 1
 [[ $(head -n 1 "${member_dir}/LICENSE") != "MIT License" ]] && echo "❌ ${member_dir}/LICENSE is not the MIT license" >&2 && exit 1
 
-runtime_deps="$(yq -r '.dependencies // {} | length' "${member_pubspec}")"
-[[ ${runtime_deps} -ne 0 ]] && echo "❌ diene_dart_lib must have zero runtime dependencies (found ${runtime_deps})" >&2 && exit 1
+runtime_deps="$(yq -r '.dependencies // {} | keys | sort | join(" ")' "${member_pubspec}")"
+expected_deps='diene_problems diene_result flutter http logto_dart_sdk meta'
+[[ ${runtime_deps} != "${expected_deps}" ]] && echo "❌ diene_auth_engine runtime dependencies must be exactly: ${expected_deps} (found: ${runtime_deps})" >&2 && exit 1
+[[ $(yq -r '.dependencies.flutter.sdk // ""' "${member_pubspec}") != "flutter" ]] && echo "❌ the flutter dependency must be the Flutter SDK" >&2 && exit 1
+not_hosted="$(yq -r '.dependencies | to_entries[] | select(.key != "flutter") | select((.value | tag) != "!!str" or (.value | tostring | test("^\^[0-9]+[.][0-9]+[.][0-9]+$") | not)) | .key' "${member_pubspec}")"
+[[ -n ${not_hosted} ]] && echo "❌ runtime dependencies must be hosted caret ranges: ${not_hosted//$'\n'/ }" >&2 && exit 1
+[[ $(yq -r '.dependency_overrides // {} | length' "${member_pubspec}") -ne 0 ]] && echo "❌ diene_auth_engine must not override dependencies" >&2 && exit 1
 
-if ! yq -r '.workspace[]' pubspec.yaml | grep -qx "packages/diene_dart_lib"; then
-  echo "❌ root pubspec.yaml .workspace must list packages/diene_dart_lib" >&2
+if ! yq -r '.workspace[]' pubspec.yaml | grep -qx "packages/diene_auth_engine"; then
+  echo "❌ root pubspec.yaml .workspace must list packages/diene_auth_engine" >&2
   exit 1
 fi
 [[ $(yq -r '.resolution' "${member_pubspec}") != "workspace" ]] && echo "❌ member pubspec must set resolution: workspace" >&2 && exit 1
 
 for file in \
-  "${member_dir}/lib/diene_dart_lib.dart" \
-  "${member_dir}/doc/diene_dart_lib.md" \
-  "${member_dir}/skills/diene-dart-lib-usage/SKILL.md" \
+  "${member_dir}/lib/diene_auth_engine.dart" \
+  "${member_dir}/doc/diene_auth_engine.md" \
+  "${member_dir}/skills/diene-auth-engine-usage/SKILL.md" \
   "${member_dir}/LICENSE" \
   "${member_dir}/README.md" \
   "${member_dir}/CHANGELOG.md"; do

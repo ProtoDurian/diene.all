@@ -21,6 +21,7 @@ with packages;
   main = [
     cyanprint
     dart
+    flutter
     git
     go-task
     infisical

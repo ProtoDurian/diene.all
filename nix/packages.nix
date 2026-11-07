@@ -39,6 +39,7 @@ let
     nix-unstable = (
       with pkgs-unstable;
       {
+        inherit flutter;
         dart = flutter.dart;
       }
     );

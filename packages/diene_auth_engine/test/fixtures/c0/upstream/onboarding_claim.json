@@ -1,0 +1,58 @@
+{
+  "keyRule": "lowercase both labels, replace every '-' with '_', join as <platform>_<service>",
+  "registeredValue": "true",
+  "vectors": {
+    "absent": [
+      {
+        "claims": {
+          "lithium_api": true
+        },
+        "name": "boolean-true",
+        "platform": "lithium",
+        "service": "api"
+      },
+      {
+        "claims": {
+          "lithium_api": null
+        },
+        "name": "null-value",
+        "platform": "lithium",
+        "service": "api"
+      },
+      {
+        "claims": {
+          "lithium_api": "TRUE"
+        },
+        "name": "wrong-case-value",
+        "platform": "lithium",
+        "service": "api"
+      },
+      {
+        "claims": {},
+        "name": "missing-key",
+        "platform": "lithium",
+        "service": "api"
+      }
+    ],
+    "present": [
+      {
+        "claims": {
+          "li_th_ap_i": "true"
+        },
+        "expectedKey": "li_th_ap_i",
+        "name": "dashes-normalized",
+        "platform": "li-th",
+        "service": "ap-i"
+      },
+      {
+        "claims": {
+          "lithium_api": "true"
+        },
+        "expectedKey": "lithium_api",
+        "name": "simple",
+        "platform": "lithium",
+        "service": "api"
+      }
+    ]
+  }
+}

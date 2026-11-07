@@ -4,7 +4,7 @@ set -euo pipefail
 mode="${1:-}"
 coverage_mode="${2:-no-coverage}"
 
-member_dir="${MEMBER_DIR:-packages/diene_dart_lib}"
+member_dir="${MEMBER_DIR:-packages/diene_auth_engine}"
 test_helper_path="${TEST_HELPER_PATH:-lib/test_helper.dart}"
 meta_test_path="${META_TEST_PATH:-test/meta}"
 
@@ -20,16 +20,15 @@ if [[ ${mode} == "meta" && ! -f "${member_dir}/${test_helper_path}" ]]; then
 fi
 [[ ${mode} == "meta" && ! -d "${member_dir}/${meta_test_path}" ]] && echo "❌ ${member_dir}/${test_helper_path} ships without its meta suite ${meta_test_path}" >&2 && exit 1
 
-dart pub get
+flutter pub get
 
-package_config="${root_dir}/.dart_tool/package_config.json"
 cd "${root_dir}/${member_dir}"
 
 tests=("${meta_test_path}")
 [[ ${mode} == "unit" ]] && tests=(test/unit test/conformance)
 
 if [[ ${coverage_mode} == "no-coverage" ]]; then
-  dart test --reporter=expanded "${tests[@]}"
+  flutter test --reporter=expanded "${tests[@]}"
   echo "✅ ${mode} tests passed"
   exit 0
 fi
@@ -43,16 +42,9 @@ rm -rf "${report_dir}"
 mkdir -p "${report_dir}"
 
 set +e
-dart test --reporter=expanded --coverage="${raw_dir}" "${tests[@]}"
+flutter test --reporter=expanded --coverage --coverage-path="${all_ledger}" "${tests[@]}"
 test_status=$?
 set -e
-
-dart run coverage:format_coverage \
-  --lcov \
-  --in="${raw_dir}" \
-  --out="${all_ledger}" \
-  --packages="${package_config}" \
-  --report-on=lib
 
 pattern="(^|/)${test_helper_path//./[.]}$"
 exclude=''

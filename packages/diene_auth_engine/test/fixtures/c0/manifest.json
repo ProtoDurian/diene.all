@@ -1,0 +1,10 @@
+{
+  "contract": "diene.auth-engine.local.v1",
+  "authority": "local-regression-only",
+  "provenance": "Local regression fixtures for the exported config block schema and the redeem URL at each mount; not part of the shared vectors.",
+  "algorithm": "sha256",
+  "fixtures": {
+    "config_block_schema.json": "243201bde6d28f1fd178b18f5903953896535e0538e7edd8323a91f693ef0230",
+    "redeem_mounts.json": "f0acbe3db9399a3bbbdddaccca0554533133b6269462ed0803989447a5a3a034"
+  }
+}

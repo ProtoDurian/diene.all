@@ -1,6 +1,6 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-const MEMBER_PUBSPEC = 'packages/diene_dart_lib/pubspec.yaml';
+const MEMBER_PUBSPEC = 'packages/diene_auth_engine/pubspec.yaml';
 
 function manifestVersion(source: string): string {
   const version = source.match(/^version:\s*(\S+)\s*$/m)?.[1];
@@ -47,7 +47,7 @@ export default {
           const drifted = original.replace(/^version:.*$/m, `version: ${version}-probe.drift`);
           await repo.write(MEMBER_PUBSPEC, drifted);
           await expectRedBecause(repo, publishAt(`v${version}`), 'publish-version-guard', ['!= tag version'], {
-            forbidden: ['Publishing diene_dart_lib'],
+            forbidden: ['Publishing diene_auth_engine'],
           });
           if ((await repo.read(MEMBER_PUBSPEC)) !== drifted) {
             throw new Error('publish-version-guard: publish restamped the member pubspec');

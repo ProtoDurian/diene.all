@@ -2,9 +2,10 @@
 set -euo pipefail
 
 root_dir="$(git rev-parse --show-toplevel)"
+export FLUTTER_ROOT="${FLUTTER_ROOT:-$(dirname "$(dirname "$(command -v flutter)")")}"
 cd "${root_dir}"
 
-member_dir="packages/diene_dart_lib"
+member_dir="packages/diene_auth_engine"
 
 dart pub get
 
