@@ -253,5 +253,10 @@
     "template": "diene/dotnet-base",
     "name": "dotnet-binary-smoke",
     "class": "smoke"
+  },
+  {
+    "template": "diene/observability",
+    "name": "observability-standards-present",
+    "class": "presence"
   }
 ]
