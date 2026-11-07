@@ -23,9 +23,6 @@ writer, `skills-sync sync`. Setup is repair-capable; the pre-commit hook
 (`skills-sync sync --frozen`, which CI runs) refuses rather than silently staging or
 repairing a commit.
 
-Docker tasks are keyed by the artifact they act on — one task set per Dockerfile.
-See [the Docker standard](../docker/index.md) for that naming convention.
-
 ## Rules
 
 1. Keep simple commands inline: a task may run several, use a template expression
@@ -34,9 +31,7 @@ See [the Docker standard](../docker/index.md) for that naming convention.
    functions) to `scripts/local/`.
 3. Never call `scripts/ci/*` from a Taskfile; workflows own those entry points.
 4. Use lowercase names and colon-separated namespaces.
-5. Put repository-specific image values in Taskfile `vars:` blocks,
-   scoped to the task that uses them rather than shared across artifacts.
-6. Do not add progress-only `echo` commands; the runner already displays each
+5. Do not add progress-only `echo` commands; the runner already displays each
    command.
 
 Each include remains self-contained so downstream strips can remove only their own

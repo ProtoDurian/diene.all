@@ -65,10 +65,6 @@ See **[docs/standards/nix/index.md](docs/standards/nix/index.md)** for the full 
 - Formatters and pre-commit hooks
 - Adding registries
 
-# Docker build and publishing
-
-See [docs/standards/docker/index.md](docs/standards/docker/index.md).
-
 # Infisical and secrets
 
 See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).

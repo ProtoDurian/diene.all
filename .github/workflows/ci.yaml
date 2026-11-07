@@ -27,19 +27,6 @@ jobs:
       contents: read
     uses: ./.github/workflows/⚡reusable-named-checks.yaml
     secrets: inherit
-
-  docker:
-    name: Docker Image
-    permissions:
-      contents: read
-      id-token: write
-      packages: write
-    uses: ./.github/workflows/⚡reusable-docker.yaml
-    secrets: inherit
-    with:
-      image_name: diene-workspace
-      dockerfile: ./infra/Dockerfile
-      platform: linux/amd64
   unit:
     name: Unit Tests
     permissions:
