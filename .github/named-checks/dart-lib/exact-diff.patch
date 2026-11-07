@@ -16,10 +16,10 @@ index 0f315ced..b26ec1d5 100644
 +          - '*'
 +    open-pull-requests-limit: 2
 diff --git a/.github/workflows/ci.yaml b/.github/workflows/ci.yaml
-index f322e7ce..208dd680 100644
+index f322e7ce..6180262e 100644
 --- a/.github/workflows/ci.yaml
 +++ b/.github/workflows/ci.yaml
-@@ -27,3 +27,42 @@ jobs:
+@@ -27,3 +27,51 @@ jobs:
        contents: read
      uses: ./.github/workflows/⚡reusable-named-checks.yaml
      secrets: inherit
@@ -48,6 +48,15 @@ index f322e7ce..208dd680 100644
 +    secrets: inherit
 +    with:
 +      mode: meta
++
++  consumer:
++    name: Consumer Test
++    permissions:
++      contents: read
++    uses: ./.github/workflows/⚡reusable-test.yaml
++    secrets: inherit
++    with:
++      mode: consumer
 +
 +  deadcode:
 +    name: Dead Code
@@ -79,10 +88,10 @@ index c13fbd24..1b32f09f 100644
 +pubspec.lock
 +reports/
 diff --git a/Taskfile.yaml b/Taskfile.yaml
-index 89749938..25a18ae6 100644
+index 89749938..b4680cd7 100644
 --- a/Taskfile.yaml
 +++ b/Taskfile.yaml
-@@ -1,5 +1,15 @@
+@@ -1,5 +1,19 @@
  version: '3'
  
 +includes:
@@ -94,11 +103,15 @@ index 89749938..25a18ae6 100644
 +    taskfile: tasks/Taskfile.test.yaml
 +    vars:
 +      MODE: meta
++  consumer:
++    taskfile: tasks/Taskfile.test.yaml
++    vars:
++      MODE: consumer
 +
  tasks:
    setup:
      desc: Set up the workspace
-@@ -10,3 +20,61 @@ tasks:
+@@ -10,3 +24,67 @@ tasks:
      desc: Run all repository gates
      cmds:
        - pre-commit run --all-files
@@ -130,10 +143,11 @@ index 89749938..25a18ae6 100644
 +      - ./scripts/ci/package-validate.sh
 +
 +  test:
-+    desc: Run unit/C0 and TestHelper meta suites without coverage
++    desc: Run unit/C0, TestHelper meta and consumer tiers without coverage
 +    cmds:
 +      - task: unit:default
 +      - task: meta:default
++      - task: consumer:default
 +
 +  test:unit:
 +    desc: Run unit and C0 conformance suites without coverage
@@ -144,6 +158,11 @@ index 89749938..25a18ae6 100644
 +    desc: Run assert-the-asserter tests for TestHelper
 +    cmds:
 +      - task: meta:default
++
++  test:consumer:
++    desc: Pack the package, install the local archive in a fresh project, then import, run, compile and type-check it
++    cmds:
++      - task: consumer:default
 +
 +  test:coverage:
 +    desc: Run every coverage-capable tier with its isolated ledger
@@ -216,10 +235,10 @@ index 53cfa76b..4a81b174 100644
    };
  }
 diff --git a/probes/features.json b/probes/features.json
-index ddf2971e..0e0b63de 100644
+index ddf2971e..bfe7254f 100644
 --- a/probes/features.json
 +++ b/probes/features.json
-@@ -153,5 +153,130 @@
+@@ -153,5 +153,135 @@
      "template": "diene/shared",
      "name": "thin-skills",
      "class": "presence"
@@ -282,6 +301,11 @@ index ddf2971e..0e0b63de 100644
 +  {
 +    "template": "diene/dart-lib",
 +    "name": "publish-archive-contents",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "consumer-test",
 +    "class": "gate"
 +  },
 +  {
