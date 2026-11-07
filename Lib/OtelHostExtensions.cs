@@ -171,12 +171,7 @@ public static class OtelHostExtensions
         target.TimeoutMilliseconds = settings.TimeoutMilliseconds;
     }
 
-    /// <summary>
-    /// Applies already-validated settings to the exporter of one signal. A block endpoint
-    /// is a base URL, and the SDK appends no path to an endpoint set in code, so the
-    /// signal path (<c>/v1/traces</c>, <c>/v1/metrics</c>, <c>/v1/logs</c>) is appended here.
-    /// When the environment override owns the endpoint, the SDK appends the path itself.
-    /// </summary>
+    /// <summary>Applies settings for one signal, appending its /v1 path to a block endpoint (the SDK appends none to an endpoint set in code).</summary>
     public static void Apply(OtlpExporterOptions target, OtlpSettings settings, OtlpSignal signal)
     {
         var path = SignalPath(signal);
