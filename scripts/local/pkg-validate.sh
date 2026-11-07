@@ -2,7 +2,7 @@
 set -euo pipefail
 
 mode="${1:-all}"
-modes=(module-path vet api-compat export-docs examples)
+modes=(module-path vet api-compat export-docs examples consumer-test)
 if [ "${mode}" != "all" ]; then
   known=false
   for each in "${modes[@]}"; do [ "${each}" = "${mode}" ] && known=true; done
