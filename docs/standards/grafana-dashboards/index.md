@@ -22,6 +22,7 @@ Dashboards are Grafana JSON files in `observability/dashboards/`, one per dashbo
 - A row is one horizontal band of panels, made with `type: row` panels. Use **RED** (rate, errors, duration) for request-driven views and **USE** (utilization, saturation, errors) for resources.
 - The first row (the **overview row**) answers "is it healthy?" in under 5 seconds, with trend panels and threshold colors. The rows below (**detail rows**) follow in the order a responder triages.
 - Open with a text panel: purpose, audience, and links to `{repo-url}/observability/overview.md` ([placeholders](/docs/standards/observability/index.md#values-the-platform-team-gives-you)) and the generic dashboard (`/d/{generic-dashboard-uid}?{generic-dashboard-vars}`). The chart does not template dashboard JSON: write the real values into the JSON once you know them.
+- Use more text panels to introduce sections where the triage order is not obvious from the panels alone, e.g. "If the error rate above is red, start here: which failure class is it?".
 - One dashboard, one purpose. Put deep dives on a linked dashboard, not in row 12.
 
 ### Panels
@@ -60,9 +61,30 @@ The log line in the store is not what the app wrote: the logging library's JSON 
 1. **Sample** 50–100 stored lines per stream (a stream is the lines that share one set of log labels) for this service, from the real landscape with Grafana Explore. Include an error window. No access to the store? Push lines shaped like the template's logger (pino in the Bun template) into the sandbox's [logs and traces profile](/docs/standards/grafana-dashboards/sandbox.md#logs-and-traces-profile) and build the panel there. Mark it `UNVERIFIED` in its description until the real store is sampled, check it after the first deploy, and still create `log-notes.md` (step 9) saying nothing was sampled yet.
 2. **Test the query engine.** LogQL support differs between Loki versions. Compare row counts for a raw query, `|~`, `| json`, `| logfmt` and `line_format`, and use only what works: on the real store, or in the profile pinned to the platform team's Loki version. Re-test when Loki is upgraded.
 3. **Split by label first**: `sum by (module) (count_over_time({service="zinc"}[1h]))`. Parse line bodies only when labels cannot answer.
-4. **Note each stream's format and level encoding**, e.g. `level=error` (logfmt), `"level":"error"` (JSON), `"level":50` (numeric, from pino, the Bun template's JSON logger).
+4. **Note each stream's format and level encoding.** One service often mixes formats (logfmt from one module, JSON from another, or JSON with stray plain lines). The level can look like:
+   - `level=error` (logfmt);
+   - `"level":"error"` (JSON with level names);
+   - `"level":50` (JSON with level numbers, from pino, the Bun template's JSON logger: 30 info, 40 warn, 50 error);
+   - `"severity":"ERROR"` (JSON that names the field `severity`);
+   - a tab-separated word, e.g. `<time>⇥error⇥<message>` (console-style output);
+   - a one-letter prefix with the date, e.g. `E0707` for an error on 7 July (klog, the Kubernetes logger);
+   - none: plain text, where only markers such as `Fatal` or an emoji show the outcome.
 5. **Filter the noise** with one targeted negative filter per noisy line type, e.g. `!= "grpc.health"`.
-6. **One panel per failure class**, taken from the failures named in `SIGNALS.md` (Gates 2 and 5), e.g. "Server errors (5xx)", "Auth denials (401/403)". An alert that sets `panel` links to the panel showing the data it fires on. The last panel is "all errors minus the classes above", so nothing hides. An empty class panel on a healthy service is correct; say so in its description.
+6. **One panel per failure class**, taken from the failures named in `SIGNALS.md` (Gates 2 and 5). A panel answers one question, named by the failure, not by the level: never a bare "Errors" or "Logs" panel. Typical panels by kind of service:
+
+   | Kind of service                   | Panels (one question each)                                                                                                                                         |
+   | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+   | Request server (HTTP or gRPC API) | "Server errors (5xx)" · "Auth denials (401/403)" · "Slow requests (≥1s)", each a targeted line filter on the sampled access-log shape                              |
+   | Reconciler or controller          | "Reconcile failures" (scoped to its `module`) · "Git or repo failures" · "Processing timeline" (one line per unit of work)                                         |
+   | Batch or cron job                 | "Failed runs" · "Run outcomes" (the completion or summary lines) · the full run log (it is low-volume)                                                             |
+   | Host daemon (systemd journal)     | "OOM and kernel crashes" · "Failed systemd units" · "Disk and I/O errors", one class per panel, matched to the host alerts; never the whole journal                |
+   | Data collector                    | "Delivery failures (drops, push errors)", backing the delivery alerts · "Other collector errors" (the same level match minus the delivery class, so nothing hides) |
+   | Explorer dashboard                | the one generic panel set allowed: `$filter` over volume, errors and all lines                                                                                     |
+
+   Two rules make the set complete:
+   - **Every alert has an evidence panel**: the panel that shows what happened when it fired, the first thing its runbook sends a responder to read. An alert that sets `panel` links straight to it; an alert that leaves `panel` out has the generic dashboard as its evidence.
+   - **The class panels cover every error**: the last panel is "all errors minus the classes above", so a failure nobody predicted still shows up. An empty class panel on a healthy service is correct; say so in its description.
+
 7. **Place log evidence in the row of the metric it explains**, or in the detail row directly under it when that metric is in the overview row; never in a generic logs row at the bottom.
 8. **Rewrite lines to their key fields**: `| json | line_format "{{.level}} {{.msg}}"`. If `line_format` does not work on the engine, use `options.displayedFields`. Leave plain-text lines raw. Keep `prettifyLogMessage` off.
 9. **Record what you found** (formats, level encoding, noise filters, engine limits, date) in `observability/dashboards/log-notes.md`.
