@@ -5,8 +5,6 @@ import 'package:diene_auth_engine/test_helper.dart';
 import 'package:diene_result/diene_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Provider that gates each acquisition on a [Completer] so the test can force
-/// concurrent callers to collide.
 final class _GatedProvider implements AuthProvider {
   int calls = 0;
   final Completer<void> gate = Completer<void>();
@@ -44,7 +42,9 @@ void main() {
   final DateTime now = DateTime.utc(2026, 7, 21);
   final ResourceKey key = AuthFixtures.resourceKey();
 
-  test('resource-key audience follows the C0 §8 template', () {
+  test('resource-key audience follows the configured domain template', () {
+    // Arrange
+    // Act
     // Assert
     expect(
       key.audience.toString(),
@@ -61,7 +61,7 @@ void main() {
       now: () => now,
     );
 
-    // Act — three concurrent callers for the SAME key.
+    // Act
     final Future<Result<ResourceToken>> a = auth.tokenFor(key);
     final Future<Result<ResourceToken>> b = auth.tokenFor(key);
     final Future<Result<ResourceToken>> c = auth.tokenFor(key);
@@ -70,7 +70,7 @@ void main() {
       <Future<Result<ResourceToken>>>[a, b, c],
     );
 
-    // Assert — exactly one provider hit, all callers get the same token.
+    // Assert
     expect(provider.calls, 1);
     expect(AuthExpect.ok(results[0]).token, 'tok-1');
     expect(AuthExpect.ok(results[2]).token, 'tok-1');
@@ -93,7 +93,6 @@ void main() {
       // Assert
       expect(provider.calls, 1);
 
-      // After invalidation, a fresh acquisition happens.
       auth.invalidate(key);
       await auth.tokenFor(key);
       expect(provider.calls, 2);
@@ -114,7 +113,7 @@ void main() {
         now: () => now,
       );
 
-      // Act — the same key twice must resolve to a single entry.
+      // Act
       final Map<ResourceKey, Result<ResourceToken>> batch = await auth
           .fetchAllTokens(<ResourceKey>[key, key]);
 

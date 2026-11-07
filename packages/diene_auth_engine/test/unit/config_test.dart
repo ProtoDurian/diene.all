@@ -11,6 +11,7 @@ void main() {
   };
 
   test('parses a valid block and defaults the mount', () {
+    // Arrange
     // Act
     final AuthEngineConfig config = AuthEngineConfig.fromBlock(block());
 
@@ -21,6 +22,7 @@ void main() {
   });
 
   test('a configurable mount changes the redeem path', () {
+    // Arrange
     // Act
     final AuthEngineConfig config = AuthEngineConfig.fromBlock(
       <String, Object?>{...block(), 'appHandoffMount': '/handoff'},
@@ -34,6 +36,7 @@ void main() {
     // Arrange
     final Map<String, Object?> bad = block()..remove('issuer');
 
+    // Act
     // Assert
     expect(() => AuthEngineConfig.fromBlock(bad), throwsFormatException);
   });
@@ -42,6 +45,7 @@ void main() {
     // Arrange
     final AuthEngineConfig config = AuthEngineConfig.fromBlock(block());
 
+    // Act
     // Assert
     expect(
       config.allowsUrl(Uri.parse('https://b.pichu.cluster.atomi.cloud/doc')),
@@ -51,6 +55,8 @@ void main() {
   });
 
   test('exposes the declarative block schema and fixed constants', () {
+    // Arrange
+    // Act
     // Assert
     expect(AuthEngineConfig.blockSchema[r'$id'], 'authEngine');
     expect(AppHandoffConstants.nonceTtl, const Duration(minutes: 15));

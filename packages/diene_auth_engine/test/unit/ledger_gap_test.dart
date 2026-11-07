@@ -6,18 +6,13 @@ import 'package:diene_problems/diene_problems.dart';
 import 'package:diene_result/diene_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// The residual failure/edge arms the behavioural suites never reached: error
-// branches, equality/hashCode contracts, guard clauses, and the const-constructor
-// arms that only a non-const invocation records. Grouped by subject rather than
-// by file so each block reads as a contract, not as a coverage errand.
 void main() {
   final DateTime now = DateTime.utc(2026, 7, 21, 9);
   final ResourceKey key = AuthFixtures.resourceKey();
 
   group('SessionTokens / ResourceToken value semantics', () {
     test('equality and hashCode cover every component', () {
-      // Arrange — a baseline plus one single-field mutation per component, so a
-      // dropped comparison in either operator== or hashCode shows up.
+      // Arrange
       final SessionTokens base = AuthFixtures.sessionTokens(now: now);
       final List<SessionTokens> mutations = <SessionTokens>[
         AuthFixtures.sessionTokens(now: now, accessToken: 'other'),
@@ -33,15 +28,17 @@ void main() {
         ),
       ];
 
-      // Act + Assert — identical inputs are equal AND hash alike.
+      // Act
       final SessionTokens twin = AuthFixtures.sessionTokens(now: now);
+
+      // Assert
       expect(base, twin);
       expect(base.hashCode, twin.hashCode);
       for (final SessionTokens mutated in mutations) {
         expect(base, isNot(mutated));
         expect(base.hashCode, isNot(mutated.hashCode));
       }
-      // A foreign type is never equal.
+
       expect(base, isNot(<String, Object?>{}));
     });
 
@@ -52,11 +49,13 @@ void main() {
         jwtToken: 'j',
       );
 
-      // Act + Assert
+      // Act
       final ResourceToken twin = AuthFixtures.resourceToken(
         now: now,
         jwtToken: 'j',
       );
+
+      // Assert
       expect(base, twin);
       expect(base.hashCode, twin.hashCode);
       expect(
@@ -77,11 +76,13 @@ void main() {
     });
 
     test('ResourceTokenEntry pairs a key with its terminal token', () {
-      // Arrange + Act — the batch entry shape (C0 §8).
+      // Arrange
       final ResourceToken token = AuthFixtures.resourceToken(
         now: now,
         jwtToken: 'j',
       );
+
+      // Act
       final ResourceTokenEntry entry = ResourceTokenEntry(
         key: key,
         token: token,
@@ -93,15 +94,16 @@ void main() {
     });
 
     test('ResourceKey toString names the map key', () {
-      // Act + Assert — the debug rendering used in failure messages.
+      // Arrange
+      // Act
+      // Assert
       expect(key.toString(), 'ResourceKey(lithium/lapras/api/root)');
     });
   });
 
   group('AuthCoordinator failure + invalidateAll', () {
     test('wraps a provider throw in a recoverable 401 problem', () async {
-      // Arrange — the provider has no token scripted for this key, so its
-      // resourceToken throws.
+      // Arrange
       final FakeAuthProvider provider = FakeAuthProvider();
       final AuthCoordinator auth = AuthCoordinator(
         provider: provider,
@@ -111,8 +113,7 @@ void main() {
       // Act
       final Result<ResourceToken> result = await auth.tokenFor(key);
 
-      // Assert — a transport/provider failure becomes a Problem, never a throw
-      // escaping into the caller's hot path.
+      // Assert
       final Problem problem = AuthExpect.errType(
         result,
         'urn:diene:problem:resource-token',
@@ -124,8 +125,7 @@ void main() {
     });
 
     test('invalidateAll drops every cached token', () async {
-      // Arrange — a counting provider, since the shared fake exposes no
-      // resource-token call counter.
+      // Arrange
       final _CountingProvider provider = _CountingProvider(
         AuthFixtures.resourceToken(now: now, jwtToken: 'j'),
       );
@@ -136,17 +136,17 @@ void main() {
       await auth.tokenFor(key);
       await auth.tokenFor(key);
 
-      // Act — the cache served the second call; invalidateAll must drop it.
+      // Act
       expect(provider.calls, 1);
       auth.invalidateAll();
       await auth.tokenFor(key);
 
-      // Assert — the third call had to re-acquire.
+      // Assert
       expect(provider.calls, 2);
     });
 
     test('defaults its clock to DateTime.now when none is injected', () async {
-      // Arrange — the default-clock arm of the constructor.
+      // Arrange
       final AuthCoordinator auth = AuthCoordinator(
         provider: FakeAuthProvider(
           resourceTokens: <String, ResourceToken>{
@@ -158,14 +158,15 @@ void main() {
         ),
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(AuthExpect.ok(await auth.tokenFor(key)).token, 'j');
     });
   });
 
   group('Claims.decode non-standard map payloads', () {
     test('normalizes a JSON object whose values are heterogeneous', () {
-      // Arrange — the Map-but-not-Map<String,Object?> normalization arm.
+      // Arrange
       final String token = AuthFixtures.jwt(<String, Object?>{
         'home_landscape': 'pichu',
         'nested': <String, Object?>{'deep': 1},
@@ -184,14 +185,13 @@ void main() {
     });
 
     test('treats a non-object JWT payload as absent claims', () {
-      // Arrange — a token whose payload segment decodes to a JSON ARRAY, which
-      // is valid JSON but carries no claims.
+      // Arrange
       final String arrayPayload = base64Url
           .encode(utf8.encode('[1,2,3]'))
           .replaceAll('=', '');
 
-      // Act + Assert — every "not a claims object" shape reads as empty rather
-      // than throwing into the caller.
+      // Act
+      // Assert
       expect(Claims.decode('only-one-segment'), isEmpty);
       expect(Claims.decode('a.!!!not-base64!!!.c'), isEmpty);
       expect(Claims.decode('header.$arrayPayload.sig'), isEmpty);
@@ -202,7 +202,7 @@ void main() {
     test(
       'surfaces a refresh transport failure as a recoverable problem',
       () async {
-        // Arrange — a session whose provider throws on refresh.
+        // Arrange
         final FakeAuthProvider provider = FakeAuthProvider(
           onSignIn: () => AuthFixtures.sessionTokens(now: now),
         );
@@ -212,10 +212,10 @@ void main() {
         );
         await session.signIn();
 
-        // Act — no onRefresh scripted, so the provider throws.
+        // Act
         final Result<SessionTokens> result = await session.refresh();
 
-        // Assert — recoverable, so the UI may retry rather than sign out.
+        // Assert
         final Problem problem = AuthExpect.errType(
           result,
           'urn:diene:problem:refresh',
@@ -239,7 +239,7 @@ void main() {
         );
         await session.signIn();
 
-        // Act — no onReMint scripted.
+        // Act
         final Result<SessionTokens> result = await session.onAppOpen();
 
         // Assert
@@ -254,7 +254,7 @@ void main() {
 
     test('signs out and reports expiry when the refresh window has closed on '
         'app open', () async {
-      // Arrange — sign in, then open the app after the refresh lifetime.
+      // Arrange
       final FakeAuthProvider provider = FakeAuthProvider(
         onSignIn: () => AuthFixtures.sessionTokens(now: now),
       );
@@ -269,7 +269,7 @@ void main() {
       // Act
       final Result<SessionTokens> result = await session.onAppOpen();
 
-      // Assert — an expired refresh window is a hard sign-out, not a retry.
+      // Assert
       AuthExpect.status(
         AuthExpect.errType(result, 'urn:diene:problem:refresh-expired'),
         401,
@@ -292,7 +292,7 @@ void main() {
       // Act
       final Result<SessionTokens> result = await session.signIn();
 
-      // Assert — the problem is readable off the controller for UI gating.
+      // Assert
       AuthExpect.errType(result, 'urn:diene:problem:auth');
       expect(session.status, SessionStatus.failed);
       expect(session.problem?.type, 'urn:diene:problem:auth');
@@ -300,22 +300,21 @@ void main() {
     });
 
     test('defaults its clock to DateTime.now when none is injected', () async {
-      // Arrange — the default-clock arm; lifetimes are validated against it.
+      // Arrange
       final SessionController session = SessionController(
         provider: FakeAuthProvider(
           onSignIn: () => AuthFixtures.sessionTokens(now: DateTime.now()),
         ),
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(AuthExpect.ok(await session.signIn()).refreshFamily, 'family');
     });
 
     test('rejects a provider-issued REFRESH token that outlives the family '
         'lifetime', () async {
-      // Arrange — the access half is legal but the refresh half overshoots.
-      // Lifetimes are ENFORCED, not trusted (C0 §12), so an over-long refresh
-      // token must be refused even though the provider offered it.
+      // Arrange
       final FakeAuthProvider provider = FakeAuthProvider(
         onSignIn: () => AuthFixtures.sessionTokens(
           now: now,
@@ -330,7 +329,7 @@ void main() {
       // Act
       final Result<SessionTokens> result = await session.signIn();
 
-      // Assert — the over-long grant is rejected, not silently accepted.
+      // Assert
       final Problem problem = AuthExpect.errType(
         result,
         'urn:diene:problem:auth',
@@ -358,7 +357,9 @@ void main() {
     };
 
     test('rejects a non-string or blank URI value', () {
-      // Act + Assert — a coerced 7 or '' must be refused, not stringified.
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => AuthEngineConfig.fromBlock(block(endpoint: 7)),
         throwsFormatException,
@@ -370,7 +371,9 @@ void main() {
     });
 
     test('rejects a relative URI where an absolute one is required', () {
-      // Act + Assert — the baked issuer/endpoint must be absolute.
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => AuthEngineConfig.fromBlock(block(endpoint: '/relative')),
         throwsFormatException,
@@ -378,7 +381,9 @@ void main() {
     });
 
     test('rejects a non-string or blank appId', () {
-      // Act + Assert
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => AuthEngineConfig.fromBlock(block(appId: 7)),
         throwsFormatException,
@@ -390,7 +395,9 @@ void main() {
     });
 
     test('rejects an appHandoffMount that does not begin with a slash', () {
-      // Act + Assert — the mount is joined verbatim onto the base.
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => AuthEngineConfig.fromBlock(block(extra: 'app-handoff')),
         throwsFormatException,
@@ -398,8 +405,8 @@ void main() {
     });
 
     test('falls back to the defaults for a wrong-typed optional block', () {
-      // Arrange — scopes/allowlist/mount all supplied at the WRONG type, plus an
-      // empty allowlist, which must not disable the gate.
+      // Arrange
+      // Act
       final AuthEngineConfig config =
           AuthEngineConfig.fromBlock(<String, Object?>{
             ...block(extra: null),
@@ -409,7 +416,7 @@ void main() {
             'postLogoutRedirectUri': '',
           });
 
-      // Assert — the baked defaults hold; an empty allowlist never means "any".
+      // Assert
       expect(config.scopes, <String>['openid', 'offline_access']);
       expect(config.endpointSuffixAllowlist, <String>['cluster.atomi.cloud']);
       expect(config.appHandoffMount, AppHandoffConstants.defaultMount);
@@ -423,6 +430,7 @@ void main() {
 
     test('accepts a supplied postLogoutRedirectUri and custom lists', () {
       // Arrange
+      // Act
       final AuthEngineConfig config = AuthEngineConfig.fromBlock(
         <String, Object?>{
           ...block(extra: null),
@@ -443,7 +451,8 @@ void main() {
     });
 
     test('the default const constructor bakes the family defaults', () {
-      // Arrange + Act — the direct (non-factory) construction arm.
+      // Arrange
+      // Act
       final AuthEngineConfig config = AuthEngineConfig(
         issuer: Uri.parse('https://api.lithium.mew.cluster.atomi.cloud'),
         endpoint: Uri.parse('https://logto.example.com'),
@@ -461,7 +470,9 @@ void main() {
 
   group('RegisteredBackend argument validation', () {
     test('rejects a blank backend id', () {
-      // Act + Assert
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => RegisteredBackend(
           backendId: '',
@@ -473,7 +484,9 @@ void main() {
     });
 
     test('rejects an empty resource list', () {
-      // Act + Assert — a backend with no resources has nothing to onboard to.
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => RegisteredBackend(
           backendId: 'api',
@@ -488,15 +501,14 @@ void main() {
   group('ReturnTo rejection arms', () {
     test('rejects a normalized path that collapses to a protocol-relative '
         'form', () {
-      // Arrange — `/.//evil.com` normalizes to path `//evil.com` with NO
-      // authority, so the scheme/authority guard alone would let it through;
-      // the single-slash guard is what actually stops the open redirect.
+      // Arrange
+      // Act
       final Result<Uri> resolved = ReturnTo.resolve('/.//evil.com/x');
       final Result<String> captured = ReturnTo.capture(
         Uri.parse('/x').replace(path: '//evil.com/x'),
       );
 
-      // Act + Assert
+      // Assert
       AuthExpect.status(
         AuthExpect.errType(resolved, 'urn:diene:problem:return-to'),
         400,
@@ -505,15 +517,18 @@ void main() {
     });
 
     test('rejects an empty returnTo', () {
-      // Act + Assert
+      // Arrange
+      // Act
+      // Assert
       AuthExpect.errType(ReturnTo.resolve(''), 'urn:diene:problem:return-to');
     });
 
     test('rejects a returnTo that is not a valid URI reference', () {
-      // Arrange — an unterminated IPv6 bracket makes Uri.parse throw.
+      // Arrange
+      // Act
       final Result<Uri> result = ReturnTo.resolve('//[');
 
-      // Act + Assert — a parse failure is a rejection, never a followed target.
+      // Assert
       final Problem problem = AuthExpect.errType(
         result,
         'urn:diene:problem:return-to',
@@ -522,7 +537,9 @@ void main() {
     });
 
     test('rejects a scheme-carrying returnTo on the way out', () {
-      // Act + Assert — the outbound re-validation, not just the inbound one.
+      // Arrange
+      // Act
+      // Assert
       final Problem problem = AuthExpect.errType(
         ReturnTo.resolve('https://evil.example.com/x'),
         'urn:diene:problem:return-to',
@@ -549,7 +566,7 @@ void main() {
         );
 
     test('maps a claim-reader throw to a recoverable 503 problem', () async {
-      // Arrange — the stored-token read itself fails.
+      // Arrange
       final HomeClaimResolver resolver = HomeClaimResolver(
         claimReader: () async => throw StateError('token store unreadable'),
         selector: selectorReturning('pichu'),
@@ -565,7 +582,7 @@ void main() {
       );
       expect(problem.status, 503);
       expect(problem.recoverable, isTrue);
-      // resolve() propagates the same problem rather than falling to Doc B.
+
       AuthExpect.errType(
         await resolver.resolve(),
         'urn:diene:problem:home-claim-read',
@@ -575,14 +592,15 @@ void main() {
     test(
       'maps a forced-reader throw to the same recoverable problem',
       () async {
-        // Arrange — the post-OnboardSync confirmation read fails.
+        // Arrange
         final HomeClaimResolver resolver = HomeClaimResolver(
           claimReader: () async => null,
           selector: selectorReturning('pichu'),
           forcedClaimReader: () async => throw StateError('refresh failed'),
         );
 
-        // Act + Assert
+        // Act
+        // Assert
         AuthExpect.status(
           AuthExpect.errType(
             await resolver.confirmedHome(),
@@ -594,19 +612,20 @@ void main() {
     );
 
     test('confirmedHome fails closed on a blank forced claim', () async {
-      // Arrange — a blank claim must read as "not confirmed", never as a value.
+      // Arrange
       final HomeClaimResolver resolver = HomeClaimResolver(
         claimReader: () async => null,
         selector: selectorReturning('pichu'),
         forcedClaimReader: () async => '',
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(AuthExpect.ok(await resolver.confirmedHome()), isNull);
     });
 
     test('tolerates an absent store on mirror, commit, and forget', () async {
-      // Arrange — the store is OPTIONAL; every write path must no-op safely.
+      // Arrange
       final HomeClaimResolver resolver = HomeClaimResolver(
         claimReader: () async => 'pichu',
         selector: selectorReturning('raichu'),
@@ -617,7 +636,7 @@ void main() {
       await resolver.commit('pichu');
       await resolver.forget();
 
-      // Assert — the authoritative claim still decides, with no store present.
+      // Assert
       final HomeResolution home = AuthExpect.ok(resolved);
       expect(home.landscape, 'pichu');
       expect(home.kind, HomeResolutionKind.fromClaim);
@@ -626,7 +645,7 @@ void main() {
     test(
       'swallows a store write failure — the cache never overrides the JWT',
       () async {
-        // Arrange — a mirror store whose write throws.
+        // Arrange
         final HomeClaimResolver resolver = HomeClaimResolver(
           claimReader: () async => 'pichu',
           selector: selectorReturning('raichu'),
@@ -636,7 +655,7 @@ void main() {
         // Act
         final Result<HomeResolution> resolved = await resolver.resolve();
 
-        // Assert — best-effort mirror; the claim decision survives.
+        // Assert
         expect(AuthExpect.ok(resolved).landscape, 'pichu');
         await resolver.commit('pichu');
       },
@@ -654,7 +673,8 @@ void main() {
           }),
         );
 
-        // Act + Assert — no token means the Doc B sign-up path, not a failure.
+        // Act
+        // Assert
         expect(await absent(), isNull);
         expect(await blank(), isNull);
         expect(await present(), 'pichu');
@@ -662,7 +682,8 @@ void main() {
     );
 
     test('HomeResolution carries the landscape and its resolution kind', () {
-      // Arrange + Act — the direct construction arm.
+      // Arrange
+      // Act
       const HomeResolution resolution = HomeResolution(
         landscape: 'pichu',
         kind: HomeResolutionKind.selected,
@@ -695,7 +716,8 @@ void main() {
         idToken: () async => null,
       );
 
-      // Act + Assert — a typo must fail loudly, not silently no-op.
+      // Act
+      // Assert
       expect(() => onboarding.machineFor('nope'), throwsArgumentError);
       expect(onboarding.machineFor('api').backendId, 'api');
       expect(onboarding.phases, <String, OnboardingPhase>{
@@ -718,7 +740,8 @@ void main() {
         idToken: () async => null,
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(machine.backendId, 'billing');
       expect(machine.resources, registered.resources);
     });
@@ -726,7 +749,7 @@ void main() {
     test(
       'errors when POST /User returns a non-created, non-conflict status',
       () async {
-        // Arrange — GET says 404 (create path) and the create itself is refused.
+        // Arrange
         final RegisteredBackend registered = backend('api');
         final ResourceKey resource = registered.onboardingResource;
         final OnboardingMachine machine = OnboardingMachine(
@@ -756,7 +779,7 @@ void main() {
     );
 
     test('errors when the post-create force-refresh batch fails', () async {
-      // Arrange — the create succeeds, then the re-acquisition returns an Err.
+      // Arrange
       final RegisteredBackend registered = backend('api');
       final ResourceKey resource = registered.onboardingResource;
       final OnboardingMachine machine = OnboardingMachine(
@@ -787,7 +810,7 @@ void main() {
       // Act
       final Result<OnboardingPhase> result = await machine.run();
 
-      // Assert — the refresh failure surfaces, not the claim-missing problem.
+      // Assert
       AuthExpect.errType(result, 'urn:diene:problem:resource-token');
       expect(machine.phase, OnboardingPhase.error);
     });
@@ -795,7 +818,7 @@ void main() {
     test(
       'errors with a 401 when the ID token needed to create is absent',
       () async {
-        // Arrange — GET 404 means create, but there is no ID token to send.
+        // Arrange
         final RegisteredBackend registered = backend('api');
         final ResourceKey resource = registered.onboardingResource;
         final OnboardingMachine machine = OnboardingMachine(
@@ -828,7 +851,7 @@ void main() {
 
   group('SignInCoordinator propagation arms', () {
     test('propagates a pre-login home-claim read failure', () async {
-      // Arrange — the very first step fails, so login must not even be tried.
+      // Arrange
       final FakeAuthProvider provider = FakeAuthProvider(
         onSignIn: () => AuthFixtures.sessionTokens(now: now),
       );
@@ -862,17 +885,13 @@ void main() {
       // Act
       final Result<SignInResult> result = await coordinator.signIn();
 
-      // Assert — the read problem propagates and no sign-in was attempted.
+      // Assert
       AuthExpect.errType(result, 'urn:diene:problem:home-claim-read');
       expect(provider.signInCount, 0);
     });
 
     test('propagates a POST-login authoritative re-read failure', () async {
-      // Arrange — the pre-login read succeeds (routing straight home, so Doc B
-      // never runs) but the re-read of the FRESHLY ISSUED token fails. That
-      // re-read exists so a server-changed/removed home_landscape overrides the
-      // pre-login value, and a failure there must surface rather than silently
-      // keep the stale home.
+      // Arrange
       int reads = 0;
       final FakeAuthProvider provider = FakeAuthProvider(
         onSignIn: () => AuthFixtures.sessionTokens(now: now),
@@ -913,17 +932,14 @@ void main() {
       // Act
       final Result<SignInResult> result = await coordinator.signIn();
 
-      // Assert — login DID happen, then the re-read failure propagated.
+      // Assert
       AuthExpect.errType(result, 'urn:diene:problem:home-claim-read');
       expect(provider.signInCount, 1);
       expect(reads, 2);
     });
 
     test('propagates a confirmation failure on the sign-up path', () async {
-      // Arrange — no stored claim, so Doc B selects a landscape (sign-up).
-      // Onboarding then succeeds, and the FORCE-FRESH confirmation read fails.
-      // The locally selected landscape must NEVER be mirrored as if it were a
-      // confirmed claim (C0 §13), so the failure has to surface.
+      // Arrange
       final FakeAuthProvider provider = FakeAuthProvider(
         onSignIn: () => AuthFixtures.sessionTokens(now: now),
       );
@@ -976,7 +992,7 @@ void main() {
       // Act
       final Result<SignInResult> result = await coordinator.signIn();
 
-      // Assert — the confirmation failure surfaces and NOTHING was mirrored.
+      // Assert
       AuthExpect.errType(result, 'urn:diene:problem:home-claim-read');
       expect(store.value, isNull);
       expect(store.writes, 0);
@@ -985,7 +1001,8 @@ void main() {
     test(
       'SignInResult carries home, phases, and the returnTo continuation',
       () {
-        // Arrange + Act — the direct construction arm.
+        // Arrange
+        // Act
         final SignInResult result = SignInResult(
           home: const HomeResolution(
             landscape: 'pichu',
@@ -1007,7 +1024,7 @@ void main() {
 
   group('deferred-login value shapes', () {
     test('DeviceInfo carries every optional field when supplied', () {
-      // Arrange + Act — the all-fields-present arm of toJson.
+      // Arrange
       const DeviceInfo device = DeviceInfo(
         platform: 'android',
         appVersion: '2.0.0',
@@ -1015,6 +1032,7 @@ void main() {
         model: 'Pixel 9',
       );
 
+      // Act
       // Assert
       expect(device.toJson(), <String, Object?>{
         'platform': 'android',
@@ -1025,20 +1043,20 @@ void main() {
     });
 
     test('DeviceInfo is constructible at runtime, not only as a const', () {
-      // Arrange — a const invocation is folded at compile time, so the platform
-      // field is exercised here through a NON-const construction built from a
-      // runtime value.
+      // Arrange
       final String platform = <String>['android', 'ios'].first;
+
+      // Act
       final DeviceInfo device = DeviceInfo(platform: platform);
 
-      // Assert — the optional telemetry fields stay absent.
+      // Assert
       expect(device.platform, 'android');
       expect(device.toJson(), <String, Object?>{'platform': 'android'});
     });
 
     test('ClipboardCarrierReader is constructible at runtime', () {
-      // Arrange + Act — a const invocation is compile-time folded, so the
-      // constructor is exercised through a NON-const construction.
+      // Arrange
+      // Act
       // ignore: prefer_const_constructors
       final ClipboardCarrierReader reader = ClipboardCarrierReader();
 
@@ -1048,8 +1066,6 @@ void main() {
   });
 }
 
-/// Provider that counts resource-token acquisitions, so a cache-vs-reacquire
-/// assertion is exact. The shared [FakeAuthProvider] exposes no such counter.
 final class _CountingProvider implements AuthProvider {
   _CountingProvider(this._token);
 
@@ -1080,8 +1096,6 @@ final class _CountingProvider implements AuthProvider {
   Future<String?> freshClaimToken() async => null;
 }
 
-/// Home claim store whose write always fails — the mirror is non-authoritative,
-/// so a failed write must never change the resolved home.
 final class _ThrowingHomeClaimStore implements HomeClaimStore {
   @override
   Future<String?> read() async => null;

@@ -7,14 +7,9 @@ import '../tokens/resource_key.dart';
 import '../tokens/session_tokens.dart';
 import '../tokens/token_lifetimes.dart';
 
-/// The Logto implementation of [AuthProvider] — the only provider in v1.
+/// The Logto [AuthProvider].
 ///
-/// PARITY DELTA (documented): Logto's SDK OWNS refresh-token rotation and reuse
-/// detection internally (`getAccessToken` refreshes behind the seam and never
-/// surfaces the refresh token). This adapter therefore synthesizes the family
-/// [SessionTokens] refresh bookkeeping; the rotating-reuse guarantee that
-/// [SessionController] enforces is exercised through provider fakes and applies
-/// verbatim to any provider that DOES surface refresh tokens.
+/// The Logto SDK rotates refresh tokens itself, so the family is synthesized.
 final class LogtoAuthProvider implements AuthProvider {
   LogtoAuthProvider({
     required AuthEngineConfig config,
@@ -96,17 +91,7 @@ final class LogtoAuthProvider implements AuthProvider {
 
   @override
   Future<String?> freshClaimToken() async {
-    // logto_dart_sdk v3 exposes NO public force-refresh / cache-invalidation for
-    // a still-valid token: `getAccessToken` returns the stored token when one
-    // exists and `idToken` reads token storage directly. A just-minted 10-minute
-    // signup access token is therefore a cache hit, so reading it back would NOT
-    // reflect an OnboardSync-updated `home_landscape` claim.
-    //
-    // The guaranteed-fresh claim-bearing token is supplied through the injected
-    // [claimTokenRefresher] seam (platform wiring — e.g. a forced token refresh
-    // via re-authentication or a management-backed claim read). Its EXACT
-    // returned token is what the caller decodes. When no refresher is wired we
-    // FAIL CLOSED (return null) rather than hand back a possibly-stale token.
+    // The SDK cannot force a fresh token; without a refresher, fail closed.
     final Future<String?> Function()? refresher = _claimTokenRefresher;
     if (refresher == null) {
       return null;

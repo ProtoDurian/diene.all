@@ -6,34 +6,26 @@ import '../tokens/resource_key.dart';
 import '../tokens/session_tokens.dart';
 import 'auth_provider.dart';
 
-/// The retriever seam api-engine dogfoods: resolve a token per resource with a
-/// per-resource cache in front of the hot path, plus the eager all-token batch
-/// (C0 §8, S7).
+/// Resolves access tokens per resource, with a cache and an eager batch.
 abstract interface class IAuth {
   /// Resolves one resource's token, serving the cache when still valid.
   Future<Result<ResourceToken>> tokenFor(ResourceKey key);
 
-  /// Eager all-token batch: dedups [keys] by full [ResourceKey], starts
-  /// acquisition for EVERY key before awaiting any, and returns a total map
-  /// with exactly one terminal entry per requested key. Lazy first-call
-  /// acquisition is not permitted.
+  /// Starts every key before awaiting any; one entry per distinct key.
   Future<Map<ResourceKey, Result<ResourceToken>>> fetchAllTokens(
     Iterable<ResourceKey> keys,
   );
 
-  /// Drops every cached resource token (used on sign-out / force-refresh).
+  /// Drops every cached resource token.
   void invalidateAll();
 
   /// Drops one resource's cached token.
   void invalidate(ResourceKey key);
 }
 
-/// A clock skew applied when deciding whether a cached token is still fresh.
 const Duration _refreshSkew = Duration(seconds: 30);
 
-/// Default [IAuth] implementation: cache keyed per [ResourceKey], expiry-aware
-/// refresh, and single-flight refresh-race handling (concurrent callers for the
-/// same key await ONE acquisition).
+/// The default [IAuth]: per-key cache; concurrent callers share one fetch.
 final class AuthCoordinator implements IAuth {
   AuthCoordinator({required this._provider, DateTime Function()? now})
     : _now = now ?? DateTime.now;
@@ -51,7 +43,6 @@ final class AuthCoordinator implements IAuth {
     if (cached != null && cached.expiresAt.isAfter(now.add(_refreshSkew))) {
       return Future<Result<ResourceToken>>.value(Ok<ResourceToken>(cached));
     }
-    // Single-flight: concurrent callers for the same key share one acquisition.
     final Future<Result<ResourceToken>>? pending = _inflight[key.mapKey];
     if (pending != null) {
       return pending;
@@ -84,12 +75,10 @@ final class AuthCoordinator implements IAuth {
   Future<Map<ResourceKey, Result<ResourceToken>>> fetchAllTokens(
     Iterable<ResourceKey> keys,
   ) async {
-    // Deduplicate the union by full ResourceKey (mapKey identity).
     final Map<String, ResourceKey> unique = <String, ResourceKey>{};
     for (final ResourceKey key in keys) {
       unique[key.mapKey] = key;
     }
-    // Start EVERY acquisition before awaiting any (no lazy first-call).
     final Map<ResourceKey, Future<Result<ResourceToken>>> started =
         <ResourceKey, Future<Result<ResourceToken>>>{
           for (final ResourceKey key in unique.values) key: tokenFor(key),

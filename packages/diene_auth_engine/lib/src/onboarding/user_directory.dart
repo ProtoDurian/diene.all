@@ -1,18 +1,12 @@
-/// The `/User` onboarding surface a backend exposes (C0 §8).
-///
-/// Implementations issue exactly the HTTP calls the machine asks for and return
-/// the raw status code; a transport failure throws (the machine maps it to
-/// `error`). Callers pass the designated onboarding-resource access token.
+/// A backend's `/User` onboarding surface; returns raw status codes.
 abstract interface class UserDirectory {
-  /// `GET {backend}/User/Me` with the bearer [accessToken]. Returns the status
-  /// (200 = row exists, 404 = create path).
+  /// `GET /User/Me`: 200 when the user exists, 404 to create.
   Future<int> getUserMe({
     required String backendId,
     required String accessToken,
   });
 
-  /// `POST {backend}/User` with the bearer [accessToken] and body
-  /// `{ "idToken": ..., "accessToken": ... }`. Any 2xx or 409 is create-or-ok.
+  /// `POST /User` with the ID and access tokens; 2xx or 409 means done.
   Future<int> postUser({
     required String backendId,
     required String accessToken,

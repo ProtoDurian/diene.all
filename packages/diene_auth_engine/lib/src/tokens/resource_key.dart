@@ -1,14 +1,8 @@
 import 'package:meta/meta.dart';
 
-/// Full resource identity (C0 §8, S7):
-/// `ResourceKey = (platform, landscape, service, resourceName)`.
+/// A resource identity: platform, landscape, service and resource name.
 ///
-/// Every component is an explicit lowercase DNS label; none is inferred.
-/// `resourceName` occupies the M slot of the public LPSM coordinate, so the
-/// Logto resource identifier / JWT `aud` is exactly
-/// `https://<resourceName>.<service>.<platform>.<landscape>.cluster.atomi.cloud`
-/// (no trailing slash). The identifier is an identity string; dereferenceability
-/// is not required.
+/// Each part must be a lowercase DNS label.
 @immutable
 final class ResourceKey {
   ResourceKey({

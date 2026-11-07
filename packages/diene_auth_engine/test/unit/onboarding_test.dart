@@ -136,7 +136,8 @@ void main() {
       directory: directory,
     );
 
-    // Act + Assert
+    // Act
+    // Assert
     AuthExpect.phase(AuthExpect.ok(await m.run()), OnboardingPhase.ready);
   });
 
@@ -147,7 +148,8 @@ void main() {
       directory: FakeUserDirectory(getStatus: 500),
     );
 
-    // Act + Assert
+    // Act
+    // Assert
     expect(await m.run(), isA<Err<OnboardingPhase>>());
     AuthExpect.phase(m.phase, OnboardingPhase.error);
   });
@@ -159,12 +161,13 @@ void main() {
       directory: FakeUserDirectory(throwOnGet: true),
     );
 
-    // Act + Assert
+    // Act
+    // Assert
     expect(await m.run(), isA<Err<OnboardingPhase>>());
   });
 
   test('claim still absent after create → OnboardingClaimMissing', () async {
-    // Arrange — both batches unregistered.
+    // Arrange
     final OnboardingMachine m = machine(
       FakeAuth(<Map<ResourceKey, Result<ResourceToken>>>[
         unregistered(),
@@ -192,7 +195,8 @@ void main() {
       ]),
     );
 
-    // Act + Assert
+    // Act
+    // Assert
     expect(await m.run(), isA<Err<OnboardingPhase>>());
   });
 
@@ -224,7 +228,7 @@ void main() {
         onboardingResource: keyB,
       ),
     ]);
-    // Shared auth: primary key registered, billing key failed.
+
     final FakeAuth auth = FakeAuth(<Map<ResourceKey, Result<ResourceToken>>>[
       <ResourceKey, Result<ResourceToken>>{
         key: Ok<ResourceToken>(
@@ -258,8 +262,7 @@ void main() {
 
   test('multi-backend performs ONE registry-union acquisition for a shared '
       'resource and still projects independent outcomes', () async {
-    // Arrange — backend A needs {shared}; backend B needs {shared, extra}. The
-    // shared key must be acquired exactly once for the whole registry (C0 §8).
+    // Arrange
     final ResourceKey shared = AuthFixtures.resourceKey(service: 'api');
     final ResourceKey extra = AuthFixtures.resourceKey(service: 'billing');
     final BackendRegistry registry = BackendRegistry(<RegisteredBackend>[
@@ -301,7 +304,7 @@ void main() {
     final Map<String, Result<OnboardingPhase>> results = await onboarding
         .runAll();
 
-    // Assert — exactly one initial acquisition batch for the whole registry.
+    // Assert
     expect(auth.fetchAllCount, 1);
     expect(results['a'], isA<Ok<OnboardingPhase>>());
     expect(results['b'], isA<Ok<OnboardingPhase>>());

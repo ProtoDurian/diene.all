@@ -7,11 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-// Transport-level regressions for the HTTP redeem adapter. The C0 §7 contract is
-// NO ORACLE: every non-success outcome — bad status, non-object body, missing or
-// blank token, non-string email, transport throw — must collapse to the single
-// AppHandoffExpired problem, so a caller can never distinguish "deleted" from
-// "replayed" from "upstream down".
 void main() {
   const DeviceInfo device = DeviceInfo(
     platform: 'ios',
@@ -56,8 +51,7 @@ void main() {
       device: device,
     );
 
-    // Assert — the redeem route is POST {mount}/redeem with a JSON envelope
-    // carrying the nonce and the telemetry-only device block.
+    // Assert
     expect(seen!.method, 'POST');
     expect(
       seen!.url.toString(),
@@ -101,7 +95,8 @@ void main() {
         ),
       );
 
-      // Act + Assert — C0 §7 fixes the one-time token lifetime at 120s.
+      // Act
+      // Assert
       expect(
         AuthExpect.ok(
           await absent.redeem(nonce: 'n', device: device),
@@ -120,8 +115,7 @@ void main() {
   test(
     'accepts an empty-string email (identity resolution is upstream)',
     () async {
-      // Arrange — only a NON-string email is malformed; a blank one is upstream's
-      // business, so it must not be turned into a client-side oracle.
+      // Arrange
       final HttpAppHandoffApi api = apiReturning(
         (http.Request request) => http.Response(
           jsonEncode(<String, Object?>{'token': 't', 'email': ''}),
@@ -129,7 +123,8 @@ void main() {
         ),
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(
         AuthExpect.ok(await api.redeem(nonce: 'n', device: device)).email,
         '',
@@ -138,7 +133,7 @@ void main() {
   );
 
   test('collapses every non-success outcome to AppHandoffExpired', () async {
-    // Arrange — one case per failure branch in the adapter.
+    // Arrange
     final Map<String, HttpAppHandoffApi> cases = <String, HttpAppHandoffApi>{
       'non-200 status': apiReturning(
         (http.Request request) => http.Response('gone', 410),
@@ -181,14 +176,15 @@ void main() {
       ),
     };
 
-    // Act + Assert — indistinguishable outcomes, one problem.
+    // Act
+    // Assert
     for (final MapEntry<String, HttpAppHandoffApi> entry in cases.entries) {
       expectExpired(await entry.value.redeem(nonce: 'n', device: device));
     }
   });
 
   test('joins the mount onto the base without doubling slashes', () async {
-    // Arrange — the base carries a trailing slash AND the mount a leading one.
+    // Arrange
     final List<Uri> requested = <Uri>[];
     http.Client recorder() => MockClient((http.Request request) async {
       requested.add(request.url);
@@ -210,14 +206,15 @@ void main() {
       client: recorder(),
     ).redeem(nonce: 'n', device: device);
 
-    // Assert — both spellings resolve to the exact same route.
+    // Assert
     expect(requested.map((Uri u) => u.path).toSet(), <String>{
       '/app-handoff/redeem',
     });
   });
 
   test('defaults to a real http.Client when none is injected', () {
-    // Arrange + Act — construction must do NO network work.
+    // Arrange
+    // Act
     final HttpAppHandoffApi api = HttpAppHandoffApi(
       base: Uri.parse('https://api.lithium.lapras.cluster.atomi.cloud'),
       redeemPath: '${AppHandoffConstants.defaultMount}/redeem',

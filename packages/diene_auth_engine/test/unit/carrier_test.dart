@@ -2,11 +2,12 @@ import 'package:diene_auth_engine/diene_auth_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const String nonce =
-      'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'; // 43 chars
+  const String nonce = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
   const String canonical = 'atomi-app-handoff:v1:$nonce';
 
   test('parses the canonical carrier text', () {
+    // Arrange
+    // Act
     // Assert
     expect(AppHandoffCarrier.parseCanonical(canonical)?.nonce, nonce);
     expect(AppHandoffCarrier.parseCanonical('nope'), isNull);
@@ -17,6 +18,8 @@ void main() {
   });
 
   test('round-trips through canonicalText', () {
+    // Arrange
+    // Act
     // Assert
     expect(
       AppHandoffCarrier.parseCanonical(canonical)?.canonicalText,
@@ -29,6 +32,7 @@ void main() {
     final String referrer =
         'utm_source=store&app_handoff=${Uri.encodeComponent(canonical)}&x=1';
 
+    // Act
     // Assert
     expect(AppHandoffCarrier.parseAndroidReferrer(referrer)?.nonce, nonce);
   });
@@ -37,6 +41,7 @@ void main() {
     // Arrange
     final String encoded = Uri.encodeComponent(canonical);
 
+    // Act
     // Assert
     expect(AppHandoffCarrier.parseAndroidReferrer('utm=1'), isNull);
     expect(
@@ -48,6 +53,8 @@ void main() {
   });
 
   test('trims iOS clipboard whitespace', () {
+    // Arrange
+    // Act
     // Assert
     expect(AppHandoffCarrier.parseClipboard('  $canonical\n')?.nonce, nonce);
   });

@@ -1,0 +1,33 @@
+{
+  "audienceTemplate": "https://{resourceName}.{service}.{platform}.{landscape}.cluster.atomi.cloud",
+  "mapKeyTemplate": "{platform}/{landscape}/{service}/{resourceName}",
+  "vectors": {
+    "invalid": [
+      {
+        "landscape": "lapras",
+        "name": "trailing-hyphen-label",
+        "platform": "lithium-",
+        "resourceName": "root",
+        "service": "api"
+      },
+      {
+        "landscape": "lapras",
+        "name": "uppercase-label",
+        "platform": "Lithium",
+        "resourceName": "root",
+        "service": "api"
+      }
+    ],
+    "valid": [
+      {
+        "expectedAudience": "https://root.api.lithium.lapras.cluster.atomi.cloud",
+        "expectedMapKey": "lithium/lapras/api/root",
+        "landscape": "lapras",
+        "name": "lpsm-audience",
+        "platform": "lithium",
+        "resourceName": "root",
+        "service": "api"
+      }
+    ]
+  }
+}

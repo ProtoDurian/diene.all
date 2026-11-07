@@ -1,0 +1,158 @@
+{
+  "requiredEntryKeys": ["name", "region"],
+  "requiredKeys": ["landscapes", "platform", "tier"],
+  "topLevelRule": "exactly the keys landscapes, platform, tier; platform and tier are non-empty strings; landscapes is an array; any other top-level key is rejected; a doc violating any rule is untrusted as a whole",
+  "vectors": {
+    "invalid": [
+      {
+        "doc": {
+          "landscapes": [
+            {
+              "address": "https://a.example",
+              "name": "raichu",
+              "region": "sgp"
+            }
+          ],
+          "platform": "lithium",
+          "tier": "prod"
+        },
+        "name": "address-key"
+      },
+      {
+        "doc": {
+          "landscapes": [
+            {
+              "issuer": "https://issuer.example",
+              "name": "raichu",
+              "region": "sgp"
+            }
+          ],
+          "platform": "lithium",
+          "tier": "prod"
+        },
+        "name": "issuer-key"
+      },
+      {
+        "doc": {
+          "platform": "lithium",
+          "tier": "prod"
+        },
+        "name": "missing-landscapes"
+      },
+      {
+        "doc": {
+          "landscapes": [
+            {
+              "region": "sgp"
+            }
+          ],
+          "platform": "lithium",
+          "tier": "prod"
+        },
+        "name": "missing-name"
+      },
+      {
+        "doc": {
+          "landscapes": [
+            {
+              "name": "raichu",
+              "region": "sgp"
+            }
+          ],
+          "tier": "prod"
+        },
+        "name": "missing-platform"
+      },
+      {
+        "doc": {
+          "landscapes": [
+            {
+              "name": "raichu",
+              "region": "sgp"
+            }
+          ],
+          "platform": "lithium"
+        },
+        "name": "missing-tier"
+      },
+      {
+        "doc": {
+          "landscapes": [
+            {
+              "name": "raichu",
+              "region": "sgp"
+            }
+          ],
+          "platform": 7,
+          "tier": "prod"
+        },
+        "name": "non-string-platform"
+      },
+      {
+        "doc": {
+          "landscapes": [
+            {
+              "name": "raichu",
+              "region": "sgp"
+            }
+          ],
+          "platform": "lithium",
+          "tier": true
+        },
+        "name": "non-string-tier"
+      },
+      {
+        "doc": {
+          "landscapes": [
+            {
+              "name": "raichu",
+              "region": "sgp"
+            }
+          ],
+          "platform": "lithium",
+          "region": "sgp",
+          "tier": "prod"
+        },
+        "name": "unknown-top-level-key"
+      },
+      {
+        "doc": {
+          "landscapes": [
+            {
+              "metadata": {
+                "ping": "https://ping.example"
+              },
+              "name": "raichu",
+              "region": "sgp"
+            }
+          ],
+          "platform": "lithium",
+          "tier": "prod"
+        },
+        "name": "url-value-in-metadata"
+      }
+    ],
+    "valid": [
+      {
+        "doc": {
+          "landscapes": [
+            {
+              "metadata": {
+                "displayName": "Raichu"
+              },
+              "name": "raichu",
+              "region": "sgp"
+            },
+            {
+              "name": "amphoros",
+              "region": "fra"
+            }
+          ],
+          "platform": "lithium",
+          "tier": "prod"
+        },
+        "name": "names-and-metadata-only"
+      }
+    ]
+  }
+}

@@ -1,18 +1,5 @@
-/// Frontend auth engine for the AtomiCloud Diene Dart family.
-///
-/// Ships: Logto flows + per-resource tokens, the multi-backend claims-first
-/// onboarding phase machine, the deferred-login mobile client (carrier +
-/// redeem), returnTo deeplink continuation, the engine-owned config block
-/// schema, and the sign-up-only Doc B landscape selector.
-///
-/// Dart is frontend-only — there is NO otel surface here; telemetry rides Faro
-/// through flutter-base.
-///
-/// Every fallible member returns `Result` from `package:diene_result`, with the
-/// canonical `Problem` envelope from `package:diene_problems`. Neither package
-/// is re-exported here — consumers depend on them directly, matching the
-/// accepted `diene_interfaces` shape, so the canonical types have exactly one
-/// owner and cannot drift behind an alias.
+/// Logto sign-in, per-resource tokens, per-backend claims-first onboarding,
+/// deferred login, returnTo continuation and Doc B home selection for Flutter.
 library;
 
 export 'src/auth/auth_provider.dart';

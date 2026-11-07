@@ -9,10 +9,7 @@ import 'auth_provider.dart';
 /// Coarse session state for UI gating.
 enum SessionStatus { unauthenticated, authenticating, authenticated, failed }
 
-/// Owns the token lifecycle for one Logto session (C0 §12):
-/// access = 10 minutes, refresh = 14 days rotating with reuse detection, and a
-/// silent re-mint on every app open. Lifetimes are ENFORCED, not trusted: a
-/// provider that hands back a longer-lived token is rejected.
+/// Owns one Logto session's tokens and rejects over-long lifetimes.
 final class SessionController extends ChangeNotifier {
   SessionController({
     required this._provider,
@@ -34,8 +31,7 @@ final class SessionController extends ChangeNotifier {
   Problem? get problem => _problem;
   SessionTokens? get tokens => _tokens;
 
-  /// Interactive sign-in. [extraParams] carries deferred-login one-time-token /
-  /// login-hint params when redeeming an app-handoff carrier.
+  /// Interactive sign-in; [extraParams] carry the app-handoff token.
   Future<Result<SessionTokens>> signIn({
     Map<String, String> extraParams = const <String, String>{},
   }) async {
@@ -60,8 +56,7 @@ final class SessionController extends ChangeNotifier {
     }
   }
 
-  /// Rotating refresh with reuse detection. A refresh that changes the family
-  /// or re-returns the same refresh token signs the session out (theft).
+  /// Rotating refresh; a changed family or reused token signs out.
   Future<Result<SessionTokens>> refresh() async {
     final SessionTokens? current = _tokens;
     if (current == null || !current.refreshValidAt(_now())) {
@@ -103,8 +98,7 @@ final class SessionController extends ChangeNotifier {
     }
   }
 
-  /// Silent re-mint on app open: a fresh session always starts on a fresh
-  /// access token (C0 §12). The refresh token is preserved.
+  /// Re-mints the access token on app open, keeping the refresh token.
   Future<Result<SessionTokens>> onAppOpen() async {
     final SessionTokens? current = _tokens;
     if (current == null) {
@@ -145,7 +139,7 @@ final class SessionController extends ChangeNotifier {
     }
   }
 
-  /// Clears local + provider session state.
+  /// Clears the local and provider session.
   Future<void> signOut() async {
     _tokens = null;
     _status = SessionStatus.unauthenticated;

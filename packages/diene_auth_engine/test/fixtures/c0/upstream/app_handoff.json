@@ -1,0 +1,117 @@
+{
+  "carrierPrefix": "atomi-app-handoff:v1:",
+  "carriers": {
+    "invalid": [
+      {
+        "androidReferrer": "app_handoff=atomi-app-handoff%3Av1%3AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&app_handoff=atomi-app-handoff%3Av1%3ABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        "name": "android-duplicate-field"
+      },
+      {
+        "androidReferrer": "utm_source=play",
+        "name": "android-missing-field"
+      },
+      {
+        "name": "padded-nonce",
+        "text": "atomi-app-handoff:v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      {
+        "name": "second-segment",
+        "text": "atomi-app-handoff:v1:app-handoff:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      {
+        "name": "short-nonce",
+        "text": "atomi-app-handoff:v1:AAAA"
+      },
+      {
+        "name": "wrong-version",
+        "text": "atomi-app-handoff:v2:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      }
+    ],
+    "valid": [
+      {
+        "androidReferrer": "utm_source=play&app_handoff=atomi-app-handoff%3Av1%3AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "name": "android-referrer",
+        "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      {
+        "name": "canonical",
+        "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "text": "atomi-app-handoff:v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      {
+        "clipboard": "  atomi-app-handoff:v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA  ",
+        "name": "ios-clipboard-trimmed",
+        "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      }
+    ]
+  },
+  "defaultMount": "/app-handoff",
+  "genericExpiryProblem": {
+    "data": {},
+    "detail": "This app handoff is expired or invalid.",
+    "id": "AppHandoffExpired",
+    "status": 410,
+    "title": "App handoff expired"
+  },
+  "mintRoute": {
+    "method": "POST",
+    "path": "{mount}"
+  },
+  "nonceEncoding": "rfc4648-base64url-no-padding",
+  "nonceLength": 43,
+  "noncePattern": "^[A-Za-z0-9_-]{43}$",
+  "nonceTtlMinutes": 15,
+  "oneTimeTokenExpiresInSeconds": 120,
+  "redeemRequests": {
+    "invalid": [
+      {
+        "body": {
+          "device": {
+            "platform": "android",
+            "serial": "x"
+          },
+          "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "name": "unknown-device-key"
+      },
+      {
+        "body": {
+          "device": {
+            "platform": "android"
+          },
+          "extra": 1,
+          "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "name": "unknown-top-level-key"
+      }
+    ],
+    "valid": [
+      {
+        "body": {
+          "device": {
+            "appVersion": "1.2.3",
+            "model": "Pixel 9",
+            "osVersion": "15",
+            "platform": "android"
+          },
+          "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "name": "android-full"
+      },
+      {
+        "body": {
+          "device": {
+            "platform": "ios"
+          },
+          "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "name": "ios-minimal"
+      }
+    ]
+  },
+  "redeemRoute": {
+    "method": "POST",
+    "path": "{mount}/redeem"
+  },
+  "redeemSuccessKeys": ["token", "email", "expiresIn"]
+}

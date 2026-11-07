@@ -5,10 +5,7 @@ import 'package:http/http.dart' as http;
 import '../config/auth_engine_config.dart';
 import '../home/landscape_selector.dart';
 
-/// HTTP implementation of [LandscapeSelectorSource] (Doc B).
-///
-/// Enforces the baked endpoint-suffix allowlist on the doc URL at use time
-/// (C0 §10) BEFORE fetching — a doc served off an unlisted host is untrusted.
+/// Fetches Doc B over HTTP; refuses a URL outside the suffix allowlist.
 final class HttpLandscapeSelectorSource implements LandscapeSelectorSource {
   HttpLandscapeSelectorSource({
     required this._docUrl,
@@ -47,12 +44,10 @@ final class HttpLandscapeSelectorSource implements LandscapeSelectorSource {
   }
 }
 
-/// Derives a landscape's ping URL from its name — the convention, never
-/// doc-carried (C0 §10).
+/// Builds a ping URL from the landscape name.
 typedef PingUrlBuilder = Uri Function(LandscapeEntry entry);
 
-/// HTTP implementation of [RegionPinger]. Returns round-trip latency, or `null`
-/// on any non-2xx / timeout / transport error.
+/// [RegionPinger] over HTTP; `null` on non-2xx, timeout or error.
 final class HttpRegionPinger implements RegionPinger {
   HttpRegionPinger({
     required this._pingUrlOf,

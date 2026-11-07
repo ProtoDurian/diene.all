@@ -1,0 +1,32 @@
+{
+  "claimName": "home_landscape",
+  "vectors": {
+    "absent": [
+      {
+        "claims": {
+          "home_landscape": ""
+        },
+        "name": "blank"
+      },
+      {
+        "claims": {
+          "home_landscape": true
+        },
+        "name": "non-string"
+      },
+      {
+        "claims": {},
+        "name": "missing"
+      }
+    ],
+    "present": [
+      {
+        "claims": {
+          "home_landscape": "raichu"
+        },
+        "expected": "raichu",
+        "name": "present"
+      }
+    ]
+  }
+}

@@ -81,7 +81,7 @@ void main() {
   });
 
   test('refresh-token reuse signs out the whole session', () async {
-    // Arrange — provider hands back the SAME refresh token (reuse/theft).
+    // Arrange
     final FakeAuthProvider provider = FakeAuthProvider(
       onSignIn: () => issued(refresh: 'r1'),
       onRefresh: (SessionTokens c) =>
@@ -139,7 +139,8 @@ void main() {
       now: () => now,
     );
 
-    // Act + Assert
+    // Act
+    // Assert
     expect((await session.refresh()), isA<Err<SessionTokens>>());
     expect((await session.onAppOpen()), isA<Err<SessionTokens>>());
   });

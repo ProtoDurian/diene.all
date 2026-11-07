@@ -2,11 +2,7 @@ import 'package:meta/meta.dart';
 
 import 'resource_key.dart';
 
-/// The refresh/access pair for one authenticated Logto session.
-///
-/// `refreshFamily` identifies the rotating refresh-token family; a refresh that
-/// returns a different family (or re-returns the same refresh token) is treated
-/// as reuse/theft by the session controller (C0 §12).
+/// The access and rotating refresh tokens of one Logto session.
 @immutable
 final class SessionTokens {
   const SessionTokens({

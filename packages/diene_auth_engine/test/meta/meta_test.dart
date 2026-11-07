@@ -1,5 +1,3 @@
-// META TIER — subject = the TestHelper code (assert-the-asserter, contract
-// parity, fixture/builder invariants). Run via `pls test:meta`.
 import 'package:diene_auth_engine/diene_auth_engine.dart';
 import 'package:diene_auth_engine/test_helper.dart';
 import 'package:diene_problems/diene_problems.dart';
@@ -11,9 +9,11 @@ void main() {
 
   group('assert-the-asserter: AuthExpect', () {
     test('ok passes on Ok and throws on Err', () {
-      // Known-good
+      // Arrange
+      // Act
+      // Assert
       expect(AuthExpect.ok(const Ok<int>(1)), 1);
-      // Known-bad
+
       expect(
         () => AuthExpect.ok(
           const Err<int>(Problem(type: 't', title: 'x', status: 400)),
@@ -23,6 +23,9 @@ void main() {
     });
 
     test('err passes on Err and throws on Ok', () {
+      // Arrange
+      // Act
+      // Assert
       expect(
         AuthExpect.err(
           const Err<int>(Problem(type: 't', title: 'x', status: 400)),
@@ -36,9 +39,13 @@ void main() {
     });
 
     test('errType matches the problem type and rejects a mismatch', () {
+      // Arrange
       const Result<int> failure = Err<int>(
         Problem(type: 'urn:x', title: 'x', status: 400),
       );
+
+      // Act
+      // Assert
       expect(AuthExpect.errType(failure, 'urn:x').type, 'urn:x');
       expect(
         () => AuthExpect.errType(failure, 'urn:y'),
@@ -47,6 +54,9 @@ void main() {
     });
 
     test('some/none behave and fail on the opposite arm', () {
+      // Arrange
+      // Act
+      // Assert
       expect(AuthExpect.some(const Some<int>(3)), 3);
       expect(
         () => AuthExpect.some(const None<int>()),
@@ -63,12 +73,16 @@ void main() {
       // Arrange
       final AuthAssertionError error = AuthAssertionError('boom');
 
-      // Act + Assert — the toString is what a failing tier actually prints.
+      // Act
+      // Assert
       expect(error.toString(), 'AuthAssertionError: boom');
       expect(error.message, 'boom');
     });
 
     test('phase / status pass on match and throw on mismatch', () {
+      // Arrange
+      // Act
+      // Assert
       AuthExpect.phase(OnboardingPhase.ready, OnboardingPhase.ready);
       expect(
         () => AuthExpect.phase(OnboardingPhase.ready, OnboardingPhase.error),
@@ -87,12 +101,20 @@ void main() {
 
   group('fixture/builder invariants: AuthFixtures', () {
     test('jwt payload decodes back to the supplied claims', () {
+      // Arrange
+      // Act
       final String token = AuthFixtures.jwt(<String, Object?>{'k': 'v'});
+
+      // Assert
       expect(Claims.decode(token)['k'], 'v');
     });
 
     test('registeredJwt carries the exact registration claim', () {
+      // Arrange
       final ResourceKey key = AuthFixtures.resourceKey();
+
+      // Act
+      // Assert
       expect(
         Claims.hasRegistration(
           Claims.decode(AuthFixtures.registeredJwt(key)),
@@ -104,7 +126,11 @@ void main() {
     });
 
     test('unregisteredJwt omits the registration claim', () {
+      // Arrange
       final ResourceKey key = AuthFixtures.resourceKey();
+
+      // Act
+      // Assert
       expect(
         Claims.hasRegistration(
           Claims.decode(AuthFixtures.unregisteredJwt(key)),
@@ -116,7 +142,11 @@ void main() {
     });
 
     test('sessionTokens honours the family lifetimes', () {
+      // Arrange
+      // Act
       final SessionTokens tokens = AuthFixtures.sessionTokens(now: now);
+
+      // Assert
       expect(tokens.accessExpiresAt.difference(now), TokenLifetimes.access);
       expect(tokens.refreshExpiresAt.difference(now), TokenLifetimes.refresh);
     });
@@ -124,6 +154,7 @@ void main() {
 
   group('contract parity: fakes honour their seam contracts', () {
     test('FakeAuth returns one terminal entry per requested key', () async {
+      // Arrange
       final ResourceKey key = AuthFixtures.resourceKey();
       final FakeAuth auth = FakeAuth(<Map<ResourceKey, Result<ResourceToken>>>[
         <ResourceKey, Result<ResourceToken>>{
@@ -132,14 +163,22 @@ void main() {
           ),
         },
       ]);
+
+      // Act
       final Map<ResourceKey, Result<ResourceToken>> batch = await auth
           .fetchAllTokens(<ResourceKey>[key]);
+
+      // Assert
       expect(batch.length, 1);
       expect(AuthExpect.ok(batch[key]!).token, 'j');
     });
 
     test('MemoryHomeClaimStore round-trips read/write/clear', () async {
+      // Arrange
       final MemoryHomeClaimStore store = MemoryHomeClaimStore();
+
+      // Act
+      // Assert
       expect(await store.read(), isNull);
       await store.write('pichu');
       expect(await store.read(), 'pichu');
@@ -148,10 +187,15 @@ void main() {
     });
 
     test('FakeClipboardCarrierSource clears only on an exact match', () async {
+      // Arrange
       final FakeClipboardCarrierSource clip = FakeClipboardCarrierSource(
         '  x ',
       );
+
+      // Act
       await clip.clearIfEquals('y');
+
+      // Assert
       expect(clip.cleared, isFalse);
       await clip.clearIfEquals('x');
       expect(clip.cleared, isTrue);
@@ -160,6 +204,7 @@ void main() {
     test(
       'FakeAuthProvider scripts sign-in / refresh / re-mint / tokens',
       () async {
+        // Arrange
         final ResourceKey key = AuthFixtures.resourceKey();
         final FakeAuthProvider provider = FakeAuthProvider(
           onSignIn: () => AuthFixtures.sessionTokens(now: now),
@@ -172,6 +217,7 @@ void main() {
           freshClaimTokenValue: 'fresh.claim.jwt',
         );
 
+        // Act
         final SessionTokens signedIn = await provider.signIn(
           extraParams: <String, String>{'one_time_token': 't'},
         );
@@ -179,6 +225,7 @@ void main() {
         await provider.reMintOnOpen(signedIn);
         await provider.signOut();
 
+        // Assert
         expect(provider.signInCount, 1);
         expect(provider.refreshCount, 1);
         expect(provider.reMintCount, 1);
@@ -194,14 +241,19 @@ void main() {
     test(
       'FakeAuthProvider throwOnSignIn surfaces the scripted error',
       () async {
+        // Arrange
         final FakeAuthProvider provider = FakeAuthProvider(
           throwOnSignIn: StateError('nope'),
         );
+
+        // Act
+        // Assert
         await expectLater(provider.signIn(), throwsStateError);
       },
     );
 
     test('FakeAuth advances batches and records invalidation', () async {
+      // Arrange
       final ResourceKey key = AuthFixtures.resourceKey();
       final FakeAuth auth = FakeAuth(<Map<ResourceKey, Result<ResourceToken>>>[
         <ResourceKey, Result<ResourceToken>>{
@@ -215,10 +267,14 @@ void main() {
           ),
         },
       ]);
-      await auth.fetchAllTokens(<ResourceKey>[key]); // batch 0
-      final Result<ResourceToken> second = await auth.tokenFor(key); // batch 1
+
+      // Act
+      await auth.fetchAllTokens(<ResourceKey>[key]);
+      final Result<ResourceToken> second = await auth.tokenFor(key);
       auth.invalidate(key);
       auth.invalidateAll();
+
+      // Assert
       expect(AuthExpect.ok(second).token, 'b');
       expect(auth.invalidated, <String>[key.mapKey]);
       expect(auth.invalidateAllCount, 1);
@@ -227,10 +283,14 @@ void main() {
     test(
       'FakeUserDirectory / FakeAppHandoffApi / referrer count calls',
       () async {
+        // Arrange
         final FakeUserDirectory dir = FakeUserDirectory(
           getStatus: 404,
           postStatus: 201,
         );
+
+        // Act
+        // Assert
         expect(await dir.getUserMe(backendId: 'b', accessToken: 't'), 404);
         expect(
           await dir.postUser(backendId: 'b', accessToken: 't', idToken: 'i'),
@@ -261,7 +321,7 @@ void main() {
     );
 
     test('unscripted fakes fail LOUDLY rather than returning a stub', () async {
-      // Arrange — a fake with nothing scripted for the seam under exercise.
+      // Arrange
       final ResourceKey key = AuthFixtures.resourceKey();
       final FakeAuthProvider provider = FakeAuthProvider();
       final FakeUserDirectory directory = FakeUserDirectory(throwOnGet: true);
@@ -269,8 +329,8 @@ void main() {
         error: const FormatException('doc B unreachable'),
       );
 
-      // Act + Assert — an unscripted seam must throw, never hand back a
-      // silently-empty value that would make a real test vacuously pass.
+      // Act
+      // Assert
       await expectLater(provider.resourceToken(key), throwsStateError);
       await expectLater(
         provider.refresh(AuthFixtures.sessionTokens(now: now)),
@@ -293,19 +353,20 @@ void main() {
     });
 
     test('FakeAuthProvider honours the onFreshClaimToken callback', () async {
-      // Arrange — the callback arm takes precedence over the fixed value.
+      // Arrange
       final FakeAuthProvider provider = FakeAuthProvider(
         onFreshClaimToken: () async => 'callback.claim.jwt',
         freshClaimTokenValue: 'ignored',
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(await provider.freshClaimToken(), 'callback.claim.jwt');
       expect(provider.freshClaimTokenCount, 1);
     });
 
     test('FakeAuth synthesizes a 401 problem for an unscripted key', () async {
-      // Arrange — a batch that does NOT carry the requested key.
+      // Arrange
       final ResourceKey scripted = AuthFixtures.resourceKey();
       final ResourceKey missing = AuthFixtures.resourceKey(service: 'other');
       final FakeAuth auth = FakeAuth(<Map<ResourceKey, Result<ResourceToken>>>[
@@ -319,8 +380,7 @@ void main() {
       // Act
       final Result<ResourceToken> result = await auth.tokenFor(missing);
 
-      // Assert — a total map still needs a TERMINAL entry per key, so the fake
-      // fabricates the same shape a real coordinator failure would.
+      // Assert
       final Problem problem = AuthExpect.errType(
         result,
         'urn:diene:problem:resource-token',
@@ -330,7 +390,7 @@ void main() {
     });
 
     test('FakeAppHandoffApi defaults to the no-oracle expiry', () async {
-      // Arrange — no scripted result at all.
+      // Arrange
       final FakeAppHandoffApi api = FakeAppHandoffApi();
 
       // Act
@@ -339,7 +399,7 @@ void main() {
         device: const DeviceInfo(platform: 'android'),
       );
 
-      // Assert — the single generic failure, never an account-state oracle.
+      // Assert
       AuthExpect.status(
         AuthExpect.errType(result, 'urn:diene:problem:app-handoff-expired'),
         410,
@@ -351,7 +411,8 @@ void main() {
       // Arrange
       final FakeClipboardCarrierSource clip = FakeClipboardCarrierSource('tok');
 
-      // Act + Assert — read is the launch-time carrier probe.
+      // Act
+      // Assert
       expect(await clip.read(), 'tok');
       await clip.clearIfEquals('tok');
       expect(await clip.read(), isNull);
@@ -360,6 +421,7 @@ void main() {
     test(
       'FakeLandscapeSelectorSource / FakeRegionPinger honour scripts',
       () async {
+        // Arrange
         final FakeLandscapeSelectorSource source = FakeLandscapeSelectorSource(
           doc: const LandscapeSelectorDoc(
             platform: 'p',
@@ -369,6 +431,9 @@ void main() {
             ],
           ),
         );
+
+        // Act
+        // Assert
         expect((await source.fetch()).landscapes.length, 1);
         expect(source.fetchCount, 1);
 

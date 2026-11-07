@@ -5,10 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-// Transport-level regressions for the HTTP Doc B source and region pinger. Both
-// take an injected `http.Client`, so every branch runs against a MockClient with
-// no live edge — the allowlist gate, the status gate, the shape gate, and the
-// pinger's healthy / unhealthy / transport-error / timeout arms.
 void main() {
   final AuthEngineConfig config = AuthEngineConfig.fromBlock(<String, Object?>{
     'issuer': 'https://api.lithium.platform.mew.cluster.atomi.cloud',
@@ -57,7 +53,7 @@ void main() {
 
     test('refuses a doc URL outside the baked endpoint-suffix allowlist BEFORE '
         'fetching', () async {
-      // Arrange — an attacker-supplied host must never even be contacted.
+      // Arrange
       int calls = 0;
       final HttpLandscapeSelectorSource source = HttpLandscapeSelectorSource(
         docUrl: Uri.parse('https://evil.example.com/landscapes.json'),
@@ -68,7 +64,8 @@ void main() {
         }),
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       await expectLater(source.fetch(), throwsFormatException);
       expect(calls, 0);
     });
@@ -83,12 +80,13 @@ void main() {
         ),
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       await expectLater(source.fetch(), throwsA(isA<http.ClientException>()));
     });
 
     test('rejects a Doc B body that is not a JSON object', () async {
-      // Arrange — a JSON array is well-formed JSON but the wrong shape.
+      // Arrange
       final HttpLandscapeSelectorSource source = HttpLandscapeSelectorSource(
         docUrl: docUrl,
         config: config,
@@ -97,13 +95,13 @@ void main() {
         ),
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       await expectLater(source.fetch(), throwsFormatException);
     });
 
     test('normalizes non-string top-level doc keys before parsing', () async {
-      // Arrange — jsonDecode yields Map<String, dynamic>, but the source maps
-      // keys defensively; a doc whose keys survive that mapping still parses.
+      // Arrange
       final HttpLandscapeSelectorSource source = HttpLandscapeSelectorSource(
         docUrl: docUrl,
         config: config,
@@ -136,8 +134,8 @@ void main() {
     });
 
     test('defaults to a real http.Client when none is injected', () {
-      // Arrange + Act — construction must do NO network work, so the default
-      // client arm is safe to exercise without a live edge.
+      // Arrange
+      // Act
       final HttpLandscapeSelectorSource source = HttpLandscapeSelectorSource(
         docUrl: docUrl,
         config: config,
@@ -157,7 +155,7 @@ void main() {
         Uri.parse('https://api.lithium.${e.name}.cluster.atomi.cloud/health');
 
     test('returns the round-trip latency for a healthy 2xx region', () async {
-      // Arrange — a deterministic stopwatch so the asserted latency is exact.
+      // Arrange
       Uri? requested;
       final HttpRegionPinger pinger = HttpRegionPinger(
         pingUrlOf: pingUrlOf,
@@ -171,7 +169,7 @@ void main() {
       // Act
       final Duration? latency = await pinger.ping(entry);
 
-      // Assert — the ping URL is DERIVED from the name, never doc-carried.
+      // Assert
       expect(requested, pingUrlOf(entry));
       expect(latency, const Duration(milliseconds: 42));
     });
@@ -185,12 +183,13 @@ void main() {
         ),
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(await pinger.ping(entry), isNull);
     });
 
     test('treats a 3xx region as unhealthy', () async {
-      // Arrange — the healthy window is exactly [200, 300).
+      // Arrange
       final HttpRegionPinger pinger = HttpRegionPinger(
         pingUrlOf: pingUrlOf,
         client: MockClient(
@@ -198,7 +197,8 @@ void main() {
         ),
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(await pinger.ping(entry), isNull);
     });
 
@@ -212,12 +212,13 @@ void main() {
         ),
       );
 
-      // Act + Assert — an unreachable region is null, never an exception.
+      // Act
+      // Assert
       expect(await pinger.ping(entry), isNull);
     });
 
     test('swallows a timeout and reports unhealthy', () async {
-      // Arrange — a client that outlives the ping budget.
+      // Arrange
       final HttpRegionPinger pinger = HttpRegionPinger(
         pingUrlOf: pingUrlOf,
         client: MockClient((http.Request request) async {
@@ -227,13 +228,15 @@ void main() {
         timeout: const Duration(milliseconds: 10),
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(await pinger.ping(entry), isNull);
     });
 
     test('defaults to a real http.Client and Stopwatch when none are '
         'injected', () {
-      // Arrange + Act — construction alone must do no network work.
+      // Arrange
+      // Act
       final HttpRegionPinger pinger = HttpRegionPinger(pingUrlOf: pingUrlOf);
 
       // Assert
@@ -242,8 +245,6 @@ void main() {
   });
 }
 
-/// Stopwatch whose [elapsed] is a fixed value, so a latency assertion is exact
-/// rather than wall-clock dependent.
 final class _FixedStopwatch implements Stopwatch {
   _FixedStopwatch(this._elapsed);
 

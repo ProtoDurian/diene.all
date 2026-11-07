@@ -21,7 +21,7 @@ void main() {
         pinger: FakeRegionPinger(<String, Duration?>{
           'a': const Duration(milliseconds: 90),
           'b': const Duration(milliseconds: 30),
-          'c': null, // unhealthy
+          'c': null,
         }),
       );
 
@@ -56,7 +56,8 @@ void main() {
         pinger: FakeRegionPinger(<String, Duration?>{'a': null}),
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(await client.selectHome(), isA<Err<String>>());
     });
 
@@ -67,7 +68,8 @@ void main() {
         pinger: FakeRegionPinger(const <String, Duration?>{}),
       );
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(await client.selectHome(), isA<Err<String>>());
     });
   });
@@ -82,6 +84,9 @@ void main() {
     };
 
     test('rejects a top-level issuer/address key', () {
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => LandscapeSelectorDoc.fromJson(
           docWith(<String, Object?>{'issuer': 'https://evil'})
@@ -92,6 +97,9 @@ void main() {
     });
 
     test('rejects a prohibited key nested inside metadata', () {
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => LandscapeSelectorDoc.fromJson(
           docWith(<String, Object?>{
@@ -104,6 +112,9 @@ void main() {
     });
 
     test('rejects a deeply nested address key', () {
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => LandscapeSelectorDoc.fromJson(
           docWith(<String, Object?>{
@@ -120,6 +131,9 @@ void main() {
     });
 
     test('rejects a URL-shaped value hidden under a benign key', () {
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => LandscapeSelectorDoc.fromJson(
           docWith(<String, Object?>{
@@ -134,6 +148,9 @@ void main() {
     });
 
     test('rejects a protocol-relative value in a metadata list', () {
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => LandscapeSelectorDoc.fromJson(
           docWith(<String, Object?>{
@@ -148,6 +165,8 @@ void main() {
     });
 
     test('accepts safe names + benign metadata', () {
+      // Arrange
+      // Act
       final LandscapeSelectorDoc doc = LandscapeSelectorDoc.fromJson(
         docWith(<String, Object?>{
               'metadata': <String, Object?>{
@@ -157,22 +176,32 @@ void main() {
             })
             as Map<String, Object?>,
       );
+
+      // Assert
       expect(doc.landscapes.single.metadata['display'], 'Region A');
     });
   });
 
   group('jwtHomeClaimReader', () {
     test('decodes home_landscape from the ID token', () async {
+      // Arrange
       final HomeClaimReader reader = jwtHomeClaimReader(
         () async => AuthFixtures.jwt(<String, Object?>{
           Claims.homeLandscape: 'pikachu',
         }),
       );
+
+      // Act
+      // Assert
       expect(await reader(), 'pikachu');
     });
 
     test('returns null for a missing token', () async {
+      // Arrange
       final HomeClaimReader reader = jwtHomeClaimReader(() async => null);
+
+      // Act
+      // Assert
       expect(await reader(), isNull);
     });
   });
@@ -199,7 +228,9 @@ void main() {
     test(
       'confirmedHome reads the FORCED claim reader (post-OnboardSync)',
       () async {
-        // Present forced claim → confirmed.
+        // Arrange
+        // Act
+        // Assert
         expect(
           AuthExpect.ok(
             await resolver(
@@ -209,7 +240,7 @@ void main() {
           ),
           'raichu',
         );
-        // Forced claim absent → null (fail-closed).
+
         expect(
           AuthExpect.ok(
             await resolver(
@@ -219,7 +250,7 @@ void main() {
           ),
           isNull,
         );
-        // No forced reader wired → null (fail-closed).
+
         expect(
           AuthExpect.ok(
             await resolver(claimReader: () async => null).confirmedHome(),
@@ -252,7 +283,7 @@ void main() {
     );
 
     test('JWT claim overrides a disagreeing local cache', () async {
-      // Arrange — cache says raichu, but the authoritative JWT says pichu.
+      // Arrange
       final MemoryHomeClaimStore store = MemoryHomeClaimStore('raichu');
       final HomeClaimResolver r = resolver(
         claimReader: () async => 'pichu',
@@ -262,7 +293,7 @@ void main() {
       // Act
       final HomeResolution home = AuthExpect.ok(await r.resolve());
 
-      // Assert — JWT wins and the mirror is corrected.
+      // Assert
       expect(home.landscape, 'pichu');
       expect(home.kind, HomeResolutionKind.fromClaim);
       expect(store.value, 'pichu');
@@ -271,7 +302,7 @@ void main() {
     test(
       'absent JWT claim runs Doc B even when the cache is populated',
       () async {
-        // Arrange — a stale cache must NOT choose the home; the claim is absent.
+        // Arrange
         final FakeLandscapeSelectorSource source = FakeLandscapeSelectorSource(
           doc: _doc(<String>['a']),
         );
@@ -284,7 +315,7 @@ void main() {
         // Act
         final HomeResolution home = AuthExpect.ok(await r.resolve());
 
-        // Assert — Doc B decided, not the cache.
+        // Assert
         expect(home.landscape, 'a');
         expect(home.kind, HomeResolutionKind.selected);
         expect(source.fetchCount, 1);
@@ -292,6 +323,8 @@ void main() {
     );
 
     test('authoritativeHome reports absent vs present without Doc B', () async {
+      // Arrange
+      // Act
       // Assert
       expect(
         AuthExpect.ok(

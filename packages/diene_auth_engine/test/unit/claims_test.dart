@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('registration key lowercases and replaces dashes with underscores', () {
+    // Arrange
+    // Act
     // Assert
     expect(
       Claims.registrationKey(platform: 'Lith-ium', service: 'API-x'),
@@ -23,7 +25,8 @@ void main() {
       AuthFixtures.jwt(<String, Object?>{'other': 'true'}),
     );
 
-    // Assert — only the string "true" counts.
+    // Act
+    // Assert
     expect(
       Claims.hasRegistration(yes, platform: 'lithium', service: 'api'),
       isTrue,
@@ -47,12 +50,15 @@ void main() {
       AuthFixtures.jwt(<String, Object?>{Claims.homeLandscape: ''}),
     );
 
+    // Act
     // Assert
     expect(Claims.home(present), 'pichu');
     expect(Claims.home(blank), isNull);
   });
 
   test('decode tolerates a structurally invalid token', () {
+    // Arrange
+    // Act
     // Assert
     expect(Claims.decode('not-a-jwt'), isEmpty);
   });

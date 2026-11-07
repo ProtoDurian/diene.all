@@ -1,0 +1,15 @@
+{
+  "$id": "authEngine",
+  "type": "object",
+  "required": ["issuer", "endpoint", "appId", "redirectUri"],
+  "properties": {
+    "issuer": { "type": "string", "format": "uri" },
+    "endpoint": { "type": "string", "format": "uri" },
+    "appId": { "type": "string" },
+    "redirectUri": { "type": "string", "format": "uri" },
+    "postLogoutRedirectUri": { "type": "string", "format": "uri" },
+    "scopes": { "type": "array", "items": { "type": "string" } },
+    "appHandoffMount": { "type": "string", "default": "/app-handoff" },
+    "endpointSuffixAllowlist": { "type": "array", "items": { "type": "string" } }
+  }
+}

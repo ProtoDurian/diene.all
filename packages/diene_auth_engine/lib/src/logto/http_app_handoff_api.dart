@@ -5,10 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../deferred/redeem_client.dart';
 
-/// HTTP implementation of [AppHandoffApi] against `POST {mount}/redeem`.
-///
-/// Every non-success outcome — bad status, malformed body, transport error —
-/// collapses to the single no-oracle [appHandoffExpired] problem (C0 §7).
+/// [AppHandoffApi] over HTTP; every failure is [appHandoffExpired].
 final class HttpAppHandoffApi implements AppHandoffApi {
   HttpAppHandoffApi({
     required Uri base,

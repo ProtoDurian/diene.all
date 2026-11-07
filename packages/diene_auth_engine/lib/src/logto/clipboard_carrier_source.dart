@@ -2,8 +2,7 @@ import 'package:flutter/services.dart';
 
 import '../deferred/deferred_login.dart';
 
-/// iOS clipboard carrier reader (C0 §7). Reads the clipboard on launch with no
-/// consent tap and clears it only when it still equals the captured value.
+/// Reads the iOS clipboard; clears it only if it still holds the carrier.
 final class ClipboardCarrierReader implements ClipboardCarrierSource {
   const ClipboardCarrierReader();
 
@@ -22,9 +21,7 @@ final class ClipboardCarrierReader implements ClipboardCarrierSource {
   }
 }
 
-/// Android Install Referrer source backed by injected callbacks, so the actual
-/// `android_play_install_referrer` plugin stays in the app (flutter-base)
-/// rather than in this dependency-light package.
+/// An Install Referrer source from callbacks; the plugin stays in the app.
 final class CallbackInstallReferrerSource implements InstallReferrerSource {
   const CallbackInstallReferrerSource({
     required this._readReferrer,

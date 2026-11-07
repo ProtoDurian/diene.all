@@ -1,0 +1,54 @@
+{
+  "authority": "c0-fixtures-r2",
+  "source": {
+    "commit": "fe77520d591f81a9762c40ebf68dc9c0106502d3",
+    "path": "contracts/c0/cases/identity.json",
+    "sha256": "add399f33101bd68b98ac6aea3f073d6f7e852410cba5e846c7311ce2028ac59"
+  },
+  "algorithm": "sha256 of the subtree printed by jq -cS (sorted keys, no whitespace, trailing newline)",
+  "vectors": {
+    "app_handoff.json": {
+      "pointer": "/cases/appHandoff",
+      "sha256": "2c17af752ff43d6cf8ea00811aff47b9a26f0784d7a71926ff3a4958d8a63169",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/identity.json | jq -cS .cases.appHandoff | sha256sum",
+      "adaptations": [
+        "The redeem route is exercised at the default mount and at a non-default mount.",
+        "The mint route is served by the API host, not by this client, so it is not exercised.",
+        "The expiry problem is matched on status, title, detail and data. Its type is the URN urn:diene:problem:app-handoff-expired, not the id AppHandoffExpired.",
+        "Valid redeem bodies must equal the body the client sends. The client cannot build the invalid ones, so the TestHelper redeem stub must refuse them."
+      ]
+    },
+    "doc_b.json": {
+      "pointer": "/cases/docB",
+      "sha256": "ae26772ebf317b4cbd99f6efc30da42183fdd8a7ec6ce4608f6a5e6b620e6878",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/identity.json | jq -cS .cases.docB | sha256sum",
+      "adaptations": [
+        "Ping URLs are not in the vectors: the test derives them from each landscape name and checks that no URL comes from the document."
+      ]
+    },
+    "home_claim.json": {
+      "pointer": "/cases/homeClaim",
+      "sha256": "eec0b04e4e8f1085a2d2d0649ceb011fdb9e70d2b49cc9ef91d4d1feabe9c669",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/identity.json | jq -cS .cases.homeClaim | sha256sum",
+      "adaptations": []
+    },
+    "onboarding_claim.json": {
+      "pointer": "/cases/onboardingClaim",
+      "sha256": "6e1b675d0d0ff45f68f4e2580e756318e7f52a616174cb6eb2550918394ef481",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/identity.json | jq -cS .cases.onboardingClaim | sha256sum",
+      "adaptations": []
+    },
+    "resource_audience.json": {
+      "pointer": "/cases/resourceAudience",
+      "sha256": "ecf1af51b24677874a7ec080f05b23f5c4d7e1cdedd9adc7dd43568f4114f8ad",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/identity.json | jq -cS .cases.resourceAudience | sha256sum",
+      "adaptations": ["The audience is built with the default domain cluster.atomi.cloud."]
+    },
+    "token_lifetimes.json": {
+      "pointer": "/cases/tokenLifetimes",
+      "sha256": "8946b19c24c691f11be839871e16c99f3a1e865cacacd5465ea7af4fe447c422",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/identity.json | jq -cS .cases.tokenLifetimes | sha256sum",
+      "adaptations": []
+    }
+  }
+}

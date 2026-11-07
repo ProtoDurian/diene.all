@@ -8,7 +8,6 @@ void main() {
   final DateTime now = DateTime.utc(2026, 7, 21);
   final ResourceKey key = AuthFixtures.resourceKey();
 
-  // JWT bytes for the stored (pre/post-login) token and the force-fresh token.
   String jwtWithHome(String home) =>
       AuthFixtures.jwt(<String, Object?>{Claims.homeLandscape: home});
   final String staleNoHome = AuthFixtures.jwt(<String, Object?>{'sub': 'u1'});
@@ -40,10 +39,6 @@ void main() {
         idToken: () async => 'id',
       );
 
-  // Wires the REAL coordinator over one FakeAuthProvider whose stored `idToken`
-  // (the pre/post-login authoritative read) is DISTINCT from its force-fresh
-  // `freshClaimToken` (the post-OnboardSync confirmation). The home readers are
-  // bound to those exact provider methods — not a free-running sequence.
   ({
     SignInCoordinator coordinator,
     FakeAuthProvider provider,
@@ -95,7 +90,7 @@ void main() {
   test(
     'returning user: stored JWT claim routes home, resumes returnTo',
     () async {
-      // Arrange — the stored token already carries home_landscape.
+      // Arrange
       final wired = build(storedIdToken: jwtWithHome('pichu'));
 
       // Act
@@ -103,7 +98,7 @@ void main() {
         await wired.coordinator.signIn(returnTo: Uri.parse('/secret?x=1')),
       );
 
-      // Assert — no forced refresh needed on the fast path.
+      // Assert
       expect(signIn.home.kind, HomeResolutionKind.fromClaim);
       expect(signIn.home.landscape, 'pichu');
       expect(signIn.continueTo.toString(), '/secret?x=1');
@@ -115,7 +110,7 @@ void main() {
   test(
     'sign-up: confirms from the FORCE-FRESH token, not the stale stored one',
     () async {
-      // Arrange — stored token lacks the claim; only the force-fresh token has it.
+      // Arrange
       final wired = build(
         storedIdToken: staleNoHome,
         freshClaim: jwtWithHome('lapras'),
@@ -126,7 +121,7 @@ void main() {
         await wired.coordinator.signIn(),
       );
 
-      // Assert — the claim came from freshClaimToken (stale read would 409).
+      // Assert
       expect(signIn.home.kind, HomeResolutionKind.fromClaim);
       expect(signIn.home.landscape, 'lapras');
       expect(wired.store.value, 'lapras');
@@ -137,7 +132,7 @@ void main() {
   test(
     'sign-up: a differing OnboardSync claim overrides the Doc B selection',
     () async {
-      // Arrange — Doc B picks lapras, but the fresh token says pichu.
+      // Arrange
       final wired = build(
         storedIdToken: staleNoHome,
         freshClaim: jwtWithHome('pichu'),
@@ -148,7 +143,7 @@ void main() {
         await wired.coordinator.signIn(),
       );
 
-      // Assert — the fresh JWT wins; the selection is never persisted.
+      // Assert
       expect(signIn.home.landscape, 'pichu');
       expect(wired.store.value, 'pichu');
     },
@@ -157,7 +152,7 @@ void main() {
   test(
     'sign-up: a fresh token still lacking the claim errors without mirroring',
     () async {
-      // Arrange — the force-fresh token carries no home_landscape.
+      // Arrange
       final wired = build(storedIdToken: staleNoHome, freshClaim: staleNoHome);
 
       // Act
@@ -174,7 +169,7 @@ void main() {
   );
 
   test('sign-up: a null fresh token fails closed without mirroring', () async {
-    // Arrange — the adapter could not guarantee a fresh token.
+    // Arrange
     final wired = build(storedIdToken: staleNoHome, freshClaim: null);
 
     // Act
@@ -201,7 +196,7 @@ void main() {
       // Act
       final Result<SignInResult> result = await wired.coordinator.signIn();
 
-      // Assert — onboarding failure surfaces; no confirmation, no mirror.
+      // Assert
       expect(result, isA<Err<SignInResult>>());
       expect(wired.store.value, isNull);
       expect(wired.provider.freshClaimTokenCount, 0);
@@ -215,7 +210,8 @@ void main() {
       throwOnSignIn: StateError('bad creds'),
     );
 
-    // Act + Assert
+    // Act
+    // Assert
     expect(await wired.coordinator.signIn(), isA<Err<SignInResult>>());
   });
 

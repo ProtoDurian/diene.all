@@ -2,53 +2,43 @@ import 'package:diene_problems/diene_problems.dart';
 import 'carrier.dart';
 import 'redeem_client.dart';
 
-/// Reads the Android Play Install Referrer payload and marks it processed.
+/// Reads the Android Install Referrer.
 abstract interface class InstallReferrerSource {
-  /// The raw referrer payload, or `null` when none is present.
   Future<String?> read();
 
-  /// Marks the referrer value processed so it is never redeemed twice.
+  /// Marks the referrer processed so it is never redeemed twice.
   Future<void> markProcessed();
 }
 
-/// Reads and (conditionally) clears the iOS clipboard carrier.
+/// Reads the iOS clipboard carrier.
 abstract interface class ClipboardCarrierSource {
-  /// The clipboard contents, or `null` when empty/unavailable.
   Future<String?> read();
 
-  /// Clears the clipboard ONLY if it still equals [value].
+  /// Clears the clipboard only if it still equals [value].
   Future<void> clearIfEquals(String value);
 }
 
-/// Result of preparing a deferred login.
 sealed class DeferredLoginOutcome {
   const DeferredLoginOutcome();
 }
 
-/// A carrier was captured and redeemed — [extraParams] feed
-/// `signIn(extraParams:)`.
+/// A carrier was redeemed; pass [extraParams] to `signIn(extraParams:)`.
 final class DeferredLoginReady extends DeferredLoginOutcome {
   const DeferredLoginReady(this.extraParams);
 
   final Map<String, String> extraParams;
 }
 
-/// No valid carrier, or redeem returned the generic expiry — fall back to
-/// normal interactive login. [problem] is set only for a redeem failure.
+/// Fall back to interactive login; [problem] is set on a redeem failure.
 final class DeferredLoginFallback extends DeferredLoginOutcome {
   const DeferredLoginFallback([this.problem]);
 
   final Problem? problem;
 }
 
-/// The mobile deferred-login client (C0 §7 / goals/deferred-login.md).
+/// Reads a carrier, marks it used, then calls `POST {mount}/redeem`.
 ///
-/// Reads the store carrier (Android Install Referrer or iOS clipboard),
-/// marks it processed / clears the clipboard BEFORE redeem, redeems against
-/// `POST {mount}/redeem`, and on success returns the `one_time_token` +
-/// `login_hint` extra params. Absent/invalid carrier or an `AppHandoffExpired`
-/// response falls back to interactive login — there is no carrier-specific
-/// retry loop.
+/// Any failure falls back to interactive login; there is no retry loop.
 final class DeferredLoginClient {
   const DeferredLoginClient({
     required this._api,
@@ -62,10 +52,8 @@ final class DeferredLoginClient {
   final InstallReferrerSource? _referrer;
   final ClipboardCarrierSource? _clipboard;
 
-  /// Attempts a deferred login. Never throws — a failed carrier read simply
-  /// falls back to interactive login.
+  /// Never throws.
   Future<DeferredLoginOutcome> prepare() async {
-    // Android Install Referrer takes priority when present.
     final InstallReferrerSource? referrer = _referrer;
     if (referrer != null) {
       final String? raw = await _safeRead(referrer.read);
@@ -78,7 +66,6 @@ final class DeferredLoginClient {
       }
     }
 
-    // iOS clipboard fallback.
     final ClipboardCarrierSource? clipboard = _clipboard;
     if (clipboard != null) {
       final String? raw = await _safeRead(clipboard.read);
@@ -119,7 +106,7 @@ final class DeferredLoginClient {
     try {
       await action();
     } on Object {
-      // Best-effort side effects; never block the login path.
+      // Best effort; never block login.
     }
   }
 }

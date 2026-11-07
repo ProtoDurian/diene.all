@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('captures a relative target preserving path and query', () {
+    // Arrange
     // Act
     final Result<String> captured = ReturnTo.capture(
       Uri.parse('/orders/42?tab=items&sort=asc'),
@@ -15,6 +16,8 @@ void main() {
   });
 
   test('rejects open-redirect targets', () {
+    // Arrange
+    // Act
     // Assert
     expect(
       ReturnTo.capture(Uri.parse('https://evil.example/x')),
@@ -26,6 +29,7 @@ void main() {
   });
 
   test('builds a login redirect carrying the returnTo', () {
+    // Arrange
     // Act
     final Result<Uri> redirect = ReturnTo.buildLoginRedirect(
       Uri.parse('/login'),
@@ -57,6 +61,7 @@ void main() {
     // Arrange
     final Uri fallback = Uri.parse('/home');
 
+    // Act
     // Assert
     expect(
       ReturnTo.continueFrom(Uri.parse('/callback'), fallback: fallback),

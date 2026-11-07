@@ -1,22 +1,18 @@
-/// App-handoff carrier v1 (C0 §7, Q-I48).
+/// The app-handoff carrier: `atomi-app-handoff:v1:<nonce>`.
 ///
-/// The canonical carrier text is exactly `atomi-app-handoff:v1:<nonce>` where
-/// the nonce is 32 random bytes RFC 4648 base64url WITHOUT padding (43 ASCII
-/// chars). The nonce is opaque and Logto-meaningless; the client NEVER
-/// logs/persists it.
+/// Never log or persist the nonce.
 final class AppHandoffCarrier {
   const AppHandoffCarrier._(this.nonce);
 
-  /// The opaque 43-char base64url nonce.
+  /// The 43-character unpadded base64url nonce.
   final String nonce;
 
   static const String _prefix = 'atomi-app-handoff:v1:';
   static final RegExp _nonce = RegExp(r'^[A-Za-z0-9_-]{43}$');
 
-  /// The canonical carrier text.
   String get canonicalText => '$_prefix$nonce';
 
-  /// Parses the canonical carrier text; returns `null` when malformed.
+  /// Parses the canonical text; `null` when malformed.
   static AppHandoffCarrier? parseCanonical(String raw) {
     if (!raw.startsWith(_prefix)) {
       return null;
@@ -28,10 +24,7 @@ final class AppHandoffCarrier {
     return AppHandoffCarrier._(nonce);
   }
 
-  /// Parses an Android Play Install Referrer payload (an
-  /// `application/x-www-form-urlencoded` string). The carrier rides one
-  /// `app_handoff=<percent-encoded canonical carrier>` field; zero or duplicate
-  /// `app_handoff` fields are treated as absent. Other campaign fields coexist.
+  /// Parses an Install Referrer string; needs exactly one `app_handoff` field.
   static AppHandoffCarrier? parseAndroidReferrer(String referrer) {
     final List<String> values = <String>[];
     for (final String pair in referrer.split('&')) {
@@ -56,8 +49,7 @@ final class AppHandoffCarrier {
     return parseCanonical(decoded);
   }
 
-  /// Parses iOS clipboard content — the canonical carrier text with ASCII
-  /// leading/trailing whitespace optionally trimmed.
+  /// Parses iOS clipboard text, trimming surrounding whitespace.
   static AppHandoffCarrier? parseClipboard(String clipboard) =>
       parseCanonical(clipboard.trim());
 }

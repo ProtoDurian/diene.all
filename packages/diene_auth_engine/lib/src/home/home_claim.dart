@@ -4,14 +4,10 @@ import 'package:diene_result/diene_result.dart';
 import '../auth/claims.dart';
 import 'landscape_selector.dart';
 
-/// Reads the AUTHORITATIVE `home_landscape` claim from the provider's
-/// existing/issued JWT (C0 §13). Returns `null` when no token exists yet or the
-/// token carries no claim. This — not local storage — decides the home.
+/// Reads the `home_landscape` claim from the JWT; `null` when absent.
 typedef HomeClaimReader = Future<String?> Function();
 
-/// Builds a [HomeClaimReader] that decodes `home_landscape` from the provider's
-/// current ID token. Pass `AuthProvider.idToken` (or the access-token reader).
-/// A missing token or absent claim yields `null` (→ Doc B sign-up path).
+/// A [HomeClaimReader] that decodes the claim from the token [readToken] gives.
 HomeClaimReader jwtHomeClaimReader(Future<String?> Function() readToken) =>
     () async {
       final String? token = await readToken();
@@ -21,26 +17,21 @@ HomeClaimReader jwtHomeClaimReader(Future<String?> Function() readToken) =>
       return Claims.home(Claims.decode(token));
     };
 
-/// Persists the client's known home landscape as a NON-AUTHORITATIVE mirror of
-/// the `home_landscape` JWT claim (C0 §13). It never chooses the home; it only
-/// caches a value the JWT already made authoritative, for offline UI hints.
+/// A local cache of the home claim; it never decides the home.
 abstract interface class HomeClaimStore {
   Future<String?> read();
   Future<void> write(String landscape);
   Future<void> clear();
 }
 
-/// How the home landscape was resolved on this sign-in.
 enum HomeResolutionKind {
-  /// The authoritative JWT `home_landscape` claim was present — routed straight
-  /// home, no Doc B, no picker.
+  /// The claim was present; Doc B was not fetched.
   fromClaim,
 
-  /// The authoritative claim was absent — the Doc B selector ran (sign-up).
+  /// The claim was absent; Doc B selection ran.
   selected,
 }
 
-/// The resolved home landscape plus how it was obtained.
 final class HomeResolution {
   const HomeResolution({required this.landscape, required this.kind});
 
@@ -48,14 +39,9 @@ final class HomeResolution {
   final HomeResolutionKind kind;
 }
 
-/// Resolves the home landscape on EVERY sign-in (C0 §13).
+/// Resolves the home landscape on every sign-in from the JWT claim.
 ///
-/// The `home_landscape` claim rides the ID/access JWT and is AUTHORITATIVE:
-/// the resolver decodes it through [HomeClaimReader]. When present it decides
-/// the home (and is mirrored into the local store); when absent the Doc B
-/// selector runs (sign-up only). The local store is only a mirror — a stale or
-/// tampered cache can NEVER choose the home, and a changed/removed Logto
-/// `custom_data.home_landscape` is always observed on the next sign-in.
+/// Doc B is fetched only while the claim is absent; the cache never decides.
 final class HomeClaimResolver {
   const HomeClaimResolver({
     required this._claimReader,
@@ -68,15 +54,9 @@ final class HomeClaimResolver {
   final LandscapeSelectorClient _selector;
   final HomeClaimStore? _store;
 
-  /// Reads the home claim from a FORCE-FRESH claim-bearing token (built from
-  /// `AuthProvider.freshClaimToken`). Used ONLY to confirm the post-OnboardSync
-  /// claim; distinct from [_claimReader], which reads the existing stored token.
   final HomeClaimReader? _forcedClaimReader;
 
-  /// Reads the AUTHORITATIVE `home_landscape` claim from the provider's JWT,
-  /// WITHOUT running Doc B. `null` (inside a [Ok]) means the claim is
-  /// absent. Used by the coordinator to re-check the freshly issued token after
-  /// login so a server-changed/removed claim is always observed.
+  /// The JWT claim without running Doc B; `Ok(null)` when absent.
   Future<Result<String?>> authoritativeHome() async {
     try {
       final String? claim = await _claimReader();
@@ -94,11 +74,7 @@ final class HomeClaimResolver {
     }
   }
 
-  /// Confirms the home claim AFTER onboarding/OnboardSync by decoding a
-  /// FORCE-FRESH claim-bearing token (never the possibly-stale stored token).
-  /// `null` (inside a [Ok]) means the claim could not be confirmed —
-  /// fail-closed: absent forced reader, a null/blank fresh token, or a token
-  /// without the claim all map to `null` so the coordinator refuses to mirror.
+  /// The claim from a fresh token after onboarding; `Ok(null)` fails closed.
   Future<Result<String?>> confirmedHome() async {
     final HomeClaimReader? reader = _forcedClaimReader;
     if (reader == null) {
@@ -120,8 +96,7 @@ final class HomeClaimResolver {
     }
   }
 
-  /// Resolves the home landscape. Consults the authoritative JWT claim first;
-  /// runs the Doc B selector ONLY when that claim is absent (sign-up).
+  /// Uses the claim when present, otherwise runs Doc B selection.
   Future<Result<HomeResolution>> resolve({String? preferred}) async {
     final Result<String?> read = await authoritativeHome();
     if (read is Err<String?>) {
@@ -129,7 +104,6 @@ final class HomeClaimResolver {
     }
     final String? authoritative = (read as Ok<String?>).value;
     if (authoritative != null && authoritative.isNotEmpty) {
-      // Mirror the authoritative value; the store is not consulted to decide.
       await _mirror(authoritative);
       return Ok<HomeResolution>(
         HomeResolution(
@@ -138,7 +112,6 @@ final class HomeClaimResolver {
         ),
       );
     }
-    // Authoritative claim absent → sign-up path: Doc B → ping → pick.
     final Result<String> selected = await _selector.selectHome(
       preferred: preferred,
     );
@@ -150,10 +123,10 @@ final class HomeClaimResolver {
     );
   }
 
-  /// Mirrors the OnboardSync-written home claim into the local store.
+  /// Caches the claim written by onboarding.
   Future<void> commit(String landscape) => _mirror(landscape);
 
-  /// Clears the cached home (e.g. on full sign-out / re-home event).
+  /// Clears the cached home.
   Future<void> forget() async => _store?.clear();
 
   Future<void> _mirror(String landscape) async {
@@ -161,11 +134,10 @@ final class HomeClaimResolver {
     if (store == null) {
       return;
     }
-    // Best-effort mirror; a store failure must never override the JWT decision.
     try {
       await store.write(landscape);
     } on Object {
-      // Non-authoritative cache; ignore write failures.
+      // The cache never overrides the JWT.
     }
   }
 }

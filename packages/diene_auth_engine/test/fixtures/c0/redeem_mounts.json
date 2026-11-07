@@ -1,0 +1,19 @@
+[
+  {
+    "name": "default-mount",
+    "base": "https://api.example.test",
+    "redeemUrl": "https://api.example.test/app-handoff/redeem"
+  },
+  {
+    "name": "non-default-mount",
+    "base": "https://api.example.test",
+    "mount": "/auth/handoff",
+    "redeemUrl": "https://api.example.test/auth/handoff/redeem"
+  },
+  {
+    "name": "base-with-path",
+    "base": "https://api.example.test/v1/",
+    "mount": "/app-handoff",
+    "redeemUrl": "https://api.example.test/v1/app-handoff/redeem"
+  }
+]

@@ -83,7 +83,7 @@ void main() {
   test('redeem failure falls back with the generic-expiry problem', () async {
     // Arrange
     final DeferredLoginClient client = DeferredLoginClient(
-      api: FakeAppHandoffApi(), // defaults to AppHandoffExpired
+      api: FakeAppHandoffApi(),
       device: device,
       referrer: FakeInstallReferrerSource(
         'app_handoff=${Uri.encodeComponent(canonical)}',

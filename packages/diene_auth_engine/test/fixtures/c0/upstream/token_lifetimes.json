@@ -1,0 +1,6 @@
+{
+  "accessMinutes": 10,
+  "refreshDays": 14,
+  "refreshRotating": true,
+  "remintOnOpen": true
+}

@@ -5,18 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final DateTime now = DateTime.utc(2026, 7, 21);
 
-  // The `Result` / `Option` monad semantics that used to be asserted here are
-  // NOT this package's contract any more. They belong to the hosted
-  // `diene_result`, which proves them in its own suite against the C0 §5
-  // fixtures; re-asserting them here would duplicate a sibling's contract tests
-  // and drift from them (R2 — minimal diff, libs are new files). What this
-  // package still owns, and what the C0 conformance tier asserts, is that its
-  // OWN fallible members return those types — see
-  // test/conformance/c0_conformance_test.dart.
-
   group('SessionTokens / ResourceToken', () {
     test('validity checks and equality', () {
+      // Arrange
       final SessionTokens tokens = AuthFixtures.sessionTokens(now: now);
+
+      // Act
+      // Assert
       expect(tokens.accessValidAt(now), isTrue);
       expect(
         tokens.accessValidAt(now.add(const Duration(minutes: 11))),
@@ -36,6 +31,9 @@ void main() {
 
   group('ResourceKey', () {
     test('rejects a non-DNS label', () {
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => ResourceKey(
           platform: 'BadCase',
@@ -48,21 +46,33 @@ void main() {
     });
 
     test('equality is by mapKey + domain', () {
+      // Arrange
+      // Act
+      // Assert
       expect(AuthFixtures.resourceKey(), AuthFixtures.resourceKey());
     });
   });
 
   group('DeviceInfo / RedeemResult', () {
     test('device json omits null optionals', () {
+      // Arrange
       const DeviceInfo device = DeviceInfo(platform: 'ios', appVersion: '1.2');
+
+      // Act
       final Map<String, Object?> json = device.toJson();
+
+      // Assert
       expect(json['platform'], 'ios');
       expect(json['appVersion'], '1.2');
       expect(json.containsKey('osVersion'), isFalse);
     });
 
     test('redeem result defaults expiresIn to 120', () {
+      // Arrange
+      // Act
       const RedeemResult result = RedeemResult(token: 't', email: 'e');
+
+      // Assert
       expect(result.expiresIn, 120);
     });
   });
@@ -71,6 +81,9 @@ void main() {
     final ResourceKey key = AuthFixtures.resourceKey();
 
     test('rejects a duplicate backend id', () {
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => BackendRegistry(<RegisteredBackend>[
           RegisteredBackend(
@@ -89,6 +102,9 @@ void main() {
     });
 
     test('rejects an onboarding resource outside the resource list', () {
+      // Arrange
+      // Act
+      // Assert
       expect(
         () => RegisteredBackend(
           backendId: 'a',
@@ -100,7 +116,10 @@ void main() {
     });
 
     test('resourceUnion dedups across backends', () {
+      // Arrange
       final ResourceKey keyB = AuthFixtures.resourceKey(service: 'billing');
+
+      // Act
       final BackendRegistry registry = BackendRegistry(<RegisteredBackend>[
         RegisteredBackend(
           backendId: 'a',
@@ -113,6 +132,8 @@ void main() {
           onboardingResource: keyB,
         ),
       ]);
+
+      // Assert
       expect(registry.resourceUnion.length, 2);
       expect(registry.byId('a')?.backendId, 'a');
     });

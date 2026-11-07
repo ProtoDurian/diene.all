@@ -8,15 +8,13 @@ import '../tokens/session_tokens.dart';
 import 'backend_registry.dart';
 import 'user_directory.dart';
 
-/// Per-backend claims-first phase (C0 §8 S20). NO singleton onboarded flag —
-/// one machine per registered backend.
+/// One backend's onboarding phase; there is no global onboarded flag.
 enum OnboardingPhase { bootstrapping, needsOnboarding, ready, error }
 
-/// Reads the raw OIDC ID token for the `POST /User` create body.
+/// Reads the raw ID token for the `POST /User` body.
 typedef IdTokenReader = Future<String?> Function();
 
-/// Drives ONE backend through the C0 §8 claims-first state table. Err is
-/// isolated to this backend; disjoint backends run their own machines.
+/// Runs claims-first onboarding for one backend; failures stay with it.
 final class OnboardingMachine {
   OnboardingMachine({
     required this._backend,
@@ -35,23 +33,13 @@ final class OnboardingMachine {
 
   String get backendId => _backend.backendId;
 
-  /// This backend's required resource keys (used by [MultiBackendOnboarding] to
-  /// project the shared registry-union batch).
   List<ResourceKey> get resources => _backend.resources;
 
-  /// Runs the machine to a terminal phase for this backend.
-  ///
-  /// [initialBatch] is this backend's projection of the ONE
-  /// registry-union acquisition (C0 §8) taken by [MultiBackendOnboarding]. When
-  /// omitted (a standalone single-backend run) the machine acquires its own
-  /// batch. Either way the create-path force-refresh below re-acquires ONLY this
-  /// backend's resources.
+  /// Runs to a terminal phase; [initialBatch] is this backend's shared slice.
   Future<Result<OnboardingPhase>> run({
     Map<ResourceKey, Result<ResourceToken>>? initialBatch,
   }) async {
     _phase = OnboardingPhase.bootstrapping;
-    // Step 1: resolve the backend's complete token batch — the shared
-    // registry-union projection when supplied, else a scoped acquisition.
     final Map<ResourceKey, Result<ResourceToken>> batch =
         initialBatch ?? await _auth.fetchAllTokens(_backend.resources);
     final Problem? batchProblem = _firstFailure(batch);
@@ -59,12 +47,11 @@ final class OnboardingMachine {
       return _error(batchProblem);
     }
 
-    // Step 2: registered on every required resource token?
     if (_allRegistered(batch)) {
       return _settleRegistered(batch);
     }
 
-    // Step 3: registration absent from ANY token → one GET /User/Me.
+    // A claim is absent: only now call `GET /User/Me`.
     final ResourceToken onboarding =
         (batch[_backend.onboardingResource]! as Ok<ResourceToken>).value;
     try {
@@ -108,7 +95,7 @@ final class OnboardingMachine {
       );
     }
 
-    // Step 4: force-refresh ALL resource tokens and re-check the exact claim.
+    // Refetch every token and re-check the claim.
     for (final ResourceKey key in _backend.resources) {
       _auth.invalidate(key);
     }
@@ -121,7 +108,6 @@ final class OnboardingMachine {
     if (_allRegistered(refreshed)) {
       return _settleRegistered(refreshed);
     }
-    // Still absent after the create/refresh: the only claim-repair path failed.
     return _error(
       const Problem(
         type: 'urn:diene:problem:onboarding-claim-missing',
@@ -131,9 +117,7 @@ final class OnboardingMachine {
     );
   }
 
-  /// Step 5: a claim was present but a normal owned-resource call later
-  /// returned 401/404. This is an ordinary authorization/data error — enter
-  /// `error` WITHOUT re-running `/User/Me` or create.
+  /// A present claim later met 401/404: an ordinary error, no re-create.
   Result<OnboardingPhase> markStaleClaim() => _error(
     const Problem(
       type: 'urn:diene:problem:onboarding-stale-claim',
@@ -199,8 +183,7 @@ final class OnboardingMachine {
   }
 }
 
-/// Holds one [OnboardingMachine] per registered backend — independent phases,
-/// no cross-backend state bleed (ready on A while onboarding/error on B).
+/// One [OnboardingMachine] per backend; phases and tokens never bleed.
 final class MultiBackendOnboarding {
   MultiBackendOnboarding({
     required BackendRegistry registry,
@@ -231,26 +214,17 @@ final class MultiBackendOnboarding {
     return machine;
   }
 
-  /// Current phase per backend.
   Map<String, OnboardingPhase> get phases => <String, OnboardingPhase>{
     for (final MapEntry<String, OnboardingMachine> entry in _machines.entries)
       entry.key: entry.value.phase,
   };
 
-  /// Bootstraps every backend from ONE registry-union acquisition (C0 §8):
-  /// takes a single registry snapshot, deduplicates the full `ResourceKey`
-  /// union, starts exactly one initial acquisition batch, and projects it into
-  /// independent per-backend outcomes. A resource shared by two backends is
-  /// acquired once here — never once per backend. Each backend's terminal phase
-  /// stays independent, and the create-path force-refresh inside each machine
-  /// re-acquires only that backend's resources.
+  /// Bootstraps every backend from one deduplicated token batch.
   Future<Map<String, Result<OnboardingPhase>>> runAll() async {
-    // One snapshot + dedup union + one initial acquisition batch.
     final List<ResourceKey> union = _registry.resourceUnion;
     final Map<ResourceKey, Result<ResourceToken>> unionBatch = await _auth
         .fetchAllTokens(union);
 
-    // Project the single batch into each backend's slice and run concurrently.
     final Map<String, Future<Result<OnboardingPhase>>> started =
         <String, Future<Result<OnboardingPhase>>>{
           for (final MapEntry<String, OnboardingMachine> entry
@@ -268,7 +242,6 @@ final class MultiBackendOnboarding {
     return results;
   }
 
-  /// Slices the shared [unionBatch] down to one machine's required resources.
   Map<ResourceKey, Result<ResourceToken>> _project(
     OnboardingMachine machine,
     Map<ResourceKey, Result<ResourceToken>> unionBatch,

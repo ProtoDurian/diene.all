@@ -1,25 +1,20 @@
 import 'package:meta/meta.dart';
 
-/// Fixed app-handoff contract constants (C0 §7). These are NOT schema knobs.
+/// Fixed app-handoff constants; not config knobs.
 abstract final class AppHandoffConstants {
-  /// Opaque nonce TTL — fixed 15 minutes.
+  /// Nonce lifetime: 15 minutes.
   static const Duration nonceTtl = Duration(minutes: 15);
 
-  /// Logto one-time token lifetime — fixed 120 seconds (not a ceiling).
+  /// Logto one-time token lifetime: exactly 120 seconds.
   static const int oneTimeTokenExpiresInSeconds = 120;
 
-  /// Default mount base path; the mount itself is configurable.
+  /// The default mount; hosts may configure another.
   static const String defaultMount = '/app-handoff';
 }
 
-/// The engine-owned config block schema (dart-family "engine-owned config block
-/// schemas" rule). The `config` lib is the sole merger/validator; this block
-/// lives NEXT TO the code that reads it and is composed into the service root
-/// schema.
+/// The engine-owned `authEngine` config block and its schema.
 ///
-/// The OIDC [issuer] is BAKED build-time config and is NEVER doc-sourced
-/// (C0 §10/§13) — it is a required key here, and the landscape selector doc
-/// parser refuses any `issuer` field so it cannot leak in at runtime.
+/// The issuer is baked build-time config, never read from a document.
 @immutable
 final class AuthEngineConfig {
   const AuthEngineConfig({
@@ -33,17 +28,8 @@ final class AuthEngineConfig {
     this.endpointSuffixAllowlist = const <String>['cluster.atomi.cloud'],
   });
 
-  /// Parses and validates the `authEngine` config block (fail-fast on the final
-  /// merged layer).
+  /// Parses and validates the merged `authEngine` block.
   factory AuthEngineConfig.fromBlock(Map<String, Object?> block) {
-    // No `required` parameter. It defaulted to true and NONE of the three call
-    // sites (issuer, endpoint, redirectUri) ever passed false, so the
-    // `required == false` arm was dead — the author had already named its body
-    // `throw StateError('unreachable')`. Dropping the parameter deletes the dead
-    // branch instead of leaving a self-declared-unreachable line the coverage
-    // ledger can never close. `uri` is a private closure inside this factory, so
-    // this is not an API change; if an optional URI key is ever wanted, add the
-    // parameter back together with a call site that actually uses it.
     Uri uri(String key) {
       final Object? value = block[key];
       if (value == null) {
@@ -101,36 +87,28 @@ final class AuthEngineConfig {
     );
   }
 
-  /// The OIDC issuer — BAKED build-time, never doc-sourced.
   final Uri issuer;
 
-  /// The Logto endpoint.
   final Uri endpoint;
 
-  /// The Logto application id.
   final String appId;
 
-  /// The sign-in redirect URI.
   final Uri redirectUri;
 
-  /// The optional post-logout redirect URI.
   final Uri? postLogoutRedirectUri;
 
-  /// OIDC scopes.
   final List<String> scopes;
 
-  /// The configurable app-handoff mount base (default `/app-handoff`).
+  /// The app-handoff mount, default `/app-handoff`.
   final String appHandoffMount;
 
-  /// Baked endpoint-suffix allowlist enforced on every doc-sourced URL at use
-  /// time (C0 §10).
+  /// Host suffixes every document-sourced URL must end with.
   final List<String> endpointSuffixAllowlist;
 
-  /// The redeem route: `POST {mount}/redeem` (no doubled `app-handoff`).
+  /// `{mount}/redeem`, never a doubled `app-handoff` segment.
   String get redeemPath => '$appHandoffMount/redeem';
 
-  /// Whether [url] satisfies the baked endpoint-suffix allowlist. Doc-level
-  /// enforcement: a doc containing one bad suffix is untrusted.
+  /// Whether the host of [url] matches the suffix allowlist.
   bool allowsUrl(Uri url) {
     final String host = url.host;
     return endpointSuffixAllowlist.any(
@@ -138,8 +116,7 @@ final class AuthEngineConfig {
     );
   }
 
-  /// The declarative block schema the `config` lib composes into the service
-  /// root schema. Keys map to a `{type, required}` descriptor.
+  /// The block schema the `config` package composes into the root schema.
   static Map<String, Object?> get blockSchema => <String, Object?>{
     r'$id': 'authEngine',
     'type': 'object',

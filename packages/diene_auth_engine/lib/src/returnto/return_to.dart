@@ -1,18 +1,13 @@
 import 'package:diene_problems/diene_problems.dart';
 import 'package:diene_result/diene_result.dart';
 
-/// returnTo deeplink continuation (goals/lib/dart-family.md auth-engine row).
+/// Keeps the exact protected route, path and query, across login.
 ///
-/// A deeplink into a protected screen → login → resume the EXACT target route
-/// with path AND query preserved. Only same-origin RELATIVE targets are legal;
-/// any absolute URL / protocol-relative `//host` / back-slash trick is rejected
-/// as an open redirect.
+/// Only single-slash relative targets pass; anything else is an open redirect.
 abstract final class ReturnTo {
-  /// The query parameter name carrying the encoded target.
   static const String queryKey = 'returnTo';
 
-  /// Validates [target] as a safe relative route and returns its canonical
-  /// `path[?query][#fragment]` string. Rejects open-redirect inputs.
+  /// Validates [target] and returns its `path[?query][#fragment]` text.
   static Result<String> capture(Uri target) {
     if (target.hasScheme || target.hasAuthority) {
       return _reject('returnTo target must be relative (no scheme/authority)');
@@ -26,7 +21,7 @@ abstract final class ReturnTo {
     return Ok<String>(_render(target));
   }
 
-  /// Builds the login redirect [loginBase] carrying the validated returnTo.
+  /// Adds the validated target to [loginBase] as `returnTo`.
   static Result<Uri> buildLoginRedirect(Uri loginBase, Uri target) =>
       capture(target).map(
         (String encoded) => loginBase.replace(
@@ -37,9 +32,7 @@ abstract final class ReturnTo {
         ),
       );
 
-  /// Resolves a captured returnTo string back to the EXACT relative target,
-  /// re-validating the open-redirect guard on the way out (a tampered value is
-  /// rejected, not followed).
+  /// Re-validates a captured value and returns the exact target.
   static Result<Uri> resolve(String raw) {
     if (raw.isEmpty) {
       return _reject('returnTo is empty');
@@ -62,8 +55,7 @@ abstract final class ReturnTo {
     return Ok<Uri>(Uri.parse(_render(parsed)));
   }
 
-  /// Extracts and resolves the returnTo from a post-login callback URL, or
-  /// falls back to [fallback] when absent/invalid.
+  /// The target from a callback URL, or [fallback] when absent or invalid.
   static Uri continueFrom(Uri callback, {required Uri fallback}) {
     final String? raw = callback.queryParameters[queryKey];
     if (raw == null) {

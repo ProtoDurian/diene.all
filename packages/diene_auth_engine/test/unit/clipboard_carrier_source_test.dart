@@ -2,16 +2,9 @@ import 'package:diene_auth_engine/diene_auth_engine.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// Platform-channel regressions for the real iOS clipboard carrier reader and the
-// callback-backed Android Install Referrer source (C0 §7). The clipboard path is
-// driven through a mocked SystemChannels.platform handler, so no device is
-// needed: the launch-time read takes NO consent tap, and the clear is
-// conditional — it must never wipe a clipboard the user has since changed.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  /// Installs a fake platform clipboard whose contents live in [box] and records
-  /// every method invoked on SystemChannels.platform.
   List<MethodCall> installClipboard(List<String?> box) {
     final List<MethodCall> calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -50,7 +43,7 @@ void main() {
       // Act
       final String? carrier = await reader.read();
 
-      // Assert — a plain read of kTextPlain, no consent prompt in the path.
+      // Assert
       expect(carrier, 'diene-carrier-token');
       expect(calls.single.method, 'Clipboard.getData');
       expect(calls.single.arguments, Clipboard.kTextPlain);
@@ -62,14 +55,15 @@ void main() {
       installClipboard(box);
       const ClipboardCarrierReader reader = ClipboardCarrierReader();
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(await reader.read(), isNull);
     });
 
     test(
       'clears the clipboard when it still equals the captured value',
       () async {
-        // Arrange — trailing whitespace is trimmed before the equality check.
+        // Arrange
         final List<String?> box = <String?>['  diene-carrier-token \n'];
         final List<MethodCall> calls = installClipboard(box);
         const ClipboardCarrierReader reader = ClipboardCarrierReader();
@@ -95,7 +89,7 @@ void main() {
       // Act
       await reader.clearIfEquals('diene-carrier-token');
 
-      // Assert — never destroy content the carrier does not own.
+      // Assert
       expect(box.first, 'a shopping list');
       expect(calls.map((MethodCall c) => c.method), <String>[
         'Clipboard.getData',
@@ -103,7 +97,7 @@ void main() {
     });
 
     test('leaves an already-empty clipboard untouched', () async {
-      // Arrange — the null-data arm of the conditional clear.
+      // Arrange
       final List<String?> box = <String?>[null];
       final List<MethodCall> calls = installClipboard(box);
       const ClipboardCarrierReader reader = ClipboardCarrierReader();
@@ -120,39 +114,42 @@ void main() {
   });
 
   group('CallbackInstallReferrerSource', () {
-    test('delegates read and markProcessed to the injected callbacks', () async {
-      // Arrange — the real plugin stays in flutter-base; this package only owns
-      // the seam, so the callbacks ARE the contract.
-      int reads = 0;
-      int marks = 0;
-      final CallbackInstallReferrerSource source =
-          CallbackInstallReferrerSource(
-            readReferrer: () async {
-              reads += 1;
-              return 'utm_source=diene&carrier=abc';
-            },
-            markProcessed: () async => marks += 1,
-          );
+    test(
+      'delegates read and markProcessed to the injected callbacks',
+      () async {
+        // Arrange
+        int reads = 0;
+        int marks = 0;
+        final CallbackInstallReferrerSource source =
+            CallbackInstallReferrerSource(
+              readReferrer: () async {
+                reads += 1;
+                return 'utm_source=diene&carrier=abc';
+              },
+              markProcessed: () async => marks += 1,
+            );
 
-      // Act
-      final String? referrer = await source.read();
-      await source.markProcessed();
+        // Act
+        final String? referrer = await source.read();
+        await source.markProcessed();
 
-      // Assert
-      expect(referrer, 'utm_source=diene&carrier=abc');
-      expect(reads, 1);
-      expect(marks, 1);
-    });
+        // Assert
+        expect(referrer, 'utm_source=diene&carrier=abc');
+        expect(reads, 1);
+        expect(marks, 1);
+      },
+    );
 
     test('propagates a null referrer from the platform callback', () async {
-      // Arrange — no referrer means no deferred-login carrier to redeem.
+      // Arrange
       final CallbackInstallReferrerSource source =
           CallbackInstallReferrerSource(
             readReferrer: () async => null,
             markProcessed: () async {},
           );
 
-      // Act + Assert
+      // Act
+      // Assert
       expect(await source.read(), isNull);
     });
   });

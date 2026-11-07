@@ -1,16 +1,4 @@
-# Published archive keeps only lib/, example/, doc/, skills/, README.md,
-# CHANGELOG.md, LICENSE, and pubspec.yaml. Everything below is dev/CI/test
-# tooling that must not ship to pub.dev.
-#
-# ANCHORING IS LOAD-BEARING. .pubignore uses gitignore semantics, so a BARE
-# `config/` matches a directory named `config` at ANY DEPTH — including
-# `lib/src/config/`. That is exactly how diene_auth_engine 1.0.0 and 1.0.1
-# shipped WITHOUT `lib/src/config/auth_engine_config.dart` while
-# `lib/diene_auth_engine.dart` line 22 still exports it: both archives are
-# structurally unusable, every consumer fails to compile with
-# "Type 'AuthEngineConfig' not found", and publication is irreversible.
-# The same hazard applies to every root-only directory below. Anchoring makes
-# each exclusion mean exactly the repository layer it names.
+# Root-anchor every directory: a bare `config/` would also drop lib/src/config/.
 /.claude/
 /.dart_tool/
 /.direnv/
@@ -28,12 +16,11 @@
 .coderabbit.yaml
 .envrc
 .markdownlint-cli2.jsonc
+.markdownlint.json
 .prettierrc.yaml
-codecov.yml
-dlint.yaml
+atomi_release.yaml
 flake.lock
 flake.nix
-release.yaml
 Taskfile.yaml
 CLAUDE.md
 VERSION

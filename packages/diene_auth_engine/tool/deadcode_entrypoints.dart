@@ -1,32 +1,12 @@
-// Production dead-code root for the published `diene_auth_engine` surface.
-//
-// This is TOOLING, not a test. `dart_code_linter` otherwise treats only the
-// public barrel (`diene_auth_engine.dart`) as an entrypoint and so reports every
-// public member of `test_helper.dart` as unused. Referencing the public surface
-// here keeps the production-only dead-code pass honest WITHOUT any exclusion
-// list (R12 — two passes, no exclusions). `scripts/local/deadcode.sh` copies this
-// file to `bin/main.dart` inside the production-only sandbox, so it must live in
-// the member package where `package:diene_auth_engine` resolves, and it is kept
-// out of the published archive by `.pubignore`.
-//
-// This file was LOST in the R-E19a transplant: the sample's copy was removed
-// with the rest of `packages/diene_dart_lib/tool/` and no auth-engine equivalent
-// was written, so `cp .../tool/deadcode_entrypoints.dart` failed and the
-// "Production dead-code pass" step exited 1 in CI while the repository pass
-// above it printed "no unused files found!".
+// Production dead-code root: references every public export so test_helper.dart counts as used.
 import 'package:diene_auth_engine/diene_auth_engine.dart';
 import 'package:diene_auth_engine/test_helper.dart';
 import 'package:diene_problems/diene_problems.dart';
 import 'package:diene_result/diene_result.dart';
 
-/// Touches the production surface, then the TestHelper surface, then proves the
-/// helper failure type is reachable. Every reference is a real call so the
-/// linter sees genuine use rather than a bare identifier mention.
 Future<void> main() async {
-  // A fixed instant: this tool is an analysis root, so it must be deterministic.
   final DateTime now = DateTime.utc(2026, 7, 27);
 
-  // --- Production surface -------------------------------------------------
   final ResourceKey key = AuthFixtures.resourceKey();
   final SessionTokens tokens = AuthFixtures.sessionTokens(now: now);
   final ResourceToken token = AuthFixtures.resourceToken(
@@ -42,7 +22,6 @@ Future<void> main() async {
     throw StateError('fixtures must build a usable identity');
   }
 
-  // Token lifetimes and app-handoff constants (C0 §12 / §7).
   if (TokenLifetimes.access <= Duration.zero ||
       TokenLifetimes.refresh <= Duration.zero ||
       !TokenLifetimes.refreshRotating ||
@@ -53,7 +32,6 @@ Future<void> main() async {
     throw StateError('normative constants must be positive');
   }
 
-  // Claims-first inspection (C0 §8 / §13).
   final Map<String, Object?> claims = Claims.decode(
     AuthFixtures.registeredJwt(key),
   );
@@ -67,7 +45,6 @@ Future<void> main() async {
   Claims.home(Claims.decode(AuthFixtures.unregisteredJwt(key)));
   Claims.registrationKey(platform: key.platform, service: key.service);
 
-  // App-handoff carrier parsing (C0 §7).
   final AppHandoffCarrier? carrier = AppHandoffCarrier.parseCanonical(
     'atomi-app-handoff:v1:${'A' * 43}',
   );
@@ -77,7 +54,6 @@ Future<void> main() async {
   AppHandoffCarrier.parseAndroidReferrer('utm_source=play');
   AppHandoffCarrier.parseClipboard(carrier.canonicalText);
 
-  // Doc B selector (C0 §10) and the expiry problem envelope.
   LandscapeSelectorDoc.fromJson(<String, Object?>{
     'platform': 'lithium',
     'tier': 'prod',
@@ -87,8 +63,6 @@ Future<void> main() async {
   });
   final Problem expired = appHandoffExpired();
 
-  // returnTo deeplink continuation — capture, build the login redirect, resolve
-  // it back, and continue from the callback.
   final Result<String> captured = ReturnTo.capture(Uri.parse('/a?b=c'));
   AuthExpect.ok<String>(captured);
   final Uri login = Uri.parse('https://login.example/authorize');
@@ -101,7 +75,6 @@ Future<void> main() async {
     fallback: Uri.parse('/'),
   );
 
-  // --- TestHelper surface -------------------------------------------------
   const LandscapeEntry entry = LandscapeEntry(name: 'raichu', region: 'sgp');
   final FakeAuthProvider provider = FakeAuthProvider(onSignIn: () => tokens);
   final SessionController session = SessionController(provider: provider);
@@ -138,8 +111,70 @@ Future<void> main() async {
   await store.write('raichu');
   await store.read();
   await store.clear();
+  final AuthEngineConfig config = AuthEngineConfig.fromBlock(<String, Object?>{
+    'issuer': 'https://issuer.example.test/oidc',
+    'endpoint': 'https://issuer.example.test',
+    'appId': 'app',
+    'redirectUri': 'io.atomi.app://callback',
+  });
+  final RegisteredBackend backend = RegisteredBackend(
+    backendId: 'api',
+    resources: <ResourceKey>[key],
+    onboardingResource: key,
+  );
+  final HomeClaimResolver resolver = HomeClaimResolver(
+    claimReader: jwtHomeClaimReader(provider.idToken),
+    selector: LandscapeSelectorClient(
+      source: HttpLandscapeSelectorSource(
+        docUrl: Uri.parse('https://edge.cluster.atomi.cloud/doc-b.json'),
+        config: config,
+      ),
+      pinger: HttpRegionPinger(
+        pingUrlOf: (LandscapeEntry e) =>
+            Uri.https('${e.name}.cluster.atomi.cloud', '/'),
+      ),
+    ),
+  );
+  final List<Object> production = <Object>[
+    AuthCoordinator(provider: provider),
+    DeferredLoginClient(
+      api: handoff,
+      device: const DeviceInfo(platform: 'android'),
+      referrer: CallbackInstallReferrerSource(
+        readReferrer: () async => null,
+        markProcessed: () async {},
+      ),
+      clipboard: const ClipboardCarrierReader(),
+    ),
+    LogtoAuthProvider(config: config, primaryResource: key),
+    SignInCoordinator(
+      session: session,
+      homeResolver: resolver,
+      onboarding: MultiBackendOnboarding(
+        registry: BackendRegistry(<RegisteredBackend>[backend]),
+        auth: auth,
+        directory: directory,
+        idToken: provider.idToken,
+      ),
+    ),
+    ResourceTokenEntry(key: key, token: token),
+  ];
+  if (production.length != 5) {
+    throw StateError('every production entrypoint must build');
+  }
+  final FakeRedeemHttpClient redeemServer = FakeRedeemHttpClient();
+  await HttpAppHandoffApi(
+    base: Uri.parse('https://api.example.test'),
+    redeemPath: '${AppHandoffConstants.defaultMount}/redeem',
+    client: redeemServer,
+  ).redeem(
+    nonce: 'A' * 43,
+    device: const DeviceInfo(platform: 'ios'),
+  );
+  if (!FakeRedeemHttpClient.acceptsBody(redeemServer.bodies.single)) {
+    throw StateError('the client must send a valid redeem body');
+  }
 
-  // Assertion helpers: accept a known-GOOD case on each arm...
   AuthExpect.ok<int>(const Ok<int>(1));
   AuthExpect.err<int>(Err<int>(expired));
   AuthExpect.errType<int>(Err<int>(expired), expired.type);
@@ -148,8 +183,6 @@ Future<void> main() async {
   AuthExpect.phase(OnboardingPhase.ready, OnboardingPhase.ready);
   AuthExpect.status(expired, expired.status);
 
-  // ...and prove the failure type is REACHABLE by rejecting a known-bad one. A
-  // helper that can never fail is not an assertion.
   try {
     AuthExpect.ok<int>(Err<int>(expired));
     throw StateError('AuthExpect.ok must reject an Err');
