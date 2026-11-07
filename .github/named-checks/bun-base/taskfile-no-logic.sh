@@ -7,13 +7,15 @@ parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat .github/named-checks/bun-base/paren
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch --quiet --no-tags origin "${parent_sha}" || true
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ shared .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 
-conditional='(^|[^[:alnum:]_])(if|elif|case)[[:space:]]|\[\[?[[:space:]]|(^|[;&|(][[:space:]]*)test[[:space:]]|&&|\|\||\{\{-?[[:space:]]*(if|else|with)[[:space:]}]'
+conditional='(^|[^[:alnum:]_])(if|elif|case)([[:space:]]|$)|\[\[?[[:space:]]|(^|[;&|(][[:space:]]*)test[[:space:]]|&&|\|\||\{\{-?[[:space:]]*(if|else|with)[[:space:]}]'
+# Every task form: a string, a list, or a map with cmd/cmds; each cmd a string or {cmd: ...}.
+cmds='[.tasks[] | (select(tag == "!!str"), (select(tag == "!!seq") | .[]), (select(tag == "!!map") | (.cmd, (.cmds // [])[])))] | .[] | select(tag == "!!str" or (tag == "!!map" and has("cmd"))) | with(select(tag == "!!map"); . = .cmd)'
 failed=0
 
-# Lines the parent already carries are reported, not failed: they are fixed in the parent.
+# A line the parent already carries is reported, not failed: it is fixed in the parent.
 judge() {
-  local file="$1" line="$2" what="$3"
-  if git show "${parent_sha}:${file}" 2>/dev/null | grep -Fq -- "${line}"; then
+  local inherited="$1" file="$2" line="$3" what="$4"
+  if grep -Fxq -- "${line}" <<<"${inherited}"; then
     echo "⚠️ inherited ${what} in ${file} (fix in the parent): ${line}"
   else
     echo "❌ ${what} in ${file}: ${line}" >&2
@@ -23,16 +25,15 @@ judge() {
 
 shopt -s nullglob
 for file in Taskfile.yaml tasks/*.yaml; do
+  parent="$(git show "${parent_sha}:${file}" 2>/dev/null || true)"
+  parent_cmds="$(yq "${cmds}" <<<"${parent}" 2>/dev/null || true)"
   while IFS= read -r line; do
     if [[ ${line} =~ ${conditional} ]]; then
-      judge "${file}" "${line}" "conditional in a task cmd"
+      judge "${parent_cmds}" "${file}" "${line}" "conditional in a task cmd"
     fi
-  done < <(yq '.tasks[] | (.cmd, (.cmds // [])[]) | select(. != null) | (.cmd // .)' "${file}")
-done
-
-for file in Taskfile.yaml tasks/*.yaml; do
+  done < <(yq "${cmds}" "${file}")
   while IFS= read -r line; do
-    judge "${file}" "${line}" "scripts/ci call"
+    judge "${parent}" "${file}" "${line}" "scripts/ci call"
   done < <(rg -N 'scripts/ci/' "${file}" || true)
 done
 
