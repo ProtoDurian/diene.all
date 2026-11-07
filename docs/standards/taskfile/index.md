@@ -29,8 +29,10 @@ Dockerfile and per chart. See [the Docker standard](../docker/index.md) and
 
 ## Rules
 
-1. Keep one- or two-line commands inline in Taskfiles.
-2. Move conditional or multi-step local logic to `scripts/local/`.
+1. Keep simple commands inline: a task may run several, use a template expression
+   such as `{{if .CLI_ARGS}}…{{end}}`, or end one command with `|| true`.
+2. Move shell control flow (`if`/`elif`/`else`/`fi`, `case`, `for`/`while` loops,
+   functions) to `scripts/local/`.
 3. Never call `scripts/ci/*` from a Taskfile; workflows own those entry points.
 4. Use lowercase names and colon-separated namespaces.
 5. Put repository-specific image and chart values in Taskfile `vars:` blocks,

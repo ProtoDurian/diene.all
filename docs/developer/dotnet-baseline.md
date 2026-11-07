@@ -25,9 +25,13 @@ shared workspace, standards, Docker, Helm, secret, and release surfaces.
 | `task test:unit:coverage`          | Enforce the merged unit coverage ledger.                       |
 | `task test:int:coverage`           | Enforce the merged integration coverage ledger.                |
 | `task test:unit:watch`             | Watch the fast unit tier.                                      |
+| `task test:int:watch`              | Watch the integration tier.                                    |
 | `task deadcode`                    | Emit both broad, non-blocking LLM reviews.                     |
 | `task deadcode:strict`             | Run both blocking dead-code passes, as CI does.                |
 | `task lint`                        | Run every generated pre-commit hook.                           |
+
+Each tier task is a one-line call to `scripts/local/test.sh <tier>`, which reads
+the tiers from `.config/dotnet-base.test.yaml`; a tier with no test files passes.
 
 ## Projects and coverage
 
