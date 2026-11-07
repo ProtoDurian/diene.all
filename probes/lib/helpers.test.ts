@@ -3,23 +3,14 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { devShellCommand } from './exec';
-import {
-  capturedEnvCommand,
-  DEV_SHELL_CHAIN,
-  expectDevShellsOnce,
-  expectRedBecause,
-  preserveMutationBeforeRestore,
-} from './helpers';
+import { capturedEnvCommand, expectRedBecause } from './helpers';
 
 const ENV_DIR = '/captures';
 
-// The four-shell chain dev-shell.ts asserts, verbatim.
 const CHAINED =
   'nix develop --no-write-lock-file .#default -c true && nix develop --no-write-lock-file .#ci -c true && ' +
   'nix develop --no-write-lock-file .#cd -c true && nix develop --no-write-lock-file .#releaser -c true';
 
-// A real corpus command whose payload is a single-quoted bash script containing its own
-// escaped single quotes — the shape the rewrite is most likely to corrupt.
 const EMBEDDED_QUOTES =
   `nix develop .#ci -c bash -c 'set -euo pipefail; first="$(mktemp -d)"; ` +
   `trap "rm -rf \\"$first\\"" EXIT; test "$(cat skill)" = '"'"'committed skill'"'"''`;
@@ -28,7 +19,8 @@ describe('captured-env rewrite — flag off is byte-identical', () => {
   const commands = [
     CHAINED,
     EMBEDDED_QUOTES,
-    'nix develop .#ci -c shellcheck -x scripts/ci/pre-commit.sh',
+    'nix develop .#ci -c helm lint infra/root_chart',
+    'CI_DOCKER_PUSH=false nix develop .#cd -c ./scripts/ci/docker.sh',
     'nix fmt --no-write-lock-file -- --ci --formatters shfmt',
   ];
 
@@ -58,9 +50,9 @@ describe('captured-env rewrite — flag on', () => {
   });
 
   test('both invocation variants are rewritten and the shell name selects the capture', () => {
-    expect(
-      capturedEnvCommand('nix develop .#ci -c shellcheck -x scripts/ci/pre-commit.sh', 'hook-shellcheck', ENV_DIR),
-    ).toContain(`probe-captured-env '/captures/ci.sh' shellcheck -x scripts/ci/pre-commit.sh`);
+    expect(capturedEnvCommand('nix develop .#ci -c helm lint infra/root_chart', 'helm-lint', ENV_DIR)).toContain(
+      `probe-captured-env '/captures/ci.sh' helm lint infra/root_chart`,
+    );
     expect(
       capturedEnvCommand('nix develop --no-write-lock-file .#default -c pre-commit run treefmt', 'fmt', ENV_DIR),
     ).toContain(`probe-captured-env '/captures/default.sh' pre-commit run treefmt`);
@@ -100,34 +92,6 @@ describe('captured-env rewrite — flag on', () => {
   });
 });
 
-describe('duplicate dev-shell proof', () => {
-  test('one real shell chain proves both duplicate feature arms in one sandbox phase', async () => {
-    const commands: string[] = [];
-    const outcomes = [{ exitCode: 1 }, { exitCode: 0 }, { exitCode: 0 }, { exitCode: 0 }];
-    const repo = {
-      exec: async (command: string) => {
-        commands.push(command);
-        return outcomes.shift() ?? { exitCode: 1 };
-      },
-    };
-
-    await expectDevShellsOnce(repo);
-    await expectDevShellsOnce(repo);
-
-    expect(DEV_SHELL_CHAIN).toBe(CHAINED);
-    expect(commands.filter(command => command === DEV_SHELL_CHAIN)).toHaveLength(1);
-    expect(commands).toEqual([
-      '[ -f .git/cyanprint-probe-dev-shell-checked ]',
-      DEV_SHELL_CHAIN,
-      ': > .git/cyanprint-probe-dev-shell-checked',
-      '[ -f .git/cyanprint-probe-dev-shell-checked ]',
-    ]);
-  });
-});
-
-// The byte assertions above cannot show that the rewritten string still *runs* the same
-// argv. These do, against a hand-written capture, with no nix anywhere: `sh -c` is exactly
-// how cyanprint's probe sandbox executes a probe command (packages/core/src/probe/spawn.ts).
 describe('captured-env rewrite — the rewritten command actually runs', () => {
   const dir = mkdtempSync(join(tmpdir(), 'captured-env-test-'));
   writeFileSync(join(dir, 'ci.sh'), 'export PROBE_TEST_MARKER=from-capture\n');
@@ -176,8 +140,6 @@ describe('captured-env rewrite — the rewritten command actually runs', () => {
 
 type Recorded = { command: string; options?: { timeoutMs?: number } };
 
-// None of these commands contain a `nix develop .#<shell> -c ` entry, so the captured-env
-// rewrite is a no-op on them whatever PROBE_CAPTURED_ENV holds.
 function fakeRepo(result: { exitCode: number; stdout?: string; stderr?: string }) {
   const calls: Recorded[] = [];
   return {
@@ -189,7 +151,6 @@ function fakeRepo(result: { exitCode: number; stdout?: string; stderr?: string }
   };
 }
 
-// Assert-the-asserter: every arm is driven on a known-bad case as well as a known-good one.
 describe('expectRedBecause', () => {
   test('accepts a red whose output names every declared reason', async () => {
     const repo = fakeRepo({ exitCode: 1, stdout: 'error TS2322: Type mismatch\n' });
@@ -278,74 +239,4 @@ describe('expectRedBecause', () => {
       );
     });
   }
-});
-
-// preserveMutationBeforeRestore is the helper eight probes import and the parent never
-// defined. It is proved in BOTH directions here: the satisfied state returns green, and a
-// deliberately broken restore returns red. A restore helper that cannot report failure is
-// exactly the gate that can never say "no".
-describe('preserveMutationBeforeRestore', () => {
-  function fakeRepo(initial: string) {
-    let content: string | null = initial;
-    return {
-      current: () => content,
-      read: async () => {
-        if (content === null) throw new Error('ENOENT');
-        return content;
-      },
-      write: async (_path: string, next: string) => {
-        content = next;
-      },
-    };
-  }
-
-  test('restores the original bytes after a mutation arm', async () => {
-    const repo = fakeRepo('version: 1.0.0-probe-drift');
-    await preserveMutationBeforeRestore(repo, 'publish-version-guard', 'pubspec.yaml', 'version: 1.0.0');
-    expect(repo.current()).toBe('version: 1.0.0');
-  });
-
-  test('restores a file the mutation arm deleted outright', async () => {
-    const repo = fakeRepo('gone');
-    // Simulate deletion: read throws until the restore writes it back.
-    const deleted = {
-      ...repo,
-      read: (() => {
-        let first = true;
-        return async () => {
-          if (first) {
-            first = false;
-            throw new Error('ENOENT');
-          }
-          return repo.current();
-        };
-      })(),
-    };
-    await preserveMutationBeforeRestore(deleted, 'label', 'p', 'restored');
-    expect(repo.current()).toBe('restored');
-  });
-
-  test('THROWS when the restore does not actually land, and preserves the mutated bytes', async () => {
-    // A write that silently no-ops — the precise failure the read-back exists to catch.
-    const stuck = {
-      read: async () => 'resolution: none',
-      write: async () => {},
-    };
-    let caught: Error | null = null;
-    try {
-      await preserveMutationBeforeRestore(
-        stuck,
-        'pub-workspace-metadata-validator',
-        'pubspec.yaml',
-        'resolution: workspace',
-      );
-    } catch (error) {
-      caught = error as Error;
-    }
-    expect(caught).not.toBeNull();
-    expect(caught!.message).toContain('was not restored');
-    // The mutated bytes must survive into the report, not be overwritten and lost.
-    expect(caught!.message).toContain('resolution: none');
-    expect(caught!.message).toContain('resolution: workspace');
-  });
 });

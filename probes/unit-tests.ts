@@ -1,58 +1,41 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
+import { flipAssertion } from './lib/mutations.ts';
 
-// Gate: the unit test suite (`flutter test test/unit`) guards library behavior.
-// Sabotage flips a boolean matcher in the first unit test (falling back to an
-// injected failing expectation) and proves the suite goes red.
+const UNIT = 'nix develop .#ci -c ./scripts/ci/test.sh unit no-coverage';
+
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: {
-    post: [
-      'nix develop .#ci --no-write-lock-file -c flutter pub get --offline || nix develop .#ci --no-write-lock-file -c flutter pub get',
-    ],
-  },
+  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
   probes: [
     {
       name: 'baseline-unit-tests-green',
-      description: 'flutter test test/unit passes on the pristine template',
+      description: 'the unit suite exercises the sample through its public barrel and passes',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(
-          repo,
-          "nix develop .#ci --no-write-lock-file -c bash -lc 'cd packages/diene_api_engine && flutter test test/unit'",
-          'unit-tests',
-        );
+        await expectGreen(repo, UNIT, 'unit-tests');
       },
     },
     {
       name: 'mutation-unit-tests-caught',
-      description: 'flutter test test/unit fails once an assertion is inverted',
+      description: 'the unit suite fails once one structurally selected boolean assertion is flipped',
       kind: 'mutation',
-      expectedImpact: ['unit-coverage-ledger'],
+      expectedImpact: [],
       async run(repo: any) {
-        const tests = (await repo.glob('packages/*/test/unit/**/*.dart')).sort();
-        const target = tests[0];
-        if (!target) {
+        const tests = await repo.glob('packages/*/test/unit/**/*_test.dart');
+        if (tests.length === 0) {
           throw new Error('unit-tests: no unit test file to sabotage');
         }
-        const original = await repo.read(target);
-        let mutated: string;
-        if (original.includes(', isFalse)')) {
-          mutated = original.replace(', isFalse)', ', isTrue)');
-        } else if (original.includes(', isTrue)')) {
-          mutated = original.replace(', isTrue)', ', isFalse)');
-        } else {
-          mutated = original.replace(
-            'void main() {',
-            "void main() {\n  test('probe sabotage', () {\n    expect(0, 1);\n  });",
-          );
-        }
-        await repo.write(target, mutated);
-        await expectRed(
-          repo,
-          "nix develop .#ci --no-write-lock-file -c bash -lc 'cd packages/diene_api_engine && flutter test test/unit'",
-          'unit-tests',
-        );
+        await withCleanProbeState(repo, tests, async () => {
+          await flipAssertion(repo, {
+            globs: ['packages/*/test/unit/**/*_test.dart'],
+            replacements: [
+              { find: /\bexpect\(([^\n]+),\s*isFalse\)/, replace: 'expect($1, isTrue)' },
+              { find: /\bexpect\(([^\n]+),\s*isTrue\)/, replace: 'expect($1, isFalse)' },
+            ],
+          });
+          await expectRedBecause(repo, UNIT, 'unit-tests', ['Some tests failed']);
+        });
       },
     },
   ],

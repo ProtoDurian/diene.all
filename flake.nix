@@ -52,38 +52,24 @@
             env
             ;
         };
-        pre-commit-offline = import ./nix/pre-commit.nix {
-          inherit
-            packages
-            pkgs
-            pre-commit-lib
-            formatter
-            env
-            ;
-          offline = true;
-        };
         formatter = import ./nix/fmt.nix {
           inherit treefmt-nix pkgs;
         };
         packages = import ./nix/packages.nix {
-          inherit pkgs-2605 pkgs-unstable atomi;
+          inherit
+            pkgs-2605
+            pkgs-unstable
+            atomi
+            ;
         };
         env = import ./nix/env.nix {
           inherit pkgs packages;
         };
         devShells = import ./nix/shells.nix {
           inherit pkgs env packages;
-          shellHook = pre-commit.shellHook;
+          shellHook = checks.pre-commit-check.shellHook;
         };
         checks = {
-          # ONLINE, deliberately. The parent binds `pre-commit-offline` here, and
-          # that binding arrived through a CLEAN merge with no conflict marker.
-          # Adopting it would drop `a-dart-analyze`, `a-dart-test` and
-          # `a-dart-package` from the check set entirely, so the battery would
-          # come back green having never run the Dart hooks at all. A green from
-          # a detector set that excludes the node's own toolchain is a false
-          # green, not a pass — restored to the online variant so the battery
-          # answers a question about this node.
           pre-commit-check = pre-commit;
           format = formatter;
         };

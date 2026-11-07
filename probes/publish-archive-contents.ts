@@ -1,43 +1,53 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-// Gate: the publishable archive (as reported by the offline-safe
-// `flutter pub publish --dry-run --skip-validation` archive builder)
-// must ship the consumer usage skill. Sabotage adds `skills/` to `.pubignore`
-// and proves the skill drops out of the archive listing.
-//
-// The parent's `out=$(…) && …` form replaces the child's `out=$(… || true); …`:
-// with `|| true` a dry-run that FAILED still fell through to the grep, so the
-// gate reported on whatever partial output existed instead of refusing. That is
-// a false-green and the fix is adopted here verbatim in shape.
-const DRY_RUN_HAS_SKILL =
-  'nix develop .#ci --no-write-lock-file -c bash -lc \'cd packages/diene_api_engine && out=$(flutter pub publish --dry-run --skip-validation 2>&1) && printf "%s\\n" "$out" | grep -F -q diene-api-engine-usage\'';
+const PUBIGNORE = 'packages/diene_dart_lib/.pubignore';
+const SHIPPED = [
+  'diene_dart_lib.dart',
+  'test_helper.dart',
+  'diene_dart_lib.md',
+  'LICENSE',
+  'CHANGELOG.md',
+  'README.md',
+  'diene_dart_lib_example.dart',
+  'diene-dart-lib-usage',
+  'SKILL.md',
+  'patterns.md',
+];
+const EXCLUDED = ['test', 'tool', 'deadcode_entrypoints.dart', 'c0_conformance_test.dart', 'manifest.json'];
+
+// The dry-run listing is a tree; match whole leaf names, with or without a size suffix.
+const ARCHIVE_CHECK =
+  "nix develop .#ci -c bash -c 'set -euo pipefail; cd packages/diene_dart_lib; " +
+  'listing=$(dart pub publish --dry-run --skip-validation 2>&1); ' +
+  `for f in ${SHIPPED.join(' ')}; do printf "%s\\n" "$listing" | grep -Eq "─ $f( \\(|\\$)" || { echo "archive is missing $f" >&2; exit 1; }; done; ` +
+  `for f in ${EXCLUDED.join(' ')}; do if printf "%s\\n" "$listing" | grep -Eq "─ $f( \\(|\\$)"; then echo "archive ships $f" >&2; exit 1; fi; done'`;
 
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: {
-    post: [
-      'nix develop .#ci --no-write-lock-file -c flutter pub get --offline || nix develop .#ci --no-write-lock-file -c flutter pub get',
-    ],
-  },
+  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
   probes: [
     {
       name: 'baseline-publish-archive-contents-green',
-      description: 'the dry-run archive listing includes the usage skill',
+      description:
+        'the dry-run archive ships barrel, docs, license, changelog, example and usage skill, and no dev or test files',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, DRY_RUN_HAS_SKILL, 'publish-archive-contents');
+        await expectGreen(repo, ARCHIVE_CHECK, 'publish-archive-contents');
       },
     },
     {
       name: 'mutation-publish-archive-contents-caught',
-      description: 'the archive listing loses the usage skill once skills/ is pubignored',
+      description: 'the archive check fails once .pubignore excludes the shipped skill',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        const pubignore = 'packages/diene_api_engine/.pubignore';
-        await repo.write(pubignore, `${await repo.read(pubignore)}\nskills/\n`);
-        await expectRed(repo, DRY_RUN_HAS_SKILL, 'publish-archive-contents');
+        await withCleanProbeState(repo, [PUBIGNORE], async () => {
+          await repo.write(PUBIGNORE, `${await repo.read(PUBIGNORE)}/skills/\n`);
+          await expectRedBecause(repo, ARCHIVE_CHECK, 'publish-archive-contents', [
+            'archive is missing diene-dart-lib-usage',
+          ]);
+        });
       },
     },
   ],
