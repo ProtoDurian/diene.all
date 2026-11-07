@@ -5,8 +5,6 @@ import 'package:test/test.dart';
 
 import '../support.dart';
 
-/// A second block type, so composition across DIFFERENT typed blocks is
-/// exercised rather than assumed.
 final class ApiSettings {
   const ApiSettings(this.baseUrl);
 
@@ -44,60 +42,60 @@ Map<String, Object?> validApp() => <String, Object?>{
   },
 };
 
-List<String> errorsOf(Problem problem) =>
-    (problem.data['errors']! as List<Object?>)
-        .map((Object? error) => '$error')
-        .toList(growable: false);
-
 void main() {
   group('ConfigSchema construction', () {
     test('rejects an empty block key as programmer misuse', () {
-      // A block list is source code, not input, so this throws rather than
-      // returning a failure value.
-      expect(
-        () => ConfigSchema(
-          blocks: <ConfigBlockSchema>[
-            ConfigBlock<int>(key: '', decode: (_) => 0),
-          ],
-        ),
-        throwsA(isA<ArgumentError>()),
-      );
+      // Arrange
+      final List<ConfigBlockSchema> blocks = <ConfigBlockSchema>[
+        ConfigBlock<int>(key: '', decode: (_) => 0),
+      ];
+
+      // Act
+      ConfigSchema compose() => ConfigSchema(blocks: blocks);
+
+      // Assert
+      expect(compose, throwsA(isA<ArgumentError>()));
     });
 
     test(r'rejects the reserved $schema key', () {
-      expect(
-        () => ConfigSchema(
-          blocks: <ConfigBlockSchema>[
-            ConfigBlock<int>(key: r'$schema', decode: (_) => 0),
-          ],
-        ),
-        throwsA(isA<ArgumentError>()),
-      );
+      // Arrange
+      final List<ConfigBlockSchema> blocks = <ConfigBlockSchema>[
+        ConfigBlock<int>(key: r'$schema', decode: (_) => 0),
+      ];
+
+      // Act
+      ConfigSchema compose() => ConfigSchema(blocks: blocks);
+
+      // Assert
+      expect(compose, throwsA(isA<ArgumentError>()));
     });
 
     test('rejects two blocks whose keys canonicalise together', () {
-      // `app-settings` and `appSettings` are the SAME key under C0 §3 matching,
-      // so composing both is ambiguous by construction.
-      expect(
-        () => ConfigSchema(
-          blocks: <ConfigBlockSchema>[
-            ConfigBlock<int>(key: 'app-settings', decode: (_) => 0),
-            ConfigBlock<int>(key: 'appSettings', decode: (_) => 1),
-          ],
-        ),
-        throwsA(isA<ArgumentError>()),
-      );
+      // Arrange
+      final List<ConfigBlockSchema> blocks = <ConfigBlockSchema>[
+        ConfigBlock<int>(key: 'app-settings', decode: (_) => 0),
+        ConfigBlock<int>(key: 'appSettings', decode: (_) => 1),
+      ];
+
+      // Act
+      ConfigSchema compose() => ConfigSchema(blocks: blocks);
+
+      // Assert
+      expect(compose, throwsA(isA<ArgumentError>()));
     });
 
     test('exposes its composed blocks, unmodifiably', () {
       // Arrange
       final ConfigSchema schema = appSchema();
 
+      // Act
+      final List<ConfigBlockSchema> blocks = schema.blocks;
+
       // Assert
-      expect(schema.blocks, hasLength(1));
-      expect(schema.blocks.single.key, 'app');
+      expect(blocks, hasLength(1));
+      expect(blocks.single.key, 'app');
       expect(schema.rejectUnknownBlocks, isTrue);
-      expect(() => schema.blocks.clear(), throwsUnsupportedError);
+      expect(blocks.clear, throwsUnsupportedError);
     });
 
     test('accepts an empty block list against an empty configuration', () {
@@ -119,8 +117,11 @@ void main() {
 
   group('ConfigSchema.validate', () {
     test('decodes a valid configuration into a typed slice', () {
+      // Arrange
+      final ConfigSchema schema = appSchema();
+
       // Act
-      final Result<DieneConfig> validated = appSchema().validate(validApp());
+      final Result<DieneConfig> validated = schema.validate(validApp());
 
       // Assert
       expect(validated, isOk, reason: describe(validated));
@@ -146,14 +147,12 @@ void main() {
         'AppSettings': <String, Object?>{'displayName': 'matched'},
       });
 
-      // Assert — the differently spelled root key decoded into the COMPOSED
-      // block, which is the block the slice is read back through.
+      // Assert
       expect(validated, isOk, reason: describe(validated));
       expect(validated.unwrap().slice(settingsBlock), 'matched');
     });
 
     test(r'ignores the reserved $schema root key', () {
-      // A YAML authored against a JSON-schema-aware editor carries it.
       // Arrange
       final Map<String, Object?> values = validApp()
         ..[r'$schema'] = 'https://example.test/config.json';
@@ -166,8 +165,11 @@ void main() {
     });
 
     test('reports a missing required block', () {
+      // Arrange
+      final ConfigSchema schema = appSchema();
+
       // Act
-      final Result<DieneConfig> validated = appSchema().validate(
+      final Result<DieneConfig> validated = schema.validate(
         <String, Object?>{},
       );
 
@@ -195,7 +197,7 @@ void main() {
       expect(config.optionalSlice(optionalApiBlock).isNone, isTrue);
     });
 
-    test('decodes an optional block that IS present', () {
+    test('decodes an optional block that is present', () {
       // Arrange
       final ConfigSchema schema = ConfigSchema(
         blocks: <ConfigBlockSchema>[appBlock, optionalApiBlock],
@@ -215,10 +217,13 @@ void main() {
     });
 
     test('reports a block whose value is not a map', () {
+      // Arrange
+      final ConfigSchema schema = appSchema();
+
       // Act
-      final Result<DieneConfig> validated = appSchema().validate(
-        <String, Object?>{'app': 'not a map'},
-      );
+      final Result<DieneConfig> validated = schema.validate(<String, Object?>{
+        'app': 'not a map',
+      });
 
       // Assert
       expect(errorsOf(validated.unwrapErr()), <String>[
@@ -227,12 +232,13 @@ void main() {
     });
 
     test('reports a block whose value is a list', () {
+      // Arrange
+      final ConfigSchema schema = appSchema();
+
       // Act
-      final Result<DieneConfig> validated = appSchema().validate(
-        <String, Object?>{
-          'app': <Object?>['nope'],
-        },
-      );
+      final Result<DieneConfig> validated = schema.validate(<String, Object?>{
+        'app': <Object?>['nope'],
+      });
 
       // Assert
       expect(errorsOf(validated.unwrapErr()), <String>[
@@ -241,12 +247,13 @@ void main() {
     });
 
     test('folds a throwing decoder into the aggregate problem', () {
+      // Arrange
+      final ConfigSchema schema = appSchema();
+
       // Act
-      final Result<DieneConfig> validated = appSchema().validate(
-        <String, Object?>{
-          'app': <String, Object?>{'name': '', 'retries': 1},
-        },
-      );
+      final Result<DieneConfig> validated = schema.validate(<String, Object?>{
+        'app': <String, Object?>{'name': '', 'retries': 1},
+      });
 
       // Assert
       final List<String> errors = errorsOf(validated.unwrapErr());
@@ -285,22 +292,21 @@ void main() {
     });
 
     test('reports two root keys that collide under canonicalisation', () {
+      // Arrange
+      final ConfigSchema schema = appSchema();
+
       // Act
-      final Result<DieneConfig> validated = appSchema().validate(
-        <String, Object?>{
-          'app': <String, Object?>{'name': 'a', 'retries': 0},
-          'A_P_P': <String, Object?>{'name': 'b', 'retries': 0},
-        },
-      );
+      final Result<DieneConfig> validated = schema.validate(<String, Object?>{
+        'app': <String, Object?>{'name': 'a', 'retries': 0},
+        'A_P_P': <String, Object?>{'name': 'b', 'retries': 0},
+      });
 
       // Assert
       final List<String> errors = errorsOf(validated.unwrapErr());
       expect(errors.first, 'root keys app and A_P_P collide');
     });
 
-    test('reports EVERY problem in one pass, not just the first', () {
-      // One pass that stops at the first error makes a misconfiguration take
-      // as many deploys to fix as it has mistakes.
+    test('reports every problem in one pass, not just the first', () {
       // Arrange
       final ConfigSchema schema = ConfigSchema(
         blocks: <ConfigBlockSchema>[appBlock, apiBlock],
@@ -321,14 +327,15 @@ void main() {
     });
 
     test('carries an unmodifiable error list', () {
+      // Arrange
+      final ConfigSchema schema = appSchema();
+
       // Act
-      final Problem problem = appSchema()
-          .validate(<String, Object?>{})
-          .unwrapErr();
+      final Problem problem = schema.validate(<String, Object?>{}).unwrapErr();
 
       // Assert
       expect(
-        () => (problem.data['errors']! as List<Object?>).clear(),
+        (problem.data['errors']! as List<Object?>).clear,
         throwsUnsupportedError,
       );
     });
@@ -339,10 +346,12 @@ void main() {
       // Arrange
       final DieneConfig config = appSchema().validate(validApp()).unwrap();
 
-      // Assert
-      expect(() => config.raw['app'] = null, throwsUnsupportedError);
+      // Act
       final Map<String, Object?> app =
           config.raw['app']! as Map<String, Object?>;
+
+      // Assert
+      expect(() => config.raw['app'] = null, throwsUnsupportedError);
       expect(() => app['name'] = 'mutated', throwsUnsupportedError);
       expect(
         () => (app['tags']! as List<Object?>).add('mutated'),
@@ -393,13 +402,14 @@ void main() {
     });
 
     test('slice throws for a block that was never composed', () {
-      // Asking for a slice that structurally cannot exist is programmer
-      // misuse, so it throws rather than returning a failure value.
       // Arrange
       final DieneConfig config = appSchema().validate(validApp()).unwrap();
 
+      // Act
+      ApiSettings read() => config.slice(apiBlock);
+
       // Assert
-      expect(() => config.slice(apiBlock), throwsStateError);
+      expect(read, throwsStateError);
     });
 
     test('slice throws for an absent optional block', () {
@@ -408,14 +418,14 @@ void main() {
         blocks: <ConfigBlockSchema>[appBlock, optionalApiBlock],
       ).validate(validApp()).unwrap();
 
+      // Act
+      ApiSettings read() => config.slice(optionalApiBlock);
+
       // Assert
-      expect(() => config.slice(optionalApiBlock), throwsStateError);
+      expect(read, throwsStateError);
     });
 
     test('slice refuses a same-key block with an incompatible type', () {
-      // A key-only association would answer this request with the composed
-      // `AppSettings` value and blow up in an undocumented cast. The documented
-      // contract is a StateError, so the impostor must simply be uncomposed.
       // Arrange
       final DieneConfig config = appSchema().validate(validApp()).unwrap();
       final ConfigBlock<int> impostor = ConfigBlock<int>(
@@ -423,18 +433,17 @@ void main() {
         decode: (Map<String, Object?> values) => values['retries']! as int,
       );
 
+      // Act
+      final bool hasImpostor = config.hasSlice(impostor);
+
       // Assert
-      expect(config.hasSlice(impostor), isFalse);
+      expect(hasImpostor, isFalse);
       expect(config.optionalSlice(impostor).isNone, isTrue);
       expect(() => config.slice(impostor), throwsStateError);
-      // The composed block still reads normally.
       expect(config.slice(appBlock).name, 'service');
     });
 
     test('slice refuses a same-key, same-type lookalike block', () {
-      // Same key, same type parameter, same decoder body — but a different
-      // block, so it holds no slice: the value belongs to the block that was
-      // composed, not to anything that resembles it.
       // Arrange
       final Map<String, Object?> values = validApp()
         ..['api'] = <String, Object?>{'baseUrl': 'https://api.test'};
@@ -447,16 +456,17 @@ void main() {
             ApiSettings(values['baseUrl']! as String),
       );
 
+      // Act
+      final bool hasLookalike = config.hasSlice(lookalike);
+
       // Assert
-      expect(config.hasSlice(lookalike), isFalse);
+      expect(hasLookalike, isFalse);
       expect(config.optionalSlice(lookalike).isNone, isTrue);
       expect(() => config.slice(lookalike), throwsStateError);
       expect(config.slice(apiBlock), const ApiSettings('https://api.test'));
     });
 
     test('two schemas over the same block keys keep their slices apart', () {
-      // The decoded value must follow its own block even when another schema
-      // composes an identically keyed block over the same tree.
       // Arrange
       final ConfigBlock<String> nameBlock = ConfigBlock<String>(
         key: 'app',
@@ -487,8 +497,7 @@ void main() {
     test(
       'optionalSlice is None for a same-key block that was not composed',
       () {
-        // Arrange — the composed optional block IS present, so a `true` here
-        // could only come from key-matching rather than block identity.
+        // Arrange
         final Map<String, Object?> values = validApp()
           ..['api'] = <String, Object?>{'baseUrl': 'https://api.test'};
         final DieneConfig config = ConfigSchema(
@@ -500,9 +509,12 @@ void main() {
           decode: (_) => 0,
         );
 
+        // Act
+        final Option<int> slice = config.optionalSlice(uncomposed);
+
         // Assert
         expect(config.optionalSlice(optionalApiBlock).isSome, isTrue);
-        expect(config.optionalSlice(uncomposed).isNone, isTrue);
+        expect(slice.isNone, isTrue);
         expect(config.hasSlice(uncomposed), isFalse);
       },
     );
@@ -530,11 +542,14 @@ void main() {
 
   group('ConfigBlock', () {
     test('decodeUntyped erases the static type without changing the value', () {
-      // Act
-      final Object? decoded = appBlock.decodeUntyped(<String, Object?>{
+      // Arrange
+      final Map<String, Object?> values = <String, Object?>{
         'name': 'erased',
         'retries': 3,
-      });
+      };
+
+      // Act
+      final Object? decoded = appBlock.decodeUntyped(values);
 
       // Assert
       expect(
@@ -544,6 +559,17 @@ void main() {
     });
 
     test('is required by default', () {
+      // Arrange
+      final ConfigBlock<int> plain = ConfigBlock<int>(
+        key: 'plain',
+        decode: (_) => 0,
+      );
+
+      // Act
+      final bool required = plain.required;
+
+      // Assert
+      expect(required, isTrue);
       expect(appBlock.required, isTrue);
       expect(optionalApiBlock.required, isFalse);
     });

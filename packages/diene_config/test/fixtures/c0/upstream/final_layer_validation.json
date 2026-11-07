@@ -1,0 +1,7 @@
+{
+  "invalid": {
+    "baseYaml": "app:\n  name: service\n  retries: -1\n  tags: []\n",
+    "defines": {},
+    "prefix": "ACME_"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "baseYaml": "app:\n  name: base\n  retries: -1\n  tags: [base]\n",
+  "defines": {
+    "ACME_APP__NAME": "define",
+    "ACME_APP__TAGS__0": "first",
+    "ACME_APP__TAGS__1": "second"
+  },
+  "developmentYaml": "app:\n  name: development\n  tags: [development]\n",
+  "expected": {
+    "name": "define",
+    "retries": 2,
+    "tags": ["first", "second"]
+  },
+  "landscapeYaml": "app:\n  name: landscape\n  retries: 2\n",
+  "prefix": "ACME_"
+}

@@ -1,0 +1,8 @@
+app:
+  name: base
+  retries: 1
+  tags:
+    - base
+api:
+  baseUrl: https://api.base.test
+  timeoutMs: 1000

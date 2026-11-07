@@ -17,31 +17,47 @@ ConfigLoader loaderOf({required String base}) => ConfigLoader(
 );
 
 void main() {
-  // The holder is process-wide by design, so every test starts from empty.
   setUp(AppConfig.reset);
   tearDown(AppConfig.reset);
 
   group('the compatibility entrypoint', () {
     test('re-exports the whole public surface', () {
-      // The migration promise: one import swap, no other edits. If the
-      // re-export were dropped, this file would not compile.
+      // Arrange
+      final ConfigSchema schema = appSchema();
+
+      // Act
+      final String releaseId = c0ConfigContract.provenance.releaseId;
+
+      // Assert
       expect(ConfigProblemCode.schemaInvalid.wireId, 'schema_invalid');
       expect(landscapeDefineKey, 'DIENE_LANDSCAPE');
-      expect(c0ConfigContract.provenance.releaseId, 'c0-fixtures-r2');
-      expect(appSchema().blocks, hasLength(1));
+      expect(releaseId, 'c0-fixtures-r2');
+      expect(schema.blocks, hasLength(1));
     });
   });
 
   group('AppConfig', () {
     test('starts uninstalled', () {
-      expect(AppConfig.isInstalled, isFalse);
+      // Arrange
+      AppConfig.reset();
+
+      // Act
+      final bool installed = AppConfig.isInstalled;
+
+      // Assert
+      expect(installed, isFalse);
       expect(AppConfig.maybeInstance.isNone, isTrue);
     });
 
     test('throws rather than defaulting when read before install', () {
-      // A silent default would let the app run against configuration nobody
-      // supplied, which is strictly worse than a loud startup failure.
-      expect(() => AppConfig.instance, throwsStateError);
+      // Arrange
+      AppConfig.reset();
+
+      // Act
+      DieneConfig read() => AppConfig.instance;
+
+      // Assert
+      expect(read, throwsStateError);
     });
 
     test('returns the installed configuration', () {
@@ -58,13 +74,14 @@ void main() {
     });
 
     test('refuses a second install by default', () {
-      // Two parts of the app disagreeing about the configuration is a bug,
-      // and the loser would be whichever ran first.
       // Arrange
       AppConfig.install(stub());
 
+      // Act
+      void installAgain() => AppConfig.install(stub(name: 'second'));
+
       // Assert
-      expect(() => AppConfig.install(stub(name: 'second')), throwsStateError);
+      expect(installAgain, throwsStateError);
       expect(AppConfig.instance.slice(appBlock).name, 'installed');
     });
 
@@ -94,10 +111,13 @@ void main() {
 
   group('AppConfig.loadAndInstall', () {
     test('installs the configuration a successful load produced', () async {
-      // Act
-      final Result<DieneConfig> loaded = await AppConfig.loadAndInstall(
-        loaderOf(base: 'app:\n  name: loaded\n  retries: 1\n'),
+      // Arrange
+      final ConfigLoader loader = loaderOf(
+        base: 'app:\n  name: loaded\n  retries: 1\n',
       );
+
+      // Act
+      final Result<DieneConfig> loaded = await AppConfig.loadAndInstall(loader);
 
       // Assert
       expect(loaded, isOk, reason: describe(loaded));
@@ -106,15 +126,18 @@ void main() {
       expect(AppConfig.instance, same(loaded.unwrap()));
     });
 
-    test('installs NOTHING when the load fails', () {
-      // A failed load must not leave a half-configured process behind.
-      // Act & Assert
-      return AppConfig.loadAndInstall(
-        loaderOf(base: 'app:\n  name: bad\n  retries: -1\n'),
-      ).then((Result<DieneConfig> loaded) {
-        expect(loaded, isErr, reason: describe(loaded));
-        expect(AppConfig.isInstalled, isFalse);
-      });
+    test('installs nothing when the load fails', () async {
+      // Arrange
+      final ConfigLoader loader = loaderOf(
+        base: 'app:\n  name: bad\n  retries: -1\n',
+      );
+
+      // Act
+      final Result<DieneConfig> loaded = await AppConfig.loadAndInstall(loader);
+
+      // Assert
+      expect(loaded, isErr, reason: describe(loaded));
+      expect(AppConfig.isInstalled, isFalse);
     });
 
     test(
@@ -122,14 +145,17 @@ void main() {
       () async {
         // Arrange
         AppConfig.install(stub());
-
-        // Act & Assert
-        await expectLater(
-          AppConfig.loadAndInstall(
-            loaderOf(base: 'app:\n  name: second\n  retries: 0\n'),
-          ),
-          throwsStateError,
+        final ConfigLoader loader = loaderOf(
+          base: 'app:\n  name: second\n  retries: 0\n',
         );
+
+        // Act
+        final Future<Result<DieneConfig>> loading = AppConfig.loadAndInstall(
+          loader,
+        );
+
+        // Assert
+        await expectLater(loading, throwsStateError);
         expect(AppConfig.instance.slice(appBlock).name, 'installed');
       },
     );
@@ -137,10 +163,13 @@ void main() {
     test('replaces an installed configuration on force', () async {
       // Arrange
       AppConfig.install(stub());
+      final ConfigLoader loader = loaderOf(
+        base: 'app:\n  name: replaced\n  retries: 0\n',
+      );
 
       // Act
       final Result<DieneConfig> loaded = await AppConfig.loadAndInstall(
-        loaderOf(base: 'app:\n  name: replaced\n  retries: 0\n'),
+        loader,
         force: true,
       );
 

@@ -1,0 +1,12 @@
+{
+  "type": "https://local.atomi.cloud/docs/local/flutter/app/core/v1/landscape_missing",
+  "title": "no landscape identity; build with --dart-define=DIENE_LANDSCAPE=<track>",
+  "status": 400,
+  "detail": "config.landscape_missing: no landscape identity; build with --dart-define=DIENE_LANDSCAPE=<track>",
+  "recoverable": false,
+  "data": {
+    "define": "DIENE_LANDSCAPE",
+    "code": "landscape_missing",
+    "x-diene-config-provenance": "atomicloud/diene_config@v1"
+  }
+}

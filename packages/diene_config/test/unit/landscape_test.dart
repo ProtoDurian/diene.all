@@ -20,8 +20,19 @@ void main() {
       expect(track.unwrap(), 'lapras');
     });
 
+    test('returns an explicitly injected define value', () {
+      // Arrange
+      const LandscapeSource source = DartDefineLandscapeSource(value: 'pichu');
+
+      // Act
+      final Result<String> track = landscape(source: source);
+
+      // Assert
+      expect(track, isOk, reason: describe(track));
+      expect(track.unwrap(), 'pichu');
+    });
+
     test('trims surrounding whitespace', () {
-      // A define passed through a shell script commonly arrives padded.
       // Arrange
       const LandscapeSource source = FakeLandscapeSource('  pichu \n');
 
@@ -33,7 +44,7 @@ void main() {
       expect(track.unwrap(), 'pichu');
     });
 
-    test('reports an absent define as landscape_missing', () {
+    test('reports an empty value as landscape_missing', () {
       // Arrange
       const LandscapeSource source = FakeLandscapeSource('');
 
@@ -50,10 +61,8 @@ void main() {
     });
 
     test(
-      'treats a whitespace-only define as absent, not as the empty track',
+      'treats a whitespace-only value as missing, not as an empty track',
       () {
-        // C0 §3 blank-is-unset governs every other define this package reads;
-        // the landscape must not be the one place a blank means something.
         // Arrange
         const LandscapeSource source = FakeLandscapeSource('   ');
 
@@ -68,6 +77,21 @@ void main() {
         );
       },
     );
+
+    test('treats a blank injected define as missing', () {
+      // Arrange
+      const LandscapeSource source = DartDefineLandscapeSource(value: ' \t ');
+
+      // Act
+      final Result<String> track = landscape(source: source);
+
+      // Assert
+      expect(track, isErr, reason: describe(track));
+      expect(
+        track.unwrapErr().data['code'],
+        ConfigProblemCode.landscapeMissing.wireId,
+      );
+    });
   });
 
   group('DartDefineLandscapeSource', () {
@@ -75,14 +99,14 @@ void main() {
       // Arrange
       const LandscapeSource source = DartDefineLandscapeSource(value: 'raichu');
 
-      // Act & Assert
-      expect(source.read(), 'raichu');
+      // Act
+      final String value = source.read();
+
+      // Assert
+      expect(value, 'raichu');
     });
 
-    test('defaults to the compile-time define, absent in a plain test run', () {
-      // No --dart-define is passed to `dart test`, so the constant is '' and
-      // the accessor reports the missing-identity problem. This is the real
-      // default path, not a fake.
+    test('defaults to the build define, which is empty in a test run', () {
       // Arrange
       const LandscapeSource source = DartDefineLandscapeSource();
 
@@ -94,34 +118,43 @@ void main() {
       expect(track, isErr, reason: describe(track));
     });
 
-    test('is the default source of landscape()', () {
+    test('is the default source, so landscape() alone reports missing', () {
+      // Arrange
+      final String expectedCode = ConfigProblemCode.landscapeMissing.wireId;
+
       // Act
       final Result<String> track = landscape();
 
       // Assert
       expect(track, isErr, reason: describe(track));
-      expect(
-        track.unwrapErr().data['code'],
-        ConfigProblemCode.landscapeMissing.wireId,
-      );
+      expect(track.unwrapErr().data['code'], expectedCode);
     });
 
-    test('never inspects host or runtime state', () {
-      // The accessor contract: two sources with the same value agree, and the
-      // answer depends on nothing else. A detector could not satisfy this.
+    test('depends only on the value it was given, with no detection', () {
       // Arrange
       const LandscapeSource injected = FakeLandscapeSource('lapras');
       const LandscapeSource define = DartDefineLandscapeSource(value: 'lapras');
 
+      // Act
+      final Result<String> fromFake = landscape(source: injected);
+      final Result<String> fromDefine = landscape(source: define);
+
       // Assert
-      expect(landscape(source: injected).unwrap(), 'lapras');
-      expect(landscape(source: define).unwrap(), 'lapras');
+      expect(fromFake.unwrap(), 'lapras');
+      expect(fromDefine.unwrap(), 'lapras');
     });
   });
 
   group('landscapeDefineKey', () {
-    test('is the documented DIENE_LANDSCAPE define', () {
-      expect(landscapeDefineKey, 'DIENE_LANDSCAPE');
+    test('is the DIENE_LANDSCAPE define', () {
+      // Arrange
+      const String expected = 'DIENE_LANDSCAPE';
+
+      // Act
+      const String actual = landscapeDefineKey;
+
+      // Assert
+      expect(actual, expected);
     });
   });
 }

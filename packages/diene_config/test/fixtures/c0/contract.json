@@ -1,0 +1,14 @@
+{
+  "releaseId": "c0-fixtures-r2",
+  "contractVersion": 2,
+  "releaseDigest": "0e64439c681a22fb4f02285c082ed8ffb7b465e732fde4e49757e9e3c9a5783e",
+  "sourceCase": "contracts/c0/cases/config.json",
+  "c0Sections": ["Config precedence"],
+  "projectedCases": [
+    "blankIsUnset",
+    "caseInsensitiveKeyMatching",
+    "finalLayerValidation",
+    "layeringAndIndexedList",
+    "noJsonNoComma"
+  ]
+}

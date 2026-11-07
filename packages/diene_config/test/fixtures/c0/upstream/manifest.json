@@ -1,0 +1,64 @@
+{
+  "authority": "c0-fixtures-r2",
+  "source": {
+    "commit": "fe77520d591f81a9762c40ebf68dc9c0106502d3",
+    "path": "contracts/c0/cases/config.json",
+    "sha256": "3cda07ebb84726ba01def993f83c8e0b053eea3d51496dbc4abc5d08e07cb7b0"
+  },
+  "algorithm": "sha256 of the subtree printed by jq -cS (sorted keys, no whitespace, trailing newline); fileSha256 is the sha256 of the stored file bytes",
+  "vectors": {
+    "blank_is_unset.json": {
+      "pointer": "/cases/blankIsUnset",
+      "sha256": "5e6643b167a5e983d23487acc3e1b0a2793ce91d92cf9a9b35c41e184817de45",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/config.json | jq -cS .cases.blankIsUnset | sha256sum",
+      "adaptations": [
+        "Loaded through ConfigLoader with the base YAML and the blank defines; only the app block is compared with expected.",
+        "The blank defines must give an empty define layer."
+      ],
+      "fileSha256": "a33d4e40b4fc45190d01a111e5ad2dbad663e24434c527671b81be74a0cd76c3"
+    },
+    "case_insensitive_key_matching.json": {
+      "pointer": "/cases/caseInsensitiveKeyMatching",
+      "sha256": "d54914001e36186c3b2bc22fc7809f0f068e048f2b145bb4a095f045ca4dea92",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/config.json | jq -cS .cases.caseInsensitiveKeyMatching | sha256sum",
+      "adaptations": [
+        "Each variant is loaded on its own over the base; the whole merged tree must keep the base spelling of both keys and take the variant value."
+      ],
+      "fileSha256": "8d46c97a02b97df103c4be9cdb85a4356983795dcf4b2c3ed7fac49d594f9755"
+    },
+    "final_layer_validation.json": {
+      "pointer": "/cases/finalLayerValidation",
+      "sha256": "65bad4ea9f111ea7a39628c9ad5fa237b92cc9c6a906151a057e1d07b2686efb",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/config.json | jq -cS .cases.finalLayerValidation | sha256sum",
+      "adaptations": [
+        "The case names no schema. The test composes an app block that needs a non-empty name, retries of 0 or more and a tags list, so the invalid tree fails schema_invalid on retries.",
+        "The same base with one define setting retries is accepted, and the decoder runs once: only the final tree is validated."
+      ],
+      "fileSha256": "ee2fb662ffa0a4adafbc6186900b82cc170c3908b0748ae9bb41f37b9d32dcd3"
+    },
+    "layering_and_indexed_list.json": {
+      "pointer": "/cases/layeringAndIndexedList",
+      "sha256": "6526efe628a0f9bd105a4e4ae46939efbf8da7dec7b2514b09ad9b26684f9676",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/config.json | jq -cS .cases.layeringAndIndexedList | sha256sum",
+      "adaptations": [
+        "landscapeYaml is the overlay and developmentYaml the development override. This package applies the development override after the overlay, while the case lists development before landscape; the expected tree is the same either way, because the defines replace the only keys the development layer sets.",
+        "The test also checks base plus development alone, and all three YAML layers without defines (development wins name and tags, the overlay keeps retries)."
+      ],
+      "fileSha256": "07530b482edea4c8199d3fb5c413493403d0c1d54566c2bbde34a06e47739efa"
+    },
+    "no_json_no_comma.json": {
+      "pointer": "/cases/noJsonNoComma",
+      "sha256": "f24718b6bf9923fae678cf5fd44d13a5e37d441b165bb2153b21bbebd5ad385d",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/config.json | jq -cS .cases.noJsonNoComma | sha256sum",
+      "adaptations": [
+        "Rejected means never decoded: with a block that accepts anything the value stays the original string, and with a block that needs a tags list the load fails schema_invalid."
+      ],
+      "fileSha256": "9f6bbfb8f976692ae763fd2d1fef310c372623b512f3b0d71dafa1a8f51cd3d1"
+    }
+  },
+  "notVendored": {
+    "contracts/c0/cases/identity.json": "No case there is about configuration.",
+    "contracts/c0/cases/problem.json": "It has no config problem types; type URIs and Problem envelopes are minted by diene_problems, and this package only passes its ids.",
+    "contracts/c0/cases/result-wire.json": "The Result wire form belongs to diene_result."
+  }
+}

@@ -33,10 +33,7 @@ app:
       expect((app['nested']! as JsonObject)['deep'], isTrue);
     });
 
-    test('produces types deepMerge can actually merge', () async {
-      // The yaml package returns YamlMap/YamlList views, which are NOT
-      // Map<String, Object?>. Left unconverted, deepMerge treats a nested map
-      // as an opaque scalar and REPLACES it, silently discarding base keys.
+    test('produces maps that deepMerge merges instead of replacing', () async {
       // Arrange
       final ConfigSource source = YamlConfigSource.string('''
 app:
@@ -94,7 +91,7 @@ app:
       expect(loaded.unwrap(), isEmpty);
     });
 
-    test('rejects a non-map root as source_not_a_map', () async {
+    test('rejects a list root as source_not_a_map', () async {
       // Arrange
       final ConfigSource source = YamlConfigSource.string(
         '- one\n- two\n',
@@ -146,8 +143,6 @@ app:
     });
 
     test('reports a throwing read callback as source_unreadable', () async {
-      // A missing asset or file arrives exactly this way, since the source
-      // never touches the filesystem itself.
       // Arrange
       final ConfigSource source = YamlConfigSource(
         name: 'assets/absent.yaml',
@@ -201,23 +196,22 @@ app:
       expect((loaded.unwrap()['app']! as JsonObject)['name'], 'async');
     });
 
-    test(
-      'names the layer in the envelope through the string factory',
-      () async {
-        // Arrange
-        final ConfigSource source = YamlConfigSource.string('- nope\n');
+    test('names the layer memory through the string factory', () async {
+      // Arrange
+      final ConfigSource source = YamlConfigSource.string('- nope\n');
 
-        // Act
-        final Result<JsonObject> loaded = await source.load();
+      // Act
+      final Result<JsonObject> loaded = await source.load();
 
-        // Assert
-        expect(loaded.unwrapErr().data['source'], 'memory');
-      },
-    );
+      // Assert
+      expect(loaded.unwrapErr().data['source'], 'memory');
+    });
 
     test('exposes its read callback and name', () {
       // Arrange
       FutureOr<String> read() => 'app: {}\n';
+
+      // Act
       final YamlConfigSource source = YamlConfigSource(
         read: read,
         name: 'labelled.yaml',

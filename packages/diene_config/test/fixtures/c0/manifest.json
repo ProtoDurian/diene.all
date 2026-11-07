@@ -1,0 +1,10 @@
+{
+  "contract": "diene.config.local-fixtures.v1",
+  "authority": "local-regression-only",
+  "provenance": "Locally written fixtures: the shared contract identity this package pins and one problem it mints. The shared cases live in upstream/.",
+  "algorithm": "sha256",
+  "fixtures": {
+    "contract.json": "a033626875957f4f2ded64253a6c2a5fe235a360f60ef8434cf8fc5caec36dad",
+    "landscape_missing_problem.json": "48cef46f2571b79102cee10892b1a9c65521c757d0305ad41de8a79c115e46dd"
+  }
+}

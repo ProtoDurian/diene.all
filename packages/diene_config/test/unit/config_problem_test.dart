@@ -14,45 +14,59 @@ const ErrorPortal _appPortal = ErrorPortal(
 
 void main() {
   group('ConfigProblemCode', () {
-    test('every wire id satisfies the R-E14 snake_case law', () {
-      // problemTypeUri enforces this; minting each code proves no id can be
-      // added that the ONE builder would reject.
-      for (final ConfigProblemCode code in ConfigProblemCode.values) {
-        expect(
-          problemWireIdPattern.hasMatch(code.wireId),
-          isTrue,
-          reason: '${code.name} has a non-conforming wire id "${code.wireId}"',
-        );
-      }
+    test('every wire id is snake_case as problemTypeUri requires', () {
+      // Arrange
+      const List<ConfigProblemCode> codes = ConfigProblemCode.values;
+
+      // Act
+      final List<ConfigProblemCode> nonConforming = codes
+          .where(
+            (ConfigProblemCode code) =>
+                !problemWireIdPattern.hasMatch(code.wireId),
+          )
+          .toList();
+
+      // Assert
+      expect(nonConforming, isEmpty);
     });
 
     test('every code carries a 4xx status', () {
-      // These are all client-local input failures; a 5xx would tell a caller
-      // to retry something that is deterministic in its input.
-      for (final ConfigProblemCode code in ConfigProblemCode.values) {
-        expect(
-          code.status,
-          allOf(greaterThanOrEqualTo(400), lessThan(500)),
-          reason: '${code.name} has status ${code.status}',
-        );
-      }
+      // Arrange
+      const List<ConfigProblemCode> codes = ConfigProblemCode.values;
+
+      // Act
+      final List<int> statuses = codes
+          .map((ConfigProblemCode code) => code.status)
+          .toList();
+
+      // Assert
+      expect(
+        statuses,
+        everyElement(allOf(greaterThanOrEqualTo(400), lessThan(500))),
+      );
     });
 
     test('wire ids are unique', () {
-      final Set<String> ids = ConfigProblemCode.values
+      // Arrange
+      const List<ConfigProblemCode> codes = ConfigProblemCode.values;
+
+      // Act
+      final Set<String> ids = codes
           .map((ConfigProblemCode code) => code.wireId)
           .toSet();
-      expect(ids, hasLength(ConfigProblemCode.values.length));
+
+      // Assert
+      expect(ids, hasLength(codes.length));
     });
   });
 
   group('configProblem', () {
-    test('mints its type URI through the single C0 §2 builder', () {
+    test('mints its type URI through problemTypeUri', () {
+      // Arrange
+      const ConfigProblemCode code = ConfigProblemCode.schemaInvalid;
+
       // Act
-      final Problem problem = configProblem(
-        code: ConfigProblemCode.schemaInvalid,
-        message: 'invalid',
-      );
+      final Problem problem = configProblem(code: code, message: 'invalid');
 
       // Assert
       expect(
@@ -60,28 +74,31 @@ void main() {
         problemTypeUri(
           portal: ErrorPortal.localError,
           version: configProblemVersion,
-          id: ConfigProblemCode.schemaInvalid.wireId,
+          id: code.wireId,
         ),
       );
     });
 
     test('defaults to the local-error portal', () {
+      // Arrange
+      const ConfigProblemCode code = ConfigProblemCode.sourceUnreadable;
+
       // Act
-      final Problem problem = configProblem(
-        code: ConfigProblemCode.sourceUnreadable,
-        message: 'unreadable',
-      );
+      final Problem problem = configProblem(code: code, message: 'unreadable');
 
       // Assert
       expect(problem.type, startsWith('https://local.atomi.cloud/docs/local/'));
     });
 
-    test("honours an application's real LPSM portal", () {
+    test("honours an application's own portal", () {
+      // Arrange
+      const ErrorPortal portal = _appPortal;
+
       // Act
       final Problem problem = configProblem(
         code: ConfigProblemCode.sourceNotAMap,
         message: 'not a map',
-        portal: _appPortal,
+        portal: portal,
       );
 
       // Assert
@@ -93,9 +110,12 @@ void main() {
     });
 
     test('carries the code, status, and detail prefix', () {
+      // Arrange
+      const ConfigProblemCode code = ConfigProblemCode.landscapeMissing;
+
       // Act
       final Problem problem = configProblem(
-        code: ConfigProblemCode.landscapeMissing,
+        code: code,
         message: 'no landscape',
       );
 
@@ -107,11 +127,16 @@ void main() {
     });
 
     test('merges extra details alongside the code', () {
+      // Arrange
+      const Map<String, Object?> details = <String, Object?>{
+        'source': 'base.yaml',
+      };
+
       // Act
       final Problem problem = configProblem(
         code: ConfigProblemCode.sourceUnreadable,
         message: 'unreadable',
-        details: <String, Object?>{'source': 'base.yaml'},
+        details: details,
       );
 
       // Assert
@@ -122,16 +147,14 @@ void main() {
       });
     });
 
-    test('stamps the reserved config provenance marker', () {
-      // The marker is what makes an envelope recognisable as config-minted; it
-      // is portal-independent, so it is present under any LPSM portal.
+    test('stamps the provenance marker under any portal', () {
+      // Arrange
+      const ConfigProblemCode code = ConfigProblemCode.schemaInvalid;
+
       // Act
-      final Problem local = configProblem(
-        code: ConfigProblemCode.schemaInvalid,
-        message: 'invalid',
-      );
+      final Problem local = configProblem(code: code, message: 'invalid');
       final Problem app = configProblem(
-        code: ConfigProblemCode.schemaInvalid,
+        code: code,
         message: 'invalid',
         portal: _appPortal,
       );
@@ -142,66 +165,80 @@ void main() {
       expect(configProblemValue, contains(configProblemVersion));
     });
 
-    test('reserves data.code against a conflicting caller detail', () {
-      // B3 counterexample: a caller must not be able to ask for one code while
-      // smuggling another through `details`. If this were merged into `data`, a
-      // schema-invalid request would mint a source-unreadable envelope — the
-      // type URI would say `schema_invalid` while `data.code` lied. The reserved
-      // key is refused loudly instead.
+    test('refuses a caller detail that sets a conflicting code', () {
+      // Arrange
+      const Map<String, Object?> details = <String, Object?>{
+        'code': 'source_unreadable',
+      };
+
+      // Act
+      Problem mint() => configProblem(
+        code: ConfigProblemCode.schemaInvalid,
+        message: 'invalid',
+        details: details,
+      );
+
+      // Assert
       expect(
-        () => configProblem(
-          code: ConfigProblemCode.schemaInvalid,
-          message: 'invalid',
-          details: <String, Object?>{'code': 'source_unreadable'},
-        ),
+        mint,
         throwsArgumentError,
         reason:
             'a conflicting data.code must never mint a mislabelled envelope',
       );
     });
 
-    test('reserves data.code even when the caller detail agrees', () {
-      // The key is owned outright: it is minted from [code], never accepted from
-      // the caller, so there is no ambiguous "the caller set it too" path.
-      expect(
-        () => configProblem(
-          code: ConfigProblemCode.schemaInvalid,
-          message: 'invalid',
-          details: <String, Object?>{'code': 'schema_invalid'},
-        ),
-        throwsArgumentError,
+    test('refuses a caller detail that sets the code even when it agrees', () {
+      // Arrange
+      const Map<String, Object?> details = <String, Object?>{
+        'code': 'schema_invalid',
+      };
+
+      // Act
+      Problem mint() => configProblem(
+        code: ConfigProblemCode.schemaInvalid,
+        message: 'invalid',
+        details: details,
       );
+
+      // Assert
+      expect(mint, throwsArgumentError);
     });
 
-    test('reserves the provenance marker against caller details', () {
-      // The provenance marker is the discriminator classification trusts, so a
-      // caller must not be able to forge it onto an envelope through `details`.
-      expect(
-        () => configProblem(
-          code: ConfigProblemCode.schemaInvalid,
-          message: 'invalid',
-          details: <String, Object?>{
-            configProblemProvenanceKey: configProblemValue,
-          },
-        ),
-        throwsArgumentError,
+    test('refuses a caller detail that sets the provenance marker', () {
+      // Arrange
+      const Map<String, Object?> details = <String, Object?>{
+        configProblemProvenanceKey: configProblemValue,
+      };
+
+      // Act
+      Problem mint() => configProblem(
+        code: ConfigProblemCode.schemaInvalid,
+        message: 'invalid',
+        details: details,
       );
+
+      // Assert
+      expect(mint, throwsArgumentError);
     });
 
     test('is never marked recoverable', () {
-      // Every failure here is a deterministic function of its input, so a
-      // retry of the identical call cannot change the outcome.
-      for (final ConfigProblemCode code in ConfigProblemCode.values) {
-        expect(
-          configProblem(code: code, message: 'x').recoverable,
-          isFalse,
-          reason: '${code.name} claims to be retryable',
-        );
-      }
+      // Arrange
+      const List<ConfigProblemCode> codes = ConfigProblemCode.values;
+
+      // Act
+      final List<bool> recoverable = codes
+          .map(
+            (ConfigProblemCode code) =>
+                configProblem(code: code, message: 'x').recoverable,
+          )
+          .toList();
+
+      // Assert
+      expect(recoverable, everyElement(isFalse));
     });
 
     test('round-trips through the RFC 9457 JSON envelope', () {
-      // Act
+      // Arrange
       final Problem problem = configProblem(
         code: ConfigProblemCode.schemaInvalid,
         message: 'invalid',
@@ -210,30 +247,42 @@ void main() {
         },
       );
 
+      // Act
+      final Problem decoded = Problem.fromJson(problem.toJson());
+
       // Assert
-      expect(Problem.fromJson(problem.toJson()), problem);
+      expect(decoded, problem);
     });
   });
 
   group('configFailure', () {
-    test('inherits the reserved-code guard from configProblem', () {
-      expect(
-        () => configFailure<int>(
-          code: ConfigProblemCode.schemaInvalid,
-          message: 'invalid',
-          details: <String, Object?>{'code': 'source_unreadable'},
-        ),
-        throwsArgumentError,
+    test('refuses a caller detail that sets the code, like configProblem', () {
+      // Arrange
+      const Map<String, Object?> details = <String, Object?>{
+        'code': 'source_unreadable',
+      };
+
+      // Act
+      Err<int> mint() => configFailure<int>(
+        code: ConfigProblemCode.schemaInvalid,
+        message: 'invalid',
+        details: details,
       );
+
+      // Assert
+      expect(mint, throwsArgumentError);
     });
 
     test('wraps the same envelope in an Err', () {
+      // Arrange
+      const Map<String, Object?> details = <String, Object?>{'block': 'app'};
+
       // Act
       final Err<int> failure = configFailure<int>(
         code: ConfigProblemCode.schemaInvalid,
         message: 'invalid',
         portal: _appPortal,
-        details: <String, Object?>{'block': 'app'},
+        details: details,
       );
 
       // Assert
@@ -244,7 +293,7 @@ void main() {
           code: ConfigProblemCode.schemaInvalid,
           message: 'invalid',
           portal: _appPortal,
-          details: <String, Object?>{'block': 'app'},
+          details: details,
         ),
       );
     });
@@ -252,13 +301,14 @@ void main() {
 
   group('configProblemCode', () {
     test('reads back a config-owned code', () {
-      // Act
-      final Option<ConfigProblemCode> code = configProblemCode(
-        configProblem(
-          code: ConfigProblemCode.sourceNotAMap,
-          message: 'not a map',
-        ),
+      // Arrange
+      final Problem problem = configProblem(
+        code: ConfigProblemCode.sourceNotAMap,
+        message: 'not a map',
       );
+
+      // Act
+      final Option<ConfigProblemCode> code = configProblemCode(problem);
 
       // Assert
       expect(code.isSome, isTrue);
@@ -266,8 +316,6 @@ void main() {
     });
 
     test('returns None for an envelope minted elsewhere', () {
-      // A core-utils coercion problem carries `code: invalid_input`, which is
-      // that package's vocabulary and must not read as a config code.
       // Arrange
       const Problem foreign = Problem(
         type: 'https://local.atomi.cloud/docs/local/flutter/app/core/v1/x',
@@ -276,31 +324,29 @@ void main() {
         data: <String, Object?>{'util': 'coercion', 'code': 'invalid_input'},
       );
 
+      // Act
+      final Option<ConfigProblemCode> code = configProblemCode(foreign);
+
       // Assert
-      expect(configProblemCode(foreign).isNone, isTrue);
+      expect(code.isNone, isTrue);
     });
 
-    test('classifies a config problem minted under a real app portal', () {
-      // The provenance marker is portal-independent, so classification must
-      // recognise the code no matter which LPSM portal minted the envelope.
-      // Act
+    test('classifies a config problem minted under an application portal', () {
+      // Arrange
       final Problem problem = configProblem(
         code: ConfigProblemCode.schemaInvalid,
         message: 'invalid',
         portal: _appPortal,
       );
 
+      // Act
+      final Option<ConfigProblemCode> code = configProblemCode(problem);
+
       // Assert
-      expect(
-        configProblemCode(problem).unwrap(),
-        ConfigProblemCode.schemaInvalid,
-      );
+      expect(code.unwrap(), ConfigProblemCode.schemaInvalid);
     });
 
     test('returns None for a foreign envelope carrying a config-shaped code', () {
-      // B3 counterexample: another package copies a config-shaped `data.code`.
-      // Trusting `data.code` alone would misclassify it; it lacks this package's
-      // provenance marker, so it stays None.
       // Arrange
       const Problem foreign = Problem(
         type:
@@ -310,17 +356,15 @@ void main() {
         data: <String, Object?>{'code': 'schema_invalid'},
       );
 
+      // Act
+      final Option<ConfigProblemCode> code = configProblemCode(foreign);
+
       // Assert
-      expect(configProblemCode(foreign).isNone, isTrue);
+      expect(code.isNone, isTrue);
     });
 
-    test('returns None for a foreign envelope that reproduces the type-URI suffix '
+    test('returns None for a foreign envelope that copies the type URI suffix '
         'and code', () {
-      // Controller counterexample: the type URI is caller-controlled, so a
-      // foreign minter can reproduce the exact `…/core/v1/schema_invalid`
-      // suffix under its OWN host AND set `data.code: schema_invalid`. Only the
-      // reserved provenance marker — which this foreign envelope cannot
-      // legitimately carry — keeps it None.
       // Arrange
       const Problem foreign = Problem(
         type:
@@ -330,13 +374,14 @@ void main() {
         data: <String, Object?>{'code': 'schema_invalid'},
       );
 
+      // Act
+      final Option<ConfigProblemCode> code = configProblemCode(foreign);
+
       // Assert
-      expect(configProblemCode(foreign).isNone, isTrue);
+      expect(code.isNone, isTrue);
     });
 
     test('returns None when the provenance marker carries a foreign value', () {
-      // The key is present but its value is not this package's identity, so the
-      // envelope was minted elsewhere and must not read as config-owned.
       // Arrange
       const Problem foreign = Problem(
         type:
@@ -349,15 +394,15 @@ void main() {
         },
       );
 
+      // Act
+      final Option<ConfigProblemCode> code = configProblemCode(foreign);
+
       // Assert
-      expect(configProblemCode(foreign).isNone, isTrue);
+      expect(code.isNone, isTrue);
     });
 
     test('returns None for an envelope minted under a different contract '
         'version', () {
-      // The provenance marker embeds the contract version, so an envelope minted
-      // under a different version carries a different marker and is a DIFFERENT
-      // problem type — not this version's vocabulary.
       // Arrange
       final Problem otherVersion = Problem(
         type: problemTypeUri(
@@ -373,8 +418,11 @@ void main() {
         },
       );
 
+      // Act
+      final Option<ConfigProblemCode> code = configProblemCode(otherVersion);
+
       // Assert
-      expect(configProblemCode(otherVersion).isNone, isTrue);
+      expect(code.isNone, isTrue);
     });
 
     test('returns None for an envelope with no code at all', () {
@@ -385,22 +433,61 @@ void main() {
         status: 500,
       );
 
+      // Act
+      final Option<ConfigProblemCode> code = configProblemCode(bare);
+
       // Assert
-      expect(configProblemCode(bare).isNone, isTrue);
+      expect(code.isNone, isTrue);
+    });
+
+    test('returns None for a config marker with an unknown code', () {
+      // Arrange
+      const Problem unknown = Problem(
+        type: 'about:blank',
+        title: 'unknown',
+        status: 422,
+        data: <String, Object?>{
+          configProblemCodeKey: 'not_a_config_code',
+          configProblemProvenanceKey: configProblemValue,
+        },
+      );
+
+      // Act
+      final Option<ConfigProblemCode> code = configProblemCode(unknown);
+
+      // Assert
+      expect(code.isNone, isTrue);
     });
 
     test('recognises every declared code', () {
-      for (final ConfigProblemCode code in ConfigProblemCode.values) {
-        final Problem problem = configProblem(code: code, message: 'x');
-        expect(configProblemCode(problem).unwrap(), code);
-      }
+      // Arrange
+      const List<ConfigProblemCode> codes = ConfigProblemCode.values;
+
+      // Act
+      final List<ConfigProblemCode> readBack = codes
+          .map(
+            (ConfigProblemCode code) => configProblemCode(
+              configProblem(code: code, message: 'x'),
+            ).unwrap(),
+          )
+          .toList();
+
+      // Assert
+      expect(readBack, codes);
     });
   });
 
   group('configProblemVersion', () {
     test('is a valid contract version segment', () {
+      // Arrange
+      final RegExp pattern = problemVersionPattern;
+
+      // Act
+      final bool matches = pattern.hasMatch(configProblemVersion);
+
+      // Assert
       expect(configProblemVersion, 'v1');
-      expect(problemVersionPattern.hasMatch(configProblemVersion), isTrue);
+      expect(matches, isTrue);
     });
   });
 }
