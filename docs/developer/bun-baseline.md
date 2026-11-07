@@ -27,8 +27,7 @@ rules remain in `docs/standards/`.
 - `task helm:lint` and `task helm:template` retain the inherited Helm axis.
 
 Each tier task is a one-line call to `scripts/local/test.sh`, and `task clean`
-calls `scripts/local/clean.sh`: branching lives in `scripts/local/`, and no
-Taskfile calls `scripts/ci/`.
+calls `scripts/local/clean.sh`.
 
 There is no `task dev`, `task up`, or `task down` surface in this base. Hot reload
 belongs to runnable descendants, and the integration tier owns its Redis
