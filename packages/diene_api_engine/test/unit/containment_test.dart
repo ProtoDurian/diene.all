@@ -87,6 +87,41 @@ void main() {
       ]);
     });
 
+    test('a Doc A with an infinite version is skipped', () async {
+      // Arrange
+      final FakeHttpTransport transport = FakeHttpTransport(
+        (HttpRequest request) =>
+            _ok('{"version":1e400,"catalogHosts":["cat.cluster.atomi.cloud"]}'),
+      );
+
+      // Act
+      final RescueOutcome outcome = await _router(transport).rescue(_coord);
+
+      // Assert
+      expect(outcome, isA<RescueUnavailable>());
+      expect(transport.sent.map((HttpRequest r) => r.url.path), <String>[
+        '/fleet.json',
+      ]);
+    });
+
+    test('a Doc A with a whole-number double version is still used', () async {
+      // Arrange
+      final FakeHttpTransport transport = FakeHttpTransport(
+        (HttpRequest request) => request.url.path == '/fleet.json'
+            ? _ok('{"version":5.0,"catalogHosts":["cat.cluster.atomi.cloud"]}')
+            : _ok(
+                '{"version":1,"candidates":{"lapras.lithium.api.root":'
+                '["https://alt.cluster.atomi.cloud"]}}',
+              ),
+      );
+
+      // Act
+      final RescueOutcome outcome = await _router(transport).rescue(_coord);
+
+      // Assert
+      expect((outcome as Rescued).baseUrl.host, 'alt.cluster.atomi.cloud');
+    });
+
     test('a Doc A host that is not a URI is skipped', () async {
       // Arrange
       final FakeHttpTransport transport = FakeHttpTransport(

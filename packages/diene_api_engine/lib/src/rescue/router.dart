@@ -229,7 +229,8 @@ class RescueRouter {
         final Map<String, Object?>? json = _jsonObject(outcome.response.body);
         if (json != null &&
             json['catalogHosts'] is List &&
-            json['version'] is num) {
+            json['version'] is num &&
+            (json['version']! as num).isFinite) {
           final DocA docA = DocA.fromJson(json);
           if (seenDocA != null && docA.version < seenDocA) {
             return null;
