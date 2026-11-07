@@ -93,6 +93,14 @@ Every logs panel: newest first, dedup on, a limit of about 100, time shown.
 
 Add a slow- or error-trace table (TraceQL) only once the service emits spans. No dead panels.
 
+## Test layers
+
+A dashboard is tested in three layers, in this order. Each one catches what the one before it cannot.
+
+1. **Sandbox with fake data: does the JSON render?** Before merge, load generated metrics ([`generate-metrics.awk`](/.claude/skills/grafana-dashboards/sandbox/generate-metrics.awk)) and, for log and trace panels, generated logs ([`generate-logs.awk`](/.claude/skills/grafana-dashboards/sandbox/generate-logs.awk)) and a sample trace in the [logs and traces profile](/docs/standards/grafana-dashboards/sandbox.md#logs-and-traces-profile) (Loki and Tempo). It does not prove the real data looks like the fake data. How: [Dashboard sandbox](/docs/standards/grafana-dashboards/sandbox.md) and [Check it before merge](#check-it-before-merge).
+2. **Query check against real traffic (planned, not built yet).** An end-to-end test drives real requests through the app, each with a trace id, and every panel and alert query must return rows from that run. Until that test exists, skip this layer. Goal draft: [diene-corpus pull request 63](https://github.com/ProtoDurian/diene-corpus/pull/63).
+3. **Real stored lines, after deploy.** Sample the real store in Grafana Explore. A log or trace panel built without sampled lines stays `UNVERIFIED` until it is checked against them, and what you found goes in `observability/dashboards/log-notes.md`. How: [Log and trace panels](#log-and-trace-panels), steps 1–9.
+
 ## Check it before merge
 
 Run this for every new or changed dashboard file. Tools and the sandbox: [Dashboard sandbox](/docs/standards/grafana-dashboards/sandbox.md).
