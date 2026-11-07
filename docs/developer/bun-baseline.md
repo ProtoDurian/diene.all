@@ -14,8 +14,8 @@ rules remain in `docs/standards/`.
 - `task setup` installs the locked Bun dependencies after synchronizing vendored
   package skills.
 - `task lint` runs every generated pre-commit hook.
-- `task test`, `task test:unit`, and `task test:int` run the test tiers without
-  coverage.
+- `task test`, `task test:unit`, `task test:int`, and `task test:meta` run the
+  test tiers without coverage through `scripts/local/test.sh <tier>`.
 - `task test:coverage`, `task test:unit:coverage`, and
   `task test:int:coverage` write scoped LCOV artifacts.
 - `task test:watch` watches the unit tier.
@@ -25,6 +25,9 @@ rules remain in `docs/standards/`.
 - `task preview -- <args>` rebuilds and executes the bundled artifact.
 - `task docker:build` and `task docker:run` build and run the Bun image.
 - `task helm:lint` and `task helm:template` retain the inherited Helm axis.
+
+Each tier task is a one-line call to `scripts/local/test.sh`; branching lives in
+that script, and no Taskfile calls `scripts/ci/`.
 
 There is no `task dev`, `task up`, or `task down` surface in this base. Hot reload
 belongs to runnable descendants, and the integration tier owns its Redis
@@ -45,7 +48,8 @@ uses strict no-emit typechecking. Knip has four dead-code modes, none with ignor
 ## Test and coverage tiers
 
 - `.config/bun-base.coverage.yaml` lists the tiers (`unit`, `int`, `meta`), each
-  with its test folder and coverage scope; `scripts/ci/test.sh <tier>` reads it.
+  with its test folder and coverage scope; `scripts/ci/test.sh <tier>` and
+  `scripts/local/test.sh <tier>` read it.
   A tier with no test files passes and writes no coverage file.
 - Unit tests live under `tests/unit/` and cover only `src/lib/**`.
 - Integration tests live under `tests/integration/`, use Testcontainers Redis,
