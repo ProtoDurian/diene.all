@@ -14,7 +14,6 @@ meta_test_path="${META_TEST_PATH:-test/meta}"
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
-# The consumer tier measures the published archive, not lib coverage.
 [[ ${mode} == "consumer" ]] && exec ./scripts/ci/consumer-test.sh
 
 if [[ ${mode} == "meta" && ! -f "${member_dir}/${test_helper_path}" ]]; then

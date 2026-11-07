@@ -11,7 +11,7 @@ export default {
     {
       name: 'baseline-consumer-test-green',
       description:
-        'a fresh project installs the local pub archive, imports every public library, runs, compiles and type-checks',
+        'a fresh project installs the preloaded local pub archive, imports every public library, runs, compiles and type-checks',
       kind: 'baseline',
       async run(repo: any) {
         await expectGreen(repo, CONSUMER, 'consumer-test');
@@ -26,7 +26,8 @@ export default {
         await withCleanProbeState(repo, [PUBIGNORE], async () => {
           await repo.write(PUBIGNORE, `${await repo.read(PUBIGNORE)}/lib/src/note_summary.dart\n`);
           await expectRedBecause(repo, CONSUMER, 'consumer-test', [
-            "Error when reading '../package/lib/src/note_summary.dart'",
+            "Error when reading '../pub-cache/hosted/",
+            "lib/src/note_summary.dart': No such file or directory",
           ]);
         });
       },

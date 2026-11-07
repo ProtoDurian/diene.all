@@ -1,40 +1,48 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Consumer tier: pack with pub, install the local archive in a fresh project, import, run, compile, type-check.
-# Expected files = tracked minus .pubignore; import specs = the archive's top-level lib/*.dart.
-
 root_dir="$(git rev-parse --show-toplevel)"
 member_dir="${root_dir}/${MEMBER_DIR:-packages/diene_dart_lib}"
 cd "${member_dir}"
 
 name="$(yq -r '.name' pubspec.yaml)"
 sdk="$(yq -r '.environment.sdk' pubspec.yaml)"
+# pub hides version 0.0.0 from offline resolution, so pack a pre-release of the current version.
+version="$(yq -r '.version' pubspec.yaml)-consumer"
 
 work="$(mktemp -d)"
-trap 'rm -rf "${work}"' EXIT
+cp -p pubspec.yaml "${work}/pubspec.yaml.orig"
+trap 'cp -p "${work}/pubspec.yaml.orig" "${member_dir}/pubspec.yaml"; rm -rf "${work}"' EXIT
 archive="${work}/package.tar.gz"
 unpacked="${work}/package"
 consumer="${work}/consumer"
+export PUB_CACHE="${work}/pub-cache"
 mkdir -p "${unpacked}" "${consumer}/bin"
 
-echo "📦 Packing ${name} with pub..."
+echo "📦 Packing ${name} ${version} with pub..."
+yq -i ".version = \"${version}\"" pubspec.yaml
 dart pub publish --skip-validation --to-archive="${archive}"
+cp -p "${work}/pubspec.yaml.orig" pubspec.yaml
 tar -xzf "${archive}" -C "${unpacked}"
 
-echo "🔎 Comparing the archive with the package's tracked files minus .pubignore..."
-# pub never ships dotfiles.
-git ls-files -c | grep -Ev '(^|/)[.]' | LC_ALL=C sort >"${work}/tracked"
+echo "🔎 Comparing the archive with the package's committed files minus .pubignore and pub's defaults..."
+git ls-files -c | awk -F/ '
+  { for (i = 1; i <= NF; i++) if ($i ~ /^[.]/ && $i != ".htaccess") next }
+  /(^|\/)pubspec[.]lock$/ || /^pubspec_overrides[.]yaml$/ { next }
+  { print }' | LC_ALL=C sort >"${work}/committed"
 git ls-files -c -i --exclude-per-directory=.pubignore | LC_ALL=C sort >"${work}/ignored"
-LC_ALL=C comm -23 "${work}/tracked" "${work}/ignored" >"${work}/expected"
+LC_ALL=C comm -23 "${work}/committed" "${work}/ignored" >"${work}/expected"
 (cd "${unpacked}" && find . -type f | sed 's|^\./||' | LC_ALL=C sort) >"${work}/shipped"
 if ! diff -u --label expected --label archive "${work}/expected" "${work}/shipped" >&2; then
-  echo "❌ the archive does not match the package's tracked files minus .pubignore" >&2
+  echo "❌ the archive does not match the package's committed files minus .pubignore (an uncommitted file also fails)" >&2
   exit 1
 fi
 
 mapfile -t libraries < <(cd "${unpacked}/lib" && find . -maxdepth 1 -type f -name '*.dart' | sed 's|^\./||' | LC_ALL=C sort)
 [[ ${#libraries[@]} -eq 0 ]] && echo "❌ the archive ships no public lib/*.dart library" >&2 && exit 1
+
+echo "📥 Installing the local archive into an isolated pub cache..."
+dart pub cache preload "${archive}"
 
 cat >"${consumer}/pubspec.yaml" <<YAML
 name: consumer_fixture
@@ -42,8 +50,7 @@ publish_to: none
 environment:
   sdk: '${sdk}'
 dependencies:
-  ${name}:
-    path: ${unpacked}
+  ${name}: ${version}
 YAML
 cat >"${consumer}/analysis_options.yaml" <<'YAML'
 analyzer:
@@ -59,25 +66,35 @@ YAML
 } >"${consumer}/bin/libraries.dart"
 cat >"${consumer}/bin/consumer.dart" <<DART
 import 'package:${name}/diene_dart_lib.dart';
-import 'package:${name}/test_helper.dart';
 
 void main() {
   const Note note = Note(title: 'Consumer', body: 'Installed from the archive.');
   final Note decoded = Note.fromJson(note.toJson());
   if (decoded != note) throw StateError('the wire codec did not round-trip');
   final String summary = summarizeNote(note);
-  assertNoteSummary(note, summary);
+  if (summary != 'Consumer — Installed from the archive.') throw StateError('unexpected summary: \$summary');
   print('consumer: \$summary');
 }
 DART
+if [[ -f ${unpacked}/lib/test_helper.dart ]]; then
+  cat >"${consumer}/bin/test_helper.dart" <<DART
+import 'package:${name}/diene_dart_lib.dart';
+import 'package:${name}/test_helper.dart';
+
+void main() {
+  const Note note = Note(title: 'Consumer', body: 'Helper.');
+  assertNoteSummary(note, summarizeNote(note));
+}
+DART
+fi
 
 cd "${consumer}"
-echo "📥 Installing the local archive into a fresh project..."
 dart pub get --offline
+root_uri="$(jq -r --arg n "${name}" '.packages[] | select(.name == $n) | .rootUri' .dart_tool/package_config.json)"
+[[ ${root_uri} != "file://${PUB_CACHE}/hosted/pub.dev/${name}-${version}" ]] && echo "❌ ${name} resolved to ${root_uri}, not the preloaded archive" >&2 && exit 1
 
 echo "🔎 Importing every public library (${libraries[*]}), running, compiling and type-checking..."
-dart run bin/libraries.dart
-dart run bin/consumer.dart
+for entry in bin/*.dart; do dart run "${entry}"; done
 dart compile exe bin/consumer.dart -o "${work}/consumer.exe"
 "${work}/consumer.exe"
 dart analyze --fatal-infos
