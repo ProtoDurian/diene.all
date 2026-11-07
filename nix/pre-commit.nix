@@ -22,6 +22,7 @@ pre-commit-lib.run {
         "^Changelog\\.md$"
         "^docs/developer/CommitConventions\\.md$"
         "^infra/root_chart/"
+        "^chart/"
       ];
     };
 
@@ -90,6 +91,24 @@ pre-commit-lib.run {
       entry = "${packages.shellcheck}/bin/shellcheck -x --source-path=SCRIPTDIR";
       files = ".*\\.sh$";
       pass_filenames = true;
+      language = "system";
+    };
+
+    a-wrapper-helm-docs = {
+      enable = true;
+      name = "Helm wrapper docs";
+      entry = "${packages.infralint}/bin/helm-docs --chart-search-root chart";
+      files = "^chart/.*";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-wrapper-helm-lint = {
+      enable = true;
+      name = "Helm wrapper lint";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH bash scripts/validate/helm-wrapper.sh lint'";
+      files = "^(chart/.*|config/.*|scripts/(local|validate)/.*)$";
+      pass_filenames = false;
       language = "system";
     };
   };

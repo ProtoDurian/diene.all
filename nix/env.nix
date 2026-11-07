@@ -11,6 +11,7 @@ with packages;
   lint = [
     actionlint
     dlint
+    helm-schema
     infralint
     pre-commit
     shellcheck
