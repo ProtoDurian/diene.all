@@ -1,6 +1,5 @@
 package cli_test
 
-// DOMAIN WIRING: replaceable Note/KV compiled-artifact Redis journey.
 import (
 	"context"
 	"os/exec"
@@ -46,5 +45,3 @@ func TestCompiledArtifactRedisJourney(t *testing.T) {
 		t.Fatalf("compiled artifact output = %q, want %q", got, want)
 	}
 }
-
-// END DOMAIN WIRING

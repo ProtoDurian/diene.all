@@ -1,246 +1,315 @@
 # Validation in Go
 
-## Library: none (standard library only)
+## Library: `go-playground/validator`
 
-Go validation uses plain constructors and the `errors` package. Struct-tag
-validators (`go-playground/validator` and similar) are not used: they hide rules
-in strings the compiler cannot check, and they still hand you an unparsed
-`string` afterwards.
+`github.com/go-playground/validator/v10` (v10.30.6, pinned in `go.mod`) checks
+request shape from struct tags. It validates the adapter's request types only.
+Domain rules stay in domain constructors that return `(T, error)`.
 
-```go
-import (
-	"errors"
-	"fmt"
-	"regexp"
-	"strings"
-	"unicode/utf8"
-)
+```bash
+go get github.com/go-playground/validator/v10@v10.30.6
 ```
 
-## Parse, Don't Validate
-
-A validator answers "is this string OK?" and then throws the answer away. A
-parser returns a new type that can only hold valid values, so later code never
-asks again.
-
 ```go
-// WRONG - every caller must remember to call it, and still holds a string
-func IsValidSlug(raw string) bool
-
-// RIGHT - holding a Slug is the proof
-func NewSlug(raw string) (Slug, error)
+import "github.com/go-playground/validator/v10"
 ```
 
-### Value Objects
+## One Shared Validator
+
+`*validator.Validate` caches struct metadata and is safe for concurrent use.
+Build it once in the composition root and inject it. Never call
+`validator.New()` per request.
 
 ```go
-// lib/note/slug.go
-package note
-
-var ErrInvalidSlug = errors.New("invalid slug")
-
-var slugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
-
-type Slug struct {
-	value string
-}
-
-func NewSlug(raw string) (Slug, error) {
-	if len(raw) > 64 || !slugPattern.MatchString(raw) {
-		return Slug{}, fmt.Errorf("%w: %q", ErrInvalidSlug, raw)
+// adapters/api/validate.go
+func NewValidate() (*validator.Validate, error) {
+	validate := validator.New(validator.WithRequiredStructEnabled())
+	validate.RegisterTagNameFunc(FieldNamer{}.JSON)
+	if err := validate.RegisterValidation("decimal", NewDecimalRule().Check); err != nil {
+		return nil, fmt.Errorf("register decimal rule: %w", err)
 	}
-	return Slug{value: raw}, nil
-}
-
-func (slug Slug) String() string {
-	return slug.value
+	return validate, nil
 }
 ```
-
-- The field is unexported, so no other package can build `Slug{value: "Bad!"}`.
-  The zero value `Slug{}` is still possible; treat it as "absent".
-- `type Slug string` is weaker: `note.Slug("Bad!")` compiles anywhere.
-- A compiled `regexp` is immutable, so a package-level pattern is fine. Mutable
-  package state is not.
-
-### Sentinel and Typed Errors
-
-Use a sentinel (`ErrInvalidSlug`) when callers only need to know which rule
-failed. Use a typed error when they also need data from it.
 
 ```go
-// lib/note/errors.go
-type FieldError struct {
-	Field string
-	Err   error
-}
+// adapters/api/names.go
+type FieldNamer struct{}
 
-func (fieldErr *FieldError) Error() string {
-	return fieldErr.Field + ": " + fieldErr.Err.Error()
-}
-
-func (fieldErr *FieldError) Unwrap() error {
-	return fieldErr.Err
+func (FieldNamer) JSON(field reflect.StructField) string {
+	name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+	if name == "-" {
+		return ""
+	}
+	return name
 }
 ```
 
-Callers match with `errors.Is` and `errors.As`, never with `==` or a string
-compare, because both see through `%w` wrapping:
+`RegisterTagNameFunc` makes errors name the wire field (`items[0].quantity`),
+not the Go field (`Items[0].Quantity`).
 
 ```go
-if errors.Is(err, note.ErrInvalidSlug) {
-	// the slug rule failed, however deeply the error was wrapped
+// cmd/go-base/main.go
+validate, err := api.NewValidate()
+if err != nil {
+	return fmt.Errorf("build validator: %w", err)
 }
-
-var fieldErr *note.FieldError
-if errors.As(err, &fieldErr) {
-	// fieldErr.Field names the input that failed
-}
+checker := api.NewRequestValidator(validate, api.Messages{})
+orders := orderapi.NewController(checker, orderService)
 ```
 
-### Several Fields at Once
+## Request Types
 
-Report every invalid field in one response, not the first one only. Collect the
-failures and combine them with `errors.Join`.
+The request type mirrors the wire. Tags sit here, never on domain structs.
+Pointer fields tell a missing field apart from an empty one.
 
 ```go
-// lib/note/draft.go
-var ErrEmptyBody = errors.New("body is empty")
-
-var ErrBodyTooLong = errors.New("body is longer than 10000 characters")
-
-type Draft struct {
-	Slug Slug
-	Body string
+// adapters/api/order/req.go
+type CreateOrderReq struct {
+	Items           []ItemReq   `json:"items" validate:"required,min=1,dive"`
+	ShippingAddress *AddressReq `json:"shippingAddress" validate:"required"`
+	Email           *string     `json:"email" validate:"required,email"`
+	Note            *string     `json:"note,omitempty" validate:"omitempty,max=500"`
 }
 
-func NewDraft(rawSlug string, rawBody string) (Draft, error) {
-	slug, slugErr := NewSlug(rawSlug)
+type ItemReq struct {
+	ProductID string `json:"productId" validate:"required,uuid,lowercase"`
+	Quantity  int    `json:"quantity" validate:"gt=0"`
+}
 
-	body := strings.TrimSpace(rawBody)
-	var bodyErr error
-	switch {
-	case body == "":
-		bodyErr = ErrEmptyBody
-	case utf8.RuneCountInString(body) > 10000:
-		bodyErr = ErrBodyTooLong
-	}
-
-	var errs []error
-	if slugErr != nil {
-		errs = append(errs, &FieldError{Field: "slug", Err: slugErr})
-	}
-	if bodyErr != nil {
-		errs = append(errs, &FieldError{Field: "body", Err: bodyErr})
-	}
-	if len(errs) > 0 {
-		return Draft{}, errors.Join(errs...)
-	}
-	return Draft{Slug: slug, Body: body}, nil
+type AddressReq struct {
+	Street  string `json:"street" validate:"required"`
+	City    string `json:"city" validate:"required"`
+	ZipCode string `json:"zipCode" validate:"required,len=5,numeric"`
 }
 ```
 
-`errors.Is` and `errors.As` search every branch of a joined error, but
-`errors.As` stops at the first match. To list every field, unwrap the join:
+`dive` checks every element of a slice or map. A pointer to a struct is
+followed and checked; `required` on it rejects `nil`.
+
+### Common Tags
+
+| Tag                                  | Checks                                     |
+| ------------------------------------ | ------------------------------------------ |
+| `required`                           | not the zero value; a pointer is not `nil` |
+| `omitempty`                          | skip the remaining rules when empty        |
+| `min=2`, `max=100`, `len=5`          | string length, slice length, or number     |
+| `gt=0`, `gte=0`, `lt=100`, `lte=100` | number bounds                              |
+| `email`, `url`, `uuid`, `uuid7`      | string formats                             |
+| `lowercase`, `numeric`, `alphanum`   | character classes                          |
+| `oneof=pending in_progress done`     | one of a fixed set (enums)                 |
+| `iso4217`, `timezone`                | currency code, IANA zone name              |
+| `eqfield=Password`, `gtfield=Start`  | compare with a sibling field (Go name)     |
+| `dive`                               | apply the following tags to each element   |
+
+### Cross-Field Rules
 
 ```go
-var joined interface{ Unwrap() []error }
-if errors.As(err, &joined) {
-	for _, each := range joined.Unwrap() {
-		var fieldErr *note.FieldError
-		if errors.As(each, &fieldErr) {
-			problems = append(problems, FieldProblem{Field: fieldErr.Field, Message: fieldErr.Err.Error()})
-		}
-	}
+type RegistrationReq struct {
+	Password     string `json:"password" validate:"required,min=8"`
+	Confirmation string `json:"confirmation" validate:"required,eqfield=Password"`
 }
 ```
 
-### Cross-Field Invariants
+Field-comparison tags take the Go field name, not the JSON name.
 
-A rule that spans fields belongs to the constructor of the type that owns both.
+### Custom Rules
+
+A custom tag is an exported method on a stateless struct, registered once in
+`NewValidate`.
 
 ```go
-var ErrWindowOrder = errors.New("window ends before it starts")
-
-type Window struct {
-	Start time.Time
-	End   time.Time
+// adapters/api/decimal.go
+type DecimalRule struct {
+	pattern *regexp.Regexp
 }
 
-func NewWindow(start time.Time, end time.Time) (Window, error) {
-	if end.Before(start) {
-		return Window{}, fmt.Errorf("%w: %s < %s", ErrWindowOrder, end.Format(time.RFC3339), start.Format(time.RFC3339))
-	}
-	return Window{Start: start.UTC(), End: end.UTC()}, nil
+func NewDecimalRule() DecimalRule {
+	return DecimalRule{pattern: regexp.MustCompile(`^-?[0-9]+(\.[0-9]+)?$`)}
+}
+
+func (rule DecimalRule) Check(field validator.FieldLevel) bool {
+	return rule.pattern.MatchString(field.Field().String())
 }
 ```
+
+```go
+type MoneyReq struct {
+	Amount   string `json:"amount" validate:"required,decimal"`
+	Currency string `json:"currency" validate:"required,iso4217"`
+}
+```
+
+### Single Values
+
+Query parameters and path values have no struct. Use `Var`:
+
+```go
+if err := validate.Var(limit, "min=1,max=100"); err != nil {
+	return Page{}, fmt.Errorf("limit: %w", err)
+}
+```
+
+## Errors as Values
+
+`Struct` returns `validator.ValidationErrors` for bad input and
+`*validator.InvalidValidationError` when you passed something it cannot check
+(a nil or non-struct value): that one is a programming bug. The request
+validator turns the first into a typed error the caller can match.
+
+```go
+// adapters/api/validation.go
+var ErrInvalidRequest = errors.New("invalid request")
+
+type InvalidRequestError struct {
+	Fields map[string][]string
+}
+
+func (*InvalidRequestError) Error() string {
+	return ErrInvalidRequest.Error()
+}
+
+func (*InvalidRequestError) Unwrap() error {
+	return ErrInvalidRequest
+}
+
+type RequestValidator struct {
+	validate *validator.Validate
+	messages Messages
+}
+
+func NewRequestValidator(validate *validator.Validate, messages Messages) RequestValidator {
+	return RequestValidator{validate: validate, messages: messages}
+}
+
+func (checker RequestValidator) Check(ctx context.Context, req any) error {
+	err := checker.validate.StructCtx(ctx, req)
+	var failures validator.ValidationErrors
+	if !errors.As(err, &failures) {
+		return err
+	}
+	fields := make(map[string][]string, len(failures))
+	for _, failure := range failures {
+		_, path, _ := strings.Cut(failure.Namespace(), ".")
+		fields[path] = append(fields[path], checker.messages.For(failure))
+	}
+	return &InvalidRequestError{Fields: fields}
+}
+```
+
+`Namespace()` starts with the Go type name (`CreateOrderReq.items[0].quantity`);
+`strings.Cut` drops it.
+
+```go
+// adapters/api/messages.go
+type Messages struct{}
+
+func (Messages) For(failure validator.FieldError) string {
+	switch failure.Tag() {
+	case "required":
+		return "Is required"
+	case "email":
+		return "Must be a valid email address"
+	case "min":
+		return "Must be at least " + failure.Param()
+	case "max":
+		return "Must be at most " + failure.Param()
+	case "gt":
+		return "Must be greater than " + failure.Param()
+	case "oneof":
+		return "Must be one of: " + failure.Param()
+	default:
+		return "Is invalid"
+	}
+}
+```
+
+Never echo the rejected value: it may be a password or a token.
 
 ## Validation at Boundaries
 
-| Layer   | Checks                                                   | Fails with                       |
-| ------- | -------------------------------------------------------- | -------------------------------- |
-| Adapter | shape: body size, JSON syntax, unknown or missing fields | transport error (400, exit 2)    |
-| Domain  | invariants: slug format, body length, window order       | domain error from `lib/`         |
-| Adapter | mapping: domain error to status code and response body   | `errors.Is` / `errors.As` switch |
+| Layer   | Checks                                       | Fails with                    | Status |
+| ------- | -------------------------------------------- | ----------------------------- | ------ |
+| Adapter | JSON syntax, struct tags                     | `*api.InvalidRequestError`    | 400    |
+| Domain  | invariants: totals, status moves, date order | a sentinel domain error, `%w` | 422    |
 
 ### Shape in the Adapter
 
-The request type mirrors the wire, not the domain. Pointer fields tell a missing
-field apart from an empty one.
-
 ```go
-// adapters/api/note/req.go
-type CreateNoteReq struct {
-	Slug *string `json:"slug"`
-	Body *string `json:"body"`
-}
-```
-
-```go
-// adapters/api/note/controller.go
+// adapters/api/order/controller.go
 func (controller Controller) Create(writer http.ResponseWriter, request *http.Request) {
-	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, 64<<10))
-	decoder.DisallowUnknownFields()
-
-	var req CreateNoteReq
-	if err := decoder.Decode(&req); err != nil {
-		controller.problems.Write(writer, http.StatusBadRequest, err)
+	var req CreateOrderReq
+	if err := json.NewDecoder(http.MaxBytesReader(writer, request.Body, 64<<10)).Decode(&req); err != nil {
+		controller.problems.Write(writer, err)
 		return
 	}
-	if req.Slug == nil || req.Body == nil {
-		controller.problems.Write(writer, http.StatusBadRequest, ErrMissingField)
+	if err := controller.checker.Check(request.Context(), req); err != nil {
+		controller.problems.Write(writer, err)
 		return
 	}
 
-	draft, err := note.NewDraft(*req.Slug, *req.Body)
+	draft, err := controller.mapper.ToDomain(req)
 	if err != nil {
-		controller.problems.Write(writer, http.StatusUnprocessableEntity, err)
+		controller.problems.Write(writer, err)
 		return
 	}
 
-	created, err := controller.service.Publish(request.Context(), draft)
+	created, err := controller.service.Place(request.Context(), draft)
 	if err != nil {
-		controller.problems.Write(writer, http.StatusInternalServerError, err)
+		controller.problems.Write(writer, err)
 		return
 	}
-	controller.responses.Write(writer, http.StatusCreated, NewNoteRes(created))
+	controller.responses.Write(writer, http.StatusCreated, controller.mapper.ToRes(created))
 }
 ```
 
-The adapter decides what "malformed request" means for its transport. It does
-not re-check the slug rule: `note.NewDraft` owns that.
+The problem writer picks the status with `errors.As` and `errors.Is`, so the
+controller never decides it inline. An invalid request becomes a 400 Problem:
+
+```json
+{
+  "type": "https://errors.atomi.cloud/docs/lapras/nitroso/zinc/api/v1/validation_error",
+  "title": "The request is invalid",
+  "status": 400,
+  "errors": {
+    "email": ["Must be a valid email address"],
+    "items[0].quantity": ["Must be greater than 0"]
+  }
+}
+```
 
 ### Invariants in the Domain
 
-The domain service accepts the parsed type, so it cannot receive an invalid
-value.
+The validator does not run in `lib/`. A domain type guards its own rules in a
+constructor that returns `(T, error)` and wraps a sentinel with `%w`.
+
+```go
+// lib/order/total.go
+var ErrNegativeTotal = errors.New("order total is negative")
+
+type Total struct {
+	minorUnits int64
+	currency   string
+}
+
+func NewTotal(minorUnits int64, currency string) (Total, error) {
+	if minorUnits < 0 {
+		return Total{}, fmt.Errorf("%w: %d %s", ErrNegativeTotal, minorUnits, currency)
+	}
+	return Total{minorUnits: minorUnits, currency: currency}, nil
+}
+```
+
+The problem writer maps `errors.Is(err, order.ErrNegativeTotal)` to a 422.
+The domain service takes the parsed type, so it cannot receive an unchecked
+value:
 
 ```go
 // WRONG - every caller can pass anything
-func (service Service) Publish(ctx context.Context, slug string, body string) (Note, error)
+func (service Service) Place(ctx context.Context, items []ItemReq) (Order, error)
 
-// RIGHT - the signature demands a parsed Draft
-func (service Service) Publish(ctx context.Context, draft Draft) (Note, error)
+// RIGHT - holding a Draft is the proof it was checked
+func (service Service) Place(ctx context.Context, draft Draft) (Order, error)
 ```
 
 ## Best Practices
@@ -249,38 +318,38 @@ func (service Service) Publish(ctx context.Context, draft Draft) (Note, error)
 
 ```go
 // WRONG - a bad request crashes the process
-slug := MustNewSlug(raw)
+if err := validate.Struct(req); err != nil {
+	panic(err)
+}
 
 // RIGHT - the caller decides
-slug, err := NewSlug(raw)
-if err != nil {
-	return Note{}, err
+if err := checker.Check(ctx, req); err != nil {
+	return Draft{}, err
 }
 ```
 
-`Must...` helpers are only for constants known at compile time, such as
-`regexp.MustCompile` with a literal.
-
-### Write Messages for the Caller
+### Match Errors by Type, Not Text
 
 ```go
 // WRONG
-errors.New("validation failed")
+isInvalid := strings.Contains(err.Error(), "invalid request")
 
-// RIGHT - the rule and the offending value
-fmt.Errorf("%w: %q", ErrInvalidSlug, raw)
+// RIGHT
+var invalid *api.InvalidRequestError
+isInvalid := errors.As(err, &invalid)
 ```
-
-Never echo secrets (passwords, tokens) back in an error message.
 
 ### Do
 
-- Parse once, at the edge, into a domain type.
-- Keep each rule in exactly one constructor.
-- Export the sentinel and typed errors so adapters can map them.
+- Build one `*validator.Validate` in `cmd/<name>` and inject it.
+- Put `validate` tags on request types in `adapters/`.
+- Register every custom tag in `NewValidate`, and check its error.
+- Parse into a domain type right after the tag check passes.
 
 ### Don't
 
-- Pass `map[string]any`, raw `string` IDs or half-checked structs into `lib/`.
-- Validate the same rule in the adapter and in the domain.
-- Match errors by comparing `err.Error()` strings.
+- Put `validate` tags on `lib/` structs.
+- Check the same rule in a tag and in a domain constructor.
+- Rely on `required` for an `int` or `bool` that may legitimately be zero; use
+  a pointer.
+- Test that `email` or `min` work. Test your custom rules and your mapping.

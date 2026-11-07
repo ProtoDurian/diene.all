@@ -10,6 +10,7 @@ export const topics = [
   'three-layer-architecture',
   'utilities',
   'validation',
+  'wire-format',
 ] as const;
 
 export default {
@@ -18,7 +19,7 @@ export default {
   probes: [
     {
       name: 'presence-standards-inventory',
-      description: 'All ten agnostic standards and their thin triggers exist.',
+      description: 'All eleven agnostic standards and their thin triggers exist.',
       kind: 'baseline',
       async run(repo: any) {
         for (const topic of topics) {
