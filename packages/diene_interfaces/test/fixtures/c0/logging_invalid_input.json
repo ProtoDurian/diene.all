@@ -1,0 +1,13 @@
+{
+  "type": "https://local.atomi.cloud/docs/local/flutter/app/core/v1/logging_invalid_input",
+  "title": "Log message must be non-blank",
+  "status": 400,
+  "detail": "logging.emit: Log message must be non-blank",
+  "recoverable": false,
+  "data": {
+    "port": "logging",
+    "code": "invalid_input",
+    "operation": "emit",
+    "field": "message"
+  }
+}

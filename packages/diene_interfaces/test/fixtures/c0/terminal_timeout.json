@@ -1,0 +1,13 @@
+{
+  "type": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dart/wallet/app/v1/terminal_timeout",
+  "title": "Command timed out",
+  "status": 504,
+  "detail": "terminal.run: Command timed out",
+  "recoverable": true,
+  "data": {
+    "port": "terminal",
+    "code": "timeout",
+    "operation": "run",
+    "executable": "git"
+  }
+}

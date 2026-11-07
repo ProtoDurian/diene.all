@@ -1,0 +1,11 @@
+{
+  "contract": "diene.interfaces.port-problem.v1",
+  "authority": "local-regression-only",
+  "provenance": "Locally derived port Problem envelopes; not a source-owned C0 fixture set.",
+  "algorithm": "sha256",
+  "fixtures": {
+    "logging_invalid_input.json": "ed4446e6327e20a076c860cf67b357efb1f1f373e8b613e52127eed0c5569bb2",
+    "terminal_timeout.json": "80af9d36e333ee464903581bb280997c4691fadd8674b7315d65785006355bfa",
+    "vfs_not_found.json": "01cbd03b271b6aec9f011de02112b6e48252101e315bc467b67522d1cf4a59fa"
+  }
+}
