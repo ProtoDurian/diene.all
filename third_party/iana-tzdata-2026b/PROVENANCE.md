@@ -8,8 +8,9 @@
 `packages/diene_core_utils/tool/gen_iana_zones.dart` builds
 `lib/src/iana_zones.dart` from it: every `Zone` and `Link` name in `africa`,
 `antarctica`, `asia`, `australasia`, `europe`, `northamerica`, `southamerica`,
-`etcetera`, `factory` and `backward` (598 names). `backzone` is left out: it
-only adds pre-1970 history to zones that already exist. The conformance test
+`etcetera`, `factory` and `backward` (598 names). `backzone` is left out, as in a
+default build: it holds pre-1970 data and a few zones (for example
+`Asia/Hanoi`) that are not in the main files. The conformance test
 checks the archive digest and that the committed list matches it.
 
 The data is public domain (see `LICENSE` inside the archive). The archive is

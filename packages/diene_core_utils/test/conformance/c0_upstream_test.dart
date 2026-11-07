@@ -107,6 +107,15 @@ void _checkCaseInsensitiveKeys(Map<String, Object?> vector) {
 }
 
 void _checkLayering(Map<String, Object?> vector) {
+  final JsonObject development = deepMergeAll(<JsonObject>[
+    _readYaml(vector['baseYaml']! as String),
+    _readYaml(vector['developmentYaml']! as String),
+  ]);
+  expect(development['app'], <String, Object?>{
+    'name': 'development',
+    'retries': -1,
+    'tags': <Object?>['development'],
+  });
   final JsonObject merged = deepMergeAll(<JsonObject>[
     _readYaml(vector['baseYaml']! as String),
     _readYaml(vector['developmentYaml']! as String),

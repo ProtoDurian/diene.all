@@ -33,7 +33,8 @@
       "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/config.json | jq -cS .cases.layeringAndIndexedList | sha256sum",
       "adaptations": [
         "The YAML layers are read by a small reader inside the test: this package has no YAML parser, and the vector checks the merge, not YAML. Only the app section is compared with expected.",
-        "Layers merge in the order base, development, landscape, defines."
+        "Layers merge in the order base, development, landscape, defines.",
+        "The test also checks base plus development alone, because landscape and defines mask every development value."
       ],
       "fileSha256": "07530b482edea4c8199d3fb5c413493403d0c1d54566c2bbde34a06e47739efa"
     },
@@ -49,6 +50,8 @@
   },
   "notVendored": {
     "/cases/finalLayerValidation": "Checks the merged config against a schema; this package has no schema, so it belongs to the config package.",
-    "contracts/c0/cases/identity.json": "No case there is a slug or a namespaced key: onboarding claim keys join with an underscore and resource audiences check lowercase labels."
+    "contracts/c0/cases/identity.json": "No case there is a slug or a namespaced key: onboarding claim keys join with an underscore and resource audiences check lowercase labels.",
+    "contracts/c0/cases/problem.json": "Type URIs and Problem envelopes are minted by diene_problems (problemTypeUri); this package only passes the id.",
+    "contracts/c0/cases/result-wire.json": "The Result wire form belongs to diene_result."
   }
 }

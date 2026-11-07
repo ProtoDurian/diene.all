@@ -4,7 +4,7 @@ import 'dart:io';
 const String ianaArchivePath =
     '../../third_party/iana-tzdata-2026b/tzdata2026b.tar.gz';
 
-// backzone is left out: it only adds pre-1970 history to existing zones.
+// backzone is left out, as in a default build; it adds a few zones (Asia/Hanoi).
 const List<String> ianaZoneDefiningFiles = <String>[
   'africa',
   'antarctica',

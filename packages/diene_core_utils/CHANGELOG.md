@@ -14,7 +14,8 @@ values change:
   internal file path).
 - `c0TemporalContract.provenance.contentSha256` is recomputed for those two
   values, because `digestPayload()` includes them. Every test vector is
-  unchanged.
+  unchanged. A consumer that pins `contentSha256` must update it; only the
+  first line of `digestPayload()` changes.
 
 Other changes:
 

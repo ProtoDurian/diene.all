@@ -65,6 +65,7 @@ void _checkWireProblem(Map<String, Object?> wire) {
   expect(minted.toJson(), wire);
   expect(Problem.fromJson(wire).toJson(), wire);
   expect(wire.values, isNot(contains(isNull)));
+  expect(data.values, isNot(contains(isNull)));
   expect(wire.containsKey('instance'), isFalse);
 }
 

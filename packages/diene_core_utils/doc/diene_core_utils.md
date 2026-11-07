@@ -87,6 +87,12 @@ with 1.0.x; candidates for 2.0):
   the standard writes exactly 3.
 - `IsoDuration` keeps the designation as written (`PT90M`, `P1W`) instead of
   the normal form.
+- `normalizeRfc3339ToUtc` accepts any form `DateTime.parse` reads that ends in
+  `Z`, `z` or an offset (space separator, basic format, no seconds, `+hhmm`),
+  not only RFC 3339.
+- `deepMerge` copies an explicit `null` from an overlay into the result; the
+  standard treats a missing value as omitted, so 2.0 could treat `null` as
+  unset.
 
 ## Shared temporal vectors
 

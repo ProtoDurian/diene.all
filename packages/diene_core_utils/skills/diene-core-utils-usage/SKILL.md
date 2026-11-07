@@ -14,7 +14,8 @@ The package doc (`doc/diene_core_utils.md`) is authoritative; read it first.
 - Every fallible member returns `Result`; handle it with `match`, `andThen` or a
   `switch`, never `try`/`catch`.
 - Instants on the wire are UTC with `Z`. `parseRfc3339Utc` rejects offsets;
-  normalise offset input once with `normalizeRfc3339ToUtc`.
+  normalise offset input once with `normalizeRfc3339ToUtc`. Drop microseconds
+  before `formatRfc3339Utc` if a value may carry them (the wire wants 3 digits).
 - Money and exact decimals stay strings: never pass them through
   `coerceEnvironmentScalar`.
 - Config lists come only from indexed keys (`APP__TAGS__0`); a blank value is
