@@ -22,7 +22,7 @@ judge() {
 }
 
 shopt -s nullglob
-for file in tasks/*.yaml; do
+for file in Taskfile.yaml tasks/*.yaml; do
   while IFS= read -r line; do
     if [[ ${line} =~ ${conditional} ]]; then
       judge "${file}" "${line}" "conditional in a task cmd"

@@ -26,8 +26,9 @@ rules remain in `docs/standards/`.
 - `task docker:build` and `task docker:run` build and run the Bun image.
 - `task helm:lint` and `task helm:template` retain the inherited Helm axis.
 
-Each tier task is a one-line call to `scripts/local/test.sh`; branching lives in
-that script, and no Taskfile calls `scripts/ci/`.
+Each tier task is a one-line call to `scripts/local/test.sh`, and `task clean`
+calls `scripts/local/clean.sh`: branching lives in `scripts/local/`, and no
+Taskfile calls `scripts/ci/`.
 
 There is no `task dev`, `task up`, or `task down` surface in this base. Hot reload
 belongs to runnable descendants, and the integration tier owns its Redis
