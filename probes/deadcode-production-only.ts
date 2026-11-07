@@ -9,7 +9,9 @@ const BARREL = `${MEMBER}/lib/diene_auth_engine.dart`;
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
+  setup: {
+    post: ['nix develop .#ci -c flutter pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'],
+  },
   probes: [
     {
       name: 'baseline-deadcode-production-only-green',
@@ -31,7 +33,7 @@ export default {
           await repo.write(
             TEST_FIXTURE,
             "import 'package:diene_auth_engine/diene_auth_engine.dart';\n" +
-              "import 'package:test/test.dart';\n\n" +
+              "import 'package:flutter_test/flutter_test.dart';\n\n" +
               "void main() {\n  test('probe production only', () {\n    expect(probeProductionOnly(), 1);\n  });\n}\n",
           );
           await expectRedBecause(repo, DEADCODE, 'deadcode-production-only', [

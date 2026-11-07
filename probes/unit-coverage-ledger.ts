@@ -15,7 +15,9 @@ async function findBarrel(repo: any): Promise<string> {
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
+  setup: {
+    post: ['nix develop .#ci -c flutter pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'],
+  },
   probes: [
     {
       name: 'baseline-unit-coverage-ledger-green',
@@ -26,7 +28,9 @@ export default {
         const sources = (await repo.read(REPORT)).split('\n').filter((line: string) => line.startsWith('SF:'));
         if (
           sources.length === 0 ||
-          !sources.every((line: string) => /\/lib\/.*\.dart$/.test(line) && !line.endsWith('/lib/test_helper.dart'))
+          !sources.every(
+            (line: string) => /^SF:(.*\/)?lib\/.*\.dart$/.test(line) && !/(:|\/)lib\/test_helper\.dart$/.test(line),
+          )
         ) {
           throw new Error(
             `unit-coverage-ledger: ledger is not scoped to shipped lib/ minus the TestHelper: ${sources.join(', ')}`,
