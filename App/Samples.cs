@@ -1,15 +1,14 @@
 using System.Text.Json;
 using AtomiCloud.Diene.CoreUtils.Json;
+using AtomiCloud.Diene.Problems;
 using AtomiCloud.Diene.Problems.Catalog;
 using AtomiCloud.Diene.Results;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace AtomiCloud.Diene.Problems.App;
+namespace AtomiCloud.DotnetBase.App;
 
-/// <summary>Exercises the complete public library surface as a living package consumer.</summary>
 public static class Samples
 {
-    /// <summary>Runs the non-server samples and returns observable output.</summary>
     public static string RunAll(ProblemIdentity identity, ErrorPortalOption portal)
     {
         var portalConfig = new ErrorPortalConfig(portal.Scheme, portal.Host, identity);

@@ -1,11 +1,12 @@
-using AtomiCloud.Diene.Problems.App;
+using AtomiCloud.Diene.Problems;
+using AtomiCloud.DotnetBase.App;
 using AtomiCloud.Diene.Problems.Catalog;
 using AtomiCloud.Diene.Problems.TestHelper;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 
-namespace AtomiCloud.Diene.Problems.IntTest;
+namespace AtomiCloud.DotnetBase.IntTest;
 
 public class ProblemApp_Rfc9457RoundTrip
 {

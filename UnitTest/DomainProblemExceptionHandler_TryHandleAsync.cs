@@ -1,12 +1,13 @@
 using System.Text.Json;
 using AtomiCloud.Diene.CoreUtils.Json;
+using AtomiCloud.Diene.Problems;
 using FluentAssertions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AtomiCloud.Diene.Problems.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 public class DomainProblemExceptionHandler_TryHandleAsync
 {

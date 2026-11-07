@@ -1,7 +1,8 @@
 using System.Text.Json;
+using AtomiCloud.Diene.Problems;
 using FluentAssertions;
 
-namespace AtomiCloud.Diene.Problems.IntTest;
+namespace AtomiCloud.DotnetBase.IntTest;
 
 public class C0Fixture_RoundTrip
 {

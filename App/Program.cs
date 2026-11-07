@@ -1,12 +1,11 @@
+using AtomiCloud.Diene.Problems;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 
-namespace AtomiCloud.Diene.Problems.App;
+namespace AtomiCloud.DotnetBase.App;
 
-/// <summary>Runs the full-API sample, serves one RFC 9457 response, and exits.</summary>
 public static class Program
 {
-    /// <summary>Runs the demo consumer.</summary>
     public static async Task<int> Main(string[] args)
     {
         _ = args;

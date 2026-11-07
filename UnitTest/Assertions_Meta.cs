@@ -2,11 +2,12 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using AtomiCloud.Diene.CoreUtils.Json;
+using AtomiCloud.Diene.Problems;
 using AtomiCloud.Diene.Problems.TestHelper;
 using AtomiCloud.Diene.Results;
 using FluentAssertions;
 
-namespace AtomiCloud.Diene.Problems.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 public class Assertions_Meta
 {

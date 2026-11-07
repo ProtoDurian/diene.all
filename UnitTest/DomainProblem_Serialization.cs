@@ -2,11 +2,12 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AtomiCloud.Diene.CoreUtils.Json;
+using AtomiCloud.Diene.Problems;
 using AtomiCloud.Diene.Problems.Catalog;
 using AtomiCloud.Diene.Results.TestHelper;
 using FluentAssertions;
 
-namespace AtomiCloud.Diene.Problems.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 public class DomainProblem_Serialization
 {

@@ -2,8 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <RootNamespace>AtomiCloud.Diene.Problems.App</RootNamespace>
-    <AssemblyName>App</AssemblyName>
+    <RootNamespace>AtomiCloud.DotnetBase.App</RootNamespace>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>

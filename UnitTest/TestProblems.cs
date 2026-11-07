@@ -1,8 +1,9 @@
 using System.ComponentModel;
 using System.Text.Json.Serialization;
+using AtomiCloud.Diene.Problems;
 using Microsoft.Extensions.Logging;
 
-namespace AtomiCloud.Diene.Problems.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 [Description("A sample problem used by library contract tests.")]
 internal sealed class SampleProblem : IDomainProblem

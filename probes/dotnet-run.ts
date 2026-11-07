@@ -1,4 +1,4 @@
-import { runWithOutput } from './lib/dotnet.ts';
+import { expectGreen } from './lib/dotnet.ts';
 
 export default {
   contractVersion: 1,
@@ -9,7 +9,7 @@ export default {
       description: 'The development run task executes the sample App.',
       kind: 'baseline',
       async run(repo: any) {
-        await runWithOutput(repo, 'nix develop .#default -c task run');
+        await expectGreen(repo, `nix develop .#default -c task run | rg -F '"status":404'`, 'dotnet-base-probe-run');
       },
     },
   ],

@@ -22,7 +22,7 @@ export default defineGate({
         'rm "$(find artifacts/package -maxdepth 1 -name \'AtomiCloud.Diene.Problems.TestHelper.*.snupkg\' -print -quit)"',
       );
       await expectRedBecause(repo, `${PACKAGE_VALIDATE} inventory`, 'dotnet-lib-artifact-inventory', [
-        `❌ Missing AtomiCloud.Diene.Note.TestHelper.${await manifestVersion(repo)}.snupkg`,
+        `❌ Missing AtomiCloud.Diene.Problems.TestHelper.${await manifestVersion(repo)}.snupkg`,
       ]);
     },
   },

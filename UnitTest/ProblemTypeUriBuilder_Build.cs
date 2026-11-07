@@ -1,6 +1,7 @@
+using AtomiCloud.Diene.Problems;
 using FluentAssertions;
 
-namespace AtomiCloud.Diene.Problems.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 public class ProblemTypeUriBuilder_Build
 {

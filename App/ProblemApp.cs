@@ -1,15 +1,14 @@
+using AtomiCloud.Diene.Problems;
 using AtomiCloud.Diene.Problems.Catalog;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AtomiCloud.Diene.Problems.App;
+namespace AtomiCloud.DotnetBase.App;
 
-/// <summary>Builds the non-packable demo consumer and its registered problem boundary.</summary>
 public static class ProblemApp
 {
-    /// <summary>Builds the demo app, with an optional host hook used by in-process integration tests.</summary>
     public static WebApplication Build(
         ProblemIdentity identity,
         ErrorPortalOption portal,

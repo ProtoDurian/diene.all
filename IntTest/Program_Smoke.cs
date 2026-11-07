@@ -1,7 +1,8 @@
-using AtomiCloud.Diene.Problems.App;
+using AtomiCloud.Diene.Problems;
+using AtomiCloud.DotnetBase.App;
 using FluentAssertions;
 
-namespace AtomiCloud.Diene.Problems.IntTest;
+namespace AtomiCloud.DotnetBase.IntTest;
 
 [Collection("Console")]
 public class Program_Smoke

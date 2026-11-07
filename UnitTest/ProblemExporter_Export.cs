@@ -1,7 +1,8 @@
 using System.Text.Json.Nodes;
+using AtomiCloud.Diene.Problems;
 using FluentAssertions;
 
-namespace AtomiCloud.Diene.Problems.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 public class ProblemExporter_Export
 {

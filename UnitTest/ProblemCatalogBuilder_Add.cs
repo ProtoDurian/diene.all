@@ -1,8 +1,9 @@
+using AtomiCloud.Diene.Problems;
 using AtomiCloud.Diene.Results.TestHelper;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace AtomiCloud.Diene.Problems.UnitTest;
+namespace AtomiCloud.DotnetBase.UnitTest;
 
 public class ProblemCatalogBuilder_Add
 {
