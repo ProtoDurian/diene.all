@@ -2,19 +2,82 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"time"
 
-	"github.com/ProtoDurian/diene.go-lib/adapters/kv"
-	"github.com/ProtoDurian/diene.go-lib/lib/note"
-	"github.com/ProtoDurian/diene.go-lib/testhelper"
+	"github.com/ProtoDurian/diene.go-interfaces/lib/interfaces"
+	"github.com/ProtoDurian/diene.go-interfaces/testhelper"
 )
 
 func main() {
 	ctx := context.Background()
-	service := note.NewService(testhelper.NewMemoryStore(), note.NewKeyComposer("notes"))
-	created, _ := service.Create(ctx, "Deadcode Consumer", "public surface")
-	_, _ = service.Load(ctx, created.Slug)
-	redis := kv.NewRedisStore("127.0.0.1:6379")
-	_ = redis.Save(ctx, created.Slug, created.Body)
-	_, _ = redis.Load(ctx, created.Slug)
-	_ = redis.Close()
+	modified := time.Now()
+	entry := interfaces.NewVfsEntry("/a", interfaces.VfsEntryTypeFile, 1, &modified)
+	var _ interfaces.VfsEntry = entry
+	fmt.Println(interfaces.VfsEntryTypeFile.String(), interfaces.VfsEntryTypeDirectory, interfaces.VfsEntryTypeLink)
+	fmt.Println(interfaces.LogLevelTrace.String(), interfaces.LogLevelDebug, interfaces.LogLevelInfo, interfaces.LogLevelWarning, interfaces.LogLevelError, interfaces.LogLevelFatal)
+	fmt.Println(interfaces.MetricKindCounter.String(), interfaces.MetricKindGauge, interfaces.MetricKindHistogram)
+	var _ interfaces.VfsWriteOptions = interfaces.WriteOptions{}
+	var _ interfaces.VfsListOptions = interfaces.ListOptions{}
+	var _ interfaces.VfsDirectoryOptions = interfaces.DirectoryOptions{}
+	command := interfaces.NewTerminalCommand("echo", []string{"ok"}, nil, nil, true, false)
+	var _ interfaces.TerminalCommand = command.Clone()
+	fmt.Println((interfaces.TerminalOutput{}).Succeeded())
+	log := interfaces.NewLogRecord(time.Now(), interfaces.LogLevelInfo, "message", nil, nil, nil)
+	var _ interfaces.LogRecord = log.Clone()
+	_ = interfaces.CloneAttributes(nil)
+	metric := interfaces.NewMetricRecord(time.Now(), "count", interfaces.MetricKindCounter, 1, nil, nil)
+	var _ interfaces.MetricRecord = metric.Clone()
+
+	system := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{})
+	system.EnqueueEnvironmentResult(nil, nil)
+	system.EnqueueDirectoryResult("/", nil)
+	system.EnqueueClockResult(time.Now(), nil)
+	system.EnqueueDelayResult(nil)
+	var port interfaces.System = system
+	_, _ = port.Environment("x")
+	_, _ = port.CurrentDirectory()
+	_, _ = port.NowUTC()
+	_ = port.Delay(ctx, time.Second)
+	_ = system.RequestedDelays()
+	system.SetEnvironment("x", "y")
+	system.SetDirectory("/")
+	system.SetNow(time.Now())
+
+	vfs := testhelper.NewInMemoryVfs(testhelper.InMemoryVfsOptions{})
+	vfs.EnqueueExistsResult(false, nil)
+	vfs.EnqueueReadBytesResult(nil, nil)
+	vfs.EnqueueReadTextResult("", nil)
+	vfs.EnqueueWriteBytesResult(nil)
+	vfs.EnqueueWriteTextResult(nil)
+	vfs.EnqueueListResult(nil, nil)
+	vfs.EnqueueCreateDirectoryResult(nil)
+	vfs.EnqueueDeleteResult(nil)
+	var files interfaces.Vfs = vfs
+	_, _ = files.Exists(ctx, "/")
+	_, _ = files.ReadBytes(ctx, "/")
+	_, _ = files.ReadText(ctx, "/")
+	_ = files.WriteBytes(ctx, "/x", nil, interfaces.WriteOptions{})
+	_ = files.WriteText(ctx, "/x", "", interfaces.WriteOptions{})
+	_, _ = files.List(ctx, "/", interfaces.ListOptions{})
+	_ = files.CreateDirectory(ctx, "/x", interfaces.DirectoryOptions{})
+	_ = files.Delete(ctx, "/x", interfaces.DirectoryOptions{})
+	_ = vfs.Files()
+	_ = vfs.Directories()
+
+	terminal := testhelper.NewInMemoryTerminal()
+	terminal.EnqueueResult(interfaces.TerminalOutput{}, nil)
+	var runner interfaces.Terminal = terminal
+	_, _ = runner.Run(ctx, command)
+	_ = terminal.Commands()
+	logger := testhelper.NewInMemoryLoggerSink()
+	logger.EnqueueResult(nil)
+	var sink interfaces.LoggerSink = logger
+	_ = sink.Emit(log)
+	_ = logger.Records()
+	metrics := testhelper.NewInMemoryMetricsCollector()
+	metrics.EnqueueResult(nil)
+	var collector interfaces.MetricsCollector = metrics
+	_ = collector.Emit(metric)
+	_ = metrics.Records()
 }

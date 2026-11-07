@@ -1,5 +1,4 @@
-// Package testhelper provides deterministic in-memory implementations of the
-// interfaces package for consumer tests.
+// Package testhelper provides deterministic in-memory doubles of every interfaces port for consumer tests.
 package testhelper
 
 import (
@@ -18,18 +17,14 @@ type scripted[T any] struct {
 	err   error
 }
 
-// InMemorySystemOptions configures an InMemorySystem.
+// InMemorySystemOptions seeds an InMemorySystem; empty Directory is "/" and zero Now is the Unix epoch.
 type InMemorySystemOptions struct {
-	// Environment is the initial process environment.
 	Environment map[string]string
-	// Directory is the current working directory. The empty value is "/".
-	Directory string
-	// Now is the initial clock value. The zero value is the Unix epoch in UTC.
-	Now time.Time
+	Directory   string
+	Now         time.Time
 }
 
-// InMemorySystem is a deterministic System with mutable in-memory process
-// state and FIFO-scriptable results.
+// InMemorySystem is a deterministic System with mutable state and FIFO-scripted results.
 type InMemorySystem struct {
 	state *inMemorySystemState
 }
@@ -179,17 +174,13 @@ func (s *InMemorySystem) SetNow(now time.Time) {
 	s.state.now = now.UTC()
 }
 
-// InMemoryVfsOptions configures an InMemoryVfs.
+// InMemoryVfsOptions seeds an InMemoryVfs; the root directory is always present.
 type InMemoryVfsOptions struct {
-	// Files maps initial paths to their byte contents.
-	Files map[string][]byte
-	// Directories lists initial directories. Root is always present.
+	Files       map[string][]byte
 	Directories []string
 }
 
-// InMemoryVfs is a stateful byte-backed Vfs with FIFO-scriptable results. It is
-// the synchronized, scriptable adapter around a vfsstore.Store that owns the
-// storage algorithms.
+// InMemoryVfs is a byte-backed Vfs with FIFO-scripted results.
 type InMemoryVfs struct {
 	state *inMemoryVfsState
 }

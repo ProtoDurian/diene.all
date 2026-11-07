@@ -3,6 +3,7 @@ package testhelper_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -12,275 +13,320 @@ import (
 	"github.com/ProtoDurian/diene.go-interfaces/testhelper"
 )
 
-// canonicalTypePrefix is the fixed testhelper fault type-URI prefix. Every
-// intrinsic fault resolves its type through problem.TypeURI from the fixed
-// portal, so the id is the final canonical path segment.
 const canonicalTypePrefix = "https://docs.diene.atomicloud.com/docs/diene/go/interfaces/testhelper/v1/"
 
-func TestInMemorySystem(t *testing.T) {
-	value := "value"
-	system := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{Environment: map[string]string{"present": value}, Directory: "/work", Now: time.Date(2026, 7, 22, 2, 3, 4, 0, time.FixedZone("offset", 3600))})
-	got, err := system.Environment("present")
-	if err != nil || got == nil || *got != value {
-		t.Fatalf("environment: %v %v", got, err)
+var errInjected = errors.New("injected")
+
+func assertFault(t *testing.T, err error, id string, status int) {
+	t.Helper()
+	probtest.AssertError(
+		t, err,
+		probtest.ExpectType(canonicalTypePrefix+id),
+		probtest.ExpectID(id),
+		probtest.ExpectStatus(status),
+		probtest.ExpectData(map[string]any{"id": id}),
+	)
+}
+
+func TestInMemorySystemDefaults(t *testing.T) {
+	// Arrange
+	system := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{})
+
+	// Act
+	directory, directoryErr := system.CurrentDirectory()
+	now, nowErr := system.NowUTC()
+
+	// Assert
+	if directory != "/" || directoryErr != nil || !now.Equal(time.Unix(0, 0)) || now.Location() != time.UTC || nowErr != nil {
+		t.Fatalf("defaults: %q %v %v %v", directory, directoryErr, now, nowErr)
 	}
-	if got, err = system.Environment("missing"); err != nil || got != nil {
-		t.Fatalf("missing environment: %v %v", got, err)
-	}
+}
+
+func TestInMemorySystemState(t *testing.T) {
+	// Arrange
+	environment := map[string]string{"present": "value"}
+	system := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{Environment: environment, Directory: "/work", Now: time.Date(2026, 7, 22, 2, 3, 4, 0, time.FixedZone("offset", 3600))})
+	environment["present"] = "mutated"
+
+	// Act
+	present, _ := system.Environment("present")
+	missing, missingErr := system.Environment("missing")
+	directory, _ := system.CurrentDirectory()
+	now, _ := system.NowUTC()
 	system.SetEnvironment("new", "yes")
-	got, _ = system.Environment("new")
-	if *got != "yes" {
-		t.Fatal("set environment failed")
-	}
-	queued := "queued"
-	injected := errors.New("injected")
-	system.EnqueueEnvironmentResult(&queued, injected)
-	queued = "mutated"
-	got, err = system.Environment("x")
-	if !errors.Is(err, injected) || *got != "queued" {
-		t.Fatalf("queued environment: %v %v", got, err)
-	}
-	system.EnqueueEnvironmentResult(nil, nil)
-	got, err = system.Environment("x")
-	if err != nil || got != nil {
-		t.Fatal("nil queued environment failed")
-	}
-	if directory, currentErr := system.CurrentDirectory(); currentErr != nil || directory != "/work" {
-		t.Fatalf("directory: %q %v", directory, currentErr)
-	}
 	system.SetDirectory("/other")
-	system.EnqueueDirectoryResult("/queued", injected)
-	directory, err := system.CurrentDirectory()
-	if directory != "/queued" || !errors.Is(err, injected) {
-		t.Fatal("queued directory failed")
+	system.SetNow(time.Unix(5, 0))
+	added, _ := system.Environment("new")
+	changedDirectory, _ := system.CurrentDirectory()
+	changedNow, _ := system.NowUTC()
+
+	// Assert
+	if *present != "value" || missing != nil || missingErr != nil || directory != "/work" || now.Location() != time.UTC || now.Hour() != 1 {
+		t.Fatalf("seeded state: %v %v %v %q %v", *present, missing, missingErr, directory, now)
 	}
-	directory, _ = system.CurrentDirectory()
-	if directory != "/other" {
-		t.Fatal("set directory failed")
+	if *added != "yes" || changedDirectory != "/other" || changedNow.Unix() != 5 {
+		t.Fatalf("set state: %v %q %v", *added, changedDirectory, changedNow)
 	}
-	now, err := system.NowUTC()
-	if err != nil || now.Location() != time.UTC {
-		t.Fatalf("clock: %v %v", now, err)
+}
+
+func TestInMemorySystemScriptedResults(t *testing.T) {
+	// Arrange
+	system := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{Directory: "/real"})
+	queued := "queued"
+	system.EnqueueEnvironmentResult(&queued, errInjected)
+	system.EnqueueEnvironmentResult(nil, nil)
+	system.EnqueueDirectoryResult("/queued", errInjected)
+	system.EnqueueClockResult(time.Date(2026, 1, 1, 0, 0, 0, 0, time.FixedZone("offset", 3600)), errInjected)
+	system.EnqueueDelayResult(errInjected)
+	queued = "mutated"
+
+	// Act
+	first, firstErr := system.Environment("x")
+	second, secondErr := system.Environment("x")
+	directory, directoryErr := system.CurrentDirectory()
+	afterDirectory, _ := system.CurrentDirectory()
+	now, nowErr := system.NowUTC()
+	delayErr := system.Delay(context.Background(), time.Second)
+	nextDelayErr := system.Delay(context.Background(), 2*time.Second)
+
+	// Assert
+	if *first != "queued" || !errors.Is(firstErr, errInjected) || second != nil || secondErr != nil {
+		t.Fatalf("environment: %v %v %v %v", first, firstErr, second, secondErr)
 	}
-	system.SetNow(time.Time{})
-	system.EnqueueClockResult(time.Date(2026, 1, 1, 0, 0, 0, 0, time.FixedZone("offset", 3600)), injected)
-	now, err = system.NowUTC()
-	if !errors.Is(err, injected) || now.Location() != time.UTC {
-		t.Fatal("queued clock failed")
+	if directory != "/queued" || !errors.Is(directoryErr, errInjected) || afterDirectory != "/real" {
+		t.Fatalf("directory: %q %v %q", directory, directoryErr, afterDirectory)
 	}
-	now, _ = system.NowUTC()
-	if !now.IsZero() {
-		t.Fatal("set clock failed")
+	if now.Location() != time.UTC || !errors.Is(nowErr, errInjected) {
+		t.Fatalf("clock: %v %v", now, nowErr)
 	}
-	system.EnqueueDelayResult(injected)
-	if err := system.Delay(context.Background(), time.Second); !errors.Is(err, injected) {
-		t.Fatal("queued delay failed")
+	if !errors.Is(delayErr, errInjected) || nextDelayErr != nil || !slices.Equal(system.RequestedDelays(), []time.Duration{time.Second, 2 * time.Second}) {
+		t.Fatalf("delay: %v %v %v", delayErr, nextDelayErr, system.RequestedDelays())
 	}
-	if err := system.Delay(context.Background(), 2*time.Second); err != nil {
-		t.Fatal(err)
-	}
+}
+
+func TestInMemorySystemSnapshotsAreIndependent(t *testing.T) {
+	// Arrange
+	system := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{})
+	_ = system.Delay(context.Background(), time.Second)
+
+	// Act
 	delays := system.RequestedDelays()
 	delays[0] = 0
+
+	// Assert
 	if system.RequestedDelays()[0] != time.Second {
-		t.Fatal("delays not copied")
-	}
-	defaults := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{})
-	if directory, _ := defaults.CurrentDirectory(); directory != "/" {
-		t.Fatal("default directory")
-	}
-	now, _ = defaults.NowUTC()
-	if !now.Equal(time.Unix(0, 0).UTC()) {
-		t.Fatal("default clock")
+		t.Fatal("delays alias state")
 	}
 }
 
-func TestInMemoryVfs(t *testing.T) {
+func TestInMemoryVfsFaults(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	vfs := testhelper.NewInMemoryVfs(testhelper.InMemoryVfsOptions{Files: map[string][]byte{"/a/file": []byte("t")}, Directories: []string{"/a", "/parent", "/parent/child"}})
+	cases := []struct {
+		name   string
+		run    func() error
+		id     string
+		status int
+	}{
+		{"read bytes missing", func() error { _, err := vfs.ReadBytes(ctx, "/missing"); return err }, "path-not-found", 404},
+		{"read text missing", func() error { _, err := vfs.ReadText(ctx, "/missing"); return err }, "path-not-found", 404},
+		{"write bytes without parent", func() error { return vfs.WriteBytes(ctx, "/no/file", nil, interfaces.WriteOptions{}) }, "path-not-found", 404},
+		{"write text without parent", func() error { return vfs.WriteText(ctx, "/no/file", "", interfaces.WriteOptions{}) }, "path-not-found", 404},
+		{"list missing", func() error { _, err := vfs.List(ctx, "/missing", interfaces.ListOptions{}); return err }, "path-not-found", 404},
+		{"mkdir without parent", func() error { return vfs.CreateDirectory(ctx, "/none/child", interfaces.DirectoryOptions{}) }, "path-not-found", 404},
+		{"delete missing", func() error { return vfs.Delete(ctx, "/missing", interfaces.DirectoryOptions{}) }, "path-not-found", 404},
+		{"delete dir holding a file", func() error { return vfs.Delete(ctx, "/a", interfaces.DirectoryOptions{}) }, "directory-not-empty", 409},
+		{"delete dir holding a dir", func() error { return vfs.Delete(ctx, "/parent", interfaces.DirectoryOptions{}) }, "directory-not-empty", 409},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Act
+			err := testCase.run()
+
+			// Assert
+			assertFault(t, err, testCase.id, testCase.status)
+		})
+	}
+}
+
+func TestInMemoryVfsState(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
 	vfs := testhelper.NewInMemoryVfs(testhelper.InMemoryVfsOptions{Files: map[string][]byte{"//a//file": []byte("text")}, Directories: []string{"/a", "/a/sub"}})
-	if exists, err := vfs.Exists(context.Background(), "/a/file"); err != nil || !exists {
-		t.Fatal("expected existing file")
-	}
-	if exists, err := vfs.Exists(context.Background(), "/no"); err != nil || exists {
-		t.Fatal("expected absent file")
-	}
-	injected := errors.New("injected")
-	vfs.EnqueueExistsResult(true, injected)
-	if exists, err := vfs.Exists(context.Background(), "/no"); !exists || !errors.Is(err, injected) {
-		t.Fatal("scripted exists")
-	}
-	bytes, err := vfs.ReadBytes(context.Background(), "/a/file")
-	if err != nil || string(bytes) != "text" {
-		t.Fatal("read bytes")
-	}
+
+	// Act
+	exists, _ := vfs.Exists(ctx, "/a/file")
+	bytes, _ := vfs.ReadBytes(ctx, "/a/file")
 	bytes[0] = 'x'
-	bytes, _ = vfs.ReadBytes(context.Background(), "/a/file")
-	if string(bytes) != "text" {
-		t.Fatal("read bytes aliases state")
+	text, _ := vfs.ReadText(ctx, "/a/file")
+	writeErr := vfs.WriteBytes(ctx, "/new/file", []byte("bytes"), interfaces.WriteOptions{CreateParents: true})
+	textErr := vfs.WriteText(ctx, "/new/text", "hello", interfaces.WriteOptions{})
+	mkdirErrs := []error{
+		vfs.CreateDirectory(ctx, "/created/a", interfaces.DirectoryOptions{Recursive: true}),
+		vfs.CreateDirectory(ctx, "/top", interfaces.DirectoryOptions{}),
+		vfs.CreateDirectory(ctx, "/", interfaces.DirectoryOptions{}),
 	}
-	assertProblem(t, mustErr(vfs.ReadBytes(context.Background(), "/missing")), "path-not-found", 404)
-	vfs.EnqueueReadBytesResult([]byte("queued"), injected)
-	bytes, err = vfs.ReadBytes(context.Background(), "/x")
-	if !errors.Is(err, injected) || string(bytes) != "queued" {
-		t.Fatal("scripted bytes")
+	direct, _ := vfs.List(ctx, "/a", interfaces.ListOptions{})
+	fileDeleteErr := vfs.Delete(ctx, "/a/file", interfaces.DirectoryOptions{})
+	treeDeleteErr := vfs.Delete(ctx, "/a", interfaces.DirectoryOptions{Recursive: true})
+
+	// Assert
+	if !exists || text != "text" || writeErr != nil || textErr != nil || fileDeleteErr != nil || treeDeleteErr != nil || slices.ContainsFunc(mkdirErrs, func(err error) bool { return err != nil }) {
+		t.Fatalf("operations: %v %q %v %v %v %v %v", exists, text, writeErr, textErr, mkdirErrs, fileDeleteErr, treeDeleteErr)
 	}
-	text, err := vfs.ReadText(context.Background(), "/a/file")
-	if err != nil || text != "text" {
-		t.Fatal("read text")
+	if len(direct) != 2 || direct[0].Path != "/a/file" || direct[1].Path != "/a/sub" {
+		t.Fatalf("list: %#v", direct)
 	}
-	assertProblem(t, mustErr(vfs.ReadText(context.Background(), "/missing")), "path-not-found", 404)
-	vfs.EnqueueReadTextResult("queued", injected)
-	text, err = vfs.ReadText(context.Background(), "/x")
-	if !errors.Is(err, injected) || text != "queued" {
-		t.Fatal("scripted text")
+	if !slices.Equal(vfs.Directories(), []string{"/", "/created", "/created/a", "/new", "/top"}) || len(vfs.Files()) != 2 {
+		t.Fatalf("final state: %v %v", vfs.Directories(), vfs.Files())
 	}
-	assertProblem(t, vfs.WriteBytes(context.Background(), "/missing/file", []byte("x"), interfaces.WriteOptions{}), "path-not-found", 404)
-	if writeErr := vfs.WriteBytes(context.Background(), "/new/file", []byte("bytes"), interfaces.WriteOptions{CreateParents: true}); writeErr != nil {
-		t.Fatal(writeErr)
+}
+
+func TestInMemoryVfsDeleteRootKeepsRoot(t *testing.T) {
+	// Arrange
+	vfs := testhelper.NewInMemoryVfs(testhelper.InMemoryVfsOptions{Files: map[string][]byte{"/child/file": []byte("x")}, Directories: []string{"/child"}})
+
+	// Act
+	err := vfs.Delete(context.Background(), "/", interfaces.DirectoryOptions{Recursive: true})
+
+	// Assert
+	if err != nil || !slices.Equal(vfs.Directories(), []string{"/"}) || len(vfs.Files()) != 0 {
+		t.Fatalf("delete root: %v %v %v", err, vfs.Directories(), vfs.Files())
 	}
-	vfs.EnqueueWriteBytesResult(injected)
-	if writeErr := vfs.WriteBytes(context.Background(), "/x", nil, interfaces.WriteOptions{}); !errors.Is(writeErr, injected) {
-		t.Fatal("scripted write bytes")
+}
+
+func TestInMemoryVfsScriptedResults(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	vfs := testhelper.NewInMemoryVfs(testhelper.InMemoryVfsOptions{})
+	queuedBytes := []byte("queued")
+	vfs.EnqueueExistsResult(true, errInjected)
+	vfs.EnqueueReadBytesResult(queuedBytes, errInjected)
+	vfs.EnqueueReadTextResult("queued", errInjected)
+	vfs.EnqueueWriteBytesResult(errInjected)
+	vfs.EnqueueWriteTextResult(errInjected)
+	queuedEntries := []interfaces.VfsEntry{{Path: "/script", Type: interfaces.VfsEntryTypeLink}}
+	vfs.EnqueueListResult(queuedEntries, errInjected)
+	vfs.EnqueueCreateDirectoryResult(errInjected)
+	vfs.EnqueueDeleteResult(errInjected)
+	queuedBytes[0], queuedEntries[0].Path = 'x', "/mutated"
+
+	// Act
+	exists, existsErr := vfs.Exists(ctx, "/no")
+	bytes, bytesErr := vfs.ReadBytes(ctx, "/x")
+	text, textErr := vfs.ReadText(ctx, "/x")
+	writeBytesErr := vfs.WriteBytes(ctx, "/x", nil, interfaces.WriteOptions{})
+	writeTextErr := vfs.WriteText(ctx, "/x", "x", interfaces.WriteOptions{})
+	entries, listErr := vfs.List(ctx, "/", interfaces.ListOptions{})
+	mkdirErr := vfs.CreateDirectory(ctx, "/x", interfaces.DirectoryOptions{})
+	deleteErr := vfs.Delete(ctx, "/x", interfaces.DirectoryOptions{})
+
+	// Assert
+	for name, err := range map[string]error{"exists": existsErr, "bytes": bytesErr, "text": textErr, "writeBytes": writeBytesErr, "writeText": writeTextErr, "list": listErr, "mkdir": mkdirErr, "delete": deleteErr} {
+		if !errors.Is(err, errInjected) {
+			t.Fatalf("%s: %v", name, err)
+		}
 	}
-	if writeErr := vfs.WriteText(context.Background(), "/new/text", "hello", interfaces.WriteOptions{}); writeErr != nil {
-		t.Fatal(writeErr)
+	if !exists || string(bytes) != "queued" || text != "queued" || len(entries) != 1 || entries[0].Path != "/script" {
+		t.Fatalf("scripted values: %v %q %q %#v", exists, bytes, text, entries)
 	}
-	vfs.EnqueueWriteTextResult(injected)
-	if writeErr := vfs.WriteText(context.Background(), "/x", "x", interfaces.WriteOptions{}); !errors.Is(writeErr, injected) {
-		t.Fatal("scripted write text")
+	if len(vfs.Files()) != 0 || !slices.Equal(vfs.Directories(), []string{"/"}) {
+		t.Fatal("scripted results must not touch the store")
 	}
-	entries, err := vfs.List(context.Background(), "/a", interfaces.ListOptions{})
-	if err != nil || len(entries) != 2 || entries[0].Path != "/a/file" || entries[1].Path != "/a/sub" {
-		t.Fatalf("list direct: %#v %v", entries, err)
-	}
-	entries, err = vfs.List(context.Background(), "/", interfaces.ListOptions{Recursive: true})
-	if err != nil || len(entries) < 4 {
-		t.Fatalf("list recursive: %#v %v", entries, err)
-	}
-	assertProblem(t, mustErr(vfs.List(context.Background(), "/missing", interfaces.ListOptions{})), "path-not-found", 404)
-	vfs.EnqueueListResult([]interfaces.VfsEntry{{Path: "/script", Type: interfaces.VfsEntryTypeLink}}, injected)
-	entries, err = vfs.List(context.Background(), "/", interfaces.ListOptions{})
-	if !errors.Is(err, injected) || len(entries) != 1 {
-		t.Fatal("scripted list")
-	}
-	entries[0].Path = "changed"
-	entries, _ = vfs.List(context.Background(), "/", interfaces.ListOptions{})
-	if len(entries) == 0 || entries[0].Path == "changed" {
-		t.Fatal("list not copied")
-	}
-	assertProblem(t, vfs.CreateDirectory(context.Background(), "/none/child", interfaces.DirectoryOptions{}), "path-not-found", 404)
-	if err := vfs.CreateDirectory(context.Background(), "/created/a", interfaces.DirectoryOptions{Recursive: true}); err != nil {
-		t.Fatal(err)
-	}
-	if err := vfs.WriteText(context.Background(), "/created/a/file", "recursive", interfaces.WriteOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := vfs.CreateDirectory(context.Background(), "/created/b", interfaces.DirectoryOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := vfs.CreateDirectory(context.Background(), "/top", interfaces.DirectoryOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := vfs.CreateDirectory(context.Background(), "/", interfaces.DirectoryOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	vfs.EnqueueCreateDirectoryResult(injected)
-	if err := vfs.CreateDirectory(context.Background(), "/x", interfaces.DirectoryOptions{}); !errors.Is(err, injected) {
-		t.Fatal("scripted mkdir")
-	}
-	assertProblem(t, vfs.Delete(context.Background(), "/missing", interfaces.DirectoryOptions{}), "path-not-found", 404)
-	assertProblem(t, vfs.Delete(context.Background(), "/a", interfaces.DirectoryOptions{}), "directory-not-empty", 409)
-	if err := vfs.Delete(context.Background(), "/a/file", interfaces.DirectoryOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := vfs.Delete(context.Background(), "/a", interfaces.DirectoryOptions{Recursive: true}); err != nil {
-		t.Fatal(err)
-	}
-	if err := vfs.Delete(context.Background(), "/created", interfaces.DirectoryOptions{Recursive: true}); err != nil {
-		t.Fatal(err)
-	}
-	vfs.EnqueueDeleteResult(injected)
-	if err := vfs.Delete(context.Background(), "/x", interfaces.DirectoryOptions{}); !errors.Is(err, injected) {
-		t.Fatal("scripted delete")
-	}
+}
+
+func TestInMemoryVfsSnapshotsAreIndependent(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	vfs := testhelper.NewInMemoryVfs(testhelper.InMemoryVfsOptions{Files: map[string][]byte{"/a": []byte("a")}, Directories: []string{"/d"}})
+	vfs.EnqueueReadBytesResult([]byte("queued"), nil)
+	vfs.EnqueueListResult([]interfaces.VfsEntry{{Path: "/script"}}, nil)
+
+	// Act
+	queued, _ := vfs.ReadBytes(ctx, "/a")
+	entries, _ := vfs.List(ctx, "/", interfaces.ListOptions{})
+	queued[0], entries[0].Path = 'x', "changed"
 	files := vfs.Files()
-	for _, bytes := range files {
-		if len(bytes) > 0 {
-			bytes[0] = 'x'
-		}
-	}
-	for _, bytes := range vfs.Files() {
-		if string(bytes) == "x" {
-			t.Fatal("files not copied")
-		}
-	}
+	files["/a"][0] = 'z'
 	directories := vfs.Directories()
 	directories[0] = "changed"
-	if vfs.Directories()[0] != "/" {
-		t.Fatal("directories not copied")
+
+	// Assert
+	again, _ := vfs.List(ctx, "/", interfaces.ListOptions{})
+	if string(vfs.Files()["/a"]) != "a" || vfs.Directories()[0] != "/" || again[0].Path != "/a" {
+		t.Fatalf("snapshots alias state: %v %v %v", vfs.Files(), vfs.Directories(), again)
 	}
-	root := testhelper.NewInMemoryVfs(testhelper.InMemoryVfsOptions{Files: map[string][]byte{"/child/file": []byte("x")}, Directories: []string{"/child"}})
-	if err := root.Delete(context.Background(), "/", interfaces.DirectoryOptions{Recursive: true}); err != nil {
-		t.Fatal(err)
-	}
-	directoriesOnly := testhelper.NewInMemoryVfs(testhelper.InMemoryVfsOptions{Directories: []string{"/parent", "/parent/child"}})
-	assertProblem(t, directoriesOnly.Delete(context.Background(), "/parent", interfaces.DirectoryOptions{}), "directory-not-empty", 409)
 }
 
-func TestInMemoryTerminalLoggerAndMetrics(t *testing.T) {
-	injected := errors.New("injected")
+func TestInMemoryTerminal(t *testing.T) {
+	// Arrange
 	terminal := testhelper.NewInMemoryTerminal()
 	command := interfaces.NewTerminalCommand("tool", []string{"one"}, nil, map[string]string{"A": "1"}, true, false)
-	_, err := terminal.Run(context.Background(), command)
-	assertProblem(t, err, "terminal-result-not-scripted", 500)
-	terminal.EnqueueResult(interfaces.TerminalOutput{ExitCode: 2, Stderr: "no"}, injected)
-	output, err := terminal.Run(context.Background(), command)
-	if !errors.Is(err, injected) || output.ExitCode != 2 {
-		t.Fatal("scripted terminal")
-	}
+	terminal.EnqueueResult(interfaces.TerminalOutput{ExitCode: 2, Stderr: "no"}, errInjected)
+
+	// Act
+	output, scriptedErr := terminal.Run(context.Background(), command)
+	_, unscriptedErr := terminal.Run(context.Background(), command)
 	commands := terminal.Commands()
 	commands[0].Args[0] = "changed"
-	if terminal.Commands()[0].Args[0] != "one" {
-		t.Fatal("commands not copied")
+
+	// Assert
+	if output.ExitCode != 2 || output.Stderr != "no" || !errors.Is(scriptedErr, errInjected) {
+		t.Fatalf("scripted run: %#v %v", output, scriptedErr)
 	}
-	logger := testhelper.NewInMemoryLoggerSink()
-	log := interfaces.NewLogRecord(time.Now(), interfaces.LogLevelInfo, "message", map[string]any{"key": "value"}, nil, nil)
-	logger.EnqueueResult(injected)
-	if err := logger.Emit(log); !errors.Is(err, injected) {
-		t.Fatal("scripted logger")
-	}
-	if len(logger.Records()) != 0 {
-		t.Fatal("failed log must not record")
-	}
-	if err := logger.Emit(log); err != nil {
-		t.Fatal(err)
-	}
-	logs := logger.Records()
-	logs[0].Attributes["key"] = "changed"
-	if logger.Records()[0].Attributes["key"] != "value" {
-		t.Fatal("logs not copied")
-	}
-	metrics := testhelper.NewInMemoryMetricsCollector()
-	metric := interfaces.NewMetricRecord(time.Now(), "count", interfaces.MetricKindCounter, 1, nil, map[string]any{"key": "value"})
-	metrics.EnqueueResult(injected)
-	if err := metrics.Emit(metric); !errors.Is(err, injected) {
-		t.Fatal("scripted metrics")
-	}
-	if len(metrics.Records()) != 0 {
-		t.Fatal("failed metric must not record")
-	}
-	if err := metrics.Emit(metric); err != nil {
-		t.Fatal(err)
-	}
-	records := metrics.Records()
-	records[0].Attributes["key"] = "changed"
-	if metrics.Records()[0].Attributes["key"] != "value" {
-		t.Fatal("metrics not copied")
+	assertFault(t, unscriptedErr, "terminal-result-not-scripted", 500)
+	if again := terminal.Commands(); len(again) != 2 || again[0].Args[0] != "one" {
+		t.Fatalf("commands alias state: %#v", again)
 	}
 }
 
-// TestInjectedErrorsAreProblemTyped proves every seam of every mock normalizes
-// an injected plain error so it is recoverable as *problem.Error while
-// errors.Is still reaches the original cause.
+func TestInMemoryLoggerSink(t *testing.T) {
+	// Arrange
+	logger := testhelper.NewInMemoryLoggerSink()
+	record := interfaces.NewLogRecord(time.Unix(0, 0), interfaces.LogLevelInfo, "message", map[string]any{"key": "value"}, nil, nil)
+	logger.EnqueueResult(errInjected)
+
+	// Act
+	failedErr := logger.Emit(record)
+	failedRecords := len(logger.Records())
+	okErr := logger.Emit(record)
+	records := logger.Records()
+	records[0].Attributes["key"] = "changed"
+
+	// Assert
+	if !errors.Is(failedErr, errInjected) || failedRecords != 0 || okErr != nil {
+		t.Fatalf("emit: %v %d %v", failedErr, failedRecords, okErr)
+	}
+	if again := logger.Records(); len(again) != 1 || again[0].Attributes["key"] != "value" {
+		t.Fatalf("records alias state: %#v", again)
+	}
+}
+
+func TestInMemoryMetricsCollector(t *testing.T) {
+	// Arrange
+	metrics := testhelper.NewInMemoryMetricsCollector()
+	record := interfaces.NewMetricRecord(time.Unix(0, 0), "count", interfaces.MetricKindCounter, 1, nil, map[string]any{"key": "value"})
+	metrics.EnqueueResult(errInjected)
+
+	// Act
+	failedErr := metrics.Emit(record)
+	failedRecords := len(metrics.Records())
+	okErr := metrics.Emit(record)
+	records := metrics.Records()
+	records[0].Attributes["key"] = "changed"
+
+	// Assert
+	if !errors.Is(failedErr, errInjected) || failedRecords != 0 || okErr != nil {
+		t.Fatalf("emit: %v %d %v", failedErr, failedRecords, okErr)
+	}
+	if again := metrics.Records(); len(again) != 1 || again[0].Attributes["key"] != "value" {
+		t.Fatalf("records alias state: %#v", again)
+	}
+}
+
 func TestInjectedErrorsAreProblemTyped(t *testing.T) {
+	// Arrange
 	ctx := context.Background()
 	seams := map[string]func(injected error) error{
 		"system.environment": func(injected error) error {
@@ -370,40 +416,31 @@ func TestInjectedErrorsAreProblemTyped(t *testing.T) {
 	for name, run := range seams {
 		t.Run(name, func(t *testing.T) {
 			injected := errors.New("injected cause")
+
+			// Act
 			err := run(injected)
+
+			// Assert
 			var problemErr *problem.Error
-			if !errors.As(err, &problemErr) || problemErr == nil {
-				t.Fatalf("expected a *problem.Error, got %#v", err)
-			}
-			if !errors.Is(err, injected) {
-				t.Fatal("errors.Is must still reach the injected cause")
+			if !errors.As(err, &problemErr) || problemErr == nil || !errors.Is(err, injected) {
+				t.Fatalf("want a *problem.Error that still unwraps to the cause, got %#v", err)
 			}
 		})
 	}
 }
 
-// TestScriptedProblemErrorPreserved proves an already problem-typed injected
-// error is preserved verbatim rather than re-wrapped.
 func TestScriptedProblemErrorPreserved(t *testing.T) {
+	// Arrange
 	original := problem.NewError(probtest.SampleProblem())
 	logger := testhelper.NewInMemoryLoggerSink()
 	logger.EnqueueResult(original)
+
+	// Act
 	err := logger.Emit(interfaces.NewLogRecord(time.Now(), interfaces.LogLevelInfo, "m", nil, nil, nil))
+
+	// Assert
 	if !errors.Is(err, original) {
 		t.Fatalf("expected the original problem error preserved, got %#v", err)
 	}
 	probtest.AssertError(t, err, probtest.ExpectID("entity-not-found"), probtest.ExpectStatus(404))
-}
-
-func mustErr[T any](_ T, err error) error { return err }
-
-func assertProblem(t *testing.T, err error, id string, status int) {
-	t.Helper()
-	probtest.AssertError(
-		t, err,
-		probtest.ExpectType(canonicalTypePrefix+id),
-		probtest.ExpectID(id),
-		probtest.ExpectStatus(status),
-		probtest.ExpectData(map[string]any{"id": id}),
-	)
 }

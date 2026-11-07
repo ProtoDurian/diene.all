@@ -1,10 +1,4 @@
-// Package vfsstore holds the stateful, byte-backed virtual filesystem
-// algorithms behind the testhelper InMemoryVfs. It is the cohesive home for
-// path normalization, parent resolution, and the write/list/create/delete
-// storage behavior, exposed through a small exported API so the logic is
-// black-box testable independently of the synchronized, scriptable adapter
-// that wraps it. The store is not safe for concurrent use; its adapter owns
-// synchronization.
+// Package vfsstore is the byte-backed filesystem behind InMemoryVfs; it is not safe for concurrent use.
 package vfsstore
 
 import (
@@ -15,9 +9,7 @@ import (
 	"github.com/ProtoDurian/diene.go-interfaces/testhelper/internal/faults"
 )
 
-// Store is a byte-backed virtual filesystem. Files map normalized paths to
-// their contents and directories is the set of present directories; root is
-// always present.
+// Store is a byte-backed virtual filesystem whose root directory is always present.
 type Store struct {
 	files       map[string][]byte
 	directories map[string]struct{}
@@ -28,8 +20,7 @@ func New() *Store {
 	return &Store{files: map[string][]byte{}, directories: map[string]struct{}{"/": {}}}
 }
 
-// Seed inserts initial files and directories, normalizing every path and
-// copying file contents so the store never aliases caller-owned bytes.
+// Seed inserts copies of the initial files and directories under normalized paths.
 func (s *Store) Seed(files map[string][]byte, directories []string) {
 	for path, bytes := range files {
 		s.files[Normalize(path)] = append([]byte(nil), bytes...)
@@ -47,8 +38,7 @@ func (s *Store) Exists(path string) bool {
 	return file || directory
 }
 
-// ReadBytes returns an independent copy of the file at path, or a
-// path-not-found fault when it is absent.
+// ReadBytes returns a copy of the file at path, or a path-not-found fault.
 func (s *Store) ReadBytes(path string) ([]byte, error) {
 	normalized := Normalize(path)
 	bytes, ok := s.files[normalized]
@@ -58,8 +48,7 @@ func (s *Store) ReadBytes(path string) ([]byte, error) {
 	return append([]byte(nil), bytes...), nil
 }
 
-// ReadText returns the file at path as text, or a path-not-found fault when it
-// is absent.
+// ReadText returns the file at path as text, or a path-not-found fault.
 func (s *Store) ReadText(path string) (string, error) {
 	normalized := Normalize(path)
 	bytes, ok := s.files[normalized]
@@ -69,8 +58,7 @@ func (s *Store) ReadText(path string) (string, error) {
 	return string(bytes), nil
 }
 
-// Write stores a copy of bytes at path, creating missing parents when
-// options.CreateParents is set and otherwise faulting on an absent parent.
+// Write stores a copy of bytes at path; a missing parent faults unless CreateParents is set.
 func (s *Store) Write(path string, bytes []byte, options interfaces.WriteOptions) error {
 	normalized := Normalize(path)
 	parentPath := Parent(normalized)
@@ -84,8 +72,7 @@ func (s *Store) Write(path string, bytes []byte, options interfaces.WriteOptions
 	return nil
 }
 
-// List returns the entries below the directory at path, sorted by path. A
-// non-recursive list yields only direct children; an absent directory faults.
+// List returns the entries below the directory at path, sorted by path.
 func (s *Store) List(path string, options interfaces.ListOptions) ([]interfaces.VfsEntry, error) {
 	normalized := Normalize(path)
 	if _, ok := s.directories[normalized]; !ok {
@@ -110,8 +97,7 @@ func (s *Store) List(path string, options interfaces.ListOptions) ([]interfaces.
 	return entries, nil
 }
 
-// CreateDirectory creates the directory at path. Without options.Recursive the
-// parent must already exist; with it, missing ancestors are created too.
+// CreateDirectory creates path; a missing parent faults unless Recursive is set.
 func (s *Store) CreateDirectory(path string, options interfaces.DirectoryOptions) error {
 	normalized := Normalize(path)
 	parentPath := Parent(normalized)
@@ -126,9 +112,7 @@ func (s *Store) CreateDirectory(path string, options interfaces.DirectoryOptions
 	return nil
 }
 
-// Delete removes the file or directory at path. A non-empty directory faults
-// unless options.Recursive is set, in which case its descendants are removed;
-// root is always preserved.
+// Delete removes path; a non-empty directory faults unless Recursive is set, and root survives.
 func (s *Store) Delete(path string, options interfaces.DirectoryOptions) error {
 	normalized := Normalize(path)
 	if _, ok := s.files[normalized]; ok {
@@ -166,8 +150,7 @@ func (s *Store) Delete(path string, options interfaces.DirectoryOptions) error {
 	return nil
 }
 
-// Files returns an independently owned snapshot of file contents keyed by
-// normalized path.
+// Files returns an independently owned snapshot of file contents.
 func (s *Store) Files() map[string][]byte {
 	copied := make(map[string][]byte, len(s.files))
 	for path, bytes := range s.files {
@@ -186,7 +169,7 @@ func (s *Store) Directories() []string {
 	return directories
 }
 
-// CreateParents ensures every ancestor directory of path (and root) is present.
+// CreateParents ensures path, its ancestors and root are present as directories.
 func (s *Store) CreateParents(path string) {
 	var current strings.Builder
 	for segment := range strings.SplitSeq(path, "/") {
@@ -199,8 +182,7 @@ func (s *Store) CreateParents(path string) {
 	s.directories["/"] = struct{}{}
 }
 
-// Normalize collapses a path to its canonical absolute form: a leading slash
-// and single-slash-separated non-empty segments.
+// Normalize returns path as a leading slash followed by its non-empty segments.
 func Normalize(path string) string {
 	segments := make([]string, 0)
 	for segment := range strings.SplitSeq(path, "/") {
@@ -211,8 +193,7 @@ func Normalize(path string) string {
 	return "/" + strings.Join(segments, "/")
 }
 
-// Parent returns the parent directory of a normalized path; root is its own
-// parent.
+// Parent returns the parent of a normalized path; root is its own parent.
 func Parent(path string) string {
 	if path == "/" {
 		return "/"

@@ -71,6 +71,10 @@ linters:
           disabled: true
   exclusions:
     generated: lax
+    rules:
+      - path: ^lib/interfaces/
+        linters: [revive]
+        text: '^package-naming: don''t use "interfaces"'
 
 issues:
   max-issues-per-linter: 0

@@ -1,26 +1,28 @@
+// Package interfaces defines effect ports whose non-nil errors always carry a *problem.Error.
 package interfaces
 
 import (
 	"context"
 	"maps"
+	"time"
 )
 
-// TerminalCommand is one process invocation requested through Terminal.
-// Construct it with NewTerminalCommand to take immutable snapshots of slices
-// and maps supplied by the caller.
+// System is the process and clock port; Environment returns nil for an unset variable.
+type System interface {
+	Environment(name string) (*string, error)
+	CurrentDirectory() (string, error)
+	NowUTC() (time.Time, error)
+	Delay(ctx context.Context, d time.Duration) error
+}
+
+// TerminalCommand is one process invocation; build it with NewTerminalCommand.
 type TerminalCommand struct {
-	// Executable is the program to launch.
-	Executable string
-	// Args are the program arguments, excluding Executable.
-	Args []string
-	// WorkingDirectory is absent when the implementation should keep its cwd.
-	WorkingDirectory *string
-	// Environment contains process-specific environment overrides.
-	Environment map[string]string
-	// IncludeParentEnvironment controls whether host variables are inherited.
+	Executable               string
+	Args                     []string
+	WorkingDirectory         *string
+	Environment              map[string]string
 	IncludeParentEnvironment bool
-	// RunInShell requests execution via an implementation-selected shell.
-	RunInShell bool
+	RunInShell               bool
 }
 
 // NewTerminalCommand creates a command with cloned inputs.
@@ -47,21 +49,15 @@ func (c TerminalCommand) Clone() TerminalCommand {
 
 // TerminalOutput is captured output from a completed terminal invocation.
 type TerminalOutput struct {
-	// ExitCode is the child process exit code.
 	ExitCode int
-	// Stdout is captured standard output.
-	Stdout string
-	// Stderr is captured standard error.
-	Stderr string
+	Stdout   string
+	Stderr   string
 }
 
 // Succeeded reports whether the child exited with code zero.
 func (o TerminalOutput) Succeeded() bool { return o.ExitCode == 0 }
 
-// Terminal is a process-execution boundary. A non-zero child exit code is a
-// successful TerminalOutput; only a launch failure is returned as an error.
-// Every non-nil launch error must be problem-typed.
+// Terminal runs processes; a non-zero exit is output, only a launch failure is an error.
 type Terminal interface {
-	// Run executes command.
 	Run(ctx context.Context, command TerminalCommand) (TerminalOutput, error)
 }
