@@ -1,7 +1,7 @@
 namespace AtomiCloud.Diene.Otel;
 
 /// <summary>
-/// The canonical <c>otel:</c> configuration block (C0 §4). .NET is the priority
+/// The canonical <c>otel:</c> configuration block. .NET is the priority
 /// language for this shape, so these Options classes ARE the reference binding:
 /// per-signal <c>logs</c>/<c>metrics</c>/<c>traces</c> keys, per-exporter
 /// <c>enabled</c> bools (no enum strings), and ISO 8601 duration strings on the
@@ -39,7 +39,7 @@ public sealed class LogsOption : SignalOption;
 /// <summary>The <c>otel:metrics</c> signal.</summary>
 public sealed class MetricsOption : SignalOption
 {
-    /// <summary>The reader export interval, as an ISO 8601 duration (C0 §1).</summary>
+    /// <summary>The reader export interval, as an ISO 8601 duration.</summary>
     [Required]
     public string Interval { get; set; } = "PT60S";
 }
@@ -77,12 +77,12 @@ public sealed class ExporterOption
 /// <summary>The stdout exporter.</summary>
 public sealed class ConsoleExporterOption
 {
-    /// <summary>Off by default everywhere (C0 §4); the lapras overlay flips it on.</summary>
+    /// <summary>Off by default everywhere; the lapras overlay flips it on.</summary>
     [Required]
     public bool Enabled { get; set; }
 }
 
-/// <summary>The OTLP exporter, pinned to <c>http/protobuf</c> fleet-wide (R17).</summary>
+/// <summary>The OTLP exporter, pinned to <c>http/protobuf</c> fleet-wide.</summary>
 public sealed class OtlpExporterOption
 {
     /// <summary>Off by default; a landscape overlay flips it on.</summary>
@@ -92,7 +92,7 @@ public sealed class OtlpExporterOption
     /// <summary>The collector endpoint, e.g. <c>http://collector:4318</c>.</summary>
     public string Endpoint { get; set; } = "";
 
-    /// <summary>The wire protocol, fixed fleet-wide (R17) — zinc's gRPC/4317 drift dies here.</summary>
+    /// <summary>The wire protocol, fixed fleet-wide — zinc's gRPC/4317 drift dies here.</summary>
     [Required]
     [AllowedValues("http/protobuf")]
     public string Protocol { get; set; } = "http/protobuf";
@@ -100,7 +100,7 @@ public sealed class OtlpExporterOption
     /// <summary>Headers sent with every export request.</summary>
     public Dictionary<string, string> Headers { get; set; } = [];
 
-    /// <summary>The export timeout, as an ISO 8601 duration (C0 §1).</summary>
+    /// <summary>The export timeout, as an ISO 8601 duration.</summary>
     [Required]
     public string Timeout { get; set; } = "PT10S";
 }

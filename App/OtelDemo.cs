@@ -8,28 +8,15 @@ using Microsoft.Extensions.Hosting;
 
 namespace AtomiCloud.DotnetBase.App;
 
-/// <summary>
-/// The demo consumer. It wires the otel engine onto a real host with every exporter
-/// OFF — the default a service ships with — and then drives each public entry point
-/// on its output path, so the surface this package publishes is the surface that is
-/// proven to work end to end.
-/// </summary>
 public static class OtelDemo
 {
-    /// <summary>An environment with no overrides, for probing block-only behaviour.</summary>
     private static IReadOnlyDictionary<string, string?> Environment_Empty { get; } =
         new Dictionary<string, string?>(StringComparer.Ordinal);
 
-    /// <summary>The identity the demo reports telemetry under.</summary>
     public static AppIdentity Identity { get; } = AppIdentity
         .Create("lapras", "atomi", "dotnet-otel-demo", "app", "1.0.0")
         .GetOr(new AppIdentity("lapras", "atomi", "dotnet-otel-demo", "app", "1.0.0"));
 
-    /// <summary>
-    /// The sample block: exactly the shipped defaults. Console and OTLP are both off,
-    /// which is the point — a service that forgets to configure an overlay emits
-    /// nothing rather than spraying spans at stdout in production.
-    /// </summary>
     public static OtelOption Sample() => new()
     {
         Logs = new LogsOption { Enabled = true },
@@ -41,10 +28,6 @@ public static class OtelDemo
         },
     };
 
-    /// <summary>Runs the demo, returning a process exit code.</summary>
-    /// <param name="output">Where the demo reports what it observed.</param>
-    /// <param name="option">The block to wire.</param>
-    /// <param name="environment">The environment overrides to resolve against.</param>
     public static int Run(TextWriter output, OtelOption option, IReadOnlyDictionary<string, string?> environment)
     {
         ArgumentNullException.ThrowIfNull(output);
@@ -126,9 +109,6 @@ public static class OtelDemo
                 [OtelEnvironment.TracesExporterVariable] = "none",
             });
         output.WriteLine($"'none' override: {silenced}");
-
-        // The lapras overlay is the only place console output is turned on; exercising it
-        // here proves the block's console toggle actually reaches an exporter selection.
         var overlay = OtelEnvironment.Exporters(
             new ExporterOption { Console = new ConsoleExporterOption { Enabled = true } },
             OtelEnvironment.LogsExporterVariable,
@@ -418,9 +398,7 @@ public static class OtelDemo
                 [OtelEnvironment.SdkDisabledVariable] = "true",
             });
 
-        // The bad-block probe deliberately ignores the caller's environment: an
-        // OTEL_SDK_DISABLED in it would short-circuit wiring and make a broken block look
-        // acceptable, which is the opposite of what this probe is for.
+        // Ignore the caller environment: OTEL_SDK_DISABLED would hide a broken block.
         var rejected = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder();
         var rejectedResult = rejected.AddAtomiOtel(
             Identity,
@@ -429,9 +407,7 @@ public static class OtelDemo
 
         using var built = wired.Build();
 
-        // Wiring can legitimately fail here — an OTEL_*_EXPORTER=otlp override selects an
-        // exporter the sample block never gave an endpoint. Nothing is registered when
-        // planning fails, so the seam is only resolvable on the success path.
+        // An OTEL_*_EXPORTER=otlp override can fail wiring; nothing is registered then.
         var emitter = result.Match(
             _ => built.Services.GetRequiredService<ITraceEmitter>().GetType().Name,
             error => $"not wired ({error.Code})");

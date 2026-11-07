@@ -57,7 +57,7 @@ otel:
     exporter: { console: { enabled: false }, otlp: { enabled: false } }
 ```
 
-`timeout` and `interval` are ISO 8601 duration STRINGS (C0 §1), parsed through
+`timeout` and `interval` are ISO 8601 duration STRINGS, parsed through
 core-utils `Wire.ParseDuration`. A raw millisecond integer is rejected, and so is
 a duration that is zero, negative, or larger than `int.MaxValue` milliseconds.
 
@@ -152,7 +152,7 @@ public sealed class Checkout(ILoggerSink logger, IMetricsCollector metrics, ITra
 ```
 
 Every emit is TOTAL: it returns a Result and never throws, so telemetry can never
-be the reason a business operation fails. Attribute values travel in their C0 wire
+be the reason a business operation fails. Attribute values travel in their canonical wire
 form, so what you emit is byte-identical to what a reader sees.
 
 Trace records are validated at construction: attribute keys are non-blank and

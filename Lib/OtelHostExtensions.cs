@@ -134,7 +134,7 @@ public static class OtelHostExtensions
 
     /// <summary>
     /// Validates one OTLP exporter block. The endpoint must be a non-blank absolute
-    /// HTTP(S) URI on the fleet's explicit port 4318 (C0 §4, R14) — unless
+    /// HTTP(S) URI on the fleet's explicit port 4318 — unless
     /// <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> is set, in which case the SDK reads the
     /// endpoint from the environment and any block endpoint is ignored.
     /// </summary>
@@ -175,7 +175,7 @@ public static class OtelHostExtensions
         target.TimeoutMilliseconds = settings.TimeoutMilliseconds;
     }
 
-    /// <summary>The fleet's OTLP HTTP port. Traffic on any other port is refused (C0 §4).</summary>
+    /// <summary>The fleet's OTLP HTTP port. Traffic on any other port is refused.</summary>
     public const int OtlpPort = 4318;
 
     private static Result<Option<Uri>, TraceError> Endpoint(

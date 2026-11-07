@@ -71,7 +71,7 @@ public sealed class OtelMetricsCollector(Instrumentation instrumentation) : IMet
         return Result.Ok<Unit, SeamError>(default);
     }
 
-    /// <summary>The instrument tags a sample carries, in its C0 wire form.</summary>
+    /// <summary>The instrument tags a sample carries, in its canonical wire form.</summary>
     private static KeyValuePair<string, object?>[] Tags(MetricRecord record) =>
         [.. record.Attributes.Select(attribute =>
             new KeyValuePair<string, object?>(attribute.Key, attribute.Value.Wire))];

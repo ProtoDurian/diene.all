@@ -4,7 +4,7 @@ namespace AtomiCloud.Diene.Otel;
 
 /// <summary>
 /// Maps the service-tree identity onto OpenTelemetry resource attributes. Resource
-/// attributes are always derived, never hand-authored (C0 §4): each identity value
+/// attributes are always derived, never hand-authored: each identity value
 /// lands on its semantic-convention key AND on its raw <c>atomi.*</c> key, so
 /// queries can use either vocabulary. <c>atomi.module</c> deliberately has no
 /// semconv twin — the taxonomy is finer-grained than semconv.
@@ -71,7 +71,7 @@ public static class AtomiResource
     /// <summary>
     /// The resource attributes a service actually reports: block-derived values
     /// first, then <c>OTEL_RESOURCE_ATTRIBUTES</c> and <c>OTEL_SERVICE_NAME</c>
-    /// overriding them (C0 §4 escape hatch).
+    /// overriding them (the escape hatch).
     /// </summary>
     public static IReadOnlyDictionary<string, string> Attributes(
         AppIdentity identity,

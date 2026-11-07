@@ -1,5 +1,5 @@
 {
-  "description": "The canonical otel: block key names and default values (C0 §4). Pinned so a rename in the .NET reference binding is a test failure, not a silent cross-language drift.",
+  "description": "The canonical otel: block key names and default values. Pinned so a rename in the .NET reference binding is a test failure, not a silent cross-language drift.",
   "section": "Otel",
   "envPrefix": "ATOMI_",
   "paths": {

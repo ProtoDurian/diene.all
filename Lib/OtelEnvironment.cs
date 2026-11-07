@@ -6,7 +6,7 @@ namespace AtomiCloud.Diene.Otel;
 public readonly record struct ExporterSelection(bool Console, bool Otlp);
 
 /// <summary>
-/// The C0 §4 escape hatch: standard <c>OTEL_*</c> environment variables win over
+/// The escape hatch: standard <c>OTEL_*</c> environment variables win over
 /// the config block, so ops can redirect or silence telemetry without a redeploy.
 /// The environment is injected rather than read from the process, so precedence is
 /// testable without mutating global state.
@@ -58,7 +58,7 @@ public static class OtelEnvironment
 
     /// <summary>
     /// Whether <c>OTEL_SDK_DISABLED=true</c> is set. This wins over every
-    /// <c>otel.&lt;signal&gt;.enabled=true</c> in the block (C0 §4).
+    /// <c>otel.&lt;signal&gt;.enabled=true</c> in the block.
     /// </summary>
     public static bool IsSdkDisabled(IReadOnlyDictionary<string, string?> environment)
     {

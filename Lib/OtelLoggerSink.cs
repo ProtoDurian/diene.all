@@ -6,7 +6,7 @@ namespace AtomiCloud.Diene.Otel;
 
 /// <summary>
 /// The OpenTelemetry implementation of the structured-logging seam. Attributes
-/// travel as a logging scope in their C0 wire form, so a value serialized by this
+/// travel as a logging scope in their canonical wire form, so a value serialized by this
 /// sink is byte-identical to the value the caller emitted, and the emission is
 /// total: a hostile record comes back as a <c>SeamError</c>, never as an exception
 /// thrown into application code that was only trying to log.
