@@ -2,6 +2,7 @@ package problem_test
 
 import (
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -46,7 +47,7 @@ type typeURIFixture struct {
 
 func loadFixture(t *testing.T, name string, target any) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "..", "fixtures", "wire-format", name)) //nolint:gosec // fixed in-repo fixture path
+	raw, err := fs.ReadFile(os.DirFS(filepath.Join("..", "..", "fixtures", "wire-format")), name)
 	if err != nil {
 		t.Fatalf("read fixture %s: %v", name, err)
 	}

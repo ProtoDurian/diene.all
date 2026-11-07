@@ -64,14 +64,14 @@ func ExpectStatus(want int) Option {
 }
 
 // ExpectRecoverable asserts the envelope's Recoverable flag equals want.
-//
-//nolint:revive // want is a matched value, not a control flag.
 func ExpectRecoverable(want bool) Option {
 	return func(actual problem.Problem) error {
-		if actual.Recoverable != want {
+		switch actual.Recoverable {
+		case want:
+			return nil
+		default:
 			return fmt.Errorf("recoverable mismatch: expected %t, got %t", want, actual.Recoverable)
 		}
-		return nil
 	}
 }
 
