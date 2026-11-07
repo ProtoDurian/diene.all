@@ -1,9 +1,9 @@
 name: diene_config
 description: Layered, schema-composed configuration for Dart and Flutter apps — base YAML, landscape overlay, dev override, then Dart defines, validated once.
-version: 1.0.0
-repository: https://github.com/AtomiCloud/diene.dart_config
-issue_tracker: https://github.com/AtomiCloud/diene.dart_config/issues
-homepage: https://github.com/AtomiCloud/diene.dart_config
+version: 0.0.0
+repository: https://github.com/ProtoDurian/diene.dart_config
+issue_tracker: https://github.com/ProtoDurian/diene.dart_config/issues
+homepage: https://github.com/ProtoDurian/diene.dart_config
 
 topics:
   - configuration

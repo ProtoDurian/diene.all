@@ -1,16 +1,3 @@
-/// Service-composed root schema, final-layer validation, and typed slices.
-///
-/// `diene_config` owns COMPOSITION mechanics, not schemas. An engine package
-/// (auth-engine, api-engine, …) exports its own [ConfigBlock] beside the code
-/// that reads it; the application assembles those blocks — plus its own — into
-/// one [ConfigSchema]. This library never defines another library's block.
-///
-/// Validation happens EXACTLY ONCE, against the final merged tree. No
-/// intermediate layer is validated, and no intermediate layer is ever exposed:
-/// a base YAML that is invalid on its own but completed by an overlay is
-/// correct, and the loader must not reject it midway.
-library;
-
 import 'dart:collection';
 
 import 'package:diene_core_utils/diene_core_utils.dart';
@@ -18,34 +5,18 @@ import 'package:diene_result/diene_result.dart';
 
 import 'config_problem.dart';
 
-/// Type-erased view of a [ConfigBlock], so differently typed engine blocks
-/// compose into one list.
-///
-/// A caller implements [ConfigBlock] rather than this interface; it exists
-/// because `ConfigBlock<AuthSettings>` and `ConfigBlock<ApiSettings>` have no
-/// common supertype otherwise.
+/// Type-erased view of a [ConfigBlock], so differently typed blocks compose.
 abstract interface class ConfigBlockSchema {
-  /// Root key this block decodes, in the spelling its owner authored.
   String get key;
 
-  /// Whether the final configuration must contain this block.
   bool get required;
 
-  /// Decodes [value] without exposing the block's static type.
   Object? decodeUntyped(Map<String, Object?> value);
 }
 
-/// Converts and validates one engine- or service-owned configuration block.
-///
-/// [decode] is the OWNER's validation: it receives the final merged block and
-/// either returns the typed value or throws. Throwing is correct here and is
-/// the only place this library expects it — a decoder is a plain callback
-/// written by a consumer, so demanding a `Result` return would force every
-/// engine to depend on `diene_result` merely to describe its own settings.
-/// [ConfigSchema.validate] catches each throw and folds it into ONE aggregate
-/// problem, so a caller still never sees an exception escape.
+/// One engine- or service-owned block; a throw from [decode] becomes a
+/// `schema_invalid` error.
 final class ConfigBlock<T> implements ConfigBlockSchema {
-  /// Creates a block decoding the root [key].
   const ConfigBlock({
     required this.key,
     required this.decode,
@@ -55,7 +26,6 @@ final class ConfigBlock<T> implements ConfigBlockSchema {
   @override
   final String key;
 
-  /// Turns the block's final merged map into its typed value.
   final T Function(Map<String, Object?> values) decode;
 
   @override
@@ -65,13 +35,9 @@ final class ConfigBlock<T> implements ConfigBlockSchema {
   Object? decodeUntyped(Map<String, Object?> value) => decode(value);
 }
 
-/// A root schema assembled by the service from engine-owned blocks and its own.
+/// The root schema a service composes from engine-owned blocks and its own.
 final class ConfigSchema {
-  /// Composes [blocks] into a root schema.
-  ///
-  /// Throws [ArgumentError] on an empty, reserved, or duplicate block key.
-  /// That is programmer misuse — the block list is source code, not input —
-  /// so it is the one construction that throws rather than returning a value.
+  /// Throws [ArgumentError] on an empty, reserved or duplicate block key.
   ConfigSchema({
     required Iterable<ConfigBlockSchema> blocks,
     this.rejectUnknownBlocks = true,
@@ -82,18 +48,11 @@ final class ConfigSchema {
   final List<ConfigBlockSchema> _blocks;
 
   /// Whether a root key with no composed block is an error.
-  ///
-  /// Defaults to `true`: an unknown root key is nearly always a typo, and
-  /// silently ignoring it is how a misspelled setting reaches production.
   final bool rejectUnknownBlocks;
 
-  /// The composed blocks, in composition order.
   List<ConfigBlockSchema> get blocks => _blocks;
 
-  /// Validates the FINAL merged configuration and builds its typed slices.
-  ///
-  /// Every problem found is collected before returning, so one pass reports
-  /// every misconfiguration rather than only the first.
+  /// Validates the final merged tree, collecting every error in one problem.
   Result<DieneConfig> validate(Map<String, Object?> values) {
     final Map<String, String> actualKeys = <String, String>{};
     final List<String> errors = <String>[];
@@ -111,9 +70,6 @@ final class ConfigSchema {
       }
     }
 
-    // Keyed by the composed block INSTANCE, not by its key: a decoded value
-    // must only ever be reachable through the very block whose decoder
-    // produced it. See [DieneConfig._decoded].
     final Map<ConfigBlockSchema, Object?> decoded =
         LinkedHashMap<ConfigBlockSchema, Object?>.identity();
     final Set<String> declared = <String>{};
@@ -175,64 +131,30 @@ final class ConfigSchema {
   }
 }
 
-/// An immutable, validated configuration and its typed block slices.
-///
-/// There is no watch or reload API: configuration is loaded once and is
-/// constant for the life of the process.
+/// An immutable, validated configuration and its typed slices.
 final class DieneConfig {
   const DieneConfig._(this.raw, this._decoded);
 
   /// The final merged tree, deeply unmodifiable.
   final Map<String, Object?> raw;
 
-  /// Decoded values, keyed by the IDENTITY of the block that produced each one.
-  ///
-  /// Associating a slice with its composed block rather than with its key is
-  /// what makes [slice] safe. A key is not an identity: two blocks can spell
-  /// the same key with different type parameters or different decoders, and a
-  /// key-only association would hand such a block a value it never decoded —
-  /// answering [hasSlice] with `true` and then failing an undocumented cast.
+  // Keyed by block identity: a same-key block that was not composed has no slice.
   final Map<ConfigBlockSchema, Object?> _decoded;
 
-  /// Returns the typed value produced by [block]'s owner-supplied decoder.
-  ///
-  /// [block] must be the block instance the schema actually composed: a slice
-  /// belongs to its block, not to its key. A separately constructed block that
-  /// merely spells the same key — whether or not it repeats the type parameter
-  /// and decoder — was not composed and is treated as such.
-  ///
-  /// Throws [StateError] when [block] was not part of the composed schema, or
-  /// when it is an optional block the final configuration omitted. Both are
-  /// programmer misuse — asking for a slice that structurally cannot exist —
-  /// so they throw rather than returning a failure value. Use [hasSlice] to
-  /// branch on an optional block instead.
+  /// Throws [StateError] when [block] was not composed or is absent.
   T slice<T>(ConfigBlock<T> block) {
     if (!_decoded.containsKey(block)) {
       throw StateError('Configuration block ${block.key} was not composed');
     }
-    // Sound by construction: the value came from THIS block's own decoder, so
-    // it has the block's own type parameter, and `T` can only be that type or
-    // a supertype of it.
     return _decoded[block] as T;
   }
 
-  /// Whether [block] itself was composed AND present in the final
-  /// configuration.
-  ///
-  /// Identity-matched exactly like [slice], so this is `false` for a same-key
-  /// block the schema did not compose.
   bool hasSlice(ConfigBlockSchema block) => _decoded.containsKey(block);
 
-  /// Returns [slice] when the block is present, or `None` when it is not.
   Option<T> optionalSlice<T>(ConfigBlock<T> block) =>
       hasSlice(block) ? Some<T>(slice<T>(block)) : None<T>();
 
-  /// Returns an immutable untyped view of one final merged block.
-  ///
-  /// Useful for a block nobody has written a decoder for yet. Matching is
-  /// case- and separator-insensitive, exactly like the block-key matching
-  /// [ConfigSchema.validate] performs — this is the one lookup that takes a
-  /// key, because there is no block to identify it by.
+  /// An untyped block of [raw], matched ignoring case and separators.
   Result<Map<String, Object?>> rawSlice(String key) {
     final String canonical = canonicalConfigKey(key);
     for (final MapEntry<String, Object?> entry in raw.entries) {
@@ -256,10 +178,7 @@ final class DieneConfig {
     );
   }
 
-  /// A deterministic projection of [raw] — sorted keys at every depth.
-  ///
-  /// Delegates to `stableConfig` from `diene_core_utils` so two structurally
-  /// equal configurations hash and diff identically.
+  /// [raw] with sorted keys at every depth.
   Result<Object?> stableProjection() => stableConfig(raw);
 }
 
