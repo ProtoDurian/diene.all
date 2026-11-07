@@ -7,26 +7,24 @@ cd "${member_dir}"
 
 name="$(yq -r '.name' pubspec.yaml)"
 sdk="$(yq -r '.environment.sdk' pubspec.yaml)"
-# pub hides version 0.0.0 from offline resolution, so pack a pre-release of the current version.
 version="$(yq -r '.version' pubspec.yaml)-consumer"
+user_cache="${PUB_CACHE:-${HOME}/.pub-cache}"
 
 work="$(mktemp -d)"
-cp -p pubspec.yaml "${work}/pubspec.yaml.orig"
-trap 'cp -p "${work}/pubspec.yaml.orig" "${member_dir}/pubspec.yaml"; rm -rf "${work}"' EXIT
+trap 'rm -rf "${work}"' EXIT
 archive="${work}/package.tar.gz"
+installable="${work}/installable.tar.gz"
 unpacked="${work}/package"
 consumer="${work}/consumer"
 export PUB_CACHE="${work}/pub-cache"
-mkdir -p "${unpacked}" "${consumer}/bin"
+mkdir -p "${unpacked}" "${consumer}/bin" "${PUB_CACHE}/hosted/pub.dev" "${PUB_CACHE}/hosted-hashes/pub.dev"
 
-echo "📦 Packing ${name} ${version} with pub..."
-yq -i ".version = \"${version}\"" pubspec.yaml
+echo "📦 Packing ${name} with pub..."
 dart pub publish --skip-validation --to-archive="${archive}"
-cp -p "${work}/pubspec.yaml.orig" pubspec.yaml
 tar -xzf "${archive}" -C "${unpacked}"
 
 echo "🔎 Comparing the archive with the package's committed files minus .pubignore and pub's defaults..."
-git ls-files -c | awk -F/ '
+git ls-tree -r --name-only HEAD | awk -F/ '
   { for (i = 1; i <= NF; i++) if ($i ~ /^[.]/ && $i != ".htaccess") next }
   /(^|\/)pubspec[.]lock$/ || /^pubspec_overrides[.]yaml$/ { next }
   { print }' | LC_ALL=C sort >"${work}/committed"
@@ -41,8 +39,14 @@ fi
 mapfile -t libraries < <(cd "${unpacked}/lib" && find . -maxdepth 1 -type f -name '*.dart' | sed 's|^\./||' | LC_ALL=C sort)
 [[ ${#libraries[@]} -eq 0 ]] && echo "❌ the archive ships no public lib/*.dart library" >&2 && exit 1
 
-echo "📥 Installing the local archive into an isolated pub cache..."
-dart pub cache preload "${archive}"
+echo "📥 Installing the local archive (as ${version}) into an isolated pub cache..."
+# pub hides version 0.0.0 from offline resolution: only the archive's version field is rewritten.
+yq -i ".version = \"${version}\"" "${unpacked}/pubspec.yaml"
+tar -czf "${installable}" -C "${unpacked}" .
+for entry in "${user_cache}"/hosted/pub.dev/* "${user_cache}"/hosted-hashes/pub.dev/*; do
+  if [[ -e ${entry} ]]; then ln -s "${entry}" "${PUB_CACHE}/${entry#"${user_cache}/"}"; fi
+done
+dart pub cache preload "${installable}"
 
 cat >"${consumer}/pubspec.yaml" <<YAML
 name: consumer_fixture
