@@ -1,138 +1,62 @@
-// Gate (static policy): the publish entrypoint (scripts/ci/publish.sh) must run
-// the manifest==tag guard BEFORE it publishes, must publish from the
-// diene_config member directory, and must publish exactly once.
-//
-// The previous implementation asked three independent `source.includes(...)`
-// questions. That cannot see ORDER, cannot distinguish code from a comment, and
-// cannot notice a duplicate publish — so moving the guard after
-// `dart pub publish`, or leaving the required strings behind only in comments,
-// kept this gate green while R-E43's approved publish entrypoint was no longer
-// actually proved. This version strips comments and asserts an exact ordered
-// shape over the remaining executable lines.
+import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
+
 const PUBLISH_SH = 'scripts/ci/publish.sh';
-const MEMBER = 'packages/diene_config';
-const GUARD = 'scripts/validate/publish-version.sh';
-const PUBLISH = 'dart pub publish --force';
+const MEMBER_PUBSPEC = 'packages/diene_dart_lib/pubspec.yaml';
+const STUB_DIR = '.probe-publish-stub';
+// A recording `dart` stands in for the real one, so nothing is ever uploaded.
+const STUB = '#!/usr/bin/env bash\nprintf \'%s|%s\\n\' "$(pwd -P)" "$*" >>"$PROBE_DART_CALLS"\n';
 
-// Executable lines only: a comment cannot satisfy a policy about what the
-// script DOES.
-function executableLines(source: string): string[] {
-  return source
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0 && !line.startsWith('#'));
+function publishCheck(version: string): string {
+  return (
+    "nix develop .#ci -c bash -c 'set -euo pipefail; root=$(pwd -P); " +
+    `export PROBE_DART_CALLS="$root/${STUB_DIR}/calls"; chmod +x ${STUB_DIR}/dart; export PATH="$root/${STUB_DIR}:$PATH"; ` +
+    `if ./scripts/ci/publish.sh v${version}-probe.mismatch >/dev/null 2>&1; then echo "publish ignored the version guard" >&2; exit 1; fi; ` +
+    'if grep -q "pub publish" "$PROBE_DART_CALLS" 2>/dev/null; then echo "publish ran before the version guard" >&2; exit 1; fi; ' +
+    `./scripts/ci/publish.sh v${version} >/dev/null; ` +
+    'last=$(tail -n 1 "$PROBE_DART_CALLS"); ' +
+    '[ "$last" = "$root/packages/diene_dart_lib|pub publish --force" ] || { echo "publish ran as: $last" >&2; exit 1; }\''
+  );
 }
 
-function policyViolation(source: string): string | null {
-  const lines = executableLines(source);
-
-  const guardIdx = lines.findIndex(l => l.includes(GUARD));
-  if (guardIdx === -1) return 'the manifest==tag guard is not invoked in executable code';
-
-  const publishIdxs: number[] = [];
-  lines.forEach((l, i) => {
-    if (l.includes(PUBLISH)) publishIdxs.push(i);
+async function withStub(repo: any, extra: string[], body: (version: string) => Promise<void>): Promise<void> {
+  await withCleanProbeState(repo, [STUB_DIR, ...extra], async () => {
+    const version = (await repo.read(MEMBER_PUBSPEC)).match(/^version:\s*(\S+)\s*$/m)?.[1];
+    if (!version) {
+      throw new Error('publish-command-policy: member pubspec has no version');
+    }
+    await repo.write(`${STUB_DIR}/dart`, STUB);
+    await body(version);
   });
-  if (publishIdxs.length === 0) return 'no publish command in executable code';
-  if (publishIdxs.length > 1) return `publish runs ${publishIdxs.length} times; exactly one is allowed`;
-  const publishIdx = publishIdxs[0];
-
-  if (guardIdx > publishIdx) return 'the guard runs AFTER publish; the tag/manifest match must be verified first';
-
-  // The publish must happen from the member directory, so the last `cd` before
-  // the publish line has to target it.
-  const cdBefore = lines.slice(0, publishIdx).filter(l => l.startsWith('cd '));
-  if (cdBefore.length === 0) return 'publish is not preceded by a cd into the member directory';
-  const lastCd = cdBefore[cdBefore.length - 1];
-  if (!lastCd.includes(MEMBER)) return `the last cd before publish targets '${lastCd}', not ${MEMBER}`;
-
-  return null;
 }
-
-const commandPolicyHolds = (source: string): boolean => policyViolation(source) === null;
 
 export default {
   contractVersion: 1,
-  sandbox: { snapshot: 'git' },
+  sandbox: { snapshot: 'git', preserve: ['.direnv'] },
   probes: [
     {
       name: 'baseline-publish-command-policy-green',
-      description: 'the guard precedes exactly one publish, run from the diene_config member directory',
+      description:
+        'the tag path runs dart pub publish --force from the publishable member, only after the version guard passes',
       kind: 'baseline',
       async run(repo: any) {
-        const violation = policyViolation(await repo.read(PUBLISH_SH));
-        if (violation !== null) {
-          throw new Error(`publish-command-policy: baseline violates the publish command policy: ${violation}`);
-        }
+        await withStub(repo, [], async version => {
+          await expectGreen(repo, publishCheck(version), 'publish-command-policy');
+        });
       },
     },
     {
       name: 'mutation-publish-command-policy-caught',
-      description: 'the policy check detects the publish directory being redirected away from the member',
+      description: 'the policy check fails once publish runs from the workspace root',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        const source = await repo.read(PUBLISH_SH);
-        if (!commandPolicyHolds(source)) {
-          throw new Error('publish-command-policy: policy already broken before sabotage');
-        }
-        await repo.write(PUBLISH_SH, source.replace('cd "${root_dir}/packages/diene_config"', 'cd "${root_dir}"'));
-        if (commandPolicyHolds(await repo.read(PUBLISH_SH))) {
-          throw new Error('publish-command-policy: policy survived sabotage');
-        }
-      },
-    },
-    {
-      name: 'mutation-guard-moved-after-publish-caught',
-      description: 'reordering the manifest guard to run after publication is detected',
-      kind: 'mutation',
-      expectedImpact: [],
-      async run(repo: any) {
-        const source = await repo.read(PUBLISH_SH);
-        const lines = source.split('\n');
-        const guardLine = lines.find(l => l.includes(GUARD) && !l.trim().startsWith('#'));
-        if (guardLine === undefined) {
-          throw new Error('publish-command-policy: no executable guard line to move');
-        }
-        const rest = lines.filter(l => l !== guardLine);
-        const publishAt = rest.findIndex(l => l.includes(PUBLISH) && !l.trim().startsWith('#'));
-        rest.splice(publishAt + 1, 0, guardLine);
-        const mutated = rest.join('\n');
-        if (commandPolicyHolds(mutated)) {
-          throw new Error('publish-command-policy: a guard running after publish survived the policy check');
-        }
-        await repo.write(PUBLISH_SH, mutated);
-      },
-    },
-    {
-      name: 'mutation-guard-only-in-comment-caught',
-      description: 'satisfying the guard string from a comment alone is detected',
-      kind: 'mutation',
-      expectedImpact: [],
-      async run(repo: any) {
-        const source = await repo.read(PUBLISH_SH);
-        const mutated = source
-          .split('\n')
-          .map(l => (l.includes(GUARD) && !l.trim().startsWith('#') ? `# ${l}` : l))
-          .join('\n');
-        if (commandPolicyHolds(mutated)) {
-          throw new Error('publish-command-policy: a commented-out guard still satisfied the policy');
-        }
-        await repo.write(PUBLISH_SH, mutated);
-      },
-    },
-    {
-      name: 'mutation-duplicate-publish-caught',
-      description: 'a second, unguarded publish command is detected',
-      kind: 'mutation',
-      expectedImpact: [],
-      async run(repo: any) {
-        const source = await repo.read(PUBLISH_SH);
-        const mutated = `${source}\n${PUBLISH}\n`;
-        if (commandPolicyHolds(mutated)) {
-          throw new Error('publish-command-policy: a duplicate publish survived the policy check');
-        }
-        await repo.write(PUBLISH_SH, mutated);
+        await withStub(repo, [PUBLISH_SH], async version => {
+          await repo.patch(PUBLISH_SH, {
+            find: 'cd "${root_dir}/packages/diene_dart_lib"',
+            replace: 'cd "${root_dir}"',
+          });
+          await expectRedBecause(repo, publishCheck(version), 'publish-command-policy', ['publish ran as:']);
+        });
       },
     },
   ],

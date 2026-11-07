@@ -1,0 +1,373 @@
+diff --git a/.github/dependabot.yml b/.github/dependabot.yml
+index 0f315ced..b26ec1d5 100644
+--- a/.github/dependabot.yml
++++ b/.github/dependabot.yml
+@@ -9,3 +9,12 @@ updates:
+         patterns:
+           - '*'
+     open-pull-requests-limit: 2
++  - package-ecosystem: pub
++    directory: /packages/diene_dart_lib
++    schedule:
++      interval: weekly
++    groups:
++      all:
++        patterns:
++          - '*'
++    open-pull-requests-limit: 2
+diff --git a/.github/workflows/ci.yaml b/.github/workflows/ci.yaml
+index f322e7ce..208dd680 100644
+--- a/.github/workflows/ci.yaml
++++ b/.github/workflows/ci.yaml
+@@ -27,3 +27,42 @@ jobs:
+       contents: read
+     uses: ./.github/workflows/⚡reusable-named-checks.yaml
+     secrets: inherit
++
++  analyze:
++    name: Static Analysis
++    permissions:
++      contents: read
++    uses: ./.github/workflows/⚡reusable-analyze.yaml
++    secrets: inherit
++
++  unit:
++    name: Unit and C0 Tests
++    permissions:
++      contents: read
++    uses: ./.github/workflows/⚡reusable-test.yaml
++    secrets: inherit
++    with:
++      mode: unit
++
++  meta:
++    name: TestHelper Meta Tests
++    permissions:
++      contents: read
++    uses: ./.github/workflows/⚡reusable-test.yaml
++    secrets: inherit
++    with:
++      mode: meta
++
++  deadcode:
++    name: Dead Code
++    permissions:
++      contents: read
++    uses: ./.github/workflows/⚡reusable-deadcode.yaml
++    secrets: inherit
++
++  package-validate:
++    name: Package Validation
++    permissions:
++      contents: read
++    uses: ./.github/workflows/⚡reusable-package-validate.yaml
++    secrets: inherit
+diff --git a/.gitignore b/.gitignore
+index c13fbd24..1b32f09f 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -26,3 +26,11 @@ desktop.ini
+ *~
+ .kagent/
+ .kloop/
++
++### dart
++.dart_tool/
++.pub-cache/
++build/
++doc/api/
++pubspec.lock
++reports/
+diff --git a/Taskfile.yaml b/Taskfile.yaml
+index 89749938..25a18ae6 100644
+--- a/Taskfile.yaml
++++ b/Taskfile.yaml
+@@ -1,5 +1,15 @@
+ version: '3'
+ 
++includes:
++  unit:
++    taskfile: tasks/Taskfile.test.yaml
++    vars:
++      MODE: unit
++  meta:
++    taskfile: tasks/Taskfile.test.yaml
++    vars:
++      MODE: meta
++
+ tasks:
+   setup:
+     desc: Set up the workspace
+@@ -10,3 +20,61 @@ tasks:
+     desc: Run all repository gates
+     cmds:
+       - pre-commit run --all-files
++
++  clean:
++    desc: Remove Dart dependency, build, coverage, and generated-doc artifacts
++    cmds:
++      - rm -rf .dart_tool packages/diene_dart_lib/.dart_tool reports packages/diene_dart_lib/doc/api
++
++  build:
++    desc: Validate the publishable Dart library and example
++    cmds:
++      - dart pub get >/dev/null
++      - dart analyze --fatal-infos packages/diene_dart_lib/lib packages/diene_dart_lib/example
++
++  analyze:
++    desc: Analyze the whole workspace, tests, and tooling
++    cmds:
++      - ./scripts/ci/analyze.sh
++
++  deadcode:
++    desc: Run repository and production-only dead-code passes
++    cmds:
++      - ./scripts/local/deadcode.sh
++
++  package:validate:
++    desc: Validate package metadata, pana score, and pub.dev dry-run contents
++    cmds:
++      - ./scripts/ci/package-validate.sh
++
++  test:
++    desc: Run unit/C0 and TestHelper meta suites without coverage
++    cmds:
++      - task: unit:default
++      - task: meta:default
++
++  test:unit:
++    desc: Run unit and C0 conformance suites without coverage
++    cmds:
++      - task: unit:default
++
++  test:meta:
++    desc: Run assert-the-asserter tests for TestHelper
++    cmds:
++      - task: meta:default
++
++  test:coverage:
++    desc: Run every coverage-capable tier with its isolated ledger
++    cmds:
++      - task: unit:coverage
++      - task: meta:coverage
++
++  test:unit:coverage:
++    desc: Run unit and C0 tests with the unit-only coverage ledger
++    cmds:
++      - task: unit:coverage
++
++  test:meta:coverage:
++    desc: Run TestHelper meta tests with the helper-only coverage ledger
++    cmds:
++      - task: meta:coverage
+diff --git a/dlint.yaml b/dlint.yaml
+index 08e14b5e..a8d97fea 100644
+--- a/dlint.yaml
++++ b/dlint.yaml
+@@ -11,6 +11,7 @@ checks:
+     entrypointPattern: scripts/ci/[A-Za-z0-9._-]+[.]sh
+     orchestrators:
+       - .github/workflows/ci.yaml
++      - .github/workflows/cd.yaml
+       - .github/workflows/release.yaml
+   toolchain-smoke:
+     shell: default
+diff --git a/nix/env.nix b/nix/env.nix
+index 8a80a204..381cda4b 100644
+--- a/nix/env.nix
++++ b/nix/env.nix
+@@ -20,6 +20,7 @@ with packages;
+ 
+   main = [
+     cyanprint
++    dart
+     git
+     go-task
+     infisical
+diff --git a/nix/packages.nix b/nix/packages.nix
+index 8c4dc798..249e4250 100644
+--- a/nix/packages.nix
++++ b/nix/packages.nix
+@@ -39,6 +39,7 @@ let
+     nix-unstable = (
+       with pkgs-unstable;
+       {
++        dart = flutter.dart;
+       }
+     );
+   };
+diff --git a/nix/pre-commit.nix b/nix/pre-commit.nix
+index 53cfa76b..4a81b174 100644
+--- a/nix/pre-commit.nix
++++ b/nix/pre-commit.nix
+@@ -82,5 +82,14 @@ pre-commit-lib.run {
+       pass_filenames = true;
+       language = "system";
+     };
++
++    a-dart-format = {
++      enable = true;
++      name = "Dart format";
++      entry = "${packages.dart}/bin/dart format --output=none --set-exit-if-changed";
++      files = "^packages/diene_dart_lib/(lib|test|example|tool)/.*\\.dart$";
++      pass_filenames = true;
++      language = "system";
++    };
+   };
+ }
+diff --git a/probes/features.json b/probes/features.json
+index ddf2971e..0e0b63de 100644
+--- a/probes/features.json
++++ b/probes/features.json
+@@ -153,5 +153,130 @@
+     "template": "diene/shared",
+     "name": "thin-skills",
+     "class": "presence"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "dart-format",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "dart-analyze",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "unit-tests",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "c0-fixture-harness",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "unit-coverage-ledger",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "testhelper-meta-contract",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "testhelper-meta-coverage-ledger",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "conditional-meta-activation",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "deadcode-whole-package",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "deadcode-production-only",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "pub-workspace-metadata-validator",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "publish-archive-contents",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "pana-score",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "publish-version-guard",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "publish-tag-policy",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "automated-publishing-credential-policy",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "publish-command-policy",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "package-validate-workflow-wiring",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "publish-workflow-wiring",
++    "class": "gate"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "dart-tool-inventory",
++    "class": "smoke"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "pub-workspace-resolution",
++    "class": "smoke"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "sample-execution-consumption",
++    "class": "smoke"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "publish-dry-run",
++    "class": "smoke"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "usage-skill",
++    "class": "presence"
++  },
++  {
++    "template": "diene/dart-lib",
++    "name": "probe-inventory",
++    "class": "presence"
+   }
+ ]
+diff --git a/release.yaml b/release.yaml
+index 16dc6330..691fa67f 100644
+--- a/release.yaml
++++ b/release.yaml
+@@ -165,6 +165,7 @@ release:
+     assets:
+       - Changelog.md
+       - docs/developer/CommitConventions.md
++      - packages/diene_dart_lib/pubspec.yaml
+   github:
+     enabled: true
+     successComment: 'Released in ${version}.'
+@@ -172,5 +173,7 @@ release:
+       - released
+   hooks:
+     # A file a hook writes joins commit.assets in the same edit.
+-    prepare: []
++    prepare:
++      - phase: afterWrite
++        command: './scripts/release/bump.sh ${version}'
+     success: []

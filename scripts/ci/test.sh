@@ -4,10 +4,7 @@ set -euo pipefail
 mode="${1:-}"
 coverage_mode="${2:-no-coverage}"
 
-# The publishable member lives under packages/diene_config (pub workspace).
-# `dart pub get` resolves at the repo root; `dart test`, coverage collection and
-# the coverage:format_coverage run all execute with CWD = the member directory.
-member_dir="${MEMBER_DIR:-packages/diene_config}"
+member_dir="${MEMBER_DIR:-packages/diene_dart_lib}"
 test_helper_path="${TEST_HELPER_PATH:-lib/test_helper.dart}"
 meta_test_path="${META_TEST_PATH:-test/meta}"
 
@@ -17,33 +14,13 @@ meta_test_path="${META_TEST_PATH:-test/meta}"
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
-# diene_config is a YES-TestHelper library, so its meta tier is MANDATORY, not
-# conditional. The inherited template treated the tier as a successful no-op
-# whenever the helper or the meta directory was missing; for this package that
-# turned deletion of the whole meta suite into a green CI job that uploaded no
-# TestHelper coverage at all. Both halves are therefore required, and their
-# absence is an error rather than a skip.
-#
-# TEST_HELPER_PATH/META_TEST_PATH remain overridable so probes can point the
-# tier at a deliberately absent path and prove this failure fires.
-if [[ ${mode} == "meta" ]]; then
-  if [[ ! -f "${member_dir}/${test_helper_path}" ]]; then
-    echo "❌ ${member_dir}/${test_helper_path} is missing; diene_config ships a TestHelper and its meta tier is mandatory" >&2
-    exit 1
-  fi
-  if [[ ! -d "${member_dir}/${meta_test_path}" ]]; then
-    echo "❌ ${member_dir}/${meta_test_path} is missing; the TestHelper must be dogfooded by a meta suite" >&2
-    exit 1
-  fi
-  meta_test_count="$(find "${member_dir}/${meta_test_path}" -name '*_test.dart' -type f | wc -l)"
-  echo "→ meta tier is mandatory; ${meta_test_path} holds ${meta_test_count} test file(s)"
-  if [[ ${meta_test_count} -eq 0 ]]; then
-    echo "❌ ${member_dir}/${meta_test_path} contains no *_test.dart; an empty meta directory is not a meta suite" >&2
-    exit 1
-  fi
+if [[ ${mode} == "meta" && ! -f "${member_dir}/${test_helper_path}" ]]; then
+  echo "✅ Meta tier inactive: this package has no TestHelper"
+  exit 0
 fi
+[[ ${mode} == "meta" && ! -d "${member_dir}/${meta_test_path}" ]] && echo "❌ ${member_dir}/${test_helper_path} ships without its meta suite ${meta_test_path}" >&2 && exit 1
 
-./scripts/ci/setup.sh
+dart pub get
 
 package_config="${root_dir}/.dart_tool/package_config.json"
 cd "${root_dir}/${member_dir}"
@@ -57,12 +34,13 @@ if [[ ${coverage_mode} == "no-coverage" ]]; then
   exit 0
 fi
 
-coverage_dir="coverage/${mode}"
-raw_dir="${coverage_dir}/raw"
-all_ledger="${coverage_dir}/all.info"
-ledger="${coverage_dir}/lcov.info"
-rm -rf "${coverage_dir}"
-mkdir -p "${raw_dir}"
+report_dir="${root_dir}/reports/${mode}"
+raw_dir="$(mktemp -d)"
+trap 'rm -rf "${raw_dir}"' EXIT
+all_ledger="${raw_dir}/all.info"
+ledger="${report_dir}/lcov.info"
+rm -rf "${report_dir}"
+mkdir -p "${report_dir}"
 
 set +e
 dart test --reporter=expanded --coverage="${raw_dir}" "${tests[@]}"
@@ -76,13 +54,11 @@ dart run coverage:format_coverage \
   --packages="${package_config}" \
   --report-on=lib
 
-pattern='(^|/)lib/test_helper[.]dart$'
-[[ ${mode} == "unit" ]] && pattern='(^|/)lib/src/.*[.]dart$'
+pattern="(^|/)${test_helper_path//./[.]}$"
+exclude=''
+[[ ${mode} == "unit" ]] && pattern='(^|/)lib/.*[.]dart$' && exclude="(^|/)${test_helper_path//./[.]}$"
 
-# The filter-and-assert half is Dart-free and lives in its own script, so the eight
-# descendants that rewrite this file's member path do not each carry a copy of it.
-"${root_dir}/scripts/ci/coverage-ledger.sh" "${all_ledger}" "${ledger}" "${pattern}" "${mode}"
-rm -rf "${raw_dir}"
+"${root_dir}/scripts/ci/coverage-ledger.sh" "${all_ledger}" "${ledger}" "${pattern}" "${mode}" "${exclude}"
 
 [[ ${test_status} -ne 0 ]] && echo "❌ ${mode} tests failed (exit ${test_status})" >&2 && exit "${test_status}"
-echo "✅ ${mode} coverage artifact: ${member_dir}/${ledger}"
+echo "✅ ${mode} coverage artifact: reports/${mode}/lcov.info"

@@ -52,37 +52,24 @@
             env
             ;
         };
-        pre-commit-offline = import ./nix/pre-commit.nix {
-          inherit
-            packages
-            pkgs
-            pre-commit-lib
-            formatter
-            env
-            ;
-          offline = true;
-        };
         formatter = import ./nix/fmt.nix {
           inherit treefmt-nix pkgs;
         };
         packages = import ./nix/packages.nix {
-          inherit pkgs-2605 pkgs-unstable atomi;
+          inherit
+            pkgs-2605
+            pkgs-unstable
+            atomi
+            ;
         };
         env = import ./nix/env.nix {
           inherit pkgs packages;
         };
         devShells = import ./nix/shells.nix {
           inherit pkgs env packages;
-          shellHook = pre-commit.shellHook;
+          shellHook = checks.pre-commit-check.shellHook;
         };
         checks = {
-          # ONLINE binding, restored. The clean merge repointed this at
-          # pre-commit-offline, which sets `offline = true` and therefore
-          # DISABLES a-dart-analyze, a-dart-test and a-dart-package. That is a
-          # green produced by a battery that never ran this node's Dart hooks,
-          # which answers a question about the detector set rather than about
-          # the node. pre-commit-offline stays declared for callers that
-          # genuinely need a networkless battery.
           pre-commit-check = pre-commit;
           format = formatter;
         };
