@@ -18,7 +18,7 @@ export default {
       kind: 'mutation',
       expectedImpact: ['dotnet-deadcode-all', 'dotnet-deadcode-production'],
       async run(repo: any) {
-        const lines = Array.from({ length: 40 }, (_, index) => `        total += ${index + 1};`).join('\n');
+        const lines = Array.from({ length: 400 }, (_, index) => `        total += ${index + 1};`).join('\n');
         await repo.write(
           'App/CoverageGap.cs',
           `namespace AtomiCloud.DotnetBase.App;\n\npublic class CoverageGap\n{\n    public int Uncovered()\n    {\n        var total = 0;\n${lines}\n        return total;\n    }\n}\n`,

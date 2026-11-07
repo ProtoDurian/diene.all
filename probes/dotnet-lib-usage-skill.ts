@@ -1,6 +1,6 @@
 import { definePresence } from './lib/definition.ts';
 
-const SKILL = 'skills/diene-dotnet-note-usage/SKILL.md';
+const SKILL = 'skills/diene-dotnet-otel-usage/SKILL.md';
 
 export default definePresence({
   sandbox: { snapshot: 'git' },
@@ -10,7 +10,7 @@ export default definePresence({
     async run(repo: any) {
       const frontmatter = (await repo.read(SKILL)).match(/^---\n([\s\S]*?)\n---/);
       const name = frontmatter?.[1].match(/^name:\s*(.+)$/m)?.[1]?.trim();
-      if (name !== 'diene-dotnet-note-usage') {
+      if (name !== 'diene-dotnet-otel-usage') {
         throw new Error(`usage skill name mismatch: ${name ?? 'missing'}`);
       }
     },
