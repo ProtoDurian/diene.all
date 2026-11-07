@@ -2,7 +2,18 @@ version: '3'
 
 includes:
   docker: tasks/Taskfile.docker.yaml
-  test: tasks/Taskfile.test.yaml
+  test:unit:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: unit
+  test:int:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: int
+  test:meta:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: meta
 
 tasks:
   setup:
@@ -39,23 +50,8 @@ tasks:
   test:coverage:
     desc: Run every coverage-capable suite with coverage
     cmds:
-      - ./scripts/local/test.sh unit --coverage
-      - ./scripts/local/test.sh int --coverage
-
-  test:unit:coverage:
-    desc: Run the unit suite with coverage
-    cmds:
-      - ./scripts/local/test.sh unit --coverage
-
-  test:int:coverage:
-    desc: Run the integration suite with coverage
-    cmds:
-      - ./scripts/local/test.sh int --coverage
-
-  test:watch:
-    desc: Watch the fast unit suite
-    cmds:
-      - ./scripts/local/test.sh unit --watch
+      - task: test:unit:coverage
+      - task: test:int:coverage
 
   run:
     desc: Run the Bun source entry point
