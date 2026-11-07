@@ -144,6 +144,9 @@ MODIFIED=(
   tests/integration/redis-kv-store.test.ts
   # sit joins the tier list scripts/ci/test.sh reads
   .config/bun-base.coverage.yaml
+  # the sit tier task and the compile output join the shared tier and clean scripts
+  tasks/Taskfile.test.yaml
+  scripts/local/clean.sh
   # owner !A78/!A84: buildBunCli comes from atomipkgs.lib (flake input passed to
   # nix/packages.nix; the lock floats atomipkgs v5 to the release that ships it)
   flake.nix
