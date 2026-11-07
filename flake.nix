@@ -52,43 +52,25 @@
             env
             ;
         };
-        pre-commit-offline = import ./nix/pre-commit.nix {
-          inherit
-            packages
-            pkgs
-            pre-commit-lib
-            formatter
-            env
-            ;
-          offline = true;
-        };
         formatter = import ./nix/fmt.nix {
           inherit treefmt-nix pkgs;
         };
         packages = import ./nix/packages.nix {
-          inherit pkgs-2605 pkgs-unstable atomi;
+          inherit
+            pkgs-2605
+            pkgs-unstable
+            atomi
+            ;
         };
         env = import ./nix/env.nix {
           inherit pkgs packages;
         };
         devShells = import ./nix/shells.nix {
           inherit pkgs env packages;
-          shellHook = pre-commit.shellHook;
+          shellHook = checks.pre-commit-check.shellHook;
         };
         checks = {
-          # ONLINE, restored: this node bound `pre-commit-check = pre-commit`
-          # before the merge and binds it again after. The parent's
-          # `pre-commit-offline` binding disables `a-dart-analyze`,
-          # `a-dart-test` and `a-dart-package` via `enable = !offline`, so a
-          # green from it is a green from a battery that never ran the three
-          # hooks that actually exercise this package. Taking the parent's
-          # binding here would have been a silent clean-merge loss: flake.nix
-          # did not conflict.
           pre-commit-check = pre-commit;
-          # Kept from the parent so the offline variant is still reachable by
-          # name for anyone who deliberately wants it; it is simply not what
-          # `pre-commit-check` resolves to.
-          pre-commit-check-offline = pre-commit-offline;
           format = formatter;
         };
       };

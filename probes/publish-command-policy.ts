@@ -1,45 +1,62 @@
-// Gate (static policy): the publish entrypoint (scripts/ci/publish.sh) must run
-// the version guard first, operate from the member package directory, and force
-// the pub.dev publish. Sabotage redirects the publish `cd` to the workspace root
-// and proves the policy check no longer holds.
-const PUBLISH_SH = 'scripts/ci/publish.sh';
+import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-function commandPolicyHolds(source: string): boolean {
+const PUBLISH_SH = 'scripts/ci/publish.sh';
+const MEMBER_PUBSPEC = 'packages/diene_dart_lib/pubspec.yaml';
+const STUB_DIR = '.probe-publish-stub';
+// A recording `dart` stands in for the real one, so nothing is ever uploaded.
+const STUB = '#!/usr/bin/env bash\nprintf \'%s|%s\\n\' "$(pwd -P)" "$*" >>"$PROBE_DART_CALLS"\n';
+
+function publishCheck(version: string): string {
   return (
-    source.includes('scripts/validate/publish-version.sh') &&
-    source.includes('packages/diene_e2e') &&
-    source.includes('flutter pub publish --force')
+    "nix develop .#ci -c bash -c 'set -euo pipefail; root=$(pwd -P); " +
+    `export PROBE_DART_CALLS="$root/${STUB_DIR}/calls"; chmod +x ${STUB_DIR}/dart; export PATH="$root/${STUB_DIR}:$PATH"; ` +
+    `if ./scripts/ci/publish.sh v${version}-probe.mismatch >/dev/null 2>&1; then echo "publish ignored the version guard" >&2; exit 1; fi; ` +
+    'if grep -q "pub publish" "$PROBE_DART_CALLS" 2>/dev/null; then echo "publish ran before the version guard" >&2; exit 1; fi; ' +
+    `./scripts/ci/publish.sh v${version} >/dev/null; ` +
+    'last=$(tail -n 1 "$PROBE_DART_CALLS"); ' +
+    '[ "$last" = "$root/packages/diene_dart_lib|pub publish --force" ] || { echo "publish ran as: $last" >&2; exit 1; }\''
   );
+}
+
+async function withStub(repo: any, extra: string[], body: (version: string) => Promise<void>): Promise<void> {
+  await withCleanProbeState(repo, [STUB_DIR, ...extra], async () => {
+    const version = (await repo.read(MEMBER_PUBSPEC)).match(/^version:\s*(\S+)\s*$/m)?.[1];
+    if (!version) {
+      throw new Error('publish-command-policy: member pubspec has no version');
+    }
+    await repo.write(`${STUB_DIR}/dart`, STUB);
+    await body(version);
+  });
 }
 
 export default {
   contractVersion: 1,
-  sandbox: { snapshot: 'git' },
+  sandbox: { snapshot: 'git', preserve: ['.direnv'] },
   probes: [
     {
       name: 'baseline-publish-command-policy-green',
-      description: 'publish.sh guards the version, cds into the member package, and force-publishes',
+      description:
+        'the tag path runs dart pub publish --force from the publishable member, only after the version guard passes',
       kind: 'baseline',
       async run(repo: any) {
-        if (!commandPolicyHolds(await repo.read(PUBLISH_SH))) {
-          throw new Error('publish-command-policy: publish.sh violates the publish command policy');
-        }
+        await withStub(repo, [], async version => {
+          await expectGreen(repo, publishCheck(version), 'publish-command-policy');
+        });
       },
     },
     {
       name: 'mutation-publish-command-policy-caught',
-      description: 'the policy check detects the publish directory being redirected away from the member',
+      description: 'the policy check fails once publish runs from the workspace root',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        const source = await repo.read(PUBLISH_SH);
-        if (!commandPolicyHolds(source)) {
-          throw new Error('publish-command-policy: policy already broken before sabotage');
-        }
-        await repo.write(PUBLISH_SH, source.replace('cd "${root_dir}/packages/diene_e2e"', 'cd "${root_dir}"'));
-        if (commandPolicyHolds(await repo.read(PUBLISH_SH))) {
-          throw new Error('publish-command-policy: policy survived sabotage');
-        }
+        await withStub(repo, [PUBLISH_SH], async version => {
+          await repo.patch(PUBLISH_SH, {
+            find: 'cd "${root_dir}/packages/diene_dart_lib"',
+            replace: 'cd "${root_dir}"',
+          });
+          await expectRedBecause(repo, publishCheck(version), 'publish-command-policy', ['publish ran as:']);
+        });
       },
     },
   ],
