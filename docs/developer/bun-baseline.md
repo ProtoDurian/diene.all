@@ -24,7 +24,6 @@ rules remain in `docs/standards/`.
 - `task run -- <args>` executes the source entry point.
 - `task preview -- <args>` rebuilds and executes the bundled artifact.
 - `task docker:build` and `task docker:run` build and run the Bun image.
-- `task helm:lint` and `task helm:template` retain the inherited Helm axis.
 
 Each tier task is a one-line call to `scripts/local/test.sh`, and `task clean`
 calls `scripts/local/clean.sh`.
@@ -92,7 +91,7 @@ Read the TypeScript variants alongside their shared standards:
 ## External service / compute cost
 
 - Integration tests and Docker image builds require a Docker runtime.
-- Unit, integration, build, Docker, and Helm are separate CI jobs.
+- Unit, integration, build, and Docker are separate CI jobs.
 
 ## Template maintenance boundary
 
