@@ -5,8 +5,9 @@ const UPLOAD_ACTION = 'actions/upload-artifact@';
 const GUARD = "hashFiles(format('reports/{0}/lcov.info', inputs.mode)) != ''";
 const INACTIVE_META =
   'nix develop .#ci -c bash -c \'TEST_HELPER_PATH=lib/probe_absent_helper.dart ./scripts/ci/test.sh meta coverage | grep -F "Meta tier inactive"\'';
+// No real TestHelper here, so a shipped lib file stands in for one.
 const HELPER_WITHOUT_SUITE =
-  'nix develop .#ci -c env META_TEST_PATH=test/probe_absent_meta ./scripts/ci/test.sh meta coverage';
+  'nix develop .#ci -c env TEST_HELPER_PATH=lib/diene_core_utils.dart META_TEST_PATH=test/probe_absent_meta ./scripts/ci/test.sh meta coverage';
 
 // Every artifact upload must be skipped when the run produced no ledger.
 function uploadsAreConditional(source: string): string | undefined {
