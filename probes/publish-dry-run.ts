@@ -1,7 +1,7 @@
 import { expectGreen } from './lib/helpers.ts';
 
 const DRY_RUN =
-  "nix develop .#ci -c bash -c 'set -euo pipefail; cd packages/diene_dart_lib; " +
+  "nix develop .#ci -c bash -c 'set -euo pipefail; cd packages/diene_e2e; " +
   'out=$(dart pub publish --dry-run --skip-validation 2>&1); printf "%s\\n" "$out"; ' +
   'printf "%s\\n" "$out" | grep -Fx "Package has 0 warnings."\'';
 

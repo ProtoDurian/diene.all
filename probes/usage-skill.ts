@@ -1,4 +1,4 @@
-const SKILL_DIR = 'packages/diene_dart_lib/skills/diene-dart-lib-usage';
+const SKILL_DIR = 'packages/diene_e2e/skills/diene-e2e-usage';
 
 export default {
   contractVersion: 1,
@@ -11,7 +11,7 @@ export default {
       async run(repo: any) {
         const skill = await repo.read(`${SKILL_DIR}/SKILL.md`);
         const name = skill.match(/^---\n[\s\S]*?^name:\s*(\S+)\s*$[\s\S]*?^---$/m)?.[1];
-        if (name !== 'diene-dart-lib-usage') {
+        if (name !== 'diene-e2e-usage') {
           throw new Error(`usage-skill: SKILL.md frontmatter name is ${name ?? '(none)'}`);
         }
         if ((await repo.glob(`${SKILL_DIR}/patterns.md`)).length !== 1) {
