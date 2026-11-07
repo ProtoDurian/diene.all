@@ -1,23 +1,3 @@
-import 'iana_zones.dart';
-
-/// The single, version-pinned C0 §1 temporal contract for the Dart family.
-///
-/// `diene_core_utils` OWNS this contract; every downstream Dart-family package
-/// (config, problems, auth-engine, api-engine, e2e, interfaces) consumes the
-/// SAME [c0TemporalContract] value — importing it via
-/// `package:diene_core_utils/c0_temporal.dart` — instead of redefining its own
-/// temporal cases. Its provenance pins the C0 source and the official IANA
-/// release the timezone identifiers derive from, so conformance proofs never
-/// read host IANA data or the host clock: timezone and clock vectors are
-/// injected from this contract.
-///
-/// Stale-fixture detection: [C0TemporalProvenance.contentSha256] is a recorded
-/// SHA-256 of [C0TemporalContract.digestPayload]; a test recomputes it and
-/// fails if the vectors change without an intentional digest update, and also
-/// asserts [C0TemporalProvenance.ianaRelease] equals the bundled
-/// [ianaTimeZoneRelease].
-
-/// Provenance for the shared C0 temporal contract.
 final class C0TemporalProvenance {
   const C0TemporalProvenance({
     required this.contractVersion,
@@ -29,31 +9,18 @@ final class C0TemporalProvenance {
     required this.contentSha256,
   });
 
-  /// Monotonic version of this contract's vectors.
   final String contractVersion;
-
-  /// The binding C0 section (e.g. `C0 §1 Serialization`).
   final String c0Section;
-
-  /// The C0 document the vectors are derived from.
   final String c0Source;
-
-  /// The pinned IANA release the timezone identifiers derive from.
   final String ianaRelease;
-
-  /// The official IANA archive URL for [ianaRelease].
   final String ianaArchiveUrl;
-
-  /// The SHA-256 of the official IANA archive at [ianaArchiveUrl].
   final String ianaArchiveSha256;
 
-  /// Recorded SHA-256 of [C0TemporalContract.digestPayload] (stale detection).
+  /// SHA-256 of [C0TemporalContract.digestPayload]; update it with the vectors.
   final String contentSha256;
 }
 
-/// A deterministic instant-normalization vector: [input] (any RFC 3339 form,
-/// including offsets) formats to [canonicalUtc] (RFC 3339 UTC `Z`). The instant
-/// is injected — no host clock is read.
+/// [input] in any RFC 3339 form formats to the UTC `Z` form [canonicalUtc].
 final class C0InstantVector {
   const C0InstantVector({required this.input, required this.canonicalUtc});
 
@@ -61,7 +28,6 @@ final class C0InstantVector {
   final String canonicalUtc;
 }
 
-/// Positive/negative string cases for one temporal domain.
 final class C0Cases {
   const C0Cases({required this.valid, required this.invalid});
 
@@ -69,7 +35,6 @@ final class C0Cases {
   final List<String> invalid;
 }
 
-/// The version-pinned C0 temporal contract value.
 final class C0TemporalContract {
   const C0TemporalContract({
     required this.provenance,
@@ -85,22 +50,13 @@ final class C0TemporalContract {
   final C0Cases dates;
   final C0Cases times;
   final C0Cases durations;
-
-  /// Timezone identifier cases. `valid` deliberately includes legacy
-  /// IANA-defined short identifiers (`EST`, `GMT`) and an alias (`US/Eastern`)
-  /// alongside canonical zones; `invalid` includes the non-IANA abbreviation
-  /// `PST`, offsets, wrong case, and path traversal. This settles the legacy-id
-  /// question from the contract itself, not from host membership.
   final C0Cases timezones;
-
-  /// Valid instant-normalization vectors (formatter, clock injected).
   final List<C0InstantVector> instants;
 
-  /// Instant strings the strict RFC 3339 UTC parser must reject.
+  /// Instants the strict UTC parser must reject.
   final List<String> invalidInstants;
 
-  /// Deterministic serialization hashed for stale-fixture detection. The order
-  /// and separators are fixed; changing any vector changes this payload.
+  /// Fixed-order text of every vector, hashed into `contentSha256`.
   String digestPayload() {
     final StringBuffer buffer = StringBuffer()
       ..writeln('contract=${provenance.contractVersion}')
@@ -124,19 +80,19 @@ final class C0TemporalContract {
   }
 }
 
-/// The shared C0 temporal contract consumed unchanged across the Dart family.
+/// The temporal vectors every Diene Dart package checks its own surface with.
 const C0TemporalContract c0TemporalContract = C0TemporalContract(
   provenance: C0TemporalProvenance(
     contractVersion: '1',
-    c0Section: 'C0 §1 Serialization',
-    c0Source: 'goals/c0-contracts.md',
+    c0Section: 'Serialization',
+    c0Source: 'C0 contracts',
     ianaRelease: '2026b',
     ianaArchiveUrl:
         'https://data.iana.org/time-zones/releases/tzdata2026b.tar.gz',
     ianaArchiveSha256:
         '114543d9f19a6bfeb5bca43686aea173d38755a3db1f2eec112647ae92c6f544',
     contentSha256:
-        'ca9f7cdb6f7c77007e02c59efb19d82e8c3e9553f6209041fa111fc02f7e1027',
+        'b067fe7f7783ddd63bd0f460292b3b5be87a606a08b95b4bae5519bda3cb4608',
   ),
   dates: C0Cases(
     valid: <String>['2026-07-21', '2000-02-29', '0001-01-01', '9999-12-31'],

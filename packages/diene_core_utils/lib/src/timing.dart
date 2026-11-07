@@ -1,4 +1,3 @@
-/// Duration-based waiting.
 library;
 
 import 'dart:async';
@@ -7,12 +6,7 @@ import 'package:diene_result/diene_result.dart';
 
 import 'util_problem.dart';
 
-/// Completes after [duration] has elapsed.
-///
-/// A negative duration cannot be waited out, so it is reported as an
-/// `invalid_input` [Problem] and no timer is scheduled — the failure is a value,
-/// never a thrown `ArgumentError`. `Duration.zero` is valid and yields to the
-/// event loop once.
+/// Waits [duration]; a negative duration is an `invalid_input` failure.
 Future<Result<void>> sleep(Duration duration) async {
   if (duration.isNegative) {
     return invalidUtilInput<void>(

@@ -1,4 +1,3 @@
-/// Narrowing and deterministic projection of JSON-like records.
 library;
 
 import 'package:diene_result/diene_result.dart';
@@ -6,24 +5,9 @@ import 'package:diene_result/diene_result.dart';
 import 'merge.dart';
 import 'util_problem.dart';
 
-/// Narrows [value] to a plain JSON object: a `Map` keyed by `String` that is
-/// not a list.
-///
-/// This is the Dart twin of the sibling `isRecord` guard. Dart's type system
-/// already separates maps from lists, so the check is a single `is` test rather
-/// than the runtime null/array probing the TypeScript sibling needs.
 bool isJsonObject(Object? value) => value is Map<String, Object?>;
 
-/// Produces a deterministic clone of a config-like value.
-///
-/// Object keys are re-emitted in sorted order at every depth while list element
-/// order is preserved and scalars pass through untouched, so two structurally
-/// equal configurations always project to byte-identical JSON. That makes the
-/// projection safe to hash, diff, or use as a cache key.
-///
-/// Cyclic input cannot be projected and is reported as an `unprojectable`
-/// [Problem] rather than recursing forever. A value merely *shared* across
-/// sibling branches (a non-cyclic DAG) is fine and is emitted at each position.
+/// Clones with keys sorted at every depth; a cycle is `record_unprojectable`.
 Result<Object?> stableConfig(Object? value) {
   try {
     return Ok<Object?>(_project(value, <Object>[], '<root>'));
@@ -38,8 +22,6 @@ Result<Object?> stableConfig(Object? value) {
   }
 }
 
-/// Thrown internally by [_project] and converted to a [Problem] by
-/// [stableConfig]; never visible to callers.
 final class _CycleDetected implements Exception {
   const _CycleDetected(this.path);
 
@@ -75,7 +57,5 @@ void _guardCycle(Object node, List<Object> ancestors, String path) {
   }
 }
 
-/// Deterministically projects a configuration object, preserving the
-/// [JsonObject] type for callers that merged it with [deepMerge].
 Result<JsonObject> stableConfigObject(JsonObject value) =>
     stableConfig(value).map((Object? projected) => projected! as JsonObject);

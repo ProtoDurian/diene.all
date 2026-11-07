@@ -1,4 +1,3 @@
-/// C0 §3 environment-to-configuration coercion.
 library;
 
 import 'package:diene_problems/diene_problems.dart';
@@ -14,23 +13,9 @@ final RegExp _decimal = RegExp(
 );
 final RegExp _index = RegExp(r'^(?:0|[1-9]\d*)$');
 
-/// The C0 §3 path separator inside an environment or `--dart-define` key.
 const String environmentPathSeparator = '__';
 
-/// Coerces an environment scalar using the C0 §3 configuration conventions.
-///
-/// A blank value means UNSET and becomes `null`. `true`/`false` (any case)
-/// become booleans. Safe integers and decimal forms become their Dart scalar
-/// equivalents. Everything else stays a `String`. This is total: no input is
-/// rejected, because C0 §3 gives every string a defined reading.
-///
-/// This is a CONFIGURATION-value coercion, NOT a money or wire-decimal codec.
-/// Decimal forms are parsed to `double` for ergonomic config numerics (ratios,
-/// timeouts, thresholds) and are therefore lossy for exact decimals. Per C0 §1,
-/// money and other exact-decimal wire values travel as decimal STRINGS and must
-/// not be routed through this helper; they stay strings end to end. Integers
-/// beyond the IEEE-754 safe range are likewise preserved as strings, precisely
-/// because coercing them would silently lose precision on web builds.
+/// Blank is null; booleans, safe integers and decimals are typed; else as is.
 Object? coerceEnvironmentScalar(String value) {
   if (value.isEmpty) {
     return null;
@@ -53,41 +38,12 @@ Object? coerceEnvironmentScalar(String value) {
   return value;
 }
 
-/// Converts the [prefix]-scoped entries of [environment] into a nested
-/// configuration object.
-///
-/// [prefix] is matched case-INSENSITIVELY (C0 §3), so `ACME_`, `acme_`, and
-/// `AcMe_` all select the same entries and a host that folds its environment to
-/// one case still contributes its values.
-///
-/// [environmentPathSeparator] separates path components and an all-digit
-/// component produces a list index, so `ACME_APP__TAGS__0` and
-/// `ACME_APP__TAGS__1` build `{app: {tags: [..., ...]}}`. Component names are
-/// lowercased so the result merges through [deepMerge] against any YAML
-/// spelling. Blank values are UNSET and are omitted entirely rather than
-/// written as `null`, so a blank define cannot erase a base-layer value.
-///
-/// Per C0 §3 no JSON string and no comma-separated string is ever decoded: lists
-/// come only from indexed keys. Such a value is simply carried through as the
-/// string it is.
-///
-/// Every rejection is returned as a [Problem], never thrown:
-///
-/// - a key whose suffix is empty or has an empty path component
-///   (`invalid_input`),
-/// - two keys that normalise onto the same path (`conflict`),
-/// - a key that treats a scalar path as a parent (`conflict`),
-/// - a level that mixes indexed and named children (`invalid_input`),
-/// - a list whose indexes are sparse or do not start at zero
-///   (`invalid_input`).
+/// `__` nests, digit segments index lists, blank values are omitted.
 Result<JsonObject> environmentToNestedMap(
   Map<String, String> environment, {
   required String prefix,
 }) {
   final JsonObject root = <String, Object?>{};
-  // C0 §3 case-insensitive key matching covers the PREFIX as well as the path:
-  // `acme_app__name` and `ACME_APP__NAME` name the same setting, so a host that
-  // lowercases its environment must not silently contribute nothing.
   final String foldedPrefix = prefix.toLowerCase();
   final List<MapEntry<String, String>> entries =
       environment.entries

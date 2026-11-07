@@ -1,22 +1,10 @@
-// Production dead-code root for the published diene_core_utils surface.
-//
-// This is tooling, not a test. dart_code_linter otherwise treats only the public
-// barrel (diene_core_utils.dart) as an entrypoint, so members reachable ONLY
-// through the separately exported c0_temporal.dart sub-library, and public
-// members no unit test happens to call, get reported as unused. Referencing
-// every public export here keeps the production-only dead-code pass honest
-// without any exclusion list (R12: two passes, no exclusions).
-//
-// deadcode.sh copies this file to bin/main.dart inside the production-only
-// sandbox, so it lives in the member package where `package:diene_core_utils`
-// resolves cleanly (and is excluded from the published archive by .pubignore).
+// Production dead-code root: references every public export.
 import 'package:diene_core_utils/diene_core_utils.dart';
 import 'package:diene_interfaces/test_helper.dart';
 import 'package:diene_problems/diene_problems.dart';
 import 'package:diene_result/diene_result.dart';
 
 Future<void> main() async {
-  // --- identity -------------------------------------------------------------
   final String slug = slugify('Dead Code Entrypoint');
   final Result<String> key = namespacedKey('diene', slug);
   key
@@ -26,7 +14,6 @@ Future<void> main() async {
   _sink(NamespacedKeyField.key.name);
   _sink(fuzzyIncludes(slug, 'dead'));
 
-  // --- configuration --------------------------------------------------------
   final JsonObject base = <String, Object?>{
     'app': <String, Object?>{'name': 'base'},
   };
@@ -47,7 +34,6 @@ Future<void> main() async {
     stableConfigObject(merged).run(_sink);
   });
 
-  // --- C0 temporal wire forms ----------------------------------------------
   const WireCodec codec = WireCodec();
   WireDate.of(
     2026,
@@ -81,7 +67,6 @@ Future<void> main() async {
   _sink(wireDurationGrammar);
   _sink(wireTimezoneGrammar);
 
-  // --- the shared C0 temporal contract (c0_temporal.dart sub-library) -------
   const C0TemporalContract contract = c0TemporalContract;
   _sink(contract.digestPayload());
   _sink(contract.provenance.contractVersion);
@@ -105,7 +90,6 @@ Future<void> main() async {
     _sink(vector.canonicalUtc);
   }
 
-  // --- problem vocabulary ---------------------------------------------------
   _sink(coreUtilsProblemVersion);
   for (final UtilName util in UtilName.values) {
     _sink(util.wireId);
@@ -145,7 +129,6 @@ Future<void> main() async {
     ),
   );
 
-  // --- waiting and bounded concurrency -------------------------------------
   (await sleep(Duration.zero)).run(_sink);
   (await mapWithConcurrency<int, int>(
     <int>[1, 2, 3],
@@ -153,7 +136,6 @@ Future<void> main() async {
     (int value) async => Ok<int>(value * 2),
   )).run(_sink);
 
-  // --- the diene_interfaces Vfs seam ---------------------------------------
   final InMemoryVfs vfs = InMemoryVfs();
   (await writeVfsText(vfs, '/config/base.json', '{}')).run(_sink);
   (await readVfsText(vfs, '/config/base.json')).run(_sink);
@@ -170,7 +152,6 @@ Future<void> main() async {
 Result<JsonObject> _emptyLayer(String text) =>
     Ok<JsonObject>(<String, Object?>{'length': text.length});
 
-/// Consumes a value so the analyzer sees a real use without printing.
 void _sink(Object? value) {
   if (value == null && DateTime.now().year < 0) {
     throw StateError('unreachable');

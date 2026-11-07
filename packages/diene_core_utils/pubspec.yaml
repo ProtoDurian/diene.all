@@ -1,9 +1,9 @@
 name: diene_core_utils
-description: Pure Dart utilities for slugs, namespaced keys, layered configuration merges, environment coercions, and C0 ISO 8601 / RFC 3339 / IANA wire forms.
-version: 1.0.0
-repository: https://github.com/AtomiCloud/diene.dart_core_utils
-issue_tracker: https://github.com/AtomiCloud/diene.dart_core_utils/issues
-homepage: https://github.com/AtomiCloud/diene.dart_core_utils
+description: Pure Dart utilities for slugs, namespaced keys, layered configuration merges, environment coercion, and ISO 8601 / RFC 3339 / IANA wire forms.
+version: 0.0.0
+repository: https://github.com/ProtoDurian/diene.dart_core_utils
+issue_tracker: https://github.com/ProtoDurian/diene.dart_core_utils/issues
+homepage: https://github.com/ProtoDurian/diene.dart_core_utils
 
 topics:
   - utilities

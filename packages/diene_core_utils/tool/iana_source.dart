@@ -1,17 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
-/// Deterministic extraction of IANA timezone identifiers from the vendored
-/// official native source files (see `third_party/iana-tzdata-<release>/`).
-///
-/// This is the single source of truth shared by `gen_iana_zones.dart` (which
-/// writes `lib/src/iana_zones.dart`) and the stale-source detection test
-/// (which regenerates and compares). It reads ONLY the committed, digest-pinned
-/// native files — never `/usr/share/zoneinfo` or any host-derived artifact.
+const String ianaArchivePath =
+    '../../third_party/iana-tzdata-2026b/tzdata2026b.tar.gz';
 
-/// The zone-defining files of the standard (non-`backzone`) distribution, in
-/// the fixed policy order. The identifier set is the union of every `Zone` and
-/// `Link` declared here. `backzone` is excluded: it extends pre-1970 history of
-/// existing zones and introduces no new identifier.
+// backzone is left out: it only adds pre-1970 history to existing zones.
 const List<String> ianaZoneDefiningFiles = <String>[
   'africa',
   'antarctica',
@@ -25,7 +18,6 @@ const List<String> ianaZoneDefiningFiles = <String>[
   'backward',
 ];
 
-/// The extracted release string and sorted, unique identifier union.
 class IanaSource {
   const IanaSource({required this.release, required this.identifiers});
 
@@ -33,35 +25,53 @@ class IanaSource {
   final List<String> identifiers;
 }
 
-/// Extracts the release (`version` file) and the sorted identifier union from
-/// the vendored native IANA source directory [sourceDir].
+/// Regular files of a tar.gz archive, by member name.
+Map<String, List<int>> readTarGz(List<int> archive) {
+  final List<int> tar = gzip.decode(archive);
+  final Map<String, List<int>> files = <String, List<int>>{};
+  int offset = 0;
+  while (offset + 512 <= tar.length) {
+    final List<int> header = tar.sublist(offset, offset + 512);
+    if (header.every((int byte) => byte == 0)) {
+      break;
+    }
+    final String name = _field(header, 0, 100);
+    final String prefix = _field(header, 345, 155);
+    final int size = int.parse(_field(header, 124, 12).trim(), radix: 8);
+    final int type = header[156];
+    final int start = offset + 512;
+    if (type == 0x30 || type == 0) {
+      final String path = prefix.isEmpty ? name : '$prefix/$name';
+      files[path] = tar.sublist(start, start + size);
+    }
+    offset = start + (size + 511) ~/ 512 * 512;
+  }
+  return files;
+}
+
+String _field(List<int> header, int start, int length) {
+  final List<int> raw = header.sublist(start, start + length);
+  final int end = raw.indexOf(0);
+  return ascii.decode(end == -1 ? raw : raw.sublist(0, end));
+}
+
+/// Release and sorted `Zone`/`Link` names of the archive at [archivePath].
 ///
-/// Throws [ArgumentError] if the directory or any required file is missing.
-IanaSource extractIanaSource(String sourceDir) {
-  if (!Directory(sourceDir).existsSync()) {
-    throw ArgumentError('IANA source directory not found: $sourceDir');
+/// Throws [ArgumentError] when the archive or a required member is missing.
+IanaSource extractIanaSource(String archivePath) {
+  final File file = File(archivePath);
+  if (!file.existsSync()) {
+    throw ArgumentError('IANA archive not found: $archivePath');
   }
-  final File versionFile = File('$sourceDir/version');
-  if (!versionFile.existsSync()) {
-    throw ArgumentError('missing version file in $sourceDir');
-  }
-  final String release = versionFile.readAsStringSync().trim();
+  final Map<String, List<int>> files = readTarGz(file.readAsBytesSync());
+  final String release = utf8.decode(_member(files, 'version')).trim();
 
   final Set<String> ids = <String>{};
   for (final String name in ianaZoneDefiningFiles) {
-    final File file = File('$sourceDir/$name');
-    if (!file.existsSync()) {
-      throw ArgumentError('missing IANA source file: $sourceDir/$name');
-    }
-    for (final String line in file.readAsLinesSync()) {
+    for (final String line in const LineSplitter().convert(
+      utf8.decode(_member(files, name)),
+    )) {
       final List<String> fields = line.split(RegExp(r'\s+'));
-      if (fields.isEmpty) {
-        continue;
-      }
-      // Native files use full keywords with tab-separated fields:
-      // `Zone <name> ...` and `Link <target> <link-name> [# comment]`.
-      // Continuation lines of a zone are indented, so `^Zone`/`^Link` match
-      // only the declaring line.
       switch (fields.first) {
         case 'Zone':
           if (fields.length >= 2) {
@@ -77,4 +87,12 @@ IanaSource extractIanaSource(String sourceDir) {
 
   final List<String> sorted = ids.toList()..sort();
   return IanaSource(release: release, identifiers: sorted);
+}
+
+List<int> _member(Map<String, List<int>> files, String name) {
+  final List<int>? bytes = files[name];
+  if (bytes == null) {
+    throw ArgumentError('IANA archive has no member: $name');
+  }
+  return bytes;
 }

@@ -5,62 +5,58 @@ import 'package:diene_problems/diene_problems.dart';
 import 'package:diene_result/diene_result.dart';
 import 'package:test/test.dart';
 
-/// Real consumption of the PUBLISHED `diene_interfaces` 1.0.0 seam (R-E12).
-///
-/// Two obligations are discharged here:
-///
-/// 1. **A seam injected through its interface type.** Every member under test
-///    takes `Vfs` — the published INTERFACE — as a parameter. The suite proves
-///    that by driving the same members through a second, independent `Vfs`
-///    implementation ([_RecordingVfs]) defined in this file: if the production
-///    code had reached for a concrete type or `dart:io` instead of the seam, the
-///    substitution below could not compile.
-/// 2. **The shipped fakes.** The happy paths run against
-///    `package:diene_interfaces/test_helper.dart`'s `InMemoryVfs`, including its
-///    FIFO scripted-failure mechanism, so failure branches are exercised with no
-///    host filesystem and no mocking framework.
 void main() {
   group('readVfsText / writeVfsText through the published Vfs seam', () {
     test('a write is readable back through the same seam', () async {
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs();
 
+      // Act
       final Result<void> written = await writeVfsText(
         vfs,
         '/etc/diene/base.yaml',
         'app:\n  name: base\n',
       );
-      expect(written.isOk, isTrue, reason: _describe(written));
-
       final Result<String> read = await readVfsText(
         vfs,
         '/etc/diene/base.yaml',
       );
+
+      // Assert
+      expect(written.isOk, isTrue, reason: _describe(written));
       expect(read.isOk, isTrue, reason: _describe(read));
       expect(read.unwrap(), 'app:\n  name: base\n');
     });
 
     test('writeVfsText creates missing parents', () async {
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs();
+
+      // Act
       final Result<void> written = await writeVfsText(
         vfs,
         '/deeply/nested/parents/config.yaml',
         'x: 1',
       );
-      expect(written.isOk, isTrue, reason: _describe(written));
-      expect(
-        (await vfs.exists('/deeply/nested/parents/config.yaml')).unwrap(),
-        isTrue,
+      final Result<bool> exists = await vfs.exists(
+        '/deeply/nested/parents/config.yaml',
       );
+
+      // Assert
+      expect(written.isOk, isTrue, reason: _describe(written));
+      expect(exists.unwrap(), isTrue);
     });
 
     test("a seam failure is propagated UNCHANGED, not re-wrapped", () async {
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs();
+
+      // Act
       final Result<String> read = await readVfsText(vfs, '/absent.yaml');
 
+      // Assert
       expect(read.isErr, isTrue);
       final Problem problem = read.unwrapErr();
-      // The envelope must still be the SEAM's: port=vfs, not util=vfs. A
-      // re-wrapped envelope would bury the real cause behind a second one.
       expect(problem.data['port'], 'vfs');
       expect(problem.data.containsKey('util'), isFalse);
       expect(problem.status, 404);
@@ -69,30 +65,41 @@ void main() {
 
   group('readOptionalVfsText', () {
     test('absence is a successful null, not a failure', () async {
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs();
+
+      // Act
       final Result<String?> read = await readOptionalVfsText(
         vfs,
         '/absent.yaml',
       );
+
+      // Assert
       expect(read.isOk, isTrue, reason: _describe(read));
       expect(read.unwrap(), isNull);
     });
 
     test('a present layer returns its text', () async {
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs();
       (await writeVfsText(
         vfs,
         '/overlay.yaml',
         'app:\n  name: overlay\n',
       )).unwrap();
+
+      // Act
       final Result<String?> read = await readOptionalVfsText(
         vfs,
         '/overlay.yaml',
       );
+
+      // Assert
       expect(read.unwrap(), 'app:\n  name: overlay\n');
     });
 
     test('a non-absence failure from exists() still propagates', () async {
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs()
         ..enqueueExistsResult(
           portFailure<bool>(
@@ -102,43 +109,55 @@ void main() {
             message: "host refused",
           ),
         );
+
+      // Act
       final Result<String?> read = await readOptionalVfsText(
         vfs,
         '/guarded.yaml',
       );
+
+      // Assert
       expect(read.isErr, isTrue, reason: 'a permission error is not absence');
       expect(read.unwrapErr().status, 403);
     });
 
     test('a failure AFTER a positive exists() still propagates', () async {
+      // Arrange
       final _RecordingVfs vfs = _RecordingVfs(
         existsResult: const Ok<bool>(true),
         readResult: Err<String>(
           _problem(PortErrorCode.io, 'read', 'device fell over'),
         ),
       );
+
+      // Act
       final Result<String?> read = await readOptionalVfsText(
         vfs,
         '/flaky.yaml',
       );
+
+      // Assert
       expect(read.isErr, isTrue);
       expect(read.unwrapErr().status, 500);
       expect(vfs.calls, <String>['exists:/flaky.yaml', 'readText:/flaky.yaml']);
     });
   });
 
-  group('loadConfigLayers — the C0 §3 ladder over a real seam', () {
+  group('loadConfigLayers — the ladder over a real seam', () {
     test('layers merge in order with the later layer winning', () async {
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs();
       (await writeVfsText(vfs, '/base.kv', 'name=base\nretries=1\n')).unwrap();
       (await writeVfsText(vfs, '/landscape.kv', 'retries=2\n')).unwrap();
 
+      // Act
       final Result<JsonObject> loaded =
           await loadConfigLayers(vfs, <ConfigLayer>[
             const ConfigLayer(path: '/base.kv', parse: _parseKeyValue),
             const ConfigLayer(path: '/landscape.kv', parse: _parseKeyValue),
           ]);
 
+      // Assert
       expect(loaded.isOk, isTrue, reason: _describe(loaded));
       expect(loaded.unwrap(), <String, Object?>{
         'name': 'base',
@@ -147,9 +166,11 @@ void main() {
     });
 
     test('an absent OPTIONAL layer contributes nothing', () async {
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs();
       (await writeVfsText(vfs, '/base.kv', 'name=base\n')).unwrap();
 
+      // Act
       final Result<JsonObject> loaded =
           await loadConfigLayers(vfs, <ConfigLayer>[
             const ConfigLayer(path: '/base.kv', parse: _parseKeyValue),
@@ -160,11 +181,15 @@ void main() {
             ),
           ]);
 
+      // Assert
       expect(loaded.unwrap(), <String, Object?>{'name': 'base'});
     });
 
     test('an absent REQUIRED layer fails with the seam envelope', () async {
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs();
+
+      // Act
       final Result<JsonObject> loaded = await loadConfigLayers(
         vfs,
         <ConfigLayer>[
@@ -172,12 +197,14 @@ void main() {
         ],
       );
 
+      // Assert
       expect(loaded.isErr, isTrue);
       expect(loaded.unwrapErr().data['port'], 'vfs');
       expect(loaded.unwrapErr().status, 404);
     });
 
     test('an optional layer whose exists() fails aborts the load', () async {
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs()
         ..enqueueExistsResult(
           portFailure<bool>(
@@ -187,6 +214,8 @@ void main() {
             message: "host unavailable",
           ),
         );
+
+      // Act
       final Result<JsonObject> loaded = await loadConfigLayers(
         vfs,
         <ConfigLayer>[
@@ -197,16 +226,19 @@ void main() {
           ),
         ],
       );
+
+      // Assert
       expect(loaded.isErr, isTrue);
       expect(loaded.unwrapErr().status, 503);
-      // The seam declared this one retryable; core-utils must not flatten that.
       expect(loaded.unwrapErr().recoverable, isTrue);
     });
 
     test('a parse failure aborts the load and is returned unchanged', () async {
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs();
       (await writeVfsText(vfs, '/broken.kv', 'no-equals-sign\n')).unwrap();
 
+      // Act
       final Result<JsonObject> loaded = await loadConfigLayers(
         vfs,
         <ConfigLayer>[
@@ -214,6 +246,7 @@ void main() {
         ],
       );
 
+      // Assert
       expect(loaded.isErr, isTrue);
       expect(loaded.unwrapErr().title, 'malformed key=value line');
     });
@@ -221,7 +254,10 @@ void main() {
     test(
       'no layer present at all is a core-utils failure, not a seam one',
       () async {
+        // Arrange
         final InMemoryVfs vfs = InMemoryVfs();
+
+        // Act
         final Result<JsonObject> loaded =
             await loadConfigLayers(vfs, <ConfigLayer>[
               const ConfigLayer(
@@ -236,6 +272,7 @@ void main() {
               ),
             ]);
 
+        // Assert
         expect(loaded.isErr, isTrue);
         final Problem problem = loaded.unwrapErr();
         expect(problem.data['util'], 'vfs');
@@ -246,11 +283,16 @@ void main() {
     );
 
     test('an empty layer list reports the same no-layer failure', () async {
+      // Arrange
       final InMemoryVfs vfs = InMemoryVfs();
+
+      // Act
       final Result<JsonObject> loaded = await loadConfigLayers(
         vfs,
         <ConfigLayer>[],
       );
+
+      // Assert
       expect(loaded.isErr, isTrue);
       expect(loaded.unwrapErr().data['paths'], <String>[]);
     });
@@ -260,32 +302,35 @@ void main() {
     test(
       'an independent Vfs implementation drives the identical members',
       () async {
-        // This is the substitution proof: _RecordingVfs shares no code with
-        // InMemoryVfs, so the members below can only be reaching the published
-        // `Vfs` INTERFACE.
+        // Arrange
         final _RecordingVfs vfs = _RecordingVfs(
           existsResult: const Ok<bool>(true),
           readResult: const Ok<String>('name=recorded\n'),
         );
 
-        expect((await readVfsText(vfs, '/x.kv')).unwrap(), 'name=recorded\n');
-        expect(
-          (await readOptionalVfsText(vfs, '/x.kv')).unwrap(),
-          'name=recorded\n',
+        // Act
+        final Result<String> read = await readVfsText(vfs, '/x.kv');
+        final Result<String?> readOptional = await readOptionalVfsText(
+          vfs,
+          '/x.kv',
         );
-        expect(
-          (await writeVfsText(vfs, '/x.kv', 'name=written\n')).isOk,
-          isTrue,
+        final Result<void> written = await writeVfsText(
+          vfs,
+          '/x.kv',
+          'name=written\n',
         );
-
         final Result<JsonObject> loaded = await loadConfigLayers(
           vfs,
           <ConfigLayer>[
             const ConfigLayer(path: '/x.kv', parse: _parseKeyValue),
           ],
         );
-        expect(loaded.unwrap(), <String, Object?>{'name': 'recorded'});
 
+        // Assert
+        expect(read.unwrap(), 'name=recorded\n');
+        expect(readOptional.unwrap(), 'name=recorded\n');
+        expect(written.isOk, isTrue);
+        expect(loaded.unwrap(), <String, Object?>{'name': 'recorded'});
         expect(vfs.calls, <String>[
           'readText:/x.kv',
           'exists:/x.kv',
@@ -298,12 +343,6 @@ void main() {
   });
 }
 
-/// A second, independent `Vfs` used to prove the members bind the INTERFACE.
-///
-/// Only the operations `diene_core_utils` actually calls are implemented; every
-/// other member of the contract reports `unsupported` rather than throwing, which
-/// is itself the contract's rule for a boundary that does not implement an
-/// operation.
 final class _RecordingVfs implements Vfs {
   _RecordingVfs({required this.existsResult, required this.readResult});
 
@@ -381,8 +420,6 @@ Problem _problem(PortErrorCode code, String operation, String message) =>
       message: message,
     );
 
-/// A minimal `key=value` layer reader, so the suite tests the LADDER rather than
-/// a parser. `diene_core_utils` ships no parser by design.
 Result<JsonObject> _parseKeyValue(String text) {
   final JsonObject parsed = <String, Object?>{};
   for (final String line in text.split('\n')) {

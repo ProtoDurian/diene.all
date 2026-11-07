@@ -3,45 +3,55 @@
 All notable changes to this package are documented here. Releases are managed
 from conventional commits by the repository release workflow.
 
+## Unreleased (0.0.0)
+
+No public symbol, signature or behaviour change from 1.0.1. Three constant
+values change:
+
+- `c0TemporalContract.provenance.c0Section` is now `Serialization` (was a
+  section reference into an internal document).
+- `c0TemporalContract.provenance.c0Source` is now `C0 contracts` (was an
+  internal file path).
+- `c0TemporalContract.provenance.contentSha256` is recomputed for those two
+  values, because `digestPayload()` includes them. Every test vector is
+  unchanged.
+
+Other changes:
+
+- The repository, homepage and issue tracker move to
+  `ProtoDurian/diene.dart_core_utils`.
+- API doc comments are shorter; the package doc moves to
+  `doc/diene_core_utils.md`.
+- Conformance tests check pinned copies of the shared config vectors and local
+  temporal fixtures, instead of a generated projection.
+- The IANA timezone list is generated from the official `tzdata2026b.tar.gz`
+  archive, stored unmodified. The list itself is unchanged (598 names).
+
+## 1.0.1
+
+- Changelog formatting fixes only; the library code is unchanged from 1.0.0.
+
 ## 1.0.0
 
-- Add the identity surface: `slugify` (NFKD, combining-mark removal, ASCII kebab,
-  total and idempotent), `namespacedKey` (`Result<String>`, naming the offending
-  `NamespacedKeyField` on failure), and `fuzzyIncludes`.
-- Add the C0 §3 layered-configuration mechanics: `JsonObject`, `deepClone`,
-  `deepMerge`, `deepMergeAll`, `canonicalConfigKey`, `configKeysMatch`,
-  `coerceEnvironmentScalar`, and `environmentToNestedMap`. Key matching is case-
-  and separator-insensitive (including the environment prefix), the base layer's
-  key spelling wins, `__` splits paths, all-digit components build lists, blank
-  values mean UNSET, and neither JSON nor comma-separated strings are ever decoded
-  into collections.
-- Add deterministic config projection: `isJsonObject`, `stableConfig`, and
-  `stableConfigObject`, sorting keys at every depth while preserving list order,
-  and reporting circular input as `record_unprojectable` instead of recursing.
-- Add the C0 §1 temporal wire forms: `WireDate`, `WireTime`, `IsoDuration`, and
-  `IanaTimezone` value types with `Result`-returning `parse`/`of` members;
-  `formatRfc3339Utc`; the STRICT `parseRfc3339Utc` (only the `Z` designator, so
-  one canonical spelling exists); the `normalizeRfc3339ToUtc` boundary ingress for
-  offset-carrying instants; and the `WireCodec` facade.
-- Validate timezone identifiers by exact membership in a vendored, digest-pinned
-  official IANA release (`2026b`, 598 identifiers) rather than a lexical shape
-  check or host `/usr/share/zoneinfo` data, so the answer is reproducible.
-- Export the shared, version-pinned C0 §1 temporal contract as the
-  `c0_temporal.dart` sub-library, so every Diene Dart package drives its temporal
-  conformance from one `c0TemporalContract` value instead of restating cases.
-- Add `Vfs`-seam helpers over the published `diene_interfaces` interface type:
-  `readVfsText`, `writeVfsText`, `readOptionalVfsText`, `ConfigLayer`, and
-  `loadConfigLayers`. The package imports neither `dart:io` nor Flutter, so it runs
-  on the VM, on the web, and in Flutter, and a seam failure is propagated unchanged
-  with its own status and `recoverable` flag intact.
-- Add `sleep` and `mapWithConcurrency`, the latter preserving input order, holding
-  a real concurrency bound, and resolving to the lowest failing index so the
-  outcome never depends on completion order.
-- Report every expected failure as a `Result` value carrying the canonical RFC 9457
-  `Problem` from `diene_problems`, with the `type` URI minted only by the single
-  C0 §2 builder (`UtilName`, `UtilErrorCode`, `utilProblem`, `utilFailure`,
-  `invalidUtilInput`, `invalidWireFormat`).
-- Ship no `test_helper.dart`: every member is a pure function or a pass-through
-  over an injected seam, so there is nothing to fake and no assertion a consumer
-  would repeat. The shipped `diene-core-utils-usage` skill carries the meta
-  convention and explains how to add one should that change.
+- Add `slugify`, `namespacedKey` (naming the bad `NamespacedKeyField` on
+  failure) and `fuzzyIncludes`.
+- Add config merging and coercion: `JsonObject`, `deepClone`, `deepMerge`,
+  `deepMergeAll`, `canonicalConfigKey`, `configKeysMatch`,
+  `coerceEnvironmentScalar` and `environmentToNestedMap`. Keys match ignoring
+  case and separators, the base spelling wins, `__` nests, digit segments build
+  lists, blank values are unset, and JSON or comma text is never decoded.
+- Add `isJsonObject`, `stableConfig` and `stableConfigObject`; a cycle is
+  `record_unprojectable`.
+- Add `WireDate`, `WireTime`, `IsoDuration`, `IanaTimezone`,
+  `formatRfc3339Utc`, the strict `parseRfc3339Utc` (only `Z`),
+  `normalizeRfc3339ToUtc` and `WireCodec`.
+- Check timezone names against the bundled IANA release `2026b`.
+- Export the shared temporal vectors as `c0TemporalContract` from
+  `c0_temporal.dart`.
+- Add `readVfsText`, `writeVfsText`, `readOptionalVfsText`, `ConfigLayer` and
+  `loadConfigLayers` over the `Vfs` port from `diene_interfaces`.
+- Add `sleep` and `mapWithConcurrency`.
+- Report failures as `Result` values holding a `Problem` (`UtilName`,
+  `UtilErrorCode`, `utilProblem`, `utilFailure`, `invalidUtilInput`,
+  `invalidWireFormat`).
+- Ship no `test_helper.dart`.

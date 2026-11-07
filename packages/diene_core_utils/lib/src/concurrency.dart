@@ -1,4 +1,3 @@
-/// Bounded-concurrency mapping over a fallible mapper.
 library;
 
 import 'dart:async';
@@ -8,19 +7,7 @@ import 'package:diene_result/diene_result.dart';
 
 import 'util_problem.dart';
 
-/// Maps [items] through [mapper] with at most [concurrency] calls in flight.
-///
-/// Results preserve INPUT order regardless of completion order. Work is pulled,
-/// not pushed: a fixed pool of [concurrency] workers each claims the next
-/// unclaimed index only when it becomes free, so no mapper is invoked eagerly
-/// beyond the bound. Dart has no core equivalent — `Future.wait` is unbounded —
-/// which is why this member ships rather than deferring to the SDK.
-///
-/// A [concurrency] below 1 is reported as an `invalid_input` [Problem] and no
-/// mapper runs. The first failure stops new work from being claimed, and the
-/// [Problem] of the LOWEST failing input index is returned unchanged so the
-/// outcome does not depend on completion order. Calls already in flight are
-/// awaited, so this never leaves a dangling future behind.
+/// Keeps input order; a failure returns the lowest failing index's problem.
 Future<Result<List<R>>> mapWithConcurrency<T, R>(
   Iterable<T> items,
   int concurrency,
