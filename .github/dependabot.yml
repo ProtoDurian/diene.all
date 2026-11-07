@@ -10,7 +10,7 @@ updates:
           - '*'
     open-pull-requests-limit: 2
   - package-ecosystem: pub
-    directory: /packages/diene_dart_lib
+    directory: /packages/diene_core_utils
     schedule:
       interval: weekly
     groups:
