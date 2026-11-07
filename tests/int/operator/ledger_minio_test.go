@@ -24,7 +24,7 @@ func startMinio(t *testing.T) *minio.Client {
 			Cmd:          []string{"server", "/data"},
 			Env:          map[string]string{"MINIO_ROOT_USER": "minioadmin", "MINIO_ROOT_PASSWORD": "minioadmin"},
 			ExposedPorts: []string{"9000/tcp"},
-			WaitingFor:   wait.ForHTTP("/minio/health/live").WithPort("9000/tcp"),
+			WaitingFor:   wait.ForHTTP("/minio/health/cluster").WithPort("9000/tcp"),
 		},
 		Started: true,
 	})
