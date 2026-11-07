@@ -110,5 +110,41 @@ pre-commit-lib.run {
       pass_filenames = false;
       language = "system";
     };
+
+    a-operator-markers = {
+      enable = true;
+      name = "Operator marker lint";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH CGO_ENABLED=0 ./scripts/validate/operator-markers.sh'";
+      files = "^(api/|adapters/operator/controllers/).*\\.go$|^scripts/validate/operator-markers\\.sh$";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-operator-architecture = {
+      enable = true;
+      name = "Operator architecture boundary";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH CGO_ENABLED=0 ./scripts/validate/operator-architecture.sh'";
+      files = "^(lib/operator/|adapters/operator/controllers/|tools/archcheck/).*\\.go$|^scripts/validate/operator-architecture\\.sh$";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-operator-rbac = {
+      enable = true;
+      name = "Operator RBAC minimality";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH CGO_ENABLED=0 ./scripts/validate/operator-rbac.sh'";
+      files = "^(adapters/operator/controllers/.*\\.go|infra/root_chart/templates/rbac/.*|scripts/validate/operator-rbac\\.sh)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-operator-crd-drift = {
+      enable = true;
+      name = "Operator CRD drift";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH CGO_ENABLED=0 ./scripts/validate/operator-crd-drift.sh'";
+      files = "^(api/.*\\.go|infra/root_chart/templates/crds/.*|scripts/validate/operator-crd-drift\\.sh)$";
+      pass_filenames = false;
+      language = "system";
+    };
   };
 }

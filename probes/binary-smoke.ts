@@ -76,6 +76,8 @@ actionlint -version >/dev/null
 printf '%s\n' 'name: Smoke' 'on: push' 'jobs:' '  smoke:' '    runs-on: ubuntu-latest' '    steps:' '      - run: echo smoke' >"$tmp/workflow.yaml"
 actionlint "$tmp/workflow.yaml"
 
+controller-gen --version >/dev/null
+
 dlint exec-bits >/dev/null
 
 docker --version >/dev/null
@@ -88,7 +90,8 @@ helm-docs --version >/dev/null
 helm-docs --dry-run --chart-search-root infra/root_chart >/dev/null 2>&1
 
 helm version --short >/dev/null
-helm template diene-workspace infra/root_chart | kubeconform -strict -summary >/dev/null
+# The chart ships ServiceMonitor, GrafanaAlertRuleGroup and its own CRs, which have no upstream schema.
+helm template operator-template infra/root_chart | kubeconform -strict -ignore-missing-schemas -summary >/dev/null
 
 infisical --version >/dev/null
 git -C "$tmp" init -q
@@ -101,6 +104,8 @@ git -C "$tmp" commit -qm smoke
 
 k3d version >/dev/null
 k3d cluster list --no-headers >/dev/null
+
+kubebuilder version >/dev/null 2>&1
 
 kubeconform -v >/dev/null
 
@@ -153,6 +158,10 @@ rg -q 'ripgrep smoke needle' "$tmp/rg-fixture.txt"
 rc=0
 rg -q 'no-such-needle-should-ever-match' "$tmp/rg-fixture.txt" || rc=$?
 [ "$rc" = "1" ] || { echo "rg: expected exit 1 (no match), got $rc" >&2; exit 1; }
+
+setup-envtest version >/dev/null
+test -x "$TEST_ASSET_KUBE_APISERVER"
+test -x "$TEST_ASSET_ETCD"
 
 shellcheck --version >/dev/null
 printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'echo "shellcheck smoke"' >"$tmp/shellcheck-clean.sh"
