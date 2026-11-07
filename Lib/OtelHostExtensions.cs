@@ -171,6 +171,31 @@ public static class OtelHostExtensions
         target.TimeoutMilliseconds = settings.TimeoutMilliseconds;
     }
 
+    /// <summary>
+    /// Applies already-validated settings to the exporter of one signal. A block endpoint
+    /// is a base URL, and the SDK appends no path to an endpoint set in code, so the
+    /// signal path (<c>/v1/traces</c>, <c>/v1/metrics</c>, <c>/v1/logs</c>) is appended here.
+    /// When the environment override owns the endpoint, the SDK appends the path itself.
+    /// </summary>
+    public static void Apply(OtlpExporterOptions target, OtlpSettings settings, OtlpSignal signal)
+    {
+        var path = SignalPath(signal);
+        Apply(target, settings);
+        if (settings.Endpoint.IsSome(out var endpoint))
+        {
+            target.Endpoint = new Uri(endpoint.AbsoluteUri.TrimEnd('/') + path);
+        }
+    }
+
+    /// <summary>The OTLP/HTTP path a signal is exported to.</summary>
+    public static string SignalPath(OtlpSignal signal) => signal switch
+    {
+        OtlpSignal.Traces => "/v1/traces",
+        OtlpSignal.Metrics => "/v1/metrics",
+        OtlpSignal.Logs => "/v1/logs",
+        _ => throw new ArgumentOutOfRangeException(nameof(signal), signal, "Unknown OTLP signal."),
+    };
+
     /// <summary>The fleet's OTLP HTTP port. Traffic on any other port is refused.</summary>
     public const int OtlpPort = 4318;
 
@@ -331,7 +356,7 @@ public static class OtelHostExtensions
             {
                 OpenTelemetry.Logs.OtlpLogExporterHelperExtensions.AddOtlpExporter(
                     logging,
-                    target => Apply(target, settings));
+                    target => Apply(target, settings, OtlpSignal.Logs));
             }
         });
     }
@@ -367,7 +392,7 @@ public static class OtelHostExtensions
                     {
                         metrics.AddOtlpExporter((target, reader) =>
                         {
-                            Apply(target, settings);
+                            Apply(target, settings, OtlpSignal.Metrics);
                             reader.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = interval;
                         });
                     }
@@ -396,7 +421,20 @@ public static class OtelHostExtensions
 
                     if (sampler.IsSome(out var selected)) tracing.SetSampler(selected);
                     if (selection.Console) tracing.AddConsoleExporter();
-                    if (otlp.IsSome(out var settings)) tracing.AddOtlpExporter(target => Apply(target, settings));
+                    if (otlp.IsSome(out var settings)) tracing.AddOtlpExporter(target => Apply(target, settings, OtlpSignal.Traces));
                 });
     }
+}
+
+/// <summary>The three OTLP signals, each exported to its own path.</summary>
+public enum OtlpSignal
+{
+    /// <summary>Spans, exported to <c>/v1/traces</c>.</summary>
+    Traces,
+
+    /// <summary>Measurements, exported to <c>/v1/metrics</c>.</summary>
+    Metrics,
+
+    /// <summary>Log records, exported to <c>/v1/logs</c>.</summary>
+    Logs,
 }
