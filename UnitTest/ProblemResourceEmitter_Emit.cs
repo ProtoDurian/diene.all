@@ -1,4 +1,6 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using AtomiCloud.Diene.CoreUtils.Json;
 using AtomiCloud.Diene.Problems;
 using FluentAssertions;
 
@@ -45,27 +47,92 @@ public class ProblemResourceEmitter_Emit
     }
 
     [Fact]
-    public void It_should_join_slugified_name_segments_with_dots_so_dashed_segments_never_collide()
+    public void It_should_read_a_spec_without_a_module_as_an_empty_module()
+    {
+        // Arrange
+        var emitter = Emitter(Portal, catalog => catalog.Add<SampleProblem>(400, false, new ProblemEndpoint("GET", "/sample")));
+        var document = JsonNode.Parse(emitter.Serialize(emitter.Emit(new ProblemResourceIdentity("dotnet", "notes", "lapras", "v1"))))!;
+        document["spec"]!.AsObject().Remove("module");
+
+        // Act
+        var resource = JsonSerializer.Deserialize<ProblemResource>(document.ToJsonString(), AtomiJson.DefaultOptions)!;
+
+        // Assert
+        resource.Spec.Module.Should().BeEmpty();
+        resource.Spec.Service.Should().Be("notes");
+        resource.Spec.Problems.Should().ContainSingle().Which.Endpoints.Should().Equal(new ProblemEndpoint("GET", "/sample"));
+    }
+
+    [Fact]
+    public void It_should_join_name_segments_with_dots_so_dashed_segments_never_collide()
     {
         // Arrange
         var dashedService = new ErrorPortalConfig("https", "docs.example.test", new ProblemIdentity("lapras", "dotnet", "a-b", "c"));
         var dashedModule = new ErrorPortalConfig("https", "docs.example.test", new ProblemIdentity("lapras", "dotnet", "a", "b-c"));
-        var mixedCase = new ErrorPortalConfig("https", "docs.example.test", new ProblemIdentity("Lapras", "dotnet", "Notes_Svc", "API"));
 
         // Act
         var first = Emitter(dashedService, catalog => catalog.Add<SampleProblem>(400, false))
             .Emit(new ProblemResourceIdentity("dotnet", "a-b", "lapras", "v1"));
         var second = Emitter(dashedModule, catalog => catalog.Add<SampleProblem>(400, false))
             .Emit(new ProblemResourceIdentity("dotnet", "a", "lapras", "v1"));
-        var slugged = Emitter(mixedCase, catalog => catalog.Add<SampleProblem>(400, false))
-            .Emit(new ProblemResourceIdentity("dotnet", "Notes_Svc", "Lapras", "v1"));
 
         // Assert
         first.Metadata.Name.Should().Be("a-b.c.lapras.v1");
         second.Metadata.Name.Should().Be("a.b-c.lapras.v1");
         first.Metadata.Name.Should().NotBe(second.Metadata.Name);
-        slugged.Metadata.Name.Should().Be("notes-svc.api.lapras.v1");
-        slugged.Spec.Service.Should().Be("Notes_Svc");
+    }
+
+    [Theory]
+    [InlineData("lapras", "dotnet", "notes_svc", "api", "service")]
+    [InlineData("lapras", "dotnet", "Notes.Svc", "api", "service")]
+    [InlineData("lapras", "dotnet", "NOTES_SVC", "api", "service")]
+    [InlineData("lapras", "Dotnet_Core", "notes", "api", "platform")]
+    [InlineData("lapras", "dotnet", "notes", "Api", "module")]
+    [InlineData("Lapras", "dotnet", "notes", "api", "landscape")]
+    [InlineData("lapras", "dotnet", "notes-", "api", "service")]
+    public void It_should_refuse_identity_fields_that_are_not_already_DNS_labels(
+        string landscape, string platform, string service, string module, string field)
+    {
+        // Arrange
+        var portal = new ErrorPortalConfig("https", "docs.example.test", new ProblemIdentity(landscape, platform, service, module));
+        var emitter = Emitter(portal, catalog => catalog.Add<SampleProblem>(400, false));
+
+        // Act
+        var act = () => emitter.Emit(new ProblemResourceIdentity(platform, service, landscape, "v1"));
+
+        // Assert
+        act.Should().Throw<ArgumentException>().WithMessage($"*{field}*DNS-1123 label*").Which.ParamName.Should().Be(field);
+    }
+
+    [Fact]
+    public void It_should_refuse_a_version_that_is_not_a_DNS_label()
+    {
+        // Arrange
+        var emitter = Emitter(Portal, catalog => catalog.Add<SampleProblem>(400, false));
+
+        // Act
+        var act = () => emitter.Emit(new ProblemResourceIdentity("dotnet", "notes", "lapras", "V1"));
+
+        // Assert
+        act.Should().Throw<ArgumentException>().WithMessage("*version*DNS-1123 label*");
+    }
+
+    [Fact]
+    public void It_should_refuse_a_joined_name_longer_than_a_DNS_subdomain()
+    {
+        // Arrange
+        var service = new string('s', 63);
+        var module = new string('m', 63);
+        var landscape = new string('l', 63);
+        var version = "v" + new string('1', 62);
+        var portal = new ErrorPortalConfig("https", "docs.example.test", new ProblemIdentity(landscape, "dotnet", service, module));
+        var emitter = Emitter(portal, catalog => catalog.Add<SampleProblem>(400, false));
+
+        // Act
+        var act = () => emitter.Emit(new ProblemResourceIdentity("dotnet", service, landscape, version));
+
+        // Assert
+        act.Should().Throw<ArgumentException>().WithMessage("*longer than 253*");
     }
 
     [Fact]

@@ -1,17 +1,18 @@
 using System.Text.Json;
-using AtomiCloud.Diene.CoreUtils;
+using System.Text.RegularExpressions;
 using AtomiCloud.Diene.CoreUtils.Json;
 
 namespace AtomiCloud.Diene.Problems;
 
 /// <summary>Emits deterministic Problem custom resources from a registered catalog.</summary>
-public sealed class ProblemResourceEmitter(
+public sealed partial class ProblemResourceEmitter(
     IProblemCatalog catalog,
     IProblemExporter exporter,
     IProblemTypeUriBuilder typeUris,
     ErrorPortalConfig portal)
 {
     private const int DnsLabelMax = 63;
+    private const int DnsSubdomainMax = 253;
 
     private readonly IProblemCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
     private readonly IProblemExporter _exporter = exporter ?? throw new ArgumentNullException(nameof(exporter));
@@ -26,6 +27,14 @@ public sealed class ProblemResourceEmitter(
             throw new InvalidOperationException($"Problem resources need an https ErrorPortal; received {_portal.Scheme}.");
         ValidateIdentity(identity);
         var module = _portal.Identity.Module;
+        RequireDnsLabel(identity.Platform, "platform");
+        RequireDnsLabel(identity.Service, "service");
+        RequireDnsLabel(module, "module");
+        RequireDnsLabel(identity.Landscape, "landscape");
+        RequireDnsLabel(identity.Version, "version");
+        var name = string.Join('.', identity.Service, module, identity.Landscape, identity.Version);
+        if (name.Length > DnsSubdomainMax)
+            throw new ArgumentException($"Problem resource name '{name}' is longer than {DnsSubdomainMax} characters.", nameof(identity));
 
         var descriptors = _catalog.All
             .Where(descriptor => string.Equals(descriptor.Version, identity.Version, StringComparison.Ordinal))
@@ -37,8 +46,6 @@ public sealed class ProblemResourceEmitter(
             .OrderBy(descriptor => descriptor.Id, StringComparer.Ordinal)
             .Select(descriptor => ToResourceEntry(descriptor, _exporter.Export(descriptor)))
             .ToArray();
-        string[] segments = [identity.Service, module, identity.Landscape, identity.Version];
-        var name = string.Join('.', segments.Select(DnsLabel));
 
         return new ProblemResource(
             "atomi.cloud/v1alpha1",
@@ -60,13 +67,14 @@ public sealed class ProblemResourceEmitter(
         return JsonSerializer.Serialize(resource, AtomiJson.DefaultOptions);
     }
 
-    private static string DnsLabel(string segment)
+    private static void RequireDnsLabel(string value, string field)
     {
-        var label = Slug.Slugify(segment);
-        if (label.Length is 0 or > DnsLabelMax)
-            throw new ArgumentException($"Problem resource name segment '{segment}' is not a DNS-1123 label after slugifying.", nameof(segment));
-        return label;
+        if (value.Length > DnsLabelMax || !DnsLabelPattern().IsMatch(value))
+            throw new ArgumentException($"Problem resource {field} '{value}' must be a DNS-1123 label.", field);
     }
+
+    [GeneratedRegex(@"\A[a-z0-9]([-a-z0-9]*[a-z0-9])?\z")]
+    private static partial Regex DnsLabelPattern();
 
     private ProblemResourceEntry ToResourceEntry(ProblemDescriptor descriptor, ProblemExport export)
     {

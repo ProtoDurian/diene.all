@@ -63,6 +63,7 @@ known-good and known-bad meta test.
 Resolve `ProblemResourceEmitter` from the same registered service provider. Emit
 one resource per platform/service/module/landscape/version row. The module comes
 from the ErrorPortal identity; an explicit module must match it. The resource is
-named `{service}.{module}.{landscape}.{version}` with DNS-1123 label segments.
+named `{service}.{module}.{landscape}.{version}`; every identity field must already
+be a DNS-1123 label.
 Let the consuming service's build task write the serialized canonical JSON/YAML
 into its chart.

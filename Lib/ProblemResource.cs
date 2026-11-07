@@ -47,7 +47,7 @@ public sealed record ProblemResourceSpec(
         string version,
         IReadOnlyList<ProblemResourceEntry> problems)
         : this(platform, service, landscape, version, problems) =>
-        Module = module ?? throw new ArgumentNullException(nameof(module));
+        Module = module ?? string.Empty;
 
     /// <summary>Gets the module that owns the problems.</summary>
     [JsonPropertyOrder(3)]

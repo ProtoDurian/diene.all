@@ -97,8 +97,10 @@ that is valid YAML 1.2.
 A Problem resource row is identified by five fields: platform, service, module,
 landscape and version. The module comes from the ErrorPortal identity; an
 explicit module must equal it. `metadata.name` is
-`{service}.{module}.{landscape}.{version}`, each segment slugified to a DNS-1123
-label and joined with dots, so `a-b` + `c` and `a` + `b-c` never collide.
+`{service}.{module}.{landscape}.{version}` joined with dots, so `a-b` + `c` and
+`a` + `b-c` never collide. Each field, and the platform, must already be a
+DNS-1123 label (no slugifying), and the name must fit in 253 characters, or
+emitting throws. A spec read back without `module` gets an empty module.
 Emitting needs an https ErrorPortal, because the Problem CRD accepts only
 https type URIs; envelopes may still use http. `metadata.namespace` is the
 platform. The `spec` fields are written in the order
