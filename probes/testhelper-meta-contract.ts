@@ -17,7 +17,7 @@ export default {
     },
     {
       name: 'mutation-testhelper-meta-contract-caught',
-      description: 'the meta suite fails once the TestHelper mismatch check is inverted',
+      description: 'the meta suite fails once expectPortProblem stops rejecting a wrong port or code',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
@@ -26,7 +26,10 @@ export default {
           throw new Error('testhelper-meta-contract: no lib/test_helper.dart to sabotage');
         }
         await withCleanProbeState(repo, [target], async () => {
-          await repo.patch(target, { find: 'if (actual != expected) {', replace: 'if (actual == expected) {' });
+          await repo.patch(target, {
+            find: 'if (actualPort != port.name || actualCode != code.wireId) {',
+            replace: 'if (false && (actualPort != port.name || actualCode != code.wireId)) {',
+          });
           await expectRedBecause(repo, META, 'testhelper-meta-contract', ['Some tests failed']);
         });
       },

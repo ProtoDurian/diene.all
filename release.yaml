@@ -165,7 +165,7 @@ release:
     assets:
       - Changelog.md
       - docs/developer/CommitConventions.md
-      - packages/diene_dart_lib/pubspec.yaml
+      - packages/diene_interfaces/pubspec.yaml
   github:
     enabled: true
     successComment: 'Released in ${version}.'

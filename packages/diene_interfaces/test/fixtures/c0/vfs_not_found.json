@@ -1,0 +1,13 @@
+{
+  "type": "https://local.atomi.cloud/docs/local/flutter/app/core/v1/vfs_not_found",
+  "title": "Path not found",
+  "status": 404,
+  "detail": "vfs.readText: Path not found",
+  "recoverable": false,
+  "data": {
+    "port": "vfs",
+    "code": "not_found",
+    "operation": "readText",
+    "path": "/missing"
+  }
+}

@@ -1,6 +1,6 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-const HARNESS = "nix develop .#ci -c bash -c 'cd packages/diene_dart_lib && dart test test/conformance'";
+const HARNESS = "nix develop .#ci -c bash -c 'cd packages/diene_interfaces && dart test test/conformance'";
 
 export default {
   contractVersion: 1,
@@ -17,24 +17,22 @@ export default {
     },
     {
       name: 'mutation-c0-fixture-harness-caught',
-      description: 'the C0 harness fails once one pinned fixture digest is corrupted',
+      description: 'the C0 harness fails once the vendored upstream envelope vector is altered',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        const target = (await repo.glob('packages/*/test/fixtures/c0/manifest.json')).sort()[0];
+        const target = (await repo.glob('packages/*/test/fixtures/c0/upstream/envelopes.json')).sort()[0];
         if (!target) {
-          throw new Error('c0-fixture-harness: no fixture manifest to sabotage');
+          throw new Error('c0-fixture-harness: no upstream envelope vector to sabotage');
         }
         await withCleanProbeState(repo, [target], async () => {
-          const manifest = JSON.parse(await repo.read(target));
-          const entries = manifest.fixtures ?? {};
-          const first = Object.keys(entries).sort()[0];
+          const vectors = JSON.parse(await repo.read(target));
+          const first = vectors.valid?.[0];
           if (!first) {
-            throw new Error('c0-fixture-harness: fixture manifest has no entries');
+            throw new Error('c0-fixture-harness: upstream envelope vector has no valid case');
           }
-          const digest = String(entries[first]);
-          entries[first] = (digest[0] === '0' ? '1' : '0') + digest.slice(1);
-          await repo.write(target, `${JSON.stringify(manifest, null, 2)}\n`);
+          first.status = first.status === 410 ? 409 : 410;
+          await repo.write(target, `${JSON.stringify(vectors, null, 2)}\n`);
           await expectRedBecause(repo, HARNESS, 'c0-fixture-harness', ['digest drifted from the manifest']);
         });
       },

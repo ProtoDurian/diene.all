@@ -7,14 +7,20 @@ export default {
   probes: [
     {
       name: 'baseline-pub-workspace-resolution-green',
-      description: 'cached dart pub get resolves the workspace and writes a package config naming the member',
+      description: 'cached dart pub get resolves the workspace member and its hosted diene_problems and diene_result',
       kind: 'baseline',
       async run(repo: any) {
         await expectGreen(repo, 'nix develop .#ci -c dart pub get --offline', 'pub-workspace-resolution');
         const config = JSON.parse(await repo.read('.dart_tool/package_config.json'));
-        const member = (config.packages ?? []).find((entry: any) => entry.name === 'diene_dart_lib');
-        if (!member || !String(member.rootUri).endsWith('packages/diene_dart_lib')) {
-          throw new Error('pub-workspace-resolution: package_config.json does not resolve the diene_dart_lib member');
+        const member = (config.packages ?? []).find((entry: any) => entry.name === 'diene_interfaces');
+        if (!member || !String(member.rootUri).endsWith('packages/diene_interfaces')) {
+          throw new Error('pub-workspace-resolution: package_config.json does not resolve the diene_interfaces member');
+        }
+        for (const name of ['diene_problems', 'diene_result']) {
+          const hosted = (config.packages ?? []).find((entry: any) => entry.name === name);
+          if (!hosted || !new RegExp(`/hosted/pub\\.dev/${name}-[^/]+/?$`).test(String(hosted.rootUri))) {
+            throw new Error(`pub-workspace-resolution: ${name} is not resolved from pub.dev (${hosted?.rootUri})`);
+          }
         }
       },
     },
