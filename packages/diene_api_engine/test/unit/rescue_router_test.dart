@@ -404,8 +404,8 @@ void main() {
 
         // Assert
         expect(outcome, isA<RescueUnavailable>());
-        expect(clock.nowMs(), lessThanOrEqualTo(8000));
-        expect(transport.sent.length, lessThan(5));
+        expect(clock.nowMs(), 8000);
+        expect(transport.sent.length, 3);
       },
     );
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:diene_api_engine/diene_api_engine.dart';
 import 'package:diene_api_engine/test_helper.dart';
@@ -199,6 +200,174 @@ void main() {
       expect(outcome, isA<RescueUnavailable>());
       expect(_hosts(transport), <String>['seed.cluster.atomi.cloud']);
       expect(await store.read('doca.version'), '5');
+    });
+  });
+
+  group('jittered scan', () {
+    const List<String> hosts = <String>[
+      'c0.cluster.atomi.cloud',
+      'c1.cluster.atomi.cloud',
+      'c2.cluster.atomi.cloud',
+      'c3.cluster.atomi.cloud',
+      'c4.cluster.atomi.cloud',
+      'c5.cluster.atomi.cloud',
+    ];
+    final String cachedDocC = DocC(
+      version: 1,
+      candidates: <String, List<String>>{
+        _coord.key: <String>[for (final String h in hosts) 'https://$h'],
+      },
+    ).encode();
+
+    InMemoryRescueStore store() => InMemoryRescueStore(<String, String>{
+      'docc.lithium.lapras': cachedDocC,
+      'docc.version.lithium.lapras': '1',
+    });
+
+    RescueConfig config({Duration budget = const Duration(seconds: 8)}) =>
+        RescueConfig(
+          enabled: true,
+          issuer: Uri.parse('https://issuer.cluster.atomi.cloud'),
+          catalogHosts: const <String>[],
+          endpointSuffixAllowlist: const <String>['.cluster.atomi.cloud'],
+          scanBudget: budget,
+        );
+
+    test('a random jitter in range is slept before every probe', () async {
+      // Arrange
+      final List<String> log = <String>[];
+      final FakeHttpTransport transport = FakeHttpTransport((
+        HttpRequest request,
+      ) {
+        log.add('probe ${request.url.host}');
+        return nonJsonResponse(status: 503);
+      });
+      final RescueRouter router = RescueRouter(
+        config: config(),
+        store: store(),
+        transport: transport,
+        sleep: (Duration d) async => log.add('sleep ${d.inMilliseconds}'),
+        nowMs: () => 0,
+        random: Random(42),
+      );
+
+      // Act
+      final RescueOutcome outcome = await router.rescue(_coord);
+
+      // Assert
+      expect(outcome, isA<RescueUnavailable>());
+      final List<int> jitters = <int>[];
+      for (int i = 0; i < hosts.length; i++) {
+        final List<String> step = log.sublist(i * 3, i * 3 + 3);
+        final int ms = int.parse(step[0].split(' ').last);
+        expect(step[0], startsWith('sleep '));
+        expect(ms, inInclusiveRange(0, 250));
+        expect(step.sublist(1), <String>['probe ${hosts[i]}', 'sleep 3000']);
+        jitters.add(ms);
+      }
+      expect(log, hasLength(hosts.length * 3));
+      expect(jitters.toSet().length, greaterThan(1));
+    });
+
+    test('a jitter that uses up the budget leaves no probe', () async {
+      // Arrange
+      final FakeClock clock = FakeClock();
+      final FakeHttpTransport transport = FakeHttpTransport(
+        (HttpRequest request) => okJson(<String, Object?>{}),
+      );
+      final RescueRouter router = RescueRouter(
+        config: config(budget: const Duration(milliseconds: 100)),
+        store: store(),
+        transport: transport,
+        sleep: clock.sleep,
+        nowMs: clock.nowMs,
+        jitter: () => const Duration(milliseconds: 100),
+      );
+
+      // Act
+      final RescueOutcome outcome = await router.rescue(_coord);
+
+      // Assert
+      expect(outcome, isA<RescueUnavailable>());
+      expect(transport.sent, isEmpty);
+      expect(clock.nowMs(), 100);
+    });
+
+    test('the probe after a jitter gets only the budget left', () async {
+      // Arrange
+      final FakeClock clock = FakeClock();
+      final List<int> sleeps = <int>[];
+      final RescueRouter router = RescueRouter(
+        config: config(budget: const Duration(milliseconds: 100)),
+        store: store(),
+        transport: HangingTransport(),
+        sleep: (Duration d) {
+          sleeps.add(d.inMilliseconds);
+          return clock.sleep(d);
+        },
+        nowMs: clock.nowMs,
+        jitter: () => const Duration(milliseconds: 99),
+      );
+
+      // Act
+      final RescueOutcome outcome = await router.rescue(_coord);
+
+      // Assert
+      expect(outcome, isA<RescueUnavailable>());
+      expect(sleeps.take(3), <int>[99, 1, 99]);
+      expect(clock.nowMs(), 199);
+    });
+  });
+
+  group('use-time allowlist on stored addresses', () {
+    test('a stored pin on a foreign host is ignored', () async {
+      // Arrange
+      final FakeHttpTransport transport = FakeHttpTransport(
+        (HttpRequest request) => okJson(<String, Object?>{'id': '1'}),
+      );
+      final ApiEngine engine = ApiEngine.fromConfig(
+        ApiEngineConfig(
+          backends: <BackendConfig>[
+            BackendConfig(
+              coordinate: _coord,
+              baseUrl: Uri.parse('https://$_primary'),
+            ),
+          ],
+          rescue: _rescue(enabled: true),
+        ),
+        transport: transport,
+        store: InMemoryRescueStore(<String, String>{
+          'pin.${_coord.key}': 'https://evil.example.com',
+        }),
+      );
+
+      // Act
+      final Uri? pin = await engine.rescue!.pinnedFor(_coord);
+      final Result<Object?> result = await _get(engine.backend(_coord)!);
+
+      // Assert
+      expect(pin, isNull);
+      expectOk(result);
+      expect(_hosts(transport), <String>[_primary]);
+    });
+
+    test('a stored last-known-good on a foreign host is not used', () async {
+      // Arrange
+      final RescueRouter router = RescueRouter(
+        config: _rescue(enabled: true),
+        store: InMemoryRescueStore(<String, String>{
+          'lastgood.${_coord.key}': 'https://evil.example.com',
+        }),
+        transport: FakeHttpTransport((HttpRequest request) => networkFailure()),
+        sleep: noSleep,
+        jitter: noJitter,
+      );
+
+      // Act
+      final RescueOutcome outcome = await router.rescue(_coord);
+
+      // Assert
+      expect(outcome, isA<RescueUnavailable>());
     });
   });
 }
