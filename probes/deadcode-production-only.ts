@@ -1,56 +1,44 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-// Gate: the production-only dead-code pass rebuilds the package from its
-// published entrypoints (tests excluded) so exports reachable only from tests
-// are surfaced as dead code. This probe replicates that standalone pass inline
-// (mirroring scripts/local/deadcode.sh) and proves a public export unreferenced
-// by the production entrypoints is flagged.
-const MEMBER = 'packages/diene_interfaces';
-const PRODUCTION_PASS = [
-  'nix develop .#ci --no-write-lock-file -c bash -lc ',
-  "'set -e; member=packages/diene_interfaces; prod=$(mktemp -d); ",
-  'cp "$member/analysis_options.yaml" "$prod/analysis_options.yaml"; ',
-  'yq "del(.resolution)" "$member/pubspec.yaml" > "$prod/pubspec.yaml"; ',
-  'cp -R "$member/lib" "$prod/lib"; mkdir -p "$prod/bin"; ',
-  'cp "$member/tool/deadcode_entrypoints.dart" "$prod/bin/main.dart"; ',
-  'cd "$prod"; dart pub get; ',
-  'dart run dart_code_linter:metrics check-unused-code .; ',
-  "dart run dart_code_linter:metrics check-unused-files .'",
-].join('');
+const DEADCODE = 'nix develop .#ci -c ./scripts/ci/deadcode.sh';
+const MEMBER = 'packages/diene_dart_lib';
+const LIB_FIXTURE = `${MEMBER}/lib/src/probe_production_only.dart`;
+const TEST_FIXTURE = `${MEMBER}/test/unit/probe_production_only_test.dart`;
+const BARREL = `${MEMBER}/lib/diene_dart_lib.dart`;
 
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: {
-    post: ['nix develop .#ci --no-write-lock-file -c dart pub get --offline'],
-  },
+  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
   probes: [
     {
       name: 'baseline-deadcode-production-only-green',
-      description: 'the production-only dead-code pass is clean on the pristine template',
+      description: 'the production-only view of the test-free shipped surface is clean',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, PRODUCTION_PASS, 'deadcode-production-only');
+        await expectGreen(repo, DEADCODE, 'deadcode-production-only');
       },
     },
     {
       name: 'mutation-deadcode-production-only-caught',
-      description: 'the production-only pass flags a public export unreachable from published entrypoints',
+      description: 'a barrel export used only by a test passes the whole-package view and reddens the production view',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        // Add a library file referenced ONLY by a test. In the whole-package view
-        // the test keeps it live, but the production-only pass excludes tests, so
-        // check-unused-files surfaces it as dead. (An unused top-level function is
-        // NOT flagged by check-unused-code, so the sabotage must be a file.)
-        await repo.write(`${MEMBER}/lib/src/probe_production_only.dart`, 'int probeProductionOnly() => 1;\n');
-        await repo.write(
-          `${MEMBER}/test/unit/probe_production_only_test.dart`,
-          "import 'package:diene_interfaces/src/probe_production_only.dart';\n" +
-            "import 'package:test/test.dart';\n\n" +
-            "void main() {\n  test('probe production only', () {\n    expect(probeProductionOnly(), 1);\n  });\n}\n",
-        );
-        await expectRed(repo, PRODUCTION_PASS, 'deadcode-production-only');
+        await withCleanProbeState(repo, [BARREL, LIB_FIXTURE, TEST_FIXTURE], async () => {
+          await repo.write(LIB_FIXTURE, 'int probeProductionOnly() => 1;\n');
+          await repo.write(BARREL, `${await repo.read(BARREL)}\nexport 'src/probe_production_only.dart';\n`);
+          await repo.write(
+            TEST_FIXTURE,
+            "import 'package:diene_dart_lib/diene_dart_lib.dart';\n" +
+              "import 'package:test/test.dart';\n\n" +
+              "void main() {\n  test('probe production only', () {\n    expect(probeProductionOnly(), 1);\n  });\n}\n",
+          );
+          await expectRedBecause(repo, DEADCODE, 'deadcode-production-only', [
+            'Production dead-code pass',
+            'unused function probeProductionOnly',
+          ]);
+        });
       },
     },
   ],

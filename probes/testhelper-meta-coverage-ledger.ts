@@ -1,49 +1,41 @@
-import { expectGreen, expectRed, preserveMutationBeforeRestore } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-// Gate: `scripts/ci/test.sh meta coverage` enforces a 100% line-coverage ledger
-// scoped to `lib/test_helper.dart`. Sabotage appends an uncovered helper
-// function and proves the meta coverage ledger falls below 100% and fails.
+const LEDGER = 'nix develop .#ci -c ./scripts/ci/test.sh meta coverage';
+const REPORT = 'reports/meta/lcov.info';
+
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: {
-    post: ['nix develop .#ci --no-write-lock-file -c dart pub get --offline'],
-  },
+  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
   probes: [
     {
       name: 'baseline-testhelper-meta-coverage-ledger-green',
-      description: 'the meta coverage ledger holds at 100% on the pristine TestHelper',
+      description: 'the meta ledger is 100% and scoped to the TestHelper only',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(
-          repo,
-          'nix develop .#ci --no-write-lock-file -c ./scripts/ci/test.sh meta coverage',
-          'testhelper-meta-coverage-ledger',
-        );
+        await expectGreen(repo, LEDGER, 'testhelper-meta-coverage-ledger');
+        const sources = (await repo.read(REPORT)).split('\n').filter((line: string) => line.startsWith('SF:'));
+        if (sources.length === 0 || !sources.every((line: string) => line.endsWith('/lib/test_helper.dart'))) {
+          throw new Error(
+            `testhelper-meta-coverage-ledger: ledger is not scoped to the TestHelper: ${sources.join(', ')}`,
+          );
+        }
       },
     },
     {
       name: 'mutation-testhelper-meta-coverage-ledger-caught',
-      description: 'the meta coverage ledger fails when an uncovered helper function is added',
+      description: 'the meta ledger fails once an uncovered helper member is added',
       kind: 'mutation',
-      expectedImpact: ['deadcode-whole-package'],
+      expectedImpact: [],
       async run(repo: any) {
-        const helpers = (await repo.glob('packages/*/lib/test_helper.dart')).sort();
-        const target = helpers[0];
+        const target = (await repo.glob('packages/*/lib/test_helper.dart')).sort()[0];
         if (!target) {
           throw new Error('testhelper-meta-coverage-ledger: no lib/test_helper.dart to sabotage');
         }
-        const original = await repo.read(target);
-        try {
-          await repo.write(target, `${original}\nint probeUncoveredHelper() {\n  return 1;\n}\n`);
-          await expectRed(
-            repo,
-            'nix develop .#ci --no-write-lock-file -c ./scripts/ci/test.sh meta coverage',
-            'testhelper-meta-coverage-ledger',
-          );
-        } finally {
-          await preserveMutationBeforeRestore(repo, 'testhelper-meta-coverage-ledger', target, original);
-        }
+        await withCleanProbeState(repo, [target, 'reports/meta'], async () => {
+          await repo.write(target, `${await repo.read(target)}\nint probeUncoveredHelper() {\n  return 1;\n}\n`);
+          await expectRedBecause(repo, LEDGER, 'testhelper-meta-coverage-ledger', ['meta coverage is not 100%']);
+        });
       },
     },
   ],
