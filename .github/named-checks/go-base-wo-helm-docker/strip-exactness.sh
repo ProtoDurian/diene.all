@@ -113,6 +113,8 @@ on:
 jobs:
   release:
     name: Release
+    permissions:
+      contents: read
     uses: ./.github/workflows/⚡reusable-release-note.yaml
     secrets: inherit
     with:
@@ -137,15 +139,13 @@ jobs:
       - nscloud-ubuntu-26.04-amd64-4x8-with-cache
       - nscloud-cache-size-20gb
       - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
-    timeout-minutes: 5
-    permissions:
-      contents: read
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: AtomiCloud/actions.setup-nix@v3
       - name: Release note
         env:
           VERSION: ${{ inputs.version }}
-        run: ./scripts/ci/release-note.sh
+        run: nix develop .#cd -c ./scripts/ci/release-note.sh
 EOF
 }
 release_note_script() {

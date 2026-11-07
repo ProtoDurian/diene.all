@@ -78,12 +78,14 @@ done
 [[ "$(show "${cd_wf}" | yq -o=json -I=0 '.on')" == '{"push":{"tags":["v*.*.*"]}}' ]] || fail "cd.yaml must run on v*.*.* tags only"
 [[ "$(show "${cd_wf}" | yq -o=json -I=0 '.jobs | keys')" == '["release"]' ]] || fail "cd.yaml must have exactly the release job"
 [[ "$(show "${cd_wf}" | yq '.jobs.release.uses')" == "./${note_wf}" ]] || fail "cd.yaml release job must call ${note_wf}"
+[[ "$(show "${cd_wf}" | yq -o=json -I=0 '.jobs.release.permissions')" == '{"contents":"read"}' ]] || fail "cd.yaml release job must grant only contents: read"
 # shellcheck disable=SC2016
 [[ "$(show "${cd_wf}" | yq -o=json -I=0 '.jobs.release.with')" == '{"version":"${{ github.ref_name }}"}' ]] || fail "cd.yaml release job must pass only version: the tag"
 [[ "$(show dlint.yaml | yq '[.checks["ci-wiring"].orchestrators[] | select(. == ".github/workflows/cd.yaml")] | length')" == 1 ]] || fail "dlint.yaml must wire cd.yaml as an orchestrator"
+[[ "$(show "${note_wf}" | yq -o=json -I=0 '.jobs | keys')" == '["release-note"]' ]] || fail "${note_wf} must have exactly the release-note job"
 [[ "$(show "${note_wf}" | yq '[.jobs[].steps[] | select(has("run")) | .run | select(test("[$][{][{]"))] | length')" == 0 ]] || fail "${note_wf} inlines a \${{ }} template in run:"
-[[ "$(show "${note_wf}" | yq -o=json -I=0 '[.jobs[].steps[] | select(has("run")) | .run]')" == "[\"./${note_sh}\"]" ]] || fail "${note_wf} must run only ${note_sh}"
-[[ "$(show "${note_wf}" | yq '[.jobs[].steps[] | select(has("uses")) | .uses | select(test("^actions/checkout@") | not)] | length')" == 0 ]] || fail "${note_wf} uses an action other than checkout"
+[[ "$(show "${note_wf}" | yq -o=json -I=0 '[.jobs[].steps[] | select(has("run")) | .run]')" == "[\"nix develop .#cd -c ./${note_sh}\"]" ]] || fail "${note_wf} must run only ${note_sh} in the cd shell"
+[[ "$(show "${note_wf}" | yq '[.jobs[].steps[] | select(has("uses")) | .uses | select(test("^AtomiCloud/actions[.]setup-nix@") | not)] | length')" == 0 ]] || fail "${note_wf} uses an action other than setup-nix"
 # shellcheck disable=SC2016
 [[ "$(show "${note_sh}" | grep -Ev '^(#|set -euo pipefail$|$)')" == 'echo "Released ${VERSION}"' ]] || fail "${note_sh} must only echo the release"
 
