@@ -26,7 +26,6 @@ D_PATHS=(
   # go-base's image policy: it validates infra/Dockerfile
   probes/distroless-base-policy.ts
   probes/nonroot-image-policy.ts
-  scripts/validate/go-image-policy.sh
 )
 
 parent_sha="${NAMED_CHECKS_PARENT_SHA:-$(cat "$(dirname "$0")/parent.sha")}"
@@ -113,18 +112,13 @@ apply_D() {
   edit README.md sed_z 's#is that key in the included file\. Build artifacts — Dockerfiles and Helm charts —\nlive under \[`infra/`\](infra) and may be plural, so their tasks are keyed per\nartifact\. See \[the Taskfile standard\](docs/standards/taskfile/index\.md) for the\nconventions\.#is that key in the included file. See\n[the Taskfile standard](docs/standards/taskfile/index.md) for the conventions.#'
 
   # go-base's D contributions
+  # the image-policy helpers serve only the two policy probes; they read infra/Dockerfile
+  edit probes/lib/go.ts sed_z 's#\n\nconst imagePolicies = {\n.*#\n#'
   edit .claude/skills/go-baseline/SKILL.md sed_e 's/ vulnerability, Docker, or Go CI/ vulnerability, or Go CI/'
   # shellcheck disable=SC2016
-  edit docs/developer/go-baseline.md sed_z 's|## Docker\n\nThe Dockerfile builds a static binary and runs it from\n`gcr\.io/distroless/static-debian12:nonroot` as UID/GID 65532\. Separate policy\nchecks enforce the runtime base and user\.\n\n||'
+  edit docs/developer/go-baseline.md sed_z 's|## Docker\n\nThe Dockerfile builds a static binary and runs it from\n`gcr\.io/distroless/static-debian12:nonroot` as UID/GID 65532\.\n\n||'
   edit docs/developer/go-baseline.md sed_z 's#coverage thresholds after adding real surface and the Docker entrypoint\.\n#coverage thresholds after adding real surface.\n#'
   edit docs/developer/go-baseline.md sed_z 's#one\ncomposition root, distroless nonroot runtime policy, and generated hook/probe\ncoverage\.#one\ncomposition root, and generated hook/probe coverage.#'
-
-  # nix: the docker-axis slices carry D by content (infralint-docker = hadolint,
-  # skopeo; infrautils-docker = docker, dockerd). The -core slices stay.
-  edit nix/packages.nix sed_e '/^          infralint-docker$/d;/^          infrautils-docker$/d'
-  edit nix/env.nix sed_e '/^    infralint-docker$/d;/^    infrautils-docker$/d'
-  edit dlint.yaml sed_e '/^      - skopeo$/d'
-  edit probes/binary-smoke.ts drop_lines '^skopeo --version' '^skopeo manifest-digest'
 }
 
 # --- recompute from the parent ------------------------------------------------

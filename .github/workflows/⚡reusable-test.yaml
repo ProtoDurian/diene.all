@@ -19,8 +19,6 @@ jobs:
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
       - uses: AtomiCloud/actions.cache-go@v2
-      - if: inputs.mode == 'int'
-        uses: AtomiCloud/actions.setup-docker@v2
       - name: Run ${{ inputs.mode }} coverage
         env:
           MODE: ${{ inputs.mode }}

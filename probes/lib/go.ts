@@ -102,24 +102,6 @@ export async function flipGoAssertion(repo: ProbeRepo): Promise<FlippedAssertion
   return flipComparisonAssertion(repo, 'tests/unit/**/*_test.go');
 }
 
-export async function plantWhiteBoxTest(repo: ProbeRepo): Promise<string> {
-  const paths = (await repo.glob('tests/**/*_test.go')).sort();
-  if (paths.length === 0) {
-    throw new Error('no Go test package found');
-  }
-  const source = await repo.read(paths[0]);
-  const external = packageName(source);
-  if (!external.endsWith('_test')) {
-    throw new Error('healthy test package is not external');
-  }
-  const target = `${directory(paths[0])}/probe_white_box_test.go`;
-  await repo.write(
-    target,
-    `package ${external.slice(0, -5)}\n\nimport "testing"\n\nfunc TestProbeWhiteBox(t *testing.T) { t.Helper() }\n`,
-  );
-  return target;
-}
-
 export async function breakAdapter(repo: ProbeRepo): Promise<string> {
   const paths = (await repo.glob('adapters/**/*.go')).sort();
   for (const path of paths) {
