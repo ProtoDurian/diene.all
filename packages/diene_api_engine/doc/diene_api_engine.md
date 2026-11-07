@@ -65,9 +65,10 @@ final Result<User> r = await users.call<User>(
 Generated SDK call: build the SDK on the backend, then wrap each call.
 
 ```dart
-final ServiceSdk sdk = users.sdk(ServiceSdk.new);
-final Result<UserProfile> r =
-    await const ResultSdk().call(() => sdk.users.getUser(id: '42'));
+// MyServiceSdk is your own SDK, generated from your service's OpenAPI spec.
+final MyServiceSdk sdk = users.sdk(MyServiceSdk.new);
+final Result<Order> r =
+    await const ResultSdk().call(() => sdk.orders.getOrder(id: '42'));
 ```
 
 `Backend.sdk` hands the generated client a Dio whose adapter
@@ -124,8 +125,9 @@ A received status of any kind never trips it.
 
 1. **Doc A.** Fetch `https://<host>/fleet.json` from each baked
    `rescue.catalogHosts` entry in order; the first allowed host that answers 200
-   with `catalogHosts` and a numeric `version` wins. A Doc A older than the
-   newest seen is a rollback and is refused.
+   with `catalogHosts` and a finite numeric `version` wins. A Doc A older than
+   the newest seen is a rollback: it is refused and the Doc A search stops
+   there, so no later seed is tried.
 2. **Doc C.** Fetch `https://<host>/catalog/<platform>.json` from each Doc A
    host. A Doc C is stored only when its `version` is newer than the one stored
    for this platform and landscape; otherwise the stored copy is used. Stored
@@ -150,6 +152,10 @@ A received status of any kind never trips it.
 - Every URL from a document or from the store is checked against the baked
   `endpointSuffixAllowlist` when it is used: Doc A hosts, Doc C candidates, the
   pin and last-known-good. A URL that does not parse is skipped.
+- The check is a plain suffix match on the host: write each suffix with its
+  leading dot (`.cluster.atomi.cloud`), because `atomi.cloud` would also allow
+  `evilatomi.cloud`. The scheme is not checked, so an `http://` address on an
+  allowed host passes.
 - Rescue changes addresses only, within the same landscape: candidates are
   looked up by a key that contains the landscape, so another landscape's
   address cannot be reached. Tokens and the request stay the same.
@@ -216,12 +222,19 @@ These are how 1.0 behaves today; each is a 2.0 candidate, not a promise.
   whole document untrusted. 1.0 drops just that entry and uses the rest.
 - **Doc A refresh.** Doc A is fetched only when rescue trips, not constantly,
   and its `ttl` is ignored.
+- **Doc A rollback stops the search.** The first Doc A older than the newest
+  seen ends the Doc A search; later seeds are not tried.
+- **Allowlist matching.** The host match has no label boundary and the scheme
+  is not checked. 2.0 should match whole host labels and accept only `https`
+  document URLs.
 - **Unexpected-response detail.** A non-problem JSON error keeps its body in
   `data.body`; `detail` is the fixed text `Non-problem JSON body`.
 - **Coordinates are not validated** when the config is parsed; a bad label
   fails when the backend builds its resource key.
 - `BackendConfig.timeout` is carried but not applied; the transport's own
   timeout (30 s for `IoHttpTransport`) applies.
+- **Store errors.** A `RescueStore` I/O error (disk full, no permission) is
+  not caught; it escapes from `Backend.call`.
 
 ## TestHelper
 

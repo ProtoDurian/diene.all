@@ -29,9 +29,10 @@ final Result<User> user = await users.call<User>(
   decode: User.fromJson,
 );
 
-final ServiceSdk sdk = users.sdk(ServiceSdk.new);
-final Result<UserProfile> profile =
-    await const ResultSdk().call(() => sdk.users.getUser(id: '42'));
+// MyServiceSdk is your own SDK, generated from your service's OpenAPI spec.
+final MyServiceSdk sdk = users.sdk(MyServiceSdk.new);
+final Result<Order> order =
+    await const ResultSdk().call(() => sdk.orders.getOrder(id: '42'));
 ```
 
 Tests can use `package:diene_api_engine/test_helper.dart`: fake backends, fake

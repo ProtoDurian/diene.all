@@ -5,7 +5,8 @@ from conventional commits by the repository release workflow.
 
 ## Unreleased (0.0.0)
 
-Every 1.0.0 symbol keeps its name and signature.
+Every 1.0.0 symbol keeps its name. Only the `BridgeProblems` class modifier
+changed (see Changed); every other signature is the same.
 
 Fixed (each used to throw where 1.0.0 promised a `Result`):
 
@@ -13,8 +14,9 @@ Fixed (each used to throw where 1.0.0 promised a `Result`):
   `Problem.fromJson` cannot parse (for example a numeric `title`) threw a
   `TypeError`. It is now an unexpected-response `Problem` with the status and
   body kept.
-- Rescue: a Doc A without a numeric `version` threw a `TypeError`. That host is
-  now skipped like any unusable host.
+- Rescue: a Doc A without a finite numeric `version` threw (a `TypeError`, or
+  an `UnsupportedError` for a huge number such as `1e400`). That host is now
+  skipped like any unusable host.
 - Rescue: a Doc A host, a baked catalog host or a Doc C candidate that is not a
   valid URL threw a `FormatException`. It is now skipped.
 - Rescue: a stored pin or last-known-good that is not a valid URL threw a
@@ -22,8 +24,10 @@ Fixed (each used to throw where 1.0.0 promised a `Result`):
 
 Changed:
 
-- `BridgeProblems` is an `abstract class` with no constructor; it had only a
-  private one. Its static members are unchanged.
+- `BridgeProblems` is now an `abstract class` with no constructor; before, it
+  was a plain class with only a private constructor. Code written for 1.0.0
+  still works: it still cannot be created, its static members are unchanged,
+  and it can now also be extended.
 - The TestHelper code now lives in `lib/test_helper.dart` itself, not in
   `lib/src/test_helper/`. The import `package:diene_api_engine/test_helper.dart`
   and every helper name are unchanged.
