@@ -19,7 +19,7 @@ verdict="$(jq -r '
     elif $lost == 10 and ($failed | length) == 1 and $failed[0].id == "convention"
       and ($failed[0].summary | [scan("<summary>")] | length) == 1
       and ($failed[0].summary | test("Failed to verify repository URL[.]"))
-      and ($failed[0].summary | test("but got `https://github[.]com/AtomiCloud/diene[.]dart_lib`"))
+      and ($failed[0].summary | test("but got `https://github[.]com/AtomiCloud/diene[.]dart_config`"))
     then "mirror-main-seed"
     else "lost \($lost): " + ([$failed[] | "\(.id) \(.grantedPoints)/\(.maxPoints)"] | join(", "))
     end' "${report}")"
