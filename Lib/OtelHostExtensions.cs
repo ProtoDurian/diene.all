@@ -43,9 +43,7 @@ public static class OtelHostExtensions
 
         var env = environment ?? OtelEnvironment.Process();
 
-        // Plan first, register second. Every signal is validated against the whole block
-        // before the builder is touched at all, so a bad traces endpoint cannot leave a
-        // half-wired logs pipeline behind on a host whose startup then fails.
+        // Validate every signal before touching the builder, so a failure wires nothing.
         var disabled = OtelEnvironment.IsSdkDisabled(env);
         var planned = disabled
             ? Result.Ok<Option<OtelPlan>, TraceError>(Option.None<OtelPlan>())
@@ -152,9 +150,7 @@ public static class OtelHostExtensions
                 $"The OTLP protocol is pinned to '{OtlpProtocol}' fleet-wide, but was '{configured.Protocol}'.");
         }
 
-        // Every field below is bound from external configuration, so a null is an
-        // ordinary bad-input case rather than a programming error: it comes back as a
-        // rejection, never as a NullReferenceException out of a wiring call.
+        // Fields come from external config: a null is bad input, never an exception.
         var headers = configured.Headers is null or { Count: 0 }
             ? Option.None<string>()
             : Option.Some(string.Join(',', configured.Headers.Select(header => $"{header.Key}={header.Value}")));
@@ -196,8 +192,7 @@ public static class OtelHostExtensions
                 + $"set {OtelEnvironment.OtlpEndpointVariable}.");
         }
 
-        // A bare host:port parses as an absolute URI whose scheme is the hostname, so the
-        // scheme has to be checked explicitly or 'collector:4318' silently becomes an endpoint.
+        // 'collector:4318' parses with scheme 'collector', so check the scheme explicitly.
         if (!Uri.TryCreate(configured.Endpoint.Trim(), UriKind.Absolute, out var endpoint) ||
             (endpoint.Scheme != Uri.UriSchemeHttp && endpoint.Scheme != Uri.UriSchemeHttps))
         {
@@ -206,8 +201,7 @@ public static class OtelHostExtensions
                 $"The OTLP endpoint must be an absolute http or https URI, but was '{configured.Endpoint}'.");
         }
 
-        // IsDefaultPort means the URI carried no explicit port. The fleet pins 4318, so an
-        // implicit 80/443 and zinc's 4317 are both refused rather than silently accepted.
+        // IsDefaultPort = no explicit port; an implicit 80/443 is refused like 4317.
         if (endpoint.IsDefaultPort || endpoint.Port != OtlpPort)
         {
             return TraceErrors.InvalidInput(

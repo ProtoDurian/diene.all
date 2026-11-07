@@ -20,10 +20,7 @@ public static class OtelBlockSchema
 
     private static string Load()
     {
-        // The resource is embedded by Lib.csproj, so its presence is a build-time
-        // invariant rather than a runtime condition. Asserting it with a null-check branch
-        // would add a path no test can reach without breaking the build itself; a missing
-        // resource instead surfaces as an ArgumentNullException from the reader.
+        // Embedded by Lib.csproj: a missing resource is a build bug, so no null branch.
         using var stream = typeof(OtelBlockSchema).GetTypeInfo().Assembly.GetManifestResourceStream(ResourceName)!;
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();

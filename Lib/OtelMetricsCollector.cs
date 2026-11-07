@@ -27,8 +27,7 @@ public sealed class OtelMetricsCollector(Instrumentation instrumentation) : IMet
             return SeamErrors.InvalidArgument(SeamKind.Metrics, nameof(record), "The record must not be null.");
         }
 
-        // SeamErrors.InvalidWire is fixed to the logging seam, so an unrecognized kind is
-        // reported as an invalid argument to keep the seam attribution honest.
+        // InvalidWire is logging-only, so an unknown kind is an invalid argument here.
         if (!Enum.IsDefined(record.Kind))
         {
             return SeamErrors.InvalidArgument(
@@ -45,9 +44,7 @@ public sealed class OtelMetricsCollector(Instrumentation instrumentation) : IMet
                 "A metric value must be finite; no exporter can represent NaN or infinity.");
         }
 
-        // No try/catch: every input is validated above, and the BCL instrument path
-        // (create, Add, Record) does not throw — not even on a disposed meter, where a
-        // recording is simply dropped. A catch here would be unreachable defensive code.
+        // No catch: inputs are validated and BCL instruments never throw (even when disposed).
         var tags = Tags(record);
         switch (record.Kind)
         {
