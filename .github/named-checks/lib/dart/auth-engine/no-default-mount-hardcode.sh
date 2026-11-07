@@ -72,15 +72,15 @@ for f in "${lib_files[@]}"; do
   done < <(grep -nE "${SEGMENT_RE}" <<<"${code}" || true)
   while IFS=: read -r line text; do
     [[ -z ${line} ]] && continue
-    refs=$((refs + 1))
+    [[ ${f} == "${config}" ]] && refs=$((refs + 1))
     [[ ${f} == "${config}" || (${f} == "${helper}" && ${text} == *AppHandoffConstants.defaultMount*) ]] || fail "${f}:${line} reads the default mount outside the config: $(trim <<<"${text}")"
   done < <(grep -nwE 'defaultMount' <<<"${code}" || true)
 done
 [[ ${segments} -eq 1 ]] || fail "the app-handoff segment appears ${segments} times in lib/ code, want once (the config default)"
-[[ ${refs} -ge 2 ]] || fail "control: the config no longer defaults appHandoffMount to defaultMount (${refs} references)"
+[[ ${refs} -ge 2 ]] || fail "control: the config no longer defaults appHandoffMount to defaultMount (${refs} references there)"
 
 if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ no-default-mount-hardcode: app-handoff appears once in lib/ code (the config default); defaultMount is read only by the config and the TestHelper stub (${refs} references)"
+echo "✅ no-default-mount-hardcode: app-handoff appears once in lib/ code (the config default); defaultMount is read only by the config and the TestHelper stub (${refs} in the config)"
