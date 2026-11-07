@@ -1,7 +1,9 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
 const LEDGER = 'nix develop .#ci -c ./scripts/ci/test.sh meta coverage';
-const REPORT = 'reports/meta/lcov.info';
+const MEMBER = 'packages/diene_core_utils';
+const HELPER = `${MEMBER}/lib/test_helper.dart`;
+const META_SUITE = `${MEMBER}/test/meta/empty_test.dart`;
 
 export default {
   contractVersion: 1,
@@ -10,31 +12,33 @@ export default {
   probes: [
     {
       name: 'baseline-testhelper-meta-coverage-ledger-green',
-      description: 'the meta ledger is 100% and scoped to the TestHelper only',
+      description: 'without a TestHelper the meta coverage run no-ops and writes no meta ledger to upload',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, LEDGER, 'testhelper-meta-coverage-ledger');
-        const sources = (await repo.read(REPORT)).split('\n').filter((line: string) => line.startsWith('SF:'));
-        if (sources.length === 0 || !sources.every((line: string) => line.endsWith('/lib/test_helper.dart'))) {
-          throw new Error(
-            `testhelper-meta-coverage-ledger: ledger is not scoped to the TestHelper: ${sources.join(', ')}`,
-          );
-        }
+        await withCleanProbeState(repo, ['reports/meta'], async () => {
+          await expectGreen(repo, LEDGER, 'testhelper-meta-coverage-ledger');
+          if ((await repo.glob('reports/meta/**')).length !== 0) {
+            throw new Error('testhelper-meta-coverage-ledger: the inactive meta tier wrote a ledger to upload');
+          }
+        });
       },
     },
     {
       name: 'mutation-testhelper-meta-coverage-ledger-caught',
-      description: 'the meta ledger fails once an uncovered helper member is added',
+      description: 'an added TestHelper whose meta suite never loads it is refused as an empty meta ledger',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        const target = (await repo.glob('packages/*/lib/test_helper.dart')).sort()[0];
-        if (!target) {
-          throw new Error('testhelper-meta-coverage-ledger: no lib/test_helper.dart to sabotage');
-        }
-        await withCleanProbeState(repo, [target, 'reports/meta'], async () => {
-          await repo.write(target, `${await repo.read(target)}\nint probeUncoveredHelper() {\n  return 1;\n}\n`);
-          await expectRedBecause(repo, LEDGER, 'testhelper-meta-coverage-ledger', ['meta coverage is not 100%']);
+        await withCleanProbeState(repo, [HELPER, META_SUITE, 'reports/meta'], async () => {
+          await repo.write(HELPER, 'bool expectProbeSlug(String value) => value.isNotEmpty;\n');
+          await repo.write(
+            META_SUITE,
+            "import 'package:test/test.dart';\n\n" +
+              "void main() {\n  test('probe empty meta suite', () {\n    expect(1, 1);\n  });\n}\n",
+          );
+          await expectRedBecause(repo, LEDGER, 'testhelper-meta-coverage-ledger', [
+            'meta coverage ledger contains no source files',
+          ]);
         });
       },
     },

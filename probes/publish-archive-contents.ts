@@ -3,7 +3,7 @@ import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helper
 const PUBIGNORE = 'packages/diene_core_utils/.pubignore';
 const SHIPPED = [
   'diene_core_utils.dart',
-  'test_helper.dart',
+  'c0_temporal.dart',
   'diene_core_utils.md',
   'LICENSE',
   'CHANGELOG.md',
@@ -13,7 +13,14 @@ const SHIPPED = [
   'SKILL.md',
   'patterns.md',
 ];
-const EXCLUDED = ['test', 'tool', 'deadcode_entrypoints.dart', 'c0_conformance_test.dart', 'manifest.json'];
+const EXCLUDED = [
+  'test',
+  'tool',
+  'test_helper.dart',
+  'deadcode_entrypoints.dart',
+  'gen_iana_zones.dart',
+  'manifest.json',
+];
 
 // The dry-run listing is a tree; match whole leaf names, with or without a size suffix.
 const ARCHIVE_CHECK =
