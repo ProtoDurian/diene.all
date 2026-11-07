@@ -6,7 +6,7 @@ export default {
   probes: [
     {
       name: 'baseline-dotnet-integration-tests-green',
-      description: 'The Redis adapter passes against a real Testcontainers dependency.',
+      description: 'The demo consumer wires the otel engine onto a real host with in-memory seams.',
       kind: 'baseline',
       async run(repo: any) {
         await expectGreen(repo, 'nix develop .#ci -c task test:int', 'dotnet-integration-tests', 600000);
@@ -14,7 +14,7 @@ export default {
     },
     {
       name: 'mutation-dotnet-integration-tests-caught',
-      description: 'Breaking the adapter read path turns the integration tier red.',
+      description: 'Changing the demo identity turns the integration tier red.',
       kind: 'mutation',
       expectedImpact: [
         'dotnet-integration-coverage',
@@ -25,18 +25,10 @@ export default {
         'dotnet-preview',
       ],
       async run(repo: any) {
-        let mutated = false;
-        for (const path of (await repo.glob('App*/Adapters/**/*.cs')).sort()) {
-          const source = await repo.read(path);
-          if (!/\breturn\s+[^;\n]+;/.test(source)) continue;
-          await repo.write(
-            path,
-            source.replace(/\breturn\s+[^;\n]+;/, 'throw new System.InvalidOperationException("probe");'),
-          );
-          mutated = true;
-          break;
-        }
-        if (!mutated) throw new Error('no adapter return statement found for the integration-test sabotage');
+        await repo.patch('App/OtelDemo.cs', {
+          find: '.Create("lapras", "atomi", "dotnet-otel-demo", "app", "1.0.0")',
+          replace: '.Create("pichu", "atomi", "dotnet-otel-demo", "app", "1.0.0")',
+        });
         await expectRed(repo, 'nix develop .#ci -c task test:int', 'dotnet-integration-tests', 600000);
       },
     },

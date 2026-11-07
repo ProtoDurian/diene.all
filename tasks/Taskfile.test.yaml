@@ -45,3 +45,13 @@ tasks:
     desc: Watch the TestHelper meta tier
     cmds:
       - ./scripts/local/test.sh meta --watch
+
+  sit:
+    desc: Run the SIT tier against the loopback OTLP receiver
+    cmds:
+      - ./scripts/local/test.sh sit
+
+  sit:coverage:
+    desc: Run the SIT tier the way CI does (coverage recorded, no minimum)
+    cmds:
+      - ./scripts/local/test.sh sit --coverage

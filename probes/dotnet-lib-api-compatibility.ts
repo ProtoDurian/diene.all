@@ -25,8 +25,8 @@ export default defineGate({
       'Removing a public member the published 1.0.0 package ships, and nothing in Lib reads, turns PackageValidation red.',
     expectedImpact: [],
     async run(repo: any) {
-      await repo.patch('Lib/NotePrincipal.cs', {
-        find: '    public required string Id { get; init; }\n',
+      await repo.patch('Lib/TraceWire.cs', {
+        find: '    public static Result<TraceErrorCode, TraceError> ParseErrorCode(string value) =>\n        Parse<TraceErrorCode>("code", value, Name);\n',
         replace: '',
       });
       await expectRedBecause(

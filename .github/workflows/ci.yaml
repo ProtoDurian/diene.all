@@ -62,6 +62,15 @@ jobs:
     with:
       mode: meta
 
+  sit:
+    name: SIT Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-test.yaml
+    secrets: inherit
+    with:
+      mode: sit
+
   package-validate:
     name: Package Validation
     permissions:

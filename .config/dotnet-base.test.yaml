@@ -5,7 +5,7 @@ coverage:
       - UnitTest/UnitTest.csproj
     include:
       - '[Lib*]*'
-      - '[AtomiCloud.Diene.Note]*'
+      - '[AtomiCloud.Diene.Otel]*'
     exclude:
       - '[App*]*'
       - '[*.TestHelper]*'
@@ -29,4 +29,15 @@ coverage:
     exclude:
       - '[Lib*]*'
       - '[App*]*'
+      - '[*]*.Program'
+  sit:
+    minimum: 0
+    projects:
+      - SitTest/SitTest.csproj
+    include:
+      - '[Lib*]*'
+      - '[AtomiCloud.Diene.Otel]*'
+    exclude:
+      - '[App*]*'
+      - '[*.TestHelper]*'
       - '[*]*.Program'

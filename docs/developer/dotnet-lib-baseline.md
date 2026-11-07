@@ -9,9 +9,9 @@ This branch turns the `.NET 10` base into a publishable library template. It
 keeps the base `App` as a non-packable consumer and publishes two lockstep
 packages from one solution:
 
-- `AtomiCloud.Diene.Note` contains the illustrative Note domain;
-- `AtomiCloud.Diene.Note.TestHelper` contains consumer assertions and references
-  the main package.
+- `AtomiCloud.Diene.Otel` contains the observability engine;
+- `AtomiCloud.Diene.Otel.TestHelper` contains the trace-seam double and its
+  assertions, and references the main package.
 
 Both package ids and assembly names are consumer-visible, real identities.
 `dotnet-base.slnx`, `.config/dotnet-base.test.yaml`, workflows, and non-shipped
@@ -53,16 +53,23 @@ stays at `1.0.0` in-branch, `probes/dotnet-lib-api-compatibility.ts` packs with
 
 ## Testing tiers
 
-- `task test:unit` measures the real `AtomiCloud.Diene.Note` assembly plus the
+- `task test:unit` measures the real `AtomiCloud.Diene.Otel` assembly plus the
   inherited `[Lib*]*` scaling wildcard at 100%, and explicitly excludes
   `*.TestHelper` assemblies. The scope guard in
   `scripts/local/dotnet-test.sh` reads the allowed assembly names from the
   `AssemblyName` each `Lib*` project declares, so it scales with a renamed
   library instead of naming one.
-- `task test:int` retains the base Testcontainers-backed adapter boundary and
-  measures only `[App*]*`.
+- `task test:int` measures only `[App*]*`. The otel engine's integration boundary
+  is the host, not a telemetry backend: there is no collector and no
+  Testcontainers, because a wiring test that needs a collector to pass is testing
+  the collector.
 - `task test:meta` independently measures `[*.TestHelper]*` at 100%. Its tests
   include known-good and known-bad assertion cases.
+- `task test:sit` proves real OTLP/HTTP export: `SitTest/` wires a host with
+  `AddAtomiOtel` and checks traces, metrics and logs reach a test-only loopback
+  receiver on port 4318 as `application/x-protobuf`. Each run binds a random
+  `127.x.y.z` address, so parallel runs never collide. It records coverage with
+  no minimum and is not part of the aggregate `task test`.
 
 CI uploads each tier's Cobertura report as a build artifact; the local merged
 thresholds are authoritative.
@@ -87,9 +94,11 @@ A materialized library changes only these owned surfaces:
 - `PackageId`, `AssemblyName`, `RootNamespace`, and `Description` in both
   packable projects;
 - shared author/company/repository URLs in `Directory.Build.props`;
-- README badges, install snippet, icon, and illustrative source/tests;
+- README badges, install snippet, icon, and shipped source/tests;
 - unit/meta thresholds when the shipped surface justifies a stricter value;
-- `skills/diene-dotnet-note-usage/` to the materialized library's namespaced
+- the `AtomiCloud.Diene.*` assembly name in the unit-ledger scope guard in
+  `scripts/local/dotnet-test.sh`;
+- `skills/diene-dotnet-otel-usage/` to the materialized library's namespaced
   usage skill.
 
 `scripts/local/dotnet-test.sh`, `scripts/validate/dotnet-package.sh`, and the
