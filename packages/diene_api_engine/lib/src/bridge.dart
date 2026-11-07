@@ -6,45 +6,28 @@ import 'package:diene_result/diene_result.dart';
 
 import 'transport.dart';
 
-/// api-engine's own client-side problem type URIs, minted through the ONE
-/// owned builder in `diene_problems` (never hand-formatted here — C0 §2). These
-/// are api-engine's OWN problems (transport/reconciliation failures a client
-/// raises); the `Problem` envelope type itself is owned by `diene_result`.
-class BridgeProblems {
-  BridgeProblems._();
-
-  /// Client-local portal: api-engine's transport problems have no service
-  /// backend context. A real app can override the portal via [configure].
+/// The engine's own problem type URIs, built by `diene_problems`.
+abstract class BridgeProblems {
+  /// The portal the type URIs are built under; local by default.
   static ErrorPortal portal = ErrorPortal.localError;
 
   static String _uri(String id) =>
       problemTypeUri(portal: portal, version: 'v1', id: id);
 
-  // R-E14 WIRE-ID LAW. These ids are snake_case, NOT kebab. The published
-  // `problemWireIdPattern` is `^[a-z][a-z0-9_]*$`, so a hyphen is rejected at
-  // construction:
-  //   Invalid argument (id): must be a non-empty single path segment matching
-  //   its contract pattern: "transport-failure"
-  // All four were kebab and every call site that built one threw — which is why
-  // ClientTree.register, toResult and the whole contract-parity suite failed the
-  // moment the tiers could finally run. The ids are the ONLY composition here
-  // (`_uri` passes its argument straight through), so there is no second half to
-  // this fix; `bridge_wire_id_test.dart` asserts each one against the PUBLISHED
-  // pattern rather than a local copy, so the two cannot drift apart again.
+  // Ids are snake_case: the problem id pattern rejects a hyphen.
   static String get transportFailure => _uri('transport_failure');
   static String get unexpectedResponse => _uri('unexpected_response');
   static String get duplicateBackend => _uri('duplicate_backend');
   static String get authTokenUnavailable => _uri('auth_token_unavailable');
 }
 
-/// Guard: does a decoded JSON object structurally look like an RFC 9457
-/// problem? (string `type` + int `status`).
+/// True when [value] has a string `type` and an int `status`.
 bool isProblemJson(Object? value) =>
     value is Map<String, Object?> &&
     value['type'] is String &&
     value['status'] is int;
 
-/// Guard: does [body] parse as a JSON object?
+/// [body] as a JSON object, or null when it is not one.
 Map<String, Object?>? tryDecodeObject(String body) {
   if (body.trim().isEmpty) {
     return null;
@@ -57,17 +40,14 @@ Map<String, Object?>? tryDecodeObject(String body) {
   }
 }
 
-/// The full error reconciliation: folds a [TransportOutcome] into
-/// `Result<T>` (error channel is `diene_result`'s `Problem`):
+/// Folds a [TransportOutcome] into a `Result<T>`; it never throws.
 ///
-/// * [NetworkFailure]             → transport-failure [Problem].
-/// * 2xx JSON                     → `Ok(decode(json))`.
-/// * 2xx non-JSON / decode failure→ transport-failure [Problem].
-/// * non-2xx valid problem body   → `Err(Problem.fromJson)` (incl. nested).
-/// * non-2xx JSON but not/invalid problem → unexpected-response [Problem].
-/// * non-2xx non-JSON / status-only → transport-failure [Problem].
-///
-/// No thrown exception ever escapes; the caller always gets a [Result].
+/// * [NetworkFailure] → transport failure.
+/// * 2xx JSON object → `Ok(decode(json))`; non-JSON or a failed decode →
+///   transport failure.
+/// * non-2xx problem body → that `Problem`, `data` included.
+/// * non-2xx other JSON → unexpected response, status and body kept.
+/// * non-2xx non-JSON → transport failure with status and body snippet.
 Result<T> toResult<T>(
   TransportOutcome outcome, {
   required T Function(Map<String, Object?> json) decode,
@@ -110,13 +90,9 @@ Result<T> _fromResponse<T>(
     }
   }
 
-  // Error status: a valid RFC 9457 problem body wins; anything else is wrapped.
-  if (isProblemJson(json)) {
-    try {
-      return Err<T>(Problem.fromJson(json!));
-    } on FormatException {
-      // Structurally problem-ish but not a valid envelope → unexpected.
-    }
+  final Problem? problem = isProblemJson(json) ? _problemOrNull(json!) : null;
+  if (problem != null) {
+    return Err<T>(problem);
   }
   if (json != null) {
     return Err<T>(
@@ -135,6 +111,14 @@ Result<T> _fromResponse<T>(
     );
   }
   return Err<T>(_transport('non-JSON error body', response, endpoint));
+}
+
+Problem? _problemOrNull(Map<String, Object?> json) {
+  try {
+    return Problem.fromJson(json);
+  } on Object {
+    return null;
+  }
 }
 
 Problem _transport(String reason, HttpResponse response, String? endpoint) {

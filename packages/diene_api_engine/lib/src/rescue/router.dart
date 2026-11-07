@@ -12,6 +12,7 @@ sealed class RescueOutcome {
   const RescueOutcome();
 }
 
+/// A healthy address for the same backend in the same landscape.
 final class Rescued extends RescueOutcome {
   const Rescued(this.baseUrl, {required this.fromLastKnownGood});
 
@@ -19,22 +20,15 @@ final class Rescued extends RescueOutcome {
   final bool fromLastKnownGood;
 }
 
+/// No healthy address was found; [reason] says why.
 final class RescueUnavailable extends RescueOutcome {
   const RescueUnavailable(this.reason);
 
   final String reason;
 }
 
-/// The DORMANT rescue router (dart twin of the shared bun api-engine/
-/// frontend-utils machinery). It only runs after a hard connect-failure past
-/// retry-once, and only when [RescueConfig.enabled] is true for the context.
-///
-/// Safety rails: the baked endpoint-suffix allowlist is enforced on EVERY
-/// doc-sourced URL at use time — Doc-A-supplied catalog hosts (before the
-/// Doc-C fetch) AND Doc-C candidate addresses. Monotonic doc versions (older
-/// rejected); always-baked issuer (never doc-sourced); last-known-good kept
-/// forever; jittered, strictly-budgeted scan (a hanging probe cannot exceed the
-/// global scan budget); same landscape only; addresses only; no doc signing.
+/// The dormant rescue router: runs only after a hard failure survives the
+/// retry, and only when [RescueConfig.enabled] is true.
 class RescueRouter {
   RescueRouter({
     required this.config,
@@ -59,24 +53,19 @@ class RescueRouter {
 
   static int _wallClockMs() => DateTime.now().millisecondsSinceEpoch;
 
-  // Doc A is the ONE fleet doc (host list) — its monotonic version is global.
   static const String _docAVersionKey = 'doca.version';
 
-  // Doc C is per platform × environment(landscape): cache + version keys are
-  // scoped by that partition so N backends across platforms/landscapes never
-  // reuse another partition's catalog.
+  // Doc C is cached per platform and landscape so backends never share one.
   String _docCScope(LpsmCoordinate c) => '${c.platform}.${c.landscape}';
   String _docCKey(LpsmCoordinate c) => 'docc.${_docCScope(c)}';
   String _docCVersionKey(LpsmCoordinate c) => 'docc.version.${_docCScope(c)}';
   String _pinKey(LpsmCoordinate c) => 'pin.${c.key}';
   String _lastGoodKey(LpsmCoordinate c) => 'lastgood.${c.key}';
 
-  /// The always-baked issuer. Exposed so callers can assert it is never read
-  /// from a doc.
+  /// The baked issuer; never read from a document.
   Uri get bakedIssuer => config.issuer;
 
-  /// Production jitter drawn from `[0, maxJitter]`, or the injected
-  /// deterministic source in tests.
+  /// A jitter in `[0, maxJitter]`, or the injected one.
   Duration nextJitter() {
     if (_jitterOverride != null) {
       return _jitterOverride();
@@ -87,7 +76,7 @@ class RescueRouter {
         : Duration(milliseconds: _random.nextInt(maxMs + 1));
   }
 
-  /// Enforce the baked endpoint-suffix allowlist on a doc-sourced URL/host.
+  /// True when [url]'s host matches a baked allowed suffix.
   bool isAllowed(Uri url) {
     final String host = url.host;
     if (host.isEmpty) {
@@ -98,40 +87,18 @@ class RescueRouter {
     );
   }
 
-  /// The currently-pinned rescue address for [coordinate], if any and still
-  /// allowlisted (pin-until-primary-heals).
+  /// The pinned rescue address for [coordinate], if still allowed.
   Future<Uri?> pinnedFor(LpsmCoordinate coordinate) async {
     final String? raw = await store.read(_pinKey(coordinate));
-    if (raw == null) {
-      return null;
-    }
-    final Uri url = Uri.parse(raw);
-    return isAllowed(url) ? url : null;
+    final Uri? url = raw == null ? null : Uri.tryParse(raw);
+    return url != null && isAllowed(url) ? url : null;
   }
 
-  /// Clear the pin once the primary home root heals.
+  /// Clears the pin once the primary heals.
   Future<void> onPrimaryHealed(LpsmCoordinate coordinate) =>
       store.delete(_pinKey(coordinate));
 
-  /// Probe whether a base URL is reachable (a received status < 500).
-  /// Probe [baseUrl] and report whether it answered healthily.
-  ///
-  /// This method does NOT contain a throwing transport, deliberately. A probe is
-  /// always issued through [_probeWithinBudget], which already carries an
-  /// `onError` arm for exactly that case — so containment lives THERE, at ONE
-  /// point, placed where the author had already put a handler.
-  ///
-  /// The alternative (catching here as well) was implemented first and removed:
-  /// two containment points for one condition is harder to reason about, and the
-  /// inner catch made the outer arm unreachable, so the code carried a handler
-  /// that could never run. Proven before this change landed, test-first in a
-  /// throwaway: a discriminating test FAILED with the inner catch present and
-  /// PASSED without it, with coverage instrumentation showing all three
-  /// `onError` lines at hit=1 — the arm demonstrated to RUN, not merely to be
-  /// coverable.
-  ///
-  /// A rejection from this future is therefore expected and handled one level up;
-  /// it never reaches a caller of [rescue].
+  /// True when [baseUrl] answers with a status below 500.
   Future<bool> probeHealthy(Uri baseUrl) async {
     final TransportOutcome outcome = await transport.send(
       HttpRequest(method: HttpMethod.head, url: baseUrl),
@@ -139,7 +106,7 @@ class RescueRouter {
     return outcome is Received && outcome.response.status < 500;
   }
 
-  /// The full rescue flow for [coordinate].
+  /// Finds a healthy address for [coordinate] in its own landscape.
   Future<RescueOutcome> rescue(LpsmCoordinate coordinate) async {
     if (!config.enabled) {
       return const RescueUnavailable('rescue disabled for this context');
@@ -148,23 +115,22 @@ class RescueRouter {
     final DocC? docC = await _loadOrRefreshDocC(coordinate);
     final Uri? lastGood = await _lastKnownGood(coordinate);
 
-    // Allowlist enforced at USE time on Doc-C candidates.
     final List<Uri> candidates = <Uri>[
       if (docC != null)
-        ...?docC.candidates[coordinate.key]?.map(Uri.parse).where(isAllowed),
+        ...?docC.candidates[coordinate.key]
+            ?.map(Uri.tryParse)
+            .nonNulls
+            .where(isAllowed),
     ];
 
     final int start = _nowMs();
     final int deadline = start + config.scanBudget.inMilliseconds;
     for (final Uri candidate in candidates) {
-      // Jitter counts toward the budget.
       await _sleep(nextJitter());
       final int remaining = deadline - _nowMs();
       if (remaining <= 0) {
-        break; // global budget exhausted
+        break;
       }
-      // Per-candidate timeout, capped so even a hanging probe cannot push the
-      // scan past the global budget.
       final Duration cap = Duration(
         milliseconds: remaining < config.perCandidateTimeout.inMilliseconds
             ? remaining
@@ -176,8 +142,6 @@ class RescueRouter {
       }
     }
 
-    // No fresh candidate healthy within budget — fall back to last-known-good,
-    // kept forever and still allowlisted.
     if (lastGood != null && isAllowed(lastGood)) {
       return Rescued(lastGood, fromLastKnownGood: true);
     }
@@ -186,8 +150,7 @@ class RescueRouter {
     );
   }
 
-  /// Probe [candidate] but never wait longer than [cap]. A hanging probe loses
-  /// to the timeout (fail-closed → unhealthy) so the global budget is honoured.
+  // A probe that hangs or throws counts as unhealthy once [cap] passes.
   Future<bool> _probeWithinBudget(Uri candidate, Duration cap) async {
     final Completer<bool> done = Completer<bool>();
     unawaited(
@@ -216,7 +179,7 @@ class RescueRouter {
 
   Future<Uri?> _lastKnownGood(LpsmCoordinate coordinate) async {
     final String? raw = await store.read(_lastGoodKey(coordinate));
-    return raw == null ? null : Uri.parse(raw);
+    return raw == null ? null : Uri.tryParse(raw);
   }
 
   Future<void> _pin(LpsmCoordinate coordinate, Uri url) async {
@@ -224,12 +187,7 @@ class RescueRouter {
     await store.write(_lastGoodKey(coordinate), url.toString());
   }
 
-  /// Load Doc C (per platform × landscape) from disk (cached forever) and
-  /// opportunistically refresh it via Doc A's catalog hosts. The per-scope Doc C
-  /// fetch is INDEPENDENT of the fleet Doc A version advancing — otherwise a
-  /// second platform sharing one router would reuse the first platform's
-  /// catalog once Doc A settled. Monotonic versions are honoured PER SCOPE (Doc
-  /// C) and fleet-wide (Doc A: an older Doc A is a rollback and is rejected).
+  // Doc C is refreshed per scope whatever Doc A's version does.
   Future<DocC?> _loadOrRefreshDocC(LpsmCoordinate coordinate) async {
     DocC? cached;
     final String? cachedRaw = await store.read(_docCKey(coordinate));
@@ -255,28 +213,26 @@ class RescueRouter {
     return cached;
   }
 
-  /// Fetch the fleet Doc A (host list) from the baked catalog hosts. Monotonic:
-  /// a Doc A OLDER than the last seen fleet version is a rollback and is
-  /// rejected; a Doc A at or above the seen version is usable (its hosts drive
-  /// the per-scope Doc C fetch), and the fleet version advances only on a
-  /// strictly-newer Doc A.
+  // An older Doc A is a rollback and is refused.
   Future<DocA?> _fetchDocA() async {
     final int? seenDocA = _parseInt(await store.read(_docAVersionKey));
     for (final String host in config.catalogHosts) {
-      final Uri url = _hostUri(host, '/fleet.json');
-      if (!isAllowed(url)) {
+      final Uri? url = _hostUri(host, '/fleet.json');
+      if (url == null || !isAllowed(url)) {
         continue;
       }
       final TransportOutcome? outcome = await _sendOrNull(url);
       if (outcome == null) {
-        continue; // this host is unusable — try the next baked seed
+        continue;
       }
       if (outcome is Received && outcome.response.status == 200) {
         final Map<String, Object?>? json = _jsonObject(outcome.response.body);
-        if (json != null && json['catalogHosts'] is List) {
+        if (json != null &&
+            json['catalogHosts'] is List &&
+            json['version'] is num) {
           final DocA docA = DocA.fromJson(json);
           if (seenDocA != null && docA.version < seenDocA) {
-            return null; // rollback — reject
+            return null;
           }
           if (_isNewer(docA.version, seenDocA)) {
             await store.write(_docAVersionKey, docA.version.toString());
@@ -291,15 +247,13 @@ class RescueRouter {
   Future<DocC?> _fetchDocC(DocA docA, LpsmCoordinate coordinate) async {
     final String path = '/catalog/${coordinate.platform}.json';
     for (final String host in docA.catalogHosts) {
-      final Uri url = _hostUri(host, path);
-      // Doc-A-SUPPLIED (doc-sourced) host — MUST be allowlisted before use, so
-      // a poisoned Doc A cannot redirect the Doc-C fetch off the baked roots.
-      if (!isAllowed(url)) {
+      final Uri? url = _hostUri(host, path);
+      if (url == null || !isAllowed(url)) {
         continue;
       }
       final TransportOutcome? outcome = await _sendOrNull(url);
       if (outcome == null) {
-        continue; // this host is unusable — try the next Doc-A-supplied host
+        continue;
       }
       if (outcome is Received && outcome.response.status == 200) {
         final DocC? doc = DocC.tryDecode(outcome.response.body);
@@ -311,45 +265,20 @@ class RescueRouter {
     return null;
   }
 
-  /// Send [url] and return its outcome, or `null` if the transport itself
-  /// FAILED TO ANSWER.
-  ///
-  /// [HttpTransport] documents that it never throws — a hard failure is returned
-  /// as [NetworkFailure]. But `HttpTransport` is a PUBLIC seam of this package,
-  /// so a third-party implementation that violates that contract is a real
-  /// possibility rather than a hypothetical, and without this guard such a throw
-  /// escapes the document-fetch loops and propagates out of [rescue] as an
-  /// unhandled error into the caller's request path.
-  ///
-  /// That is unacceptable in the component whose entire purpose is degrading
-  /// gracefully during an outage: the rescue router exists so a caller gets a
-  /// `Problem` it can act on, never a crash. The evidence the case was
-  /// anticipated is already in this file — `_probeWithinBudget` carries an
-  /// `onError` arm for exactly this shape of failure, but the fetches sit
-  /// upstream of it, so a throw never reached that handler.
-  ///
-  /// Failure is scoped PER HOST rather than per scan, matching how an
-  /// unallowlisted or non-200 host is already treated: one bad host is skipped
-  /// and the next candidate is tried, so a single misbehaving mirror cannot
-  /// abort a rescue that other seeds could have satisfied.
+  // A transport that throws breaks its contract; skip that host.
   Future<TransportOutcome?> _sendOrNull(Uri url) async {
     try {
       return await transport.send(
         HttpRequest(method: HttpMethod.get, url: url),
       );
     } on Object {
-      // Deliberately broad: the contract says nothing is thrown, so anything
-      // that arrives here is already outside the contract and cannot be
-      // usefully discriminated. Swallowing it is correct — the loop's own
-      // fallbacks (next host, last-known-good, RescueUnavailable) are the
-      // caller-visible answer.
       return null;
     }
   }
 
-  Uri _hostUri(String host, String path) => host.contains('://')
-      ? Uri.parse('$host$path')
-      : Uri.parse('https://$host$path');
+  Uri? _hostUri(String host, String path) => host.contains('://')
+      ? Uri.tryParse('$host$path')
+      : Uri.tryParse('https://$host$path');
 
   static Map<String, Object?>? _jsonObject(String body) {
     if (body.trim().isEmpty) {
