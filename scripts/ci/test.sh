@@ -4,7 +4,7 @@ set -euo pipefail
 mode="${1:-}"
 coverage_mode="${2:-no-coverage}"
 
-member_dir="${MEMBER_DIR:-packages/diene_dart_lib}"
+member_dir="${MEMBER_DIR:-packages/diene_problems}"
 test_helper_path="${TEST_HELPER_PATH:-lib/test_helper.dart}"
 meta_test_path="${META_TEST_PATH:-test/meta}"
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root_dir="$(git rev-parse --show-toplevel)"
-member_dir="${root_dir}/${MEMBER_DIR:-packages/diene_dart_lib}"
+member_dir="${root_dir}/${MEMBER_DIR:-packages/diene_problems}"
 cd "${member_dir}"
 
 name="$(yq -r '.name' pubspec.yaml)"
@@ -69,25 +69,50 @@ YAML
   echo 'void main() {}'
 } >"${consumer}/bin/libraries.dart"
 cat >"${consumer}/bin/consumer.dart" <<DART
-import 'package:${name}/diene_dart_lib.dart';
+import 'package:${name}/diene_problems.dart';
 
 void main() {
-  const Note note = Note(title: 'Consumer', body: 'Installed from the archive.');
-  final Note decoded = Note.fromJson(note.toJson());
-  if (decoded != note) throw StateError('the wire codec did not round-trip');
-  final String summary = summarizeNote(note);
-  if (summary != 'Consumer — Installed from the archive.') throw StateError('unexpected summary: \$summary');
-  print('consumer: \$summary');
+  const ErrorPortal portal = ErrorPortal(
+    scheme: 'https',
+    host: 'errors.atomi.cloud',
+    landscape: 'raichu',
+    platform: 'nitroso',
+    service: 'zinc',
+    module: 'api',
+  );
+  final ProblemRegistry registry = ProblemRegistry(portal);
+  GenericProblems.registerAll(registry);
+  final ProblemType notFound = registry.require('entity_not_found');
+  final Problem problem = Problem(
+    type: registry.typeUriFor(notFound),
+    title: notFound.title,
+    status: notFound.status ?? 500,
+    recoverable: notFound.recoverable,
+    data: const <String, Object?>{'entityType': 'note', 'id': '42'},
+  );
+  const String uri = 'https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/entity_not_found';
+  if (problem.type != uri) throw StateError('unexpected type URI: \${problem.type}');
+  final Map<String, Object?> wire = problem.toJson();
+  if (wire['status'] != 404 || (wire['data']! as Map<String, Object?>)['id'] != '42') throw StateError('unexpected wire: \$wire');
+  if (Problem.fromJson(wire) != problem) throw StateError('the wire codec did not round-trip');
+  final Map<String, Object?> resource = (ProblemCatalog(portal: portal)..addGenerics()).toProblemResource(version: 'v1');
+  final Object? crName = (resource['metadata']! as Map<String, Object?>)['name'];
+  if (crName != 'zinc.api.raichu.v1') throw StateError('unexpected Problem CR name: \$crName');
+  print('consumer: \${problem.type}');
 }
 DART
 if [[ -f ${unpacked}/lib/test_helper.dart ]]; then
   cat >"${consumer}/bin/test_helper.dart" <<DART
-import 'package:${name}/diene_dart_lib.dart';
 import 'package:${name}/test_helper.dart';
 
 void main() {
-  const Note note = Note(title: 'Consumer', body: 'Helper.');
-  assertNoteSummary(note, summarizeNote(note));
+  expectProblem(aProblem(), status: 404, data: <String, Object?>{'entityType': 'user', 'id': '42'});
+  try {
+    expectProblem(aProblem(), status: 500);
+  } on ProblemMatcherError {
+    return;
+  }
+  throw StateError('expectProblem accepted a wrong status');
 }
 DART
 fi

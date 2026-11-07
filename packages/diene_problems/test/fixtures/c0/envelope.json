@@ -1,0 +1,12 @@
+{
+  "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/entity_not_found",
+  "title": "Entity not found",
+  "status": 404,
+  "detail": "Note 42 does not exist",
+  "instance": "/notes/42",
+  "recoverable": false,
+  "data": {
+    "entityType": "note",
+    "id": "42"
+  }
+}

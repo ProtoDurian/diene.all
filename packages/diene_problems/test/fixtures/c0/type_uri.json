@@ -1,0 +1,13 @@
+{
+  "portal": {
+    "scheme": "https",
+    "host": "errors.atomi.cloud",
+    "landscape": "raichu",
+    "platform": "nitroso",
+    "service": "zinc",
+    "module": "api"
+  },
+  "version": "v1",
+  "id": "entity_not_found",
+  "typeUri": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/entity_not_found"
+}

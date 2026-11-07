@@ -4,12 +4,12 @@ set -euo pipefail
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
-member_pubspec="packages/diene_dart_lib/pubspec.yaml"
+member_pubspec="packages/diene_problems/pubspec.yaml"
 current_version="$(yq -r '.version' "${member_pubspec}")"
 
 fixture="$(mktemp -d)"
 trap 'rm -rf "${fixture}"' EXIT
-mkdir -p "${fixture}/packages/diene_dart_lib"
+mkdir -p "${fixture}/packages/diene_problems"
 cp "${member_pubspec}" "${fixture}/${member_pubspec}"
 
 PACKAGE_ROOT="${fixture}" ./scripts/validate/publish-version.sh "v${current_version}"
@@ -23,7 +23,7 @@ fi
 PACKAGE_ROOT="${fixture}" ./scripts/release/bump.sh v9.8.7
 [[ $(yq -r '.version' "${fixture}/${member_pubspec}") != "9.8.7" ]] && echo "❌ bump.sh did not stamp the member pubspec.yaml" >&2 && exit 1
 
-[[ $(yq -r '[.release.commit.assets[] | select(. == "packages/diene_dart_lib/pubspec.yaml")] | length' release.yaml) != "1" ]] && echo "❌ release.yaml commit.assets must list packages/diene_dart_lib/pubspec.yaml" >&2 && exit 1
+[[ $(yq -r '[.release.commit.assets[] | select(. == "packages/diene_problems/pubspec.yaml")] | length' release.yaml) != "1" ]] && echo "❌ release.yaml commit.assets must list packages/diene_problems/pubspec.yaml" >&2 && exit 1
 # shellcheck disable=SC2016 # ${version} is the literal releaser placeholder
 [[ $(yq -r '[.release.hooks.prepare[] | select(.command == "./scripts/release/bump.sh ${version}")] | length' release.yaml) != "1" ]] && echo '❌ release.yaml must run ./scripts/release/bump.sh ${version} in its prepare hooks' >&2 && exit 1
 
