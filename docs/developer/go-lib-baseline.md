@@ -28,8 +28,8 @@ The README's library section carries one badge block: pkg.go.dev reference, the 
 workflow status and the license.
 
 The sample sits between `DOMAIN WIRING` fences for wholesale replacement: `lib/note`
-(with its examples), the `adapters/kv` Redis adapter, `testhelper`, and their unit, integration
-and meta tests.
+(with its examples), the `adapters/kv` Redis adapter, `testhelper`, their unit, integration
+and meta tests, and the consumer test's round trip.
 
 ## Test pyramid and TestHelper
 
