@@ -1,10 +1,10 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
 const DEADCODE = 'nix develop .#ci -c ./scripts/ci/deadcode.sh';
-const MEMBER = 'packages/diene_dart_lib';
+const MEMBER = 'packages/diene_interfaces';
 const LIB_FIXTURE = `${MEMBER}/lib/src/probe_production_only.dart`;
 const TEST_FIXTURE = `${MEMBER}/test/unit/probe_production_only_test.dart`;
-const BARREL = `${MEMBER}/lib/diene_dart_lib.dart`;
+const BARREL = `${MEMBER}/lib/diene_interfaces.dart`;
 
 export default {
   contractVersion: 1,
@@ -30,7 +30,7 @@ export default {
           await repo.write(BARREL, `${await repo.read(BARREL)}\nexport 'src/probe_production_only.dart';\n`);
           await repo.write(
             TEST_FIXTURE,
-            "import 'package:diene_dart_lib/diene_dart_lib.dart';\n" +
+            "import 'package:diene_interfaces/diene_interfaces.dart';\n" +
               "import 'package:test/test.dart';\n\n" +
               "void main() {\n  test('probe production only', () {\n    expect(probeProductionOnly(), 1);\n  });\n}\n",
           );
