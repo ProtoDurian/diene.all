@@ -35,11 +35,6 @@ tasks:
       - task: test:int
       - task: test:meta
 
-  test:sit:
-    desc: Run the SIT export tier against a loopback OTLP receiver
-    cmds:
-      - ./scripts/ci/test-sit.sh
-
   test:coverage:
     desc: Run every coverage-capable suite with coverage
     cmds:

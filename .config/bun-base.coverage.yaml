@@ -8,3 +8,6 @@ tiers:
   meta:
     tests: tests/meta
     scope: src/test-helper/
+  sit:
+    tests: tests/sit
+    scope: ''

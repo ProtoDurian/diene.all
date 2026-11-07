@@ -15,4 +15,4 @@ jobs:
       - uses: AtomiCloud/actions.setup-nix@v3
       - uses: AtomiCloud/actions.cache-bun@v2
       - name: Run SIT tests
-        run: nix develop .#ci -c ./scripts/ci/test-sit.sh
+        run: nix develop .#ci -c ./scripts/ci/test.sh sit
