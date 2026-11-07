@@ -48,16 +48,45 @@ async function first(repo: ProbeRepo, glob: string): Promise<string> {
   return paths[0];
 }
 
-export async function flipGoAssertion(repo: ProbeRepo): Promise<string> {
-  const paths = (await repo.glob('tests/unit/**/*_test.go')).sort();
-  for (const path of paths) {
-    const source = await repo.read(path);
-    if (source.includes('; got != ')) {
-      await repo.write(path, source.replace('; got != ', '; got == '));
-      return path;
+export interface FlippedAssertion {
+  path: string;
+  // The gotestsum `=== FAIL: <package> <Test>` line the flipped assertion must produce.
+  failure: RegExp;
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Flip the first single `if a != b {` comparison (not an error check) that sits directly in a top-level
+// test body and guards a t.Fatal/t.Error call, so exactly that test fails by name.
+export async function flipComparisonAssertion(repo: ProbeRepo, glob: string): Promise<FlippedAssertion> {
+  for (const path of (await repo.glob(glob)).sort()) {
+    const lines = (await repo.read(path)).split('\n');
+    let test = '';
+    for (let index = 0; index < lines.length - 1; index++) {
+      if (lines[index].startsWith('func ')) {
+        test = lines[index].match(/^func (Test[A-Za-z0-9_]*)\(t \*testing\.T\) \{$/)?.[1] ?? '';
+        continue;
+      }
+      const comparison = lines[index].match(/^\tif ([^=!&|;]+) != ([^=!&|;{]+) \{$/);
+      if (
+        test &&
+        comparison &&
+        comparison[2] !== 'nil' &&
+        /^\t\tt\.(Fatal|Fatalf|Error|Errorf)\(/.test(lines[index + 1])
+      ) {
+        lines[index] = `\tif ${comparison[1]} == ${comparison[2]} {`;
+        await repo.write(path, lines.join('\n'));
+        return { path, failure: new RegExp(`FAIL: ${escapeRegExp(directory(path))} ${test} `) };
+      }
     }
   }
-  throw new Error('no structural Go assertion target found');
+  throw new Error(`no structural Go assertion target found in ${glob}`);
+}
+
+export async function flipGoAssertion(repo: ProbeRepo): Promise<FlippedAssertion> {
+  return flipComparisonAssertion(repo, 'tests/unit/**/*_test.go');
 }
 
 export async function plantWhiteBoxTest(repo: ProbeRepo): Promise<string> {

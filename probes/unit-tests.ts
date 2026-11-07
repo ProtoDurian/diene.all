@@ -22,9 +22,9 @@ export default {
       async run(repo: any) {
         const mutated = await flipGoAssertion(repo);
         try {
-          await expectRedWithDiagnostic(repo, gate, 'unit-tests', /Slug\(\) =/);
+          await expectRedWithDiagnostic(repo, gate, 'unit-tests', mutated.failure);
         } finally {
-          await restoreProbeState(repo, [mutated]);
+          await restoreProbeState(repo, [mutated.path]);
         }
       },
     },

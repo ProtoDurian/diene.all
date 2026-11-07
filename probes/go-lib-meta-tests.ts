@@ -20,13 +20,8 @@ export default {
       description: 'A flipped meta assertion turns the meta tier red.',
       kind: 'mutation',
       async run(repo: any) {
-        await flipMetaAssertion(repo);
-        await expectRedWithDiagnostic(
-          repo,
-          gate,
-          'go-lib-meta-tests',
-          /FAIL: tests\/meta\/testhelper TestMemoryStoreServesTheService/,
-        );
+        const mutated = await flipMetaAssertion(repo);
+        await expectRedWithDiagnostic(repo, gate, 'go-lib-meta-tests', mutated.failure);
       },
     },
   ],
