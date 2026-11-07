@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="../fixtures/c0/monad-v1.json" Link="fixtures/c0/monad-v1.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="coverlet.msbuild" />
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="GitHubActionsTestLogger" />
