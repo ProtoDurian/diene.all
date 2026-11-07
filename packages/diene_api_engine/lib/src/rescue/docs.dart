@@ -2,9 +2,7 @@ import 'dart:convert';
 
 import 'package:meta/meta.dart';
 
-/// Doc A — the fleet doc. Just `catalogHosts[]` + a monotonic `version` that
-/// doubles as the HTTP cache tag. Constantly refreshed; the "catalogs
-/// advertise catalogs" carrier whose hosts span failure domains.
+/// Doc A, the fleet doc: catalog hosts and a monotonic version.
 @immutable
 class DocA {
   const DocA({required this.version, required this.catalogHosts});
@@ -26,11 +24,7 @@ class DocA {
   };
 }
 
-/// Doc C — the platform catalog (per platform × env). Full address book with
-/// an ORDERED candidate list per `landscape.platform.service.module` (primary
-/// root first, rescue after) so clients fail over without a mid-outage
-/// republish. Dormant: fetched only when the router trips, then cached to
-/// disk. Carries its own monotonic `version`.
+/// Doc C, the platform catalog: ordered candidate base URLs per backend.
 @immutable
 class DocC {
   const DocC({required this.version, required this.candidates});
@@ -54,7 +48,7 @@ class DocC {
 
   final int version;
 
-  /// key = `landscape.platform.service.module` → ordered base-URL strings.
+  /// `landscape.platform.service.module` to ordered base URLs.
   final Map<String, List<String>> candidates;
 
   Map<String, Object?> toJson() => <String, Object?>{

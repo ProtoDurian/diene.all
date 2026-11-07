@@ -1,0 +1,68 @@
+{
+  "$id": "urn:diene:config-block:api-engine",
+  "properties": {
+    "backends": {
+      "items": {
+        "properties": {
+          "baseUrl": {
+            "format": "uri",
+            "type": "string"
+          },
+          "coordinate": {
+            "required": ["landscape", "platform", "service", "module"],
+            "type": "object"
+          },
+          "resourceName": {
+            "type": "string"
+          },
+          "retryOnNetworkError": {
+            "type": "boolean"
+          },
+          "timeoutSeconds": {
+            "type": "integer"
+          }
+        },
+        "required": ["coordinate", "baseUrl"],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "rescue": {
+      "properties": {
+        "catalogHosts": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "endpointSuffixAllowlist": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "issuer": {
+          "format": "uri",
+          "type": "string"
+        },
+        "maxJitterMs": {
+          "type": "integer"
+        },
+        "perCandidateTimeoutMs": {
+          "type": "integer"
+        },
+        "scanBudgetMs": {
+          "type": "integer"
+        }
+      },
+      "required": ["enabled", "issuer", "catalogHosts", "endpointSuffixAllowlist"],
+      "type": "object"
+    }
+  },
+  "required": ["backends", "rescue"],
+  "type": "object"
+}

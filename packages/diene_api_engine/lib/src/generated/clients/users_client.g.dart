@@ -51,7 +51,7 @@ class _UsersClient implements UsersClient {
         !(requestOptions.responseType == ResponseType.bytes ||
             requestOptions.responseType == ResponseType.stream)) {
       if (T == String) {
-        requestOptions.responseType = ResponseType.plain;
+        requestOptions.responseType = ResponseType.plain; // coverage:ignore-line
       } else {
         requestOptions.responseType = ResponseType.json;
       }

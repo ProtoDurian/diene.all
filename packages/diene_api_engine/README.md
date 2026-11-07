@@ -1,52 +1,43 @@
 # diene_api_engine
 
 [![pub package](https://img.shields.io/pub/v/diene_api_engine.svg)](https://pub.dev/packages/diene_api_engine)
-[![CI](https://github.com/AtomiCloud/diene.dart_api_engine/actions/workflows/ci.yaml/badge.svg)](https://github.com/AtomiCloud/diene.dart_api_engine/actions/workflows/ci.yaml)
-[![unit coverage](https://codecov.io/gh/AtomiCloud/diene.dart_api_engine/graph/badge.svg?flag=unit)](https://codecov.io/gh/AtomiCloud/diene.dart_api_engine)
-[![meta coverage](https://codecov.io/gh/AtomiCloud/diene.dart_api_engine/graph/badge.svg?flag=meta)](https://codecov.io/gh/AtomiCloud/diene.dart_api_engine)
 
-The generic, pure-Dart **library template** for the Diene family. It ships a
-small, replaceable sample domain — a `Note` value type with a JSON wire codec
-and a pure summariser — inside the reusable template machinery (strict analysis,
-targeted coverage, a dependency-light TestHelper, a C0 fixture harness, package
-hygiene, and a shipped usage skill).
+The backend-client engine for Diene Flutter apps:
+
+- wraps generated OpenAPI SDK calls and raw JSON calls into `Result<T>` with a
+  `Problem` error, so ordinary failures never throw;
+- registers many backends in one client tree, each with its own host and its
+  own auth token (through `diene_auth_engine`'s `IAuth`);
+- retries once on a network failure, with no failover on the normal path;
+- runs a dormant, disk-cached rescue router that finds another address for the
+  same backend in the same landscape after a hard failure;
+- owns and exports its config block schema.
 
 ```dart
 import 'package:diene_api_engine/diene_api_engine.dart';
 
-const Note note = Note(title: 'Release', body: 'Ship the template.');
+final ApiEngine engine = ApiEngine.fromConfig(
+  ApiEngineConfig.fromMap(block),
+  auth: authCoordinator,
+  store: FileRescueStore(appDocumentsDir),
+);
+final Backend users = engine.backend(usersCoordinate)!;
 
-final String summary = summarizeNote(note);        // 'Release — Ship the template.'
-final Note decoded = Note.fromJson(note.toJson());  // round-trips through JSON
+final Result<User> user = await users.call<User>(
+  method: HttpMethod.get,
+  path: '/users/42',
+  decode: User.fromJson,
+);
+
+final ServiceSdk sdk = users.sdk(ServiceSdk.new);
+final Result<UserProfile> profile =
+    await const ResultSdk().call(() => sdk.users.getUser(id: '42'));
 ```
 
-## Public surface
+Tests can use `package:diene_api_engine/test_helper.dart`: fake backends, fake
+per-backend auth, response fixtures and plain-throw assertions, with no test
+framework dependency.
 
-- `Note` — immutable `title`/`body` value type with value equality and a JSON
-  wire codec (`Note.fromJson` / `toJson`).
-- `summarizeNote(note, {maxLength})` — a pure single-line summariser.
-- `defaultSummaryLength` — the default summary cap.
-
-## TestHelper
-
-Consumer tests may import `package:diene_api_engine/test_helper.dart` for
-`assertNoteSummary`, a dependency-light assertion that throws
-`NoteAssertionFailure` on mismatch and pulls in no test framework.
-
-Read the [package doc](doc/diene_api_engine.md) for the full API, wire contract,
-C0 harness, and guidance on replacing the sample.
-
-## Using this template
-
-This is a template: a materialized child retokenizes the package identity to
-`diene_<name>` / `AtomiCloud/diene.dart_<name>`, replaces `lib/src/**` with its
-own domain, and re-points the barrel exports. See
-`skills/diene-api-engine-usage/patterns.md`.
-
-## Development
-
-- `task setup` resolves the workspace dependencies.
-- `task test` runs the unit, C0 conformance, and TestHelper meta suites.
-- `task test:coverage` enforces the separate unit and meta ledgers.
-- `task deadcode` runs the repository and production-only dead-code passes.
-- `task package:validate` runs the release guard, publish dry-run, and pana.
+Read the [package doc](doc/diene_api_engine.md) for the full guide: response
+classification, the rescue steps, the config block, differences from the Bun
+engine and the known limits of 1.0.

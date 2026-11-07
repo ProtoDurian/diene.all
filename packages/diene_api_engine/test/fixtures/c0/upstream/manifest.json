@@ -1,0 +1,104 @@
+{
+  "authority": "c0-fixtures-r2",
+  "commit": "fe77520d591f81a9762c40ebf68dc9c0106502d3",
+  "sources": {
+    "contracts/c0/cases/identity.json": "add399f33101bd68b98ac6aea3f073d6f7e852410cba5e846c7311ce2028ac59",
+    "contracts/c0/cases/problem.json": "a8c02554c198627df9badc6c2377218556ec8bd3a0b1edcdb20aedeebe43f988"
+  },
+  "algorithm": "sha256 of the subtree printed by jq -cS (sorted keys, no whitespace, trailing newline)",
+  "fileAlgorithm": "sha256 of the vendored file bytes as committed",
+  "vectors": {
+    "problem_envelopes.json": {
+      "path": "contracts/c0/cases/problem.json",
+      "pointer": "/cases/envelopes",
+      "sha256": "60277932b59b62a34eb1752b01e1c2c24d14fc7a12d206fc7a22538f83f45872",
+      "fileSha256": "9041525acac8f233334339d9a7cdbb948b41a59fe880e9904099b99e74b5fa10",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/problem.json | jq -cS .cases.envelopes | sha256sum",
+      "adaptations": [
+        "Each valid envelope is served as a non-2xx body at its own status and must come back from toResult as that exact Problem, data included.",
+        "The same envelope is also served at 500 and through a generated SDK call; both must give the same Problem."
+      ]
+    },
+    "problem_extensions.json": {
+      "path": "contracts/c0/cases/problem.json",
+      "pointer": "/cases/extensions",
+      "sha256": "b8600f6c023ba3b1af2ee5271d540b00fbd33b527ab0a67a3dd4cdf0dc519d66",
+      "fileSha256": "f79302409485acebe47118897eb5f760469c0061142b814683c0f68d9bb58856",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/problem.json | jq -cS .cases.extensions | sha256sum",
+      "adaptations": [
+        "Together with the RFC 9457 members, these are the only keys a Problem from this engine may carry."
+      ]
+    },
+    "problem_members.json": {
+      "path": "contracts/c0/cases/problem.json",
+      "pointer": "/cases/rfc9457Members",
+      "sha256": "f5c61c06a73d3bf74b1d95ef91d635aa337ab76d93654e4487d207a2ebcc633d",
+      "fileSha256": "613bf2521d32b0b433f94b4c5e72671179ebe376840b3c957af122f51dc2fe0c",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/problem.json | jq -cS .cases.rfc9457Members | sha256sum",
+      "adaptations": ["Absent optional members are omitted, never null."]
+    },
+    "resource_audience.json": {
+      "path": "contracts/c0/cases/identity.json",
+      "pointer": "/cases/resourceAudience",
+      "sha256": "ecf1af51b24677874a7ec080f05b23f5c4d7e1cdedd9adc7dd43568f4114f8ad",
+      "fileSha256": "870e5aaaf00d4a6d74482bd4773e9b6c876e8038bc6aa360ec338e3c22f3c737",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/identity.json | jq -cS .cases.resourceAudience | sha256sum",
+      "adaptations": [
+        "Each vector is a backend coordinate plus its resource name; the module slot is not part of the key.",
+        "An invalid vector must make the backend resource key fail; the engine does not validate coordinates itself."
+      ]
+    }
+  },
+  "skipped": [
+    {
+      "path": "contracts/c0/cases/problem.json",
+      "pointer": "/cases/typeUri",
+      "reason": "Service problem type URIs are built by the problems library, not by this client."
+    },
+    {
+      "path": "contracts/c0/cases/problem.json",
+      "pointer": "/cases/typeUriTemplate",
+      "reason": "Same as typeUri."
+    },
+    {
+      "path": "contracts/c0/cases/problem.json",
+      "pointer": "/cases/catalogEntry",
+      "reason": "Problem catalog entries are published by services, not read by this client."
+    },
+    {
+      "path": "contracts/c0/cases/config.json",
+      "pointer": "/cases",
+      "reason": "Layering, env overrides and key matching belong to the config library; this engine only parses its final block."
+    },
+    {
+      "path": "contracts/c0/cases/identity.json",
+      "pointer": "/cases/appHandoff",
+      "reason": "Auth engine only."
+    },
+    {
+      "path": "contracts/c0/cases/identity.json",
+      "pointer": "/cases/docB",
+      "reason": "Doc B is read by the auth engine, never by this engine."
+    },
+    {
+      "path": "contracts/c0/cases/identity.json",
+      "pointer": "/cases/homeClaim",
+      "reason": "Auth engine only."
+    },
+    {
+      "path": "contracts/c0/cases/identity.json",
+      "pointer": "/cases/onboardingClaim",
+      "reason": "Auth engine only."
+    },
+    {
+      "path": "contracts/c0/cases/identity.json",
+      "pointer": "/cases/tokenLifetimes",
+      "reason": "Auth engine only."
+    },
+    {
+      "path": "contracts/c0/cases/result-wire.json",
+      "pointer": "/cases",
+      "reason": "The Result wire form belongs to the result library."
+    }
+  ]
+}

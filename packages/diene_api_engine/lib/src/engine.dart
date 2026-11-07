@@ -14,8 +14,7 @@ import 'rescue/router.dart';
 import 'rescue/store.dart';
 import 'transport.dart';
 
-/// Outcome of the shared send pipeline (auth → base/pin → retry-once → rescue),
-/// consumed by both `Backend.call` and the generated-SDK Dio adapter.
+/// What the send pipeline produced.
 sealed class _Sent {
   const _Sent();
 }
@@ -35,18 +34,8 @@ final class _SentAuthFailed extends _Sent {
   final Problem problem;
 }
 
-/// A resolved, callable backend: the config + its per-backend token binding
-/// (via the auth-engine `IAuth` seam) + the shared engine wiring. Every call —
-/// raw `call<T>` OR a wrapped generated SDK — goes through the SAME pipeline, so
-/// the registered base URL, per-resource auth, retry-once transport, dormant
-/// rescue routing, and backend identity all apply.
+/// One callable backend; raw calls and generated SDKs share its pipeline.
 class Backend {
-  // A private initializing formal in a NAMED parameter is legal, and callers
-  // still pass the PUBLIC name (`auth:`, `rescue:`) — the analyzer's own words
-  // for `_auth:` at a call site are "The named parameter '_auth' should use the
-  // corresponding public name 'auth'". So this is not a breaking API change.
-  // `_transport` is deliberately NOT converted: its initializer contains logic
-  // (the retry-once wrap), which is why the lint does not flag it.
   Backend({
     required this.config,
     required this._auth,
@@ -63,8 +52,7 @@ class Backend {
 
   LpsmCoordinate get coordinate => config.coordinate;
 
-  /// The per-resource key handed to `IAuth`, or null when the backend needs no
-  /// token. `resourceName` occupies the M slot of the LPSM coordinate.
+  /// The `IAuth` resource key, or null when no token is needed.
   ResourceKey? get resourceKey {
     final String? resource = config.resourceName;
     if (resource == null || _auth == null) {
@@ -78,8 +66,7 @@ class Backend {
     );
   }
 
-  /// Issue a typed JSON call and fold it into `Result<T>` via the toResult
-  /// bridge.
+  /// Sends one JSON call and folds the outcome into `Result<T>`.
   Future<Result<T>> call<T>({
     required HttpMethod method,
     required String path,
@@ -111,26 +98,17 @@ class Backend {
     };
   }
 
-  /// Build a generated OA3 SDK bound to THIS backend's production pipeline.
-  /// [factory] is a generated root-client constructor (e.g. `ServiceSdk.new`);
-  /// every call it makes flows through this backend's base URL (incl. a live
-  /// rescue pin), per-resource auth, retry-once, and rescue routing. Wrap the
-  /// resulting client's calls with [ResultSdk.call].
+  /// A generated SDK (e.g. `ServiceSdk.new`) bound to this backend.
   S sdk<S>(S Function(Dio dio) factory) => factory(dio());
 
-  /// The Dio a generated SDK runs on: its HTTP is delegated to this backend's
-  /// pipeline via [BackendClientAdapter].
+  /// A Dio whose requests run through this backend's pipeline.
   Dio dio() {
     final Dio client = Dio(BaseOptions(baseUrl: config.baseUrl.toString()));
     client.httpClientAdapter = BackendClientAdapter(this);
     return client;
   }
 
-  /// Shared send pipeline: resolve the per-resource bearer (a token failure is
-  /// surfaced), resolve the base URL (a live rescue pin wins while pinned —
-  /// pin-until-primary-heals), send with the retry-once profile, and on a HARD
-  /// network failure trip the dormant rescue router (addresses only, same
-  /// landscape) and retry once against the rescued address.
+  /// Token, base URL (a live pin wins), send, then rescue on a hard failure.
   Future<_Sent> _pipeline({
     required HttpMethod method,
     required String path,
@@ -238,10 +216,7 @@ class Backend {
   }
 }
 
-/// A dio [HttpClientAdapter] that drives a generated SDK through a [Backend]'s
-/// production pipeline. Received → dio [ResponseBody]; a HARD network failure →
-/// `DioException.connectionError`; a token failure → a `DioException` carrying
-/// the auth [Problem] (surfaced losslessly by [ResultSdk]).
+/// Runs a generated SDK's requests through a [Backend]'s pipeline.
 class BackendClientAdapter implements HttpClientAdapter {
   BackendClientAdapter(this._backend);
 
@@ -310,8 +285,7 @@ class BackendClientAdapter implements HttpClientAdapter {
   };
 }
 
-/// The api-engine facade: builds the LPSM client tree and per-backend rescue
-/// wiring from the engine-owned [ApiEngineConfig].
+/// The engine: one client tree of backends plus optional rescue.
 class ApiEngine {
   ApiEngine._({
     required this.tree,
@@ -319,7 +293,7 @@ class ApiEngine {
     required this.rescue,
   });
 
-  /// Wire an engine from a validated config slice.
+  /// Wires an engine from a validated config slice.
   factory ApiEngine.fromConfig(
     ApiEngineConfig config, {
     IAuth? auth,
@@ -358,6 +332,6 @@ class ApiEngine {
   final Map<String, Backend> _backends;
   final RescueRouter? rescue;
 
-  /// Resolve a callable backend by coordinate.
+  /// The backend registered at [coordinate], or null.
   Backend? backend(LpsmCoordinate coordinate) => _backends[coordinate.key];
 }

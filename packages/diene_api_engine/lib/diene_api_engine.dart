@@ -1,14 +1,6 @@
-/// diene_api_engine — the typed OA3 backend-client engine for the Dart family.
-///
-/// Wraps generated OpenAPI SDK calls into `Result<T, Problem>`, registers N
-/// backends on the LPSM client tree with per-resource auth (the auth-engine
-/// `IAuth` seam), retries once on a hard network failure, and ships a dormant
-/// disk-cached rescue router for same-landscape address failover. Client-side
-/// only; frontend-only family (no OTel library — telemetry rides Faro).
-///
-/// `Result`/`Problem` are owned by `diene_result` and `IAuth`/`ResourceKey`/
-/// `ResourceToken` by `diene_auth_engine`; they are re-exported here for
-/// consumer convenience, never redefined.
+/// Wraps generated OpenAPI SDKs and raw calls into `Result<T>`, registers N
+/// backends with per-backend auth, retries once on a network failure and runs
+/// a dormant same-landscape address rescue.
 library;
 
 export 'package:diene_auth_engine/diene_auth_engine.dart'

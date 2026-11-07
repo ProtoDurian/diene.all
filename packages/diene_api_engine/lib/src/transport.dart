@@ -4,12 +4,10 @@ import 'dart:io';
 
 import 'package:meta/meta.dart';
 
-/// HTTP verbs the engine issues. The typed OA3 SDK a consumer brings decides
-/// which verb each call uses; the engine only carries it to the transport.
+/// HTTP verbs the engine carries to the transport.
 enum HttpMethod { get, post, put, patch, delete, head }
 
-/// A transport-level request. Base URL resolution and auth-header attachment
-/// happen before this value is built (see the client tree / `IAuth` seam).
+/// A transport-level request with its base URL and auth header already set.
 @immutable
 class HttpRequest {
   const HttpRequest({
@@ -28,8 +26,7 @@ class HttpRequest {
       HttpRequest(method: method, url: url, headers: headers, body: body);
 }
 
-/// A received HTTP response — ANY status, including 4xx/5xx. A received status
-/// is never a network failure and is never retried.
+/// A received HTTP response of any status; never a network failure.
 @immutable
 class HttpResponse {
   const HttpResponse({
@@ -43,15 +40,13 @@ class HttpResponse {
   final String body;
 }
 
-/// Total outcome of a transport send: either a [Received] HTTP response or an
-/// opaque [NetworkFailure] (connection refused/reset, DNS blip, TLS failure,
-/// timeout) where NO HTTP status was received. Modelled as a sealed value —
-/// the transport seam never throws on the hot path.
+/// What a send returns: a [Received] response or a [NetworkFailure].
 @immutable
 sealed class TransportOutcome {
   const TransportOutcome();
 }
 
+/// Any HTTP status was received.
 @immutable
 final class Received extends TransportOutcome {
   const Received(this.response);
@@ -59,6 +54,7 @@ final class Received extends TransportOutcome {
   final HttpResponse response;
 }
 
+/// No HTTP status was received: refused, reset, DNS, TLS or timeout.
 @immutable
 final class NetworkFailure extends TransportOutcome {
   const NetworkFailure(this.reason, {this.cause});
@@ -67,21 +63,12 @@ final class NetworkFailure extends TransportOutcome {
   final Object? cause;
 }
 
-/// The transport seam. Implementations MUST classify any received HTTP status
-/// as [Received] and only opaque connection-level errors as [NetworkFailure].
+/// The transport seam; implementations return failures and never throw.
 abstract interface class HttpTransport {
   Future<TransportOutcome> send(HttpRequest request);
 }
 
-/// Retry-once-on-network-error profile (ARCHITECTURE §4 hot path).
-///
-/// On an opaque [NetworkFailure] the request is retried EXACTLY ONCE over a
-/// fresh connection before the failure is surfaced. A [Received] status —
-/// even 5xx — is returned immediately and never retried. This is explicitly
-/// NOT client-side load balancing: there is no physical-URL list, circuit
-/// breaker, or failover ladder here. A [NetworkFailure] returned by this
-/// wrapper therefore means a HARD connect-failure (both attempts opaque) — the
-/// exact trip point the dormant rescue router keys off.
+/// Retries exactly once on a [NetworkFailure]; a received status is final.
 final class RetryOnceTransport implements HttpTransport {
   const RetryOnceTransport(this._inner);
 
@@ -93,14 +80,11 @@ final class RetryOnceTransport implements HttpTransport {
     if (first is Received) {
       return first;
     }
-    // First attempt was an opaque network failure — retry exactly once over a
-    // fresh connection. The inner transport owns connection freshness.
     return _inner.send(request);
   }
 }
 
-/// dart:io-backed transport. Pure Dart (no Flutter dependency) so the engine
-/// stays host-testable; Flutter consumers may inject any equivalent seam.
+/// A `dart:io` [HttpClient] transport.
 final class IoHttpTransport implements HttpTransport {
   IoHttpTransport({Duration? timeout, HttpClient? client})
     : _timeout = timeout ?? const Duration(seconds: 30),

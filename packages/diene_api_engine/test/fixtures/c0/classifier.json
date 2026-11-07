@@ -1,0 +1,63 @@
+[
+  {
+    "body": "{\"id\":\"u1\"}",
+    "expect": "ok",
+    "name": "2xx JSON object",
+    "status": 200
+  },
+  {
+    "body": "hello",
+    "expect": "transport",
+    "expectStatus": 200,
+    "name": "2xx not JSON",
+    "status": 200
+  },
+  {
+    "body": "{\"type\":\"urn:diene:problem:entity_not_found\",\"title\":\"Not found\",\"status\":404,\"recoverable\":false,\"data\":{\"entityType\":\"user\",\"id\":\"u1\"}}",
+    "expect": "problem",
+    "expectStatus": 404,
+    "name": "4xx problem body",
+    "status": 404
+  },
+  {
+    "body": "{\"type\":\"urn:diene:problem:uncatalogued\",\"title\":\"Uncatalogued\",\"status\":500,\"data\":{\"nested\":{\"cause\":{\"id\":7}}}}",
+    "expect": "problem",
+    "expectStatus": 500,
+    "name": "5xx problem body",
+    "status": 500
+  },
+  {
+    "body": "{\"error\":\"bad\"}",
+    "expect": "unexpected",
+    "expectStatus": 422,
+    "name": "4xx JSON that is not a problem",
+    "status": 422
+  },
+  {
+    "body": "[1,2]",
+    "expect": "transport",
+    "expectStatus": 503,
+    "name": "5xx JSON array, not an object",
+    "status": 503
+  },
+  {
+    "body": "Bad Gateway",
+    "expect": "transport",
+    "expectStatus": 502,
+    "name": "5xx not JSON",
+    "status": 502
+  },
+  {
+    "body": "",
+    "expect": "transport",
+    "expectStatus": 504,
+    "name": "status only",
+    "status": 504
+  },
+  {
+    "expect": "transport",
+    "expectStatus": 503,
+    "name": "network failure",
+    "network": true
+  }
+]

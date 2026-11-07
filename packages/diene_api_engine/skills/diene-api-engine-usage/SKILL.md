@@ -1,57 +1,25 @@
 ---
 name: diene-api-engine-usage
-description: Use when calling backends from a diene Dart/Flutter app — register LPSM backends, make Result-typed calls, handle Problems, and fake backends in tests with diene_api_engine.
+description: Use when calling backends from a Diene Flutter app with package:diene_api_engine (registering backends, per-backend tokens, Result-typed raw or generated-SDK calls, rescue config), or when testing that code with its TestHelper.
 ---
 
 # diene_api_engine usage
 
-`diene_api_engine` is the client-side backend layer. Every call returns
-`Result<T, Problem>`; nothing throws.
+The package doc (`doc/diene_api_engine.md`) is authoritative; read it first.
 
-## Register (LPSM client tree)
+- Import only `package:diene_api_engine/diene_api_engine.dart`; never `lib/src`.
+- Build the engine with `ApiEngine.fromConfig(ApiEngineConfig.fromMap(block),
+auth: ..., store: FileRescueStore(dir))`; one `BackendConfig` per backend.
+- Give each backend its own `resourceName`; tokens come from `IAuth` per
+  backend, never shared.
+- Use `backend.call<T>` for raw JSON and `backend.sdk(GeneratedSdk.new)` plus
+  `ResultSdk().call` for generated clients. Handle `Ok` / `Err`; do not catch.
+- Do not add URL lists, circuit breakers or your own retries; the engine
+  retries once and rescue handles hard failures when `rescue.enabled` is true.
+- Keep the issuer and allowed host suffixes in baked build config.
 
-- One backend = one `LpsmCoordinate` (`landscape.platform.service.module`) +
-  one base-URL **hostname** from config values (never a literal) + an optional
-  per-resource auth binding.
-- Build the engine from the engine-owned config block:
-  `ApiEngine.fromConfig(config, auth: retriever, store: FileRescueStore(dir))`.
-- Resolve a backend with `engine.backend(coordinate)`. Duplicate registrations
-  are a typed `Err`, not a throw.
+## Tests
 
-## Multi-backend
-
-- ONE app registers MANY backends. Tokens resolve **per backend** through the
-  `IAuth` seam (`tokenFor(coordinate, resource:)`) — never a shared/singleton
-  token. Auth-engine's onboarding machinery keys off the same registrations.
-
-## Call + handle Problems
-
-```dart
-final r = await backend.call(method: HttpMethod.get, path: '/user/me', decode: X.fromJson);
-r.match(ok: use, err: showProblem);
-```
-
-- Classification (`toResult`): 2xx JSON → `Ok`; problem body → that `Problem`;
-  non-problem JSON error → unexpected-response Problem; network/non-JSON/
-  status-only → transport-failure Problem.
-
-## Resilience (don't hand-roll it)
-
-- Retry-once on opaque network error is automatic; received statuses (incl.
-  5xx) are never retried.
-- The dormant rescue router wakes only on a hard connect-failure (Flutter/
-  browser contexts). It rescues **addresses only, same landscape**, behind a
-  baked suffix allowlist + monotonic doc versions + always-baked issuer. Do not
-  add your own physical-URL list, circuit breaker, or failover ladder.
-
-## TestHelper
-
-`import 'package:diene_api_engine/test_helper.dart';` (dependency-light):
-
-- `FakeHttpTransport.byHost({...})` / `.sequence([...])` — scripted transports.
-- `FakeAuth({coordKey: token})` — per-backend tokens; `.queried` proves no
-  cross-backend bleed.
-- `FakeRescueStore`, `noSleep`, `noJitter` — deterministic rescue tests.
-- `expectOk` / `expectErr` / `expectProblemType` — plain-throw assertions.
-- `okJson` / `problemResponse` / `nonProblemJson` / `nonJsonResponse` /
-  `networkFailure` — reconciliation-matrix builders.
+Import `package:diene_api_engine/test_helper.dart`: `FakeHttpTransport` for
+backends, `FakeAuth` for per-backend tokens, response builders and the
+`expectOk` / `expectErr` / `expectProblemType` assertions. See `patterns.md`.

@@ -1,17 +1,13 @@
 import 'dart:io';
 
-/// Durable key/value seam the rescue router persists to. Last-known-good and
-/// the current pin are kept FOREVER (never TTL-expired). Flutter consumers back
-/// this with real device disk (e.g. path_provider + a file); the engine stays
-/// pure Dart by depending only on this seam.
+/// Durable key/value store for pins, last-known-good and cached docs.
 abstract interface class RescueStore {
   Future<String?> read(String key);
   Future<void> write(String key, String value);
   Future<void> delete(String key);
 }
 
-/// In-memory store — the default when no disk is wired, and the base the test
-/// fake extends.
+/// An in-memory store; the default when no disk is wired.
 class InMemoryRescueStore implements RescueStore {
   InMemoryRescueStore([Map<String, String>? seed])
     : _data = <String, String>{...?seed};
@@ -28,9 +24,7 @@ class InMemoryRescueStore implements RescueStore {
   Future<void> delete(String key) async => _data.remove(key);
 }
 
-/// dart:io file-backed store. One JSON-ish flat file per key under [directory].
-/// Pure Dart — no Flutter/path_provider dependency; the consumer supplies the
-/// directory (Flutter passes an app-documents path).
+/// A `dart:io` store: one file per key under [directory].
 class FileRescueStore implements RescueStore {
   FileRescueStore(this.directory);
 

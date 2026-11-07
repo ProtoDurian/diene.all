@@ -1,9 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 
-/// The four-slot LPSM service-tree coordinate that addresses one backend.
-/// Instance is a projection parameter elsewhere in the fleet and is NOT part
-/// of this coordinate.
+/// The landscape/platform/service/module coordinate of one backend.
 @immutable
 class LpsmCoordinate {
   const LpsmCoordinate({
@@ -45,12 +43,7 @@ class LpsmCoordinate {
   String toString() => key;
 }
 
-/// One backend registration. The base URL is EXACTLY ONE hostname — the home
-/// landscape's, sourced from config values (never a literal, never a physical
-/// per-cluster URL list). `resourceName` is the M-slot resource label used to
-/// build the `ResourceKey` the auth-engine-owned `IAuth` seam resolves a token
-/// for (multi-backend: per-resource, no shared token). When null the backend
-/// carries no bearer token.
+/// One backend: one base URL host and its own auth resource.
 @immutable
 class BackendConfig {
   const BackendConfig({
@@ -74,16 +67,13 @@ class BackendConfig {
   final LpsmCoordinate coordinate;
   final Uri baseUrl;
 
-  /// M-slot resource label for the `ResourceKey` handed to `IAuth`; null means
-  /// no bearer token is attached.
+  /// Resource name for the `IAuth` token; null sends no bearer token.
   final String? resourceName;
   final Duration timeout;
   final bool retryOnNetworkError;
 }
 
-/// Baked rescue configuration for the dormant router. Everything here is
-/// build-time baked: the router NEVER learns its issuer or its allowed URL
-/// suffixes from a doc.
+/// Baked rescue settings; no document can change them.
 @immutable
 class RescueConfig {
   const RescueConfig({
@@ -97,8 +87,6 @@ class RescueConfig {
   });
 
   factory RescueConfig.fromMap(Map<String, Object?> value) => RescueConfig(
-    // Enabled is a PER-CONTEXT flag: ON for Flutter/browser, OFF for the
-    // nextjs server runtime (whose rescue is redeploy).
     enabled: value['enabled'] as bool? ?? false,
     issuer: Uri.parse(_string(value, 'issuer')),
     catalogHosts: _stringList(value, 'catalogHosts'),
@@ -114,20 +102,16 @@ class RescueConfig {
     ),
   );
 
-  /// Per-context enable flag. When false the router stays fully dormant and a
-  /// hard failure surfaces the transport-failure Problem directly.
+  /// Per-context flag; when false the router never runs.
   final bool enabled;
 
-  /// The auth issuer — ALWAYS baked, never doc-sourced.
+  /// The auth issuer: always baked, never read from a document.
   final Uri issuer;
 
-  /// Doc A seed: the baked `catalogHosts[]` spanning failure domains (R2 via
-  /// CF custom domain, CloudFront via the R53 rescue domain, cloudfront.net).
+  /// Baked hosts Doc A is fetched from, spread over failure domains.
   final List<String> catalogHosts;
 
-  /// Baked endpoint-suffix allowlist enforced on every doc-sourced URL at USE
-  /// time (only our own baked roots, e.g. `.cluster.atomi.cloud` + rescue
-  /// root(s)). A poisoned doc can at worst cross-wire within our own hosts.
+  /// Host suffixes every document-sourced URL must match at use time.
   final List<String> endpointSuffixAllowlist;
 
   final Duration scanBudget;
@@ -135,17 +119,12 @@ class RescueConfig {
   final Duration maxJitter;
 }
 
-/// The engine-owned config block schema (dart family has no standard-config
-/// member; each engine owns its own block beside the code that reads it). The
-/// CONFIG lib merges/validates this block into the service-composed root and
-/// serves a typed slice; it never owns this schema.
+/// The engine-owned config block: backends plus rescue.
 @immutable
 class ApiEngineConfig {
   const ApiEngineConfig({required this.backends, required this.rescue});
 
-  /// Parses (and validates) an already-merged config slice. Throws
-  /// [FormatException] on an invalid slice (fail-fast on the final layer, per
-  /// the config contract).
+  /// Parses a merged config slice; throws [FormatException] when invalid.
   factory ApiEngineConfig.fromMap(Map<String, Object?> value) {
     final List<Object?> raw = _list(value, 'backends');
     final List<BackendConfig> backends = raw
@@ -173,9 +152,7 @@ class ApiEngineConfig {
   final List<BackendConfig> backends;
   final RescueConfig rescue;
 
-  /// A machine-readable description of this engine block, exported so the
-  /// config lib can compose it into the root schema. Deliberately a plain
-  /// map (JSON-schema-shaped) so no schema library is pulled in.
+  /// The JSON-schema-shaped description of this block, for the config lib.
   static Map<String, Object?> get schema => <String, Object?>{
     r'$id': 'urn:diene:config-block:api-engine',
     'type': 'object',
@@ -233,13 +210,10 @@ class ApiEngineConfig {
 
   static const DeepCollectionEquality _eq = DeepCollectionEquality();
 
-  /// True when [schema] equals a previously-frozen copy — used by the C0
-  /// conformance test to catch accidental schema drift.
+  /// True when [other] equals [schema].
   static bool schemaEquals(Map<String, Object?> other) =>
       _eq.equals(schema, other);
 }
-
-// --- typed accessors (fail-fast) -------------------------------------------
 
 Map<String, Object?> _map(Map<String, Object?> value, String key) =>
     _asMap(value[key], key);

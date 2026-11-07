@@ -1,0 +1,10 @@
+{
+  "contract": "diene.api-engine.local.v1",
+  "authority": "local-regression-only",
+  "provenance": "Local regression fixtures for the exported config block schema and the response classifier; not part of the shared vectors.",
+  "algorithm": "sha256",
+  "fixtures": {
+    "classifier.json": "d79de0b3d961640bc66fe38f69019102df20f0570ae8e9e4cab5f61977e1f591",
+    "config_block_schema.json": "12cba3c081440826232862e675e5a36417d032e7fa6240827e23d1b7c2fb01cb"
+  }
+}
