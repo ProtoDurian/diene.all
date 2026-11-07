@@ -15,6 +15,12 @@ shared engineering standards.
 
 See [docs/standards/ci-cd/index.md](docs/standards/ci-cd/index.md).
 
+# Configuration
+
+See [docs/standards/config/index.md](docs/standards/config/index.md) before
+changing the config loader, the 4-tier merge, the env-override contract, the
+`/build-time` variant, `$schema` generation or the TestHelper.
+
 # Conventional commits
 
 See [docs/standards/conventional-commits/index.md](docs/standards/conventional-commits/index.md).

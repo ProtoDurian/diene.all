@@ -1,0 +1,6 @@
+# yaml-language-server: $schema=./schema.json
+server:
+  port: not-a-number
+  host: localhost
+client:
+  name: app
