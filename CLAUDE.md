@@ -82,6 +82,10 @@ See [docs/standards/infisical/index.md](docs/standards/infisical/index.md).
 
 See [docs/standards/linting/index.md](docs/standards/linting/index.md).
 
+# Observability standards
+
+See [/docs/standards/observability/index.md](/docs/standards/observability/index.md).
+
 # Release automation
 
 See [docs/standards/semantic-release/index.md](docs/standards/semantic-release/index.md).

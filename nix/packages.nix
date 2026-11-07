@@ -11,6 +11,7 @@ let
         inherit
           atomiutils
           cyanprint
+          dashboard-linter
           dlint
           go
           infralint
@@ -37,6 +38,7 @@ let
           infisical
           nix
           pre-commit
+          prometheus
           shellcheck
           treefmt
           ;

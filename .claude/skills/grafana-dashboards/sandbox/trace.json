@@ -1,0 +1,55 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "sample" } },
+          { "key": "deployment.environment.name", "value": { "stringValue": "pichu" } },
+          { "key": "atomi.landscape", "value": { "stringValue": "pichu" } },
+          { "key": "atomi.service", "value": { "stringValue": "sample" } },
+          { "key": "atomi.module", "value": { "stringValue": "api" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "sandbox" },
+          "spans": [
+            {
+              "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+              "spanId": "a3ce929d0e0e4736",
+              "name": "GET /orders",
+              "kind": 2,
+              "startTimeUnixNano": "@-2050",
+              "endTimeUnixNano": "@0",
+              "attributes": [
+                { "key": "http.request.method", "value": { "stringValue": "GET" } },
+                { "key": "http.response.status_code", "value": { "intValue": "503" } }
+              ],
+              "status": { "code": 2, "message": "upstream timeout after 2000 ms" }
+            },
+            {
+              "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+              "spanId": "1d2c3b4a59687706",
+              "parentSpanId": "a3ce929d0e0e4736",
+              "name": "SELECT orders",
+              "kind": 3,
+              "startTimeUnixNano": "@-2045",
+              "endTimeUnixNano": "@-2010",
+              "status": { "code": 1 }
+            },
+            {
+              "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+              "spanId": "2e3d4c5b6a798817",
+              "parentSpanId": "a3ce929d0e0e4736",
+              "name": "POST /charge",
+              "kind": 3,
+              "startTimeUnixNano": "@-2005",
+              "endTimeUnixNano": "@-5",
+              "status": { "code": 2, "message": "timeout" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
