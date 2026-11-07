@@ -27,8 +27,9 @@ system-integration tier.
 The README's library section carries one badge block: pkg.go.dev reference, the mirror's `CI`
 workflow status and the license.
 
-The `lib/note` sample and the `adapters/kv` Redis adapter sit between
-`DOMAIN WIRING` fences for wholesale replacement.
+The sample sits between `DOMAIN WIRING` fences for wholesale replacement: `lib/note`
+(with its examples), the `adapters/kv` Redis adapter, `testhelper`, and their unit, integration
+and meta tests.
 
 ## Test pyramid and TestHelper
 
