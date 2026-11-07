@@ -1,33 +1,22 @@
-import chalk from 'chalk';
-
 export interface ICliIo {
-  success(message: string): void;
-  warn(message: string): void;
-  error(message: string): void;
+  write(text: string): void;
+  writeError(text: string): void;
   setExitCode(code: number): void;
-  interactive(): boolean;
 }
 
 export class ConsoleIo implements ICliIo {
-  constructor(private readonly output: Pick<Console, 'log' | 'error'> = console) {}
+  // biome-ignore lint/complexity/noUselessConstructor: Bun coverage counts an implicit constructor as an uncovered function
+  constructor() {}
 
-  success(message: string): void {
-    this.output.log(chalk.green(message));
+  write(text: string): void {
+    process.stdout.write(text);
   }
 
-  warn(message: string): void {
-    this.output.log(chalk.yellow(message));
-  }
-
-  error(message: string): void {
-    this.output.error(chalk.red(message));
+  writeError(text: string): void {
+    process.stderr.write(text);
   }
 
   setExitCode(code: number): void {
     process.exitCode = code;
-  }
-
-  interactive(): boolean {
-    return Boolean(process.stdin.isTTY && process.stdout.isTTY);
   }
 }

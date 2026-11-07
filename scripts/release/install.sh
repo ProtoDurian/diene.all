@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="AtomiCloud/diene.bun-cli"
-BINARY="bun-cli"
+REPO="AtomiCloud/releaser"
+BINARY="releaser"
 
 VERSION="${VERSION:-latest}"
 BIN_DIR="${BIN_DIR:-${HOME}/.local/bin}"

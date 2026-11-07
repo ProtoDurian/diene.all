@@ -6,17 +6,11 @@ contract="${1:-}"
 
 case "${contract}" in
 arch)
-  test -f bin/bun-cli.ts
-  test -f src/lib/kv/interfaces.ts
+  test -f bin/releaser.ts
+  test -f src/lib/release/ports.ts
   test -f src/adapters/terminal/console-io.ts
-  rg -q 'console\.|process\.(stdin|stdout|stderr|exitCode)|from .(chalk|ora|cli-progress|inquirer).' src/lib src/adapters/kv && echo '❌ terminal/shell IO leaked into src/lib or src/adapters/kv' >&2 && exit 1
+  rg -q 'console\.|process\.(stdin|stdout|stderr|exitCode)|from .commander.' src/lib && echo '❌ terminal or CLI IO leaked into src/lib' >&2 && exit 1
   rg -q "from ['\"](\\.\\./)+adapters(?:/|['\"])" src/lib && echo '❌ src/lib imports an adapter (forbidden upward dependency)' >&2 && exit 1
-  ;;
-distroless)
-  rg -Fx 'FROM gcr.io/distroless/cc-debian12:nonroot AS runtime' infra/Dockerfile
-  ;;
-nonroot)
-  rg -F ':nonroot AS runtime' infra/Dockerfile
   ;;
 release-backup-order)
   yq -o=json '.' release.yaml | jq -e '
@@ -61,8 +55,30 @@ fury-wiring)
   rg -F -- '--config "${credential_config}"' scripts/release/fury.sh
   ! rg -F '${FURY_TOKEN}@' scripts/release/fury.sh
   ;;
-docker-release)
-  yq -o=json '.' .github/workflows/cd.yaml | jq -e '.jobs.docker.uses == "./.github/workflows/⚡reusable-docker.yaml"'
+changelog-format)
+  for required in prettier diff; do
+    command -v "${required}" >/dev/null 2>&1 || {
+      echo "❌ ${required} is not available, so this check cannot run" >&2
+      exit 1
+    }
+  done
+  tmp="$(mktemp -d)"
+  before="$(mktemp -d)"
+  trap 'rm -rf "${tmp}" "${before}"' EXIT
+  # Control: the formatter must rewrite this, or every "unchanged" below proves nothing.
+  printf '#   Bad   Spacing\n\n\n\ntext   here\n' >"${tmp}/control.md"
+  cp tests/fixtures/golden/*-notes.md "${tmp}/"
+  cp "${tmp}"/*.md "${before}/"
+  prettier --write "${tmp}"/*.md >/dev/null 2>&1 || true
+  diff -q "${before}/control.md" "${tmp}/control.md" >/dev/null 2>&1 && echo '❌ the formatter did not rewrite the control' >&2 && exit 1
+  for generated in "${tmp}"/*-notes.md; do
+    name="$(basename "${generated}")"
+    diff -q "${before}/${name}" "${generated}" >/dev/null 2>&1 || {
+      echo "❌ generated changelog notes are not formatter-stable: ${name}" >&2
+      diff "${before}/${name}" "${generated}" >&2 | head -10
+      exit 1
+    }
+  done
   ;;
 installer-checksum)
   rg -F 'checksums.txt' scripts/release/install.sh
@@ -78,12 +94,12 @@ installation-parity)
   rg -F 'scripts/release/install.sh' .goreleaser.yaml
   rg -F "name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}'" .goreleaser.yaml
   rg -F 'checksums.txt' .goreleaser.yaml
-  rg -F 'bun-cli_<os>_<arch>.tar.gz' INSTALLATION.md
+  rg -F 'releaser_<os>_<arch>.tar.gz' INSTALLATION.md
   ;;
 nix-release-wiring)
-  rg -F 'bun-cli = atomiLib.buildBunCli' nix/packages.nix
+  rg -F 'releaser = atomiLib.buildBunCli' nix/packages.nix
   yq -o=json '.' .github/workflows/cd.yaml | jq -e '.jobs.goreleaser.uses == "./.github/workflows/⚡reusable-goreleaser.yaml"'
-  rg -F 'nix build .#bun-cli' .github/workflows/⚡reusable-goreleaser.yaml
+  rg -F 'nix build .#releaser' .github/workflows/⚡reusable-goreleaser.yaml
   ;;
 *)
   echo "❌ unknown CLI contract: ${contract}" >&2

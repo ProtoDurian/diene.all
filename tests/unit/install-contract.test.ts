@@ -42,7 +42,7 @@ while [ "$#" -gt 0 ]; do
 done
 case "${'$'}{out}" in
 *checksums.txt) cp "${'$'}{FIXTURE_DIR}/checksums.txt" "${'$'}{out}" ;;
-*) cp "${'$'}{FIXTURE_DIR}/bun-cli_linux_amd64.tar.gz" "${'$'}{out}" ;;
+*) cp "${'$'}{FIXTURE_DIR}/releaser_linux_amd64.tar.gz" "${'$'}{out}" ;;
 esac
 `,
     );
@@ -52,18 +52,18 @@ esac
 
   async prepareArchive(validChecksum: boolean): Promise<void> {
     const payload = join(this.root, 'payload');
-    const archive = join(this.fixtureDir, 'bun-cli_linux_amd64.tar.gz');
+    const archive = join(this.fixtureDir, 'releaser_linux_amd64.tar.gz');
     await mkdir(payload, { recursive: true });
-    await Bun.write(join(payload, 'bun-cli'), '#!/usr/bin/env bash\necho bun-cli fixture\n');
-    await chmod(join(payload, 'bun-cli'), 0o755);
-    const tar = Bun.spawn(['tar', '-czf', archive, '-C', payload, 'bun-cli']);
+    await Bun.write(join(payload, 'releaser'), '#!/usr/bin/env bash\necho releaser fixture\n');
+    await chmod(join(payload, 'releaser'), 0o755);
+    const tar = Bun.spawn(['tar', '-czf', archive, '-C', payload, 'releaser']);
     (await tar.exited).should.equal(0);
     const digestProc = Bun.spawn(['sha256sum', archive], { stdout: 'pipe' });
     const digest = (await new Response(digestProc.stdout).text()).split(' ')[0];
     (await digestProc.exited).should.equal(0);
     await Bun.write(
       join(this.fixtureDir, 'checksums.txt'),
-      `${validChecksum ? digest : '0'.repeat(64)}  bun-cli_linux_amd64.tar.gz\n`,
+      `${validChecksum ? digest : '0'.repeat(64)}  releaser_linux_amd64.tar.gz\n`,
     );
   }
 
@@ -95,7 +95,7 @@ esac
 describe('release installer contract', () => {
   it('should reject an unsupported operating system before downloading', async () => {
     // Arrange
-    const harness = new InstallerHarness(await mkdtemp(join(tmpdir(), 'bun-cli-installer-')));
+    const harness = new InstallerHarness(await mkdtemp(join(tmpdir(), 'releaser-installer-')));
     await harness.setup();
 
     try {
@@ -112,7 +112,7 @@ describe('release installer contract', () => {
 
   it('should reject an archive whose checksum does not match', async () => {
     // Arrange
-    const harness = new InstallerHarness(await mkdtemp(join(tmpdir(), 'bun-cli-installer-')));
+    const harness = new InstallerHarness(await mkdtemp(join(tmpdir(), 'releaser-installer-')));
     await harness.setup();
     await harness.prepareArchive(false);
 
@@ -130,7 +130,7 @@ describe('release installer contract', () => {
 
   it('should complete the supported installation path after verifying its checksum', async () => {
     // Arrange
-    const harness = new InstallerHarness(await mkdtemp(join(tmpdir(), 'bun-cli-installer-')));
+    const harness = new InstallerHarness(await mkdtemp(join(tmpdir(), 'releaser-installer-')));
     await harness.setup();
     await harness.prepareArchive(true);
 
@@ -141,7 +141,7 @@ describe('release installer contract', () => {
       // Assert
       actual.code.should.equal(0);
       actual.out.should.containEql('checksum verified');
-      (await readFile(join(harness.installDir, 'bun-cli'), 'utf8')).should.containEql('bun-cli fixture');
+      (await readFile(join(harness.installDir, 'releaser'), 'utf8')).should.containEql('releaser fixture');
     } finally {
       await harness.cleanup();
     }
