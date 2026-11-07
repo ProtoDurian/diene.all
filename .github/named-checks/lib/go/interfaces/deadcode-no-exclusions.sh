@@ -27,6 +27,8 @@ if grep -qx 'staticcheck.conf' <<<"${files}"; then
   fail "staticcheck.conf switches checks off"
 fi
 
+show_config() { git show "${tree}:$1"; }
+
 exclusion_keys() {
   local config="$1"
   shift
@@ -41,6 +43,12 @@ for config in .golangci.yaml .golangci.docs.yaml; do
   # go-base keeps only `linters.exclusions.generated: lax` (generated files are not ours).
   if [[ ${config} == .golangci.yaml ]]; then
     keys="$(exclusion_keys "${config}" linters.exclusions linters.exclusions.generated)"
+    # lib/go-interfaces: a revive per-rule `exclude` is allowed (revive package-naming cannot accept the
+    # published package name `interfaces`, which cannot change). It is revive-scoped, so it cannot hide an
+    # unused/staticcheck/deadcode finding; one naming those linters is still refused below.
+    keys="$(grep -vE '^linters\.settings\.revive\.rules\.[0-9]+\.exclude(\.[0-9]+)?$' <<<"${keys}" || true)"
+    named="$(show_config "${config}" | yq -r '[.linters.settings.revive.rules // [] | .[] | select(has("exclude")) | select((.name // "") + " " + ((.exclude // []) | join(" ")) | test("(?i)unused|staticcheck|deadcode"))] | map(.name // "?") | join(",")')"
+    [[ -z ${named} ]] || fail "${config} revive rule exclude names unused/staticcheck/deadcode: ${named}"
   else
     keys="$(exclusion_keys "${config}")"
   fi
@@ -58,4 +66,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ deadcode-no-exclusions: no scanner narrowing, config exclusions or source suppressions"
+echo "✅ deadcode-no-exclusions: no scanner narrowing, config exclusions (beyond revive per-rule excludes) or source suppressions"

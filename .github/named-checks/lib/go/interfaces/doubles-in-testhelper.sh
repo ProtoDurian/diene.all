@@ -6,11 +6,14 @@ set -euo pipefail
 #   - The port method set is read from the interface types that non-test lib/**
 #     sources declare (plus Environment, ReadBytes, Run and Emit, so a renamed or
 #     deleted port cannot empty the set).
-#   - No Go file of the root module outside testhelper/** (tests included)
-#     declares a method of that set, on any receiver.
+#   - No Go file of the root module outside testhelper/** declares a method of
+#     that set, on any receiver: not a non-test file anywhere, not a test in
+#     lib/** or tests/unit/**. Only tests/meta/** *_test.go may: the meta tier's
+#     contract-parity suite runs real OS-backed adapters and known-bad doubles
+#     against the testhelper contract (lead ruling, fix round 1).
 #   - Non-test lib/** sources import only the standard library (no dot in the
-#     import path's first element).
-#   - No lib/** Go file, test or not, imports testhelper.
+#     import path's first element) and never testhelper. lib/** *_test.go
+#     (external package examples) may import testhelper.
 # Sources are parsed by go-source.go (stdlib go/parser; no build). Nested modules
 # (the sealed tests/fixtures/api-baseline stubs), probes/lib and the named checks
 # are not the module's code and are not read.
@@ -54,15 +57,17 @@ while IFS=$'\t' read -r path fact; do
   read -r _ recv name <<<"${fact}"
   [[ -n ${port[${name}]:-} ]] || continue
   [[ ${path} == testhelper/* ]] && continue
+  [[ ${path} == tests/meta/* ]] && is_test "${path}" && continue
   fail "${path}: (${recv}).${name} implements a port method outside testhelper/**; doubles live in testhelper only"
 done <<<"${facts}"
 
 while IFS=$'\t' read -r path fact; do
   [[ ${fact} == IMPORT\ * && ${path} == lib/* ]] || continue
+  is_test "${path}" && continue
   read -r _ imp _ <<<"${fact}"
   if [[ ${imp} == */testhelper || ${imp} == */testhelper/* ]]; then
-    fail "${path} imports ${imp}; lib/** never imports testhelper"
-  elif ! is_test "${path}" && [[ ${imp%%/*} == *.* ]]; then
+    fail "${path} imports ${imp}; non-test lib/** never imports testhelper"
+  elif [[ ${imp%%/*} == *.* ]]; then
     fail "${path} imports ${imp}; non-test lib/** sources import the standard library only"
   fi
 done <<<"${facts}"
@@ -71,4 +76,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ doubles-in-testhelper: port methods ($(paste -sd, < <(printf '%s\n' "${ports[@]}"))) are implemented only under testhelper/**; lib/** imports the standard library only"
+echo "✅ doubles-in-testhelper: port methods ($(paste -sd, < <(printf '%s\n' "${ports[@]}"))) are implemented only under testhelper/** (and tests/meta contract tests); non-test lib/** imports the standard library only"
