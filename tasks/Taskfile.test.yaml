@@ -1,17 +1,17 @@
 version: '3'
 
 tasks:
-  unit:
-    desc: Run the unit tier
+  default:
+    desc: Run the {{.MODE}} test tier
     cmds:
-      - ./scripts/local/test.sh unit {{.CLI_ARGS}}
+      - ./scripts/local/test.sh {{.MODE}}
 
-  int:
-    desc: Run the integration tier
+  coverage:
+    desc: Run the {{.MODE}} test tier with coverage
     cmds:
-      - ./scripts/local/test.sh int {{.CLI_ARGS}}
+      - ./scripts/local/test.sh {{.MODE}} --coverage
 
-  meta:
-    desc: Run the meta tier
+  watch:
+    desc: Watch the {{.MODE}} test tier
     cmds:
-      - ./scripts/local/test.sh meta {{.CLI_ARGS}}
+      - ./scripts/local/test.sh {{.MODE}} --watch
