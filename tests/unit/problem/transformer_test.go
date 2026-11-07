@@ -3,6 +3,7 @@ package problem_test
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"reflect"
 	"testing"
 
@@ -30,6 +31,9 @@ func TestFromObject(t *testing.T) {
 	text := func(value string) *string { return &value }
 	known := problem.Problem{Type: "t", Title: "Conflict", Status: 409}
 	var typedNil *problem.Error
+	var foreignTypedNil *fs.PathError
+	badDefaultStatus := problem.DefaultTransformOptions()
+	badDefaultStatus.DefaultStatus = 400
 	registry, _ := problem.NewRegistry(testPortal(), problem.EntityNotFound(), problem.Type{ID: "no_status", Title: "No Status", Version: "v1"})
 	brokenRegistry, _ := problem.NewRegistry(problem.ErrorPortal{}, problem.EntityNotFound())
 	withRegistry := problem.DefaultTransformOptions()
@@ -48,6 +52,16 @@ func TestFromObject(t *testing.T) {
 		{name: "problem error", value: problem.NewError(known), options: withRegistry, want: known},
 		{name: "wrapped problem error", value: fmt.Errorf("ctx: %w", problem.NewError(known)), options: withRegistry, want: known},
 		{name: "typed-nil problem error", value: error(typedNil), options: withRegistry, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500}},
+		{name: "wrapped typed-nil problem error", value: fmt.Errorf("ctx: %w", error(typedNil)), options: withRegistry, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500}},
+		{name: "typed-nil foreign error", value: error(foreignTypedNil), options: withRegistry, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500}},
+		{name: "non-5xx default status", value: "boom", options: badDefaultStatus, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500, Detail: text("boom")}},
+		{name: "zero default status", value: "boom", options: problem.TransformOptions{Portal: problem.LocalErrorPortal(), DefaultVersion: "v1"}, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500, Detail: text("boom")}},
+		{
+			name:    "data dropped for a no-data problem",
+			value:   map[string]any{"problemId": "no_status", "data": map[string]any{"x": 1}},
+			options: withRegistry,
+			want:    problem.Problem{Type: "https://docs.example.atomi.cloud/docs/raichu/go/user/api/v1/no_status", Title: "No Status", Status: 500},
+		},
 		{
 			name:    "catalogued id with data",
 			value:   map[string]any{"problemId": "entity_not_found", "data": map[string]any{"entityType": "user", "id": "42"}},

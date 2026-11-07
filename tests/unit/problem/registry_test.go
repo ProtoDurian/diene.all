@@ -203,6 +203,7 @@ func TestRegistryNewProblem(t *testing.T) {
 			want:   problem.Problem{Type: "https://docs.example.atomi.cloud/docs/raichu/go/user/api/v1/no_status", Title: "No Status", Status: 500},
 		},
 		{name: "unknown id", portal: testPortal(), id: "missing", wantErr: true},
+		{name: "data for a no-data problem", portal: testPortal(), id: "no_status", data: map[string]any{"x": 1}, wantErr: true},
 		{name: "invalid portal", portal: problem.ErrorPortal{}, id: "conflict", wantErr: true},
 	}
 	for _, tc := range cases {

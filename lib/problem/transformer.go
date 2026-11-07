@@ -3,6 +3,7 @@ package problem
 import (
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 // TransformOptions configures how [FromObject] folds a value into a [Problem].
@@ -28,9 +29,11 @@ func FromObject(value any, options TransformOptions) Problem {
 		return envelope
 	}
 	if err, ok := value.(error); ok {
-		// errors.As also matches a typed-nil *Error; reading it would panic.
+		// Typed-nil errors, top-level or wrapped, must never be dereferenced.
 		var problemErr *Error
-		if errors.As(err, &problemErr) {
+		if reflected := reflect.ValueOf(err); reflected.Kind() == reflect.Pointer && reflected.IsNil() {
+			value = nil
+		} else if errors.As(err, &problemErr) {
 			if problemErr != nil {
 				return problemErr.Problem
 			}
@@ -50,7 +53,7 @@ func FromObject(value any, options TransformOptions) Problem {
 						typeURI = blankType
 					}
 					var problemData map[string]any
-					if value, ok := fields["data"].(map[string]any); ok {
+					if value, ok := fields["data"].(map[string]any); ok && problemType.DataSchema != nil {
 						problemData = value
 					}
 					return Problem{
@@ -82,10 +85,14 @@ func FromObject(value any, options TransformOptions) Problem {
 	if text != "" {
 		detail = &text
 	}
+	status := options.DefaultStatus
+	if status < 500 || status > 599 {
+		status = defaultProblemStatus
+	}
 	return Problem{
 		Type:        typeURI,
 		Title:       unexpectedProblemTitle,
-		Status:      options.DefaultStatus,
+		Status:      status,
 		Detail:      detail,
 		Recoverable: false,
 	}

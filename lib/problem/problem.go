@@ -28,7 +28,7 @@ type Problem struct {
 	Data        map[string]any
 }
 
-// MarshalJSON renders the wire form; nil Detail/Instance and empty Data are omitted.
+// MarshalJSON renders the wire form; nil Detail, Instance and Data are omitted.
 func (p Problem) MarshalJSON() ([]byte, error) {
 	out := map[string]any{
 		"type":        p.Type,
@@ -36,7 +36,7 @@ func (p Problem) MarshalJSON() ([]byte, error) {
 		"status":      p.Status,
 		"recoverable": p.Recoverable,
 	}
-	if len(p.Data) > 0 {
+	if p.Data != nil {
 		out["data"] = p.Data
 	}
 	if p.Detail != nil {

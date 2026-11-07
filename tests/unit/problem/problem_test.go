@@ -28,9 +28,9 @@ func TestProblemMarshalJSON(t *testing.T) {
 			want:     `{"recoverable":false,"status":403,"title":"T","type":"t"}`,
 		},
 		{
-			name:     "empty data is omitted",
+			name:     "empty data is kept",
 			envelope: problem.Problem{Type: "t", Title: "T", Status: 401, Recoverable: true, Data: map[string]any{}},
-			want:     `{"recoverable":true,"status":401,"title":"T","type":"t"}`,
+			want:     `{"data":{},"recoverable":true,"status":401,"title":"T","type":"t"}`,
 		},
 		{
 			name:     "empty detail and instance are present",

@@ -2,8 +2,11 @@ package problem
 
 import (
 	"net/url"
+	"regexp"
 	"strconv"
 )
+
+var snakeCaseID = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
 
 // ErrorPortal is the service-tree block every problem type URI is built from.
 type ErrorPortal struct {
@@ -61,9 +64,13 @@ func TypeURI(portal ErrorPortal, version, id string) (string, error) {
 		{"id", id},
 	}
 	for _, segment := range segments {
-		if segment.value == "" || url.PathEscape(segment.value) != segment.value {
+		if segment.value == "" || segment.value == "." || segment.value == ".." ||
+			url.PathEscape(segment.value) != segment.value {
 			return "", &InvalidSegmentError{Name: segment.name, Value: segment.value}
 		}
+	}
+	if !snakeCaseID.MatchString(id) {
+		return "", &InvalidSegmentError{Name: "id", Value: id}
 	}
 	return portal.Scheme + "://" + portal.Host + "/docs/" +
 		portal.Landscape + "/" + portal.Platform + "/" + portal.Service + "/" +

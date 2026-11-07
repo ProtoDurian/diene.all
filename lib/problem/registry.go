@@ -1,5 +1,7 @@
 package problem
 
+import "fmt"
+
 // Type is a versioned problem declaration; a new Version mints a new type URI.
 type Type struct {
 	ID          string
@@ -101,6 +103,9 @@ func (r *Registry) NewProblem(id string, data map[string]any) (Problem, error) {
 	typeURI, err := r.TypeURIFor(problemType)
 	if err != nil {
 		return Problem{}, err
+	}
+	if problemType.DataSchema == nil && data != nil {
+		return Problem{}, fmt.Errorf("problem %q declares no data", id)
 	}
 	status := problemType.Status
 	if status == 0 {
