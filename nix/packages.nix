@@ -11,6 +11,7 @@ let
         inherit
           atomiutils
           cyanprint
+          dashboard-linter
           dlint
           dn-inspect
           dotnetlint
@@ -33,6 +34,7 @@ let
           infisical
           nix
           pre-commit
+          prometheus
           shellcheck
           treefmt
           xmlstarlet
