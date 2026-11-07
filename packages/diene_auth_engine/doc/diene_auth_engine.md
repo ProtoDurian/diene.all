@@ -157,8 +157,10 @@ Doc C), the problem catalog fetch and the dormant rescue router. Dart has no
 Two differences matter:
 
 - A bad URL rejects the whole Doc B document here, not one entry.
-- This package does not track Doc B versions. Doc B is fetched only while the
-  home claim is absent, so there is no earlier version to compare with.
+- Doc B version monotonicity is not implemented: a newer fetch is never
+  checked against an older one. This holds across interrupted sign-ins too:
+  while the home claim stays absent, each attempt may fetch Doc B again and
+  takes whatever version it gets. This is a deliberate 1.0.x limitation.
 
 ### Other deliberate differences from the Bun auth engine
 
