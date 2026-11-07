@@ -37,8 +37,8 @@ See [docs/standards/nix/index.md](docs/standards/nix/index.md) for the full guid
 # Go base template
 
 See the [Go baseline](docs/developer/go-baseline.md) for the language-specific
-toolchain, task surface, test tiers, coverage ledgers, dead-code passes and the
-illustrative Note sample. Go variants accompany the shared standards for
+toolchain, task surface, test tiers, coverage ledgers and dead-code passes.
+Go variants accompany the shared standards for
 [date/time](docs/standards/datetime/languages/go.md),
 [domain-driven design](docs/standards/domain-driven-design/languages/go.md),
 [functional practices](docs/standards/functional-practices/languages/go.md),
@@ -58,6 +58,14 @@ This module is `github.com/ProtoDurian/diene.go-errors-problems`. See the
 [Go library baseline](docs/developer/go-lib-baseline.md) for the library shape,
 the TestHelper tier, the library gates (`task validate`) and tag-based
 publication through the Go proxy.
+
+## Errors-problems library
+
+- `lib/problem`: RFC 9457 problem errors for `(T, error)` results, the one
+  type-URI builder, the generic catalog and the `Problem` resource export.
+- `testhelper`: Problem assertions for id, status and `data`.
+- No adapters, so the int tier is empty.
+- Usage skill: [`skills/diene-go-errors-problems-usage`](skills/diene-go-errors-problems-usage/SKILL.md).
 
 # Standards
 

@@ -27,8 +27,9 @@ system-integration tier.
 The README's library section carries one badge block: pkg.go.dev reference, the mirror's `CI`
 workflow status and the license.
 
-The `lib/note` sample and the `adapters/kv` Redis adapter sit between
-`DOMAIN WIRING` fences for wholesale replacement.
+This library ships `lib/problem` (problem errors, type-URI builder, catalog and
+`Problem` resource export) and `testhelper` (Problem assertions). It has no
+adapters, so the int tier is empty.
 
 ## Test pyramid and TestHelper
 
