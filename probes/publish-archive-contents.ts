@@ -4,6 +4,8 @@ const PUBIGNORE = 'packages/diene_config/.pubignore';
 const SHIPPED = [
   'diene_config.dart',
   'test_helper.dart',
+  'c0_config.dart',
+  'app_config.dart',
   'diene_config.md',
   'LICENSE',
   'CHANGELOG.md',
@@ -13,7 +15,14 @@ const SHIPPED = [
   'SKILL.md',
   'patterns.md',
 ];
-const EXCLUDED = ['test', 'tool', 'deadcode_entrypoints.dart', 'c0_conformance_test.dart', 'manifest.json'];
+const EXCLUDED = [
+  'test',
+  'tool',
+  'deadcode_entrypoints.dart',
+  'c0_conformance_test.dart',
+  'c0_upstream_test.dart',
+  'manifest.json',
+];
 
 // The dry-run listing is a tree; match whole leaf names, with or without a size suffix.
 const ARCHIVE_CHECK =
@@ -30,7 +39,7 @@ export default {
     {
       name: 'baseline-publish-archive-contents-green',
       description:
-        'the dry-run archive ships barrel, docs, license, changelog, example and usage skill, and no dev or test files',
+        'the dry-run archive ships barrel, sub-libraries, TestHelper, docs, license, changelog, example and usage skill, and no dev or test files',
       kind: 'baseline',
       async run(repo: any) {
         await expectGreen(repo, ARCHIVE_CHECK, 'publish-archive-contents');

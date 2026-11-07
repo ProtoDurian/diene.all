@@ -1,6 +1,7 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
 const HARNESS = "nix develop .#ci -c bash -c 'cd packages/diene_config && dart test test/conformance'";
+const VECTOR = 'packages/diene_config/test/fixtures/c0/upstream/layering_and_indexed_list.json';
 
 export default {
   contractVersion: 1,
@@ -9,7 +10,7 @@ export default {
   probes: [
     {
       name: 'baseline-c0-fixture-harness-green',
-      description: 'the C0 harness verifies the pinned fixture checksums and round-trips each fixture',
+      description: 'the C0 harness verifies the pinned local and upstream fixture digests and exercises each vector',
       kind: 'baseline',
       async run(repo: any) {
         await expectGreen(repo, HARNESS, 'c0-fixture-harness');
@@ -17,25 +18,15 @@ export default {
     },
     {
       name: 'mutation-c0-fixture-harness-caught',
-      description: 'the C0 harness fails once one pinned fixture digest is corrupted',
+      description: 'the C0 harness fails once the vendored upstream layering vector expects a different value',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        const target = (await repo.glob('packages/*/test/fixtures/c0/manifest.json')).sort()[0];
-        if (!target) {
-          throw new Error('c0-fixture-harness: no fixture manifest to sabotage');
-        }
-        await withCleanProbeState(repo, [target], async () => {
-          const manifest = JSON.parse(await repo.read(target));
-          const entries = manifest.fixtures ?? {};
-          const first = Object.keys(entries).sort()[0];
-          if (!first) {
-            throw new Error('c0-fixture-harness: fixture manifest has no entries');
-          }
-          const digest = String(entries[first]);
-          entries[first] = (digest[0] === '0' ? '1' : '0') + digest.slice(1);
-          await repo.write(target, `${JSON.stringify(manifest, null, 2)}\n`);
-          await expectRedBecause(repo, HARNESS, 'c0-fixture-harness', ['digest drifted from the manifest']);
+        await withCleanProbeState(repo, [VECTOR], async () => {
+          await repo.patch(VECTOR, { find: '"retries": 2', replace: '"retries": 3' });
+          await expectRedBecause(repo, HARNESS, 'c0-fixture-harness', [
+            'upstream vector file "layering_and_indexed_list.json" digest drifted from the manifest',
+          ]);
         });
       },
     },
