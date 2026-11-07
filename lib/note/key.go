@@ -1,6 +1,5 @@
 package note
 
-// DOMAIN WIRING: replaceable Note sample key composition.
 import "strings"
 
 type KeyComposer struct {
@@ -18,5 +17,3 @@ func (KeyComposer) Slug(value string) string {
 func (keys KeyComposer) Compose(key string) string {
 	return keys.namespace + ":" + key
 }
-
-// END DOMAIN WIRING
