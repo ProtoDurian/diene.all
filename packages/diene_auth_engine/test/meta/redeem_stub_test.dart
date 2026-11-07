@@ -117,6 +117,21 @@ void main() {
       expect(codes, everyElement(400));
     });
 
+    test('answers invalid JSON by route, never throwing', () async {
+      // Arrange
+      final FakeRedeemHttpClient server = FakeRedeemHttpClient();
+
+      // Act
+      final List<int> codes = <int>[
+        (await _post(server, '/app-handoff/redeem', '{')).statusCode,
+        (await _post(server, '/wrong', '{')).statusCode,
+      ];
+
+      // Assert
+      expect(codes, <int>[400, 404]);
+      expect(server.bodies, everyElement(isEmpty));
+    });
+
     test('replies with a scripted failure status', () async {
       // Arrange
       final FakeRedeemHttpClient server = FakeRedeemHttpClient(status: 410);

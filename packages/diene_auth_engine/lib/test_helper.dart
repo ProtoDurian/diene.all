@@ -430,7 +430,7 @@ final class FakeClipboardCarrierSource implements ClipboardCarrierSource {
 /// An HTTP stub that answers only `POST {mount}/redeem` with a valid body.
 ///
 /// Any other path, including a doubled `app-handoff` segment, gets 404; a body
-/// with an unknown key or a bad nonce gets 400.
+/// that is not JSON, has an unknown key or a bad nonce gets 400.
 final class FakeRedeemHttpClient extends http.BaseClient {
   FakeRedeemHttpClient({
     this.mount = AppHandoffConstants.defaultMount,
@@ -470,15 +470,14 @@ final class FakeRedeemHttpClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     requests.add(request.url);
-    final String raw = request is http.Request ? request.body : '';
-    final Object? decoded = raw.isEmpty ? null : jsonDecode(raw);
-    final Map<String, Object?> body = decoded is Map<String, Object?>
-        ? decoded
-        : <String, Object?>{};
-    bodies.add(body);
     if (request.method != 'POST' || request.url.path != '$mount/redeem') {
+      bodies.add(<String, Object?>{});
       return _reply(404, <String, Object?>{});
     }
+    final Map<String, Object?> body = _decode(
+      request is http.Request ? request.body : '',
+    );
+    bodies.add(body);
     if (!acceptsBody(body)) {
       return _reply(400, <String, Object?>{});
     }
@@ -490,6 +489,15 @@ final class FakeRedeemHttpClient extends http.BaseClient {
       'email': email,
       'expiresIn': AppHandoffConstants.oneTimeTokenExpiresInSeconds,
     });
+  }
+
+  static Map<String, Object?> _decode(String raw) {
+    try {
+      final Object? decoded = jsonDecode(raw);
+      return decoded is Map<String, Object?> ? decoded : <String, Object?>{};
+    } on FormatException {
+      return <String, Object?>{};
+    }
   }
 
   http.StreamedResponse _reply(int code, Map<String, Object?> json) =>
