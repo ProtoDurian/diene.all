@@ -1,20 +1,17 @@
 version: '3'
-vars:
-  MODE: '{{.MODE | default "unit"}}'
-  CONFIG: '{{.CONFIG | default "bunfig.unit.toml"}}'
+
 tasks:
-  default:
-    internal: true
-    desc: 'Run {{.MODE}} tests'
+  unit:
+    desc: Run the unit tier
     cmds:
-      - bun test --config={{.CONFIG}}
-  coverage:
-    internal: true
-    desc: 'Run {{.MODE}} tests with coverage (lcov + text artifacts)'
+      - ./scripts/local/test.sh unit {{.CLI_ARGS}}
+
+  int:
+    desc: Run the integration tier
     cmds:
-      - bun test --config={{.CONFIG}} --coverage
-  watch:
-    internal: true
-    desc: 'Run {{.MODE}} tests in watch mode'
+      - ./scripts/local/test.sh int {{.CLI_ARGS}}
+
+  meta:
+    desc: Run the meta tier
     cmds:
-      - bun test --config={{.CONFIG}} --watch
+      - ./scripts/local/test.sh meta {{.CLI_ARGS}}
