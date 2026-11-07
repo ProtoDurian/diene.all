@@ -8,55 +8,50 @@ import (
 	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
 )
 
-func TestErrorWithoutWrap(t *testing.T) {
+func TestErrorMessageAndUnwrap(t *testing.T) {
 	t.Parallel()
-	envelope := problem.Problem{Type: "t", Title: "T", Status: 404}
-	err := problem.NewError(envelope)
-	if err.Error() != envelope.String() {
-		t.Fatalf("Error() = %q, want %q", err.Error(), envelope.String())
+	envelope := problem.Problem{Type: "t", Title: "Conflict", Status: 409}
+	cause := errors.New("cause")
+	cases := []struct {
+		name        string
+		err         *problem.Error
+		wantMessage string
+		wantCause   error
+	}{
+		{name: "plain", err: problem.NewError(envelope), wantMessage: "Problem(t, 409, Conflict)"},
+		{name: "wrapped", err: problem.WrapError(envelope, cause), wantMessage: "Problem(t, 409, Conflict): cause", wantCause: cause},
+		{name: "nil receiver", err: nil, wantMessage: "<nil problem error>"},
 	}
-	if err.Unwrap() != nil {
-		t.Fatalf("expected nil unwrap, got %v", err.Unwrap())
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			err := tc.err
+
+			// Act
+			message := err.Error()
+			unwrapped := err.Unwrap()
+
+			// Assert
+			if message != tc.wantMessage || !errors.Is(unwrapped, tc.wantCause) {
+				t.Fatalf("Error = %q, Unwrap = %v", message, unwrapped)
+			}
+		})
 	}
 }
 
-func TestErrorWrapsCause(t *testing.T) {
+func TestErrorWorksWithErrorsAsAndIs(t *testing.T) {
 	t.Parallel()
-	cause := errors.New("boom")
-	envelope := problem.Problem{Type: "t", Title: "T", Status: 500}
-	err := problem.WrapError(envelope, cause)
-	if !errors.Is(err.Unwrap(), cause) {
-		t.Fatalf("expected wrapped cause, got %v", err.Unwrap())
-	}
-	if !errors.Is(err, cause) {
-		t.Fatal("errors.Is should find the wrapped cause")
-	}
-	want := envelope.String() + ": boom"
-	if err.Error() != want {
-		t.Fatalf("Error() = %q, want %q", err.Error(), want)
-	}
-}
-
-func TestErrorRecoverableViaErrorsAs(t *testing.T) {
-	t.Parallel()
-	envelope := problem.Problem{Type: "t", Title: "T", Status: 409}
-	wrapped := fmt.Errorf("context: %w", problem.NewError(envelope))
+	// Arrange
+	cause := errors.New("cause")
+	envelope := problem.Problem{Type: "t", Title: "Conflict", Status: 409}
 	var problemErr *problem.Error
-	if !errors.As(wrapped, &problemErr) {
-		t.Fatal("errors.As should recover the Error")
-	}
-	if !problemErr.Problem.Equal(envelope) {
-		t.Fatalf("recovered problem mismatch: %+v", problemErr.Problem)
-	}
-}
 
-func TestTypedNilErrorMethodsAreSafe(t *testing.T) {
-	t.Parallel()
-	var err *problem.Error
-	if err.Error() != "<nil problem error>" {
-		t.Fatalf("typed-nil Error() = %q", err.Error())
-	}
-	if err.Unwrap() != nil {
-		t.Fatalf("typed-nil Unwrap() = %v, want nil", err.Unwrap())
+	// Act
+	err := fmt.Errorf("saving: %w", problem.WrapError(envelope, cause))
+
+	// Assert
+	if !errors.As(err, &problemErr) || problemErr.Problem.Status != 409 || !errors.Is(err, cause) {
+		t.Fatalf("chain not traversable: %v", err)
 	}
 }

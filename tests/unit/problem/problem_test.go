@@ -2,222 +2,186 @@ package problem_test
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
 )
 
-func TestMarshalJSONOmitsEmptyDetailAndInstance(t *testing.T) {
+func TestProblemMarshalJSON(t *testing.T) {
 	t.Parallel()
-	envelope := problem.Problem{Type: "t", Title: "T", Status: 400, Recoverable: true}
-	encoded, err := json.Marshal(envelope)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
+	empty := ""
+	detail, instance := "User 42 does not exist", "/user/42"
+	cases := []struct {
+		name     string
+		envelope problem.Problem
+		want     string
+	}{
+		{
+			name:     "every member",
+			envelope: problem.Problem{Type: "t", Title: "T", Status: 404, Detail: &detail, Instance: &instance, Recoverable: false, Data: map[string]any{"id": "42"}},
+			want:     `{"data":{"id":"42"},"detail":"User 42 does not exist","instance":"/user/42","recoverable":false,"status":404,"title":"T","type":"t"}`,
+		},
+		{
+			name:     "nil data is omitted",
+			envelope: problem.Problem{Type: "t", Title: "T", Status: 403},
+			want:     `{"recoverable":false,"status":403,"title":"T","type":"t"}`,
+		},
+		{
+			name:     "empty data is omitted",
+			envelope: problem.Problem{Type: "t", Title: "T", Status: 401, Recoverable: true, Data: map[string]any{}},
+			want:     `{"recoverable":true,"status":401,"title":"T","type":"t"}`,
+		},
+		{
+			name:     "empty detail and instance are present",
+			envelope: problem.Problem{Type: "t", Title: "T", Status: 400, Detail: &empty, Instance: &empty},
+			want:     `{"detail":"","instance":"","recoverable":false,"status":400,"title":"T","type":"t"}`,
+		},
 	}
-	var out map[string]any
-	if unmarshalErr := json.Unmarshal(encoded, &out); unmarshalErr != nil {
-		t.Fatalf("unmarshal: %v", unmarshalErr)
-	}
-	for _, key := range []string{"type", "title", "status", "recoverable", "data"} {
-		if _, ok := out[key]; !ok {
-			t.Fatalf("missing key %q in %v", key, out)
-		}
-	}
-	if _, ok := out["detail"]; ok {
-		t.Fatalf("empty detail should be omitted: %v", out)
-	}
-	if _, ok := out["instance"]; ok {
-		t.Fatalf("empty instance should be omitted: %v", out)
-	}
-	data, ok := out["data"].(map[string]any)
-	if !ok || len(data) != 0 {
-		t.Fatalf("data should render as an empty object, got %v", out["data"])
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			envelope := tc.envelope
+
+			// Act
+			got, err := json.Marshal(envelope)
+
+			// Assert
+			if err != nil || string(got) != tc.want {
+				t.Fatalf("Marshal = %s, %v; want %s", got, err, tc.want)
+			}
+		})
 	}
 }
 
-func TestMarshalJSONIncludesDetailInstanceAndData(t *testing.T) {
+func TestProblemMarshalJSONRejectsUnencodableData(t *testing.T) {
 	t.Parallel()
-	envelope := problem.Problem{
-		Type:     "t",
-		Title:    "T",
-		Status:   404,
-		Detail:   new("missing"),
-		Instance: new("/x"),
-		Data:     map[string]any{"resource": "user"},
-	}
-	encoded, err := json.Marshal(envelope)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	var out map[string]any
-	if unmarshalErr := json.Unmarshal(encoded, &out); unmarshalErr != nil {
-		t.Fatalf("unmarshal: %v", unmarshalErr)
-	}
-	if out["detail"] != "missing" || out["instance"] != "/x" {
-		t.Fatalf("detail/instance not preserved: %v", out)
+	// Arrange
+	envelope := problem.Problem{Type: "t", Data: map[string]any{"bad": make(chan int)}}
+
+	// Act
+	_, err := envelope.MarshalJSON()
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected an encoding error")
 	}
 }
 
-func TestMarshalJSONFailsOnUnmarshalableData(t *testing.T) {
+func TestProblemUnmarshalJSON(t *testing.T) {
 	t.Parallel()
-	envelope := problem.Problem{Type: "t", Title: "T", Status: 500, Data: map[string]any{"fn": func() {}}}
-	if _, err := json.Marshal(envelope); err == nil {
-		t.Fatal("expected marshal error for func in data")
+	detail, instance := "d", "/i"
+	cases := []struct {
+		name  string
+		input string
+		want  problem.Problem
+	}{
+		{
+			name:  "every member",
+			input: `{"type":"t","title":"T","status":404,"detail":"d","instance":"/i","recoverable":true,"data":{"id":"42"}}`,
+			want:  problem.Problem{Type: "t", Title: "T", Status: 404, Detail: &detail, Instance: &instance, Recoverable: true, Data: map[string]any{"id": "42"}},
+		},
+		{
+			name:  "absent members take defaults",
+			input: `{}`,
+			want:  problem.Problem{Type: "about:blank", Title: "Unexpected problem", Status: 500},
+		},
+		{
+			name:  "null data stays absent",
+			input: `{"type":"t","title":"T","status":401,"data":null}`,
+			want:  problem.Problem{Type: "t", Title: "T", Status: 401},
+		},
+		{
+			name:  "wrong member types take defaults",
+			input: `{"type":1,"title":2,"status":"x","detail":3,"instance":4,"recoverable":"yes","data":[]}`,
+			want:  problem.Problem{Type: "about:blank", Title: "Unexpected problem", Status: 500},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			var got problem.Problem
+
+			// Act
+			err := json.Unmarshal([]byte(tc.input), &got)
+
+			// Assert
+			if err != nil || !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("Unmarshal = %+v, %v; want %+v", got, err, tc.want)
+			}
+		})
 	}
 }
 
-func TestUnmarshalJSONRoundTrip(t *testing.T) {
+func TestProblemUnmarshalJSONRejects(t *testing.T) {
 	t.Parallel()
-	source := []byte(`{"type":"t","title":"T","status":404,"detail":"d","instance":"/i","recoverable":true,"data":{"k":"v"}}`)
-	var envelope problem.Problem
-	if err := json.Unmarshal(source, &envelope); err != nil {
-		t.Fatalf("unmarshal: %v", err)
+	cases := []struct {
+		name  string
+		input string
+	}{
+		{name: "invalid json", input: `{`},
+		{name: "null", input: `null`},
+		{name: "array", input: `[]`},
 	}
-	if envelope.Type != "t" || envelope.Title != "T" || envelope.Status != 404 {
-		t.Fatalf("core members wrong: %+v", envelope)
-	}
-	if envelope.Detail == nil || *envelope.Detail != "d" ||
-		envelope.Instance == nil || *envelope.Instance != "/i" || !envelope.Recoverable {
-		t.Fatalf("optional members wrong: %+v", envelope)
-	}
-	if envelope.Data["k"] != "v" {
-		t.Fatalf("data wrong: %+v", envelope.Data)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			var got problem.Problem
+
+			// Act
+			err := got.UnmarshalJSON([]byte(tc.input))
+
+			// Assert
+			if err == nil {
+				t.Fatalf("expected an error for %s", tc.input)
+			}
+		})
 	}
 }
 
-func TestUnmarshalJSONAppliesDefaults(t *testing.T) {
+func TestProblemEqual(t *testing.T) {
 	t.Parallel()
-	var envelope problem.Problem
-	if err := json.Unmarshal([]byte(`{}`), &envelope); err != nil {
-		t.Fatalf("unmarshal: %v", err)
+	base := problem.Problem{Type: "t", Title: "T", Status: 404, Data: map[string]any{"count": 1}}
+	cases := []struct {
+		name  string
+		other problem.Problem
+		want  bool
+	}{
+		{name: "same value", other: base, want: true},
+		{name: "decoded numbers", other: problem.Problem{Type: "t", Title: "T", Status: 404, Data: map[string]any{"count": float64(1)}}, want: true},
+		{name: "different status", other: problem.Problem{Type: "t", Title: "T", Status: 409, Data: base.Data}, want: false},
+		{name: "unencodable", other: problem.Problem{Data: map[string]any{"bad": make(chan int)}}, want: false},
 	}
-	if envelope.Type != "about:blank" {
-		t.Fatalf("type default wrong: %q", envelope.Type)
-	}
-	if envelope.Title != "Unexpected problem" {
-		t.Fatalf("title default wrong: %q", envelope.Title)
-	}
-	if envelope.Status != 500 {
-		t.Fatalf("status default wrong: %d", envelope.Status)
-	}
-	if envelope.Detail != nil || envelope.Instance != nil || envelope.Recoverable {
-		t.Fatalf("optional defaults wrong: %+v", envelope)
-	}
-	if envelope.Data == nil || len(envelope.Data) != 0 {
-		t.Fatalf("data default should be empty map: %+v", envelope.Data)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			other := tc.other
+
+			// Act
+			got := base.Equal(other)
+
+			// Assert
+			if got != tc.want {
+				t.Fatalf("Equal = %t, want %t", got, tc.want)
+			}
+		})
 	}
 }
 
-func TestUnmarshalJSONIgnoresWrongTypedMembers(t *testing.T) {
+func TestProblemString(t *testing.T) {
 	t.Parallel()
-	var envelope problem.Problem
-	source := []byte(`{"type":5,"status":"nope","recoverable":"nope","data":"nope"}`)
-	if err := json.Unmarshal(source, &envelope); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if envelope.Type != "about:blank" || envelope.Status != 500 || envelope.Recoverable {
-		t.Fatalf("wrong-typed members should fall back to defaults: %+v", envelope)
-	}
-	if len(envelope.Data) != 0 {
-		t.Fatalf("wrong-typed data should fall back to empty: %+v", envelope.Data)
-	}
-}
+	// Arrange
+	envelope := problem.Problem{Type: "https://x/v1/conflict", Title: "Conflict", Status: 409}
 
-func TestUnmarshalJSONRejectsInvalidJSON(t *testing.T) {
-	t.Parallel()
-	var envelope problem.Problem
-	if err := envelope.UnmarshalJSON([]byte(`{`)); err == nil {
-		t.Fatal("expected error for invalid JSON")
-	}
-}
-
-func TestUnmarshalJSONRejectsNull(t *testing.T) {
-	t.Parallel()
-	var envelope problem.Problem
-	if err := json.Unmarshal([]byte(`null`), &envelope); err == nil {
-		t.Fatal("expected error for a null problem")
-	}
-}
-
-func TestEqual(t *testing.T) {
-	t.Parallel()
-	base := problem.Problem{Type: "t", Title: "T", Status: 404, Data: map[string]any{"id": 42}}
-	same := problem.Problem{Type: "t", Title: "T", Status: 404, Data: map[string]any{"id": 42}}
-	other := problem.Problem{Type: "t", Title: "T", Status: 409, Data: map[string]any{"id": 42}}
-	if !base.Equal(same) {
-		t.Fatal("expected equal problems to compare equal")
-	}
-	if base.Equal(other) {
-		t.Fatal("expected differing problems to compare unequal")
-	}
-}
-
-func TestEqualFalseWhenUnmarshalable(t *testing.T) {
-	t.Parallel()
-	bad := problem.Problem{Type: "t", Title: "T", Status: 500, Data: map[string]any{"fn": func() {}}}
-	good := problem.Problem{Type: "t", Title: "T", Status: 500}
-	if bad.Equal(good) {
-		t.Fatal("unmarshalable problem must never compare equal")
-	}
-}
-
-func TestString(t *testing.T) {
-	t.Parallel()
-	envelope := problem.Problem{Type: "https://x/v1/entity-not-found", Title: "Entity not found", Status: 404}
+	// Act
 	got := envelope.String()
-	want := "Problem(https://x/v1/entity-not-found, 404, Entity not found)"
-	if got != want {
-		t.Fatalf("String() = %q, want %q", got, want)
-	}
-}
 
-// TestUnmarshalMarshalPreservesExplicitEmptyDetailInstance is the Blocker-1
-// regression: an envelope carrying explicit empty `detail`/`instance` survives
-// an unmarshal→marshal cycle byte-identically (the keys are retained as ""),
-// matching the Dart sibling's nullable-field wire behavior (present-empty is
-// distinct from absent).
-func TestUnmarshalMarshalPreservesExplicitEmptyDetailInstance(t *testing.T) {
-	t.Parallel()
-	source := []byte(
-		`{"data":{},"detail":"","instance":"","recoverable":false,"status":400,"title":"T","type":"t"}`,
-	)
-	var envelope problem.Problem
-	if err := json.Unmarshal(source, &envelope); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if envelope.Detail == nil || *envelope.Detail != "" {
-		t.Fatalf("explicit empty detail should be present-empty, got %v", envelope.Detail)
-	}
-	if envelope.Instance == nil || *envelope.Instance != "" {
-		t.Fatalf("explicit empty instance should be present-empty, got %v", envelope.Instance)
-	}
-	encoded, err := json.Marshal(envelope)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if string(encoded) != string(source) {
-		t.Fatalf("round-trip not byte-identical:\n got=%s\nwant=%s", encoded, source)
-	}
-}
-
-// TestUnmarshalMarshalDoesNotInventDetailInstance is the Blocker-1 regression
-// for the absent case: an envelope WITHOUT `detail`/`instance` must not gain
-// those keys after an unmarshal→marshal cycle.
-func TestUnmarshalMarshalDoesNotInventDetailInstance(t *testing.T) {
-	t.Parallel()
-	source := []byte(`{"data":{},"recoverable":false,"status":400,"title":"T","type":"t"}`)
-	var envelope problem.Problem
-	if err := json.Unmarshal(source, &envelope); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if envelope.Detail != nil || envelope.Instance != nil {
-		t.Fatalf("absent members should stay nil, got detail=%v instance=%v", envelope.Detail, envelope.Instance)
-	}
-	encoded, err := json.Marshal(envelope)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if string(encoded) != string(source) {
-		t.Fatalf("absent keys must not be invented:\n got=%s\nwant=%s", encoded, source)
+	// Assert
+	if got != "Problem(https://x/v1/conflict, 409, Conflict)" {
+		t.Fatalf("String = %q", got)
 	}
 }

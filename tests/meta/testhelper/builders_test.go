@@ -1,35 +1,46 @@
 package testhelper_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
 	"github.com/ProtoDurian/diene.go-errors-problems/testhelper"
 )
 
-func TestSampleErrorPortalIsValid(t *testing.T) {
+func TestSampleErrorPortalBuildsTypeURI(t *testing.T) {
 	t.Parallel()
-	uri, err := problem.TypeURI(testhelper.SampleErrorPortal(), "v1", "entity-not-found")
-	if err != nil {
-		t.Fatalf("sample portal should be valid: %v", err)
-	}
-	if !strings.HasPrefix(uri, "https://") || !strings.Contains(uri, "/docs/") {
-		t.Fatalf("unexpected sample URI: %q", uri)
+	// Arrange
+	portal := testhelper.SampleErrorPortal()
+
+	// Act
+	uri, err := problem.TypeURI(portal, "v1", "entity_not_found")
+
+	// Assert
+	if err != nil || uri != "https://docs.raichu.cluster.atomi.cloud/docs/raichu/go/user/api/v1/entity_not_found" {
+		t.Fatalf("TypeURI = %q, %v", uri, err)
 	}
 }
 
-func TestSampleProblemMintsSingleSourceURI(t *testing.T) {
+func TestSampleProblemIsTheGenericEntityNotFound(t *testing.T) {
 	t.Parallel()
+	// Arrange
+	registry, _ := problem.NewRegistry(testhelper.SampleErrorPortal(), problem.EntityNotFound())
+	want, _ := registry.NewProblem("entity_not_found", map[string]any{"entityType": "user", "id": "42"})
+
+	// Act
 	sample := testhelper.SampleProblem()
-	want := "https://docs.raichu.cluster.atomi.cloud/docs/raichu/go/user/api/v1/entity-not-found"
-	if sample.Type != want {
-		t.Fatalf("sample type = %q, want %q", sample.Type, want)
-	}
-	if sample.Status != 404 || sample.Title != "Entity not found" {
-		t.Fatalf("unexpected sample fields: %+v", sample)
-	}
-	if err := testhelper.CheckProblem(sample, testhelper.ExpectID("entity-not-found"), testhelper.ExpectStatus(404)); err != nil {
-		t.Fatalf("sample should satisfy its own matcher: %v", err)
+
+	// Assert
+	err := testhelper.CheckProblem(
+		sample,
+		testhelper.ExpectType(want.Type),
+		testhelper.ExpectID("entity_not_found"),
+		testhelper.ExpectTitle("Entity Not Found"),
+		testhelper.ExpectStatus(404),
+		testhelper.ExpectRecoverable(false),
+		testhelper.ExpectData(map[string]any{"entityType": "user", "id": "42"}),
+	)
+	if err != nil || !sample.Equal(want) {
+		t.Fatalf("sample = %+v, %v", sample, err)
 	}
 }

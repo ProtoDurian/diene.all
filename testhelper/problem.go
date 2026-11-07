@@ -1,12 +1,4 @@
-// Package testhelper ships the Problem assertion helpers and builders that
-// consumers of github.com/ProtoDurian/diene.go-errors-problems would otherwise
-// repeat in every test: recovering a [problem.Problem] from a (T, error) result
-// via errors.As, matching it field by field, and minting valid fixtures whose
-// type URIs come from the single-source builder.
-//
-// The assertion helpers depend only on the minimal [TestingT] interface (which
-// *testing.T satisfies), never on the concrete testing type, so they stay
-// framework-free and are themselves black-box testable with a recording double.
+// Package testhelper provides Problem assertions and fixtures for tests of code that returns problem errors.
 package testhelper
 
 import (
@@ -18,16 +10,13 @@ import (
 	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
 )
 
-// TestingT is the minimal subset of *testing.T the assertion helpers use. Any
-// type with Helper and Fatalf satisfies it, which keeps the helpers decoupled
-// from the concrete testing type and unit-testable in the meta tier.
+// TestingT is the subset of *testing.T the assertions use.
 type TestingT interface {
 	Helper()
 	Fatalf(format string, args ...any)
 }
 
-// Option constrains one expected field of a [problem.Problem]. Only the fields
-// named by the supplied options are checked, and the first mismatch wins.
+// Option checks one field of a [problem.Problem]; only the given options are checked.
 type Option func(problem.Problem) error
 
 // ExpectType asserts the envelope's Type equals want.
@@ -40,8 +29,7 @@ func ExpectType(want string) Option {
 	}
 }
 
-// ExpectID asserts the final path segment of the envelope's Type equals want,
-// so callers can match a problem id without spelling out the full type URI.
+// ExpectID asserts the last path segment of the envelope's Type equals want.
 func ExpectID(want string) Option {
 	return func(actual problem.Problem) error {
 		got := actual.Type
@@ -87,8 +75,7 @@ func ExpectRecoverable(want bool) Option {
 	}
 }
 
-// ExpectDetail asserts the envelope's Detail is present and equals want. A nil
-// (absent) Detail never matches.
+// ExpectDetail asserts the envelope's Detail is present and equals want.
 func ExpectDetail(want string) Option {
 	return func(actual problem.Problem) error {
 		if actual.Detail == nil || *actual.Detail != want {
@@ -102,8 +89,7 @@ func ExpectDetail(want string) Option {
 	}
 }
 
-// ExpectInstance asserts the envelope's Instance is present and equals want. A
-// nil (absent) Instance never matches.
+// ExpectInstance asserts the envelope's Instance is present and equals want.
 func ExpectInstance(want string) Option {
 	return func(actual problem.Problem) error {
 		if actual.Instance == nil || *actual.Instance != want {
@@ -117,18 +103,17 @@ func ExpectInstance(want string) Option {
 	}
 }
 
-// ExpectData asserts the envelope's Data deep-equals want.
+// ExpectData asserts the envelope's Data deep-equals want; nil means no data.
 func ExpectData(want map[string]any) Option {
 	return func(actual problem.Problem) error {
-		if !reflect.DeepEqual(actual.Data, want) {
+		if (len(want) > 0 || len(actual.Data) > 0) && !reflect.DeepEqual(actual.Data, want) {
 			return fmt.Errorf("data mismatch: expected %v, got %v", want, actual.Data)
 		}
 		return nil
 	}
 }
 
-// CheckProblem returns the first field mismatch between actual and the supplied
-// expectations, or nil when every checked field matches.
+// CheckProblem returns the first mismatch between actual and opts, or nil.
 func CheckProblem(actual problem.Problem, opts ...Option) error {
 	for _, opt := range opts {
 		if err := opt(actual); err != nil {
@@ -138,8 +123,7 @@ func CheckProblem(actual problem.Problem, opts ...Option) error {
 	return nil
 }
 
-// AssertProblem fails t (via Fatalf) when actual does not match the supplied
-// expectations.
+// AssertProblem fails t when actual does not match opts.
 func AssertProblem(t TestingT, actual problem.Problem, opts ...Option) {
 	t.Helper()
 	if err := CheckProblem(actual, opts...); err != nil {
@@ -147,10 +131,7 @@ func AssertProblem(t TestingT, actual problem.Problem, opts ...Option) {
 	}
 }
 
-// CheckError recovers a [problem.Problem] from a (T, error) result: it
-// requires err to be non-nil and to carry a [problem.Error] in its chain
-// (via errors.As), then applies the field expectations. It returns the
-// recovered envelope, or a descriptive error on any failure.
+// CheckError recovers the [problem.Problem] carried by err and checks it against opts.
 func CheckError(err error, opts ...Option) (problem.Problem, error) {
 	if err == nil {
 		return problem.Problem{}, errors.New("expected a problem-typed error, got nil")
@@ -159,8 +140,7 @@ func CheckError(err error, opts ...Option) (problem.Problem, error) {
 	if !errors.As(err, &problemErr) {
 		return problem.Problem{}, fmt.Errorf("expected a *problem.Error, got %T", err)
 	}
-	// errors.As also matches a typed-nil *problem.Error; guard it so the helper
-	// returns a descriptive mismatch instead of dereferencing nil.
+	// errors.As also matches a typed-nil *problem.Error; reading it would panic.
 	if problemErr == nil {
 		return problem.Problem{}, fmt.Errorf("expected a non-nil *problem.Error, got a typed-nil %T", err)
 	}
@@ -170,9 +150,7 @@ func CheckError(err error, opts ...Option) (problem.Problem, error) {
 	return problemErr.Problem, nil
 }
 
-// AssertError fails t (via Fatalf) unless err carries a
-// [problem.Error] matching the expectations, and returns the recovered
-// envelope on success.
+// AssertError fails t unless err carries a problem matching opts, and returns that problem.
 func AssertError(t TestingT, err error, opts ...Option) problem.Problem {
 	t.Helper()
 	envelope, checkErr := CheckError(err, opts...)
@@ -182,8 +160,7 @@ func AssertError(t TestingT, err error, opts ...Option) problem.Problem {
 	return envelope
 }
 
-// SampleErrorPortal returns a realistic, valid [problem.ErrorPortal] for tests,
-// so fixtures never hand-format the type-URI template.
+// SampleErrorPortal returns a valid [problem.ErrorPortal] for tests.
 func SampleErrorPortal() problem.ErrorPortal {
 	return problem.ErrorPortal{
 		Scheme:    "https",
@@ -195,15 +172,9 @@ func SampleErrorPortal() problem.ErrorPortal {
 	}
 }
 
-// SampleProblem returns a valid entity-not-found [problem.Problem] whose type
-// URI is minted by the single-source builder from [SampleErrorPortal].
+// SampleProblem returns a valid entity_not_found [problem.Problem] built from [SampleErrorPortal].
 func SampleProblem() problem.Problem {
-	typeURI, _ := problem.TypeURI(SampleErrorPortal(), "v1", "entity-not-found")
-	return problem.Problem{
-		Type:        typeURI,
-		Title:       "Entity not found",
-		Status:      404,
-		Recoverable: false,
-		Data:        map[string]any{"resource": "user", "id": 42},
-	}
+	registry, _ := problem.NewRegistry(SampleErrorPortal(), problem.EntityNotFound())
+	envelope, _ := registry.NewProblem("entity_not_found", map[string]any{"entityType": "user", "id": "42"})
+	return envelope
 }

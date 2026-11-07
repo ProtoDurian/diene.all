@@ -1,0 +1,14 @@
+{
+  "template": "{scheme}://{host}/docs/{landscape}/{platform}/{service}/{module}/{version}/{id}",
+  "segments": {
+    "scheme": "https",
+    "host": "docs.raichu.cluster.atomi.cloud",
+    "landscape": "raichu",
+    "platform": "go",
+    "service": "user",
+    "module": "api",
+    "version": "v1",
+    "id": "entity_not_found"
+  },
+  "expectedTypeUri": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/go/user/api/v1/entity_not_found"
+}

@@ -5,33 +5,17 @@ import (
 	"strconv"
 )
 
-// ErrorPortal is the service-tree config block the problem type-URI template is
-// fed from (C0 §2). The LPSM segments (Landscape/Platform/Service/Module) are
-// the declaring identity that also derives public hostnames, so a type URI is
-// stable, addressable, and never hand-authored per row.
-//
-// Real services supply their build-time portal (sourced from config, never
-// hardcoded per R4); [LocalErrorPortal] is the fallback for client-local errors
-// that have no backend context.
+// ErrorPortal is the service-tree block every problem type URI is built from.
 type ErrorPortal struct {
-	// Scheme is the URI scheme, conventionally `https`.
-	Scheme string
-	// Host serves the problem docs, e.g. docs.raichu.cluster.atomi.cloud.
-	Host string
-	// Landscape is the LPSM `L` segment.
+	Scheme    string
+	Host      string
 	Landscape string
-	// Platform is the LPSM `P` segment.
-	Platform string
-	// Service is the LPSM `S` segment.
-	Service string
-	// Module is the LPSM `M` segment.
-	Module string
+	Platform  string
+	Service   string
+	Module    string
 }
 
-// LocalErrorPortal is the default portal for client-local errors with no
-// service backend context (e.g. a crash before any backend is known). Real
-// programs pass their build-time LPSM portal instead; this keeps the single
-// builder usable in isolation and in tests.
+// LocalErrorPortal is the portal for client-local errors that have no service context.
 func LocalErrorPortal() ErrorPortal {
 	return ErrorPortal{
 		Scheme:    "https",
@@ -43,13 +27,9 @@ func LocalErrorPortal() ErrorPortal {
 	}
 }
 
-// InvalidSegmentError reports a problem type-URI segment that is empty or
-// contains a `/`. Validating segments at the boundary keeps the URI canonical
-// and catches misconfigured portals instead of producing a malformed URI.
+// InvalidSegmentError reports a type-URI segment that is empty or not a single path segment.
 type InvalidSegmentError struct {
-	// Name is the offending segment name (e.g. "host", "id").
-	Name string
-	// Value is the rejected segment value.
+	Name  string
 	Value string
 }
 
@@ -58,13 +38,7 @@ func (e *InvalidSegmentError) Error() string {
 	return "problem type URI segment " + e.Name + " must be a non-empty single path segment, got " + strconv.Quote(e.Value)
 }
 
-// TypeURI builds the RFC 9457 `type` URI from an [ErrorPortal] block.
-//
-// This is the single source of the C0 §2 template
-// `{scheme}://{host}/docs/{landscape}/{platform}/{service}/{module}/{version}/{id}`.
-// Every problem — catalog entries, runtime envelopes, local errors — resolves
-// its `type` through this function. Each segment must be a non-empty single
-// path segment; otherwise an [InvalidSegmentError] is returned.
+// TypeURI builds `{scheme}://{host}/docs/{landscape}/{platform}/{service}/{module}/{version}/{id}`; it is the only place that formats a type URI.
 func TypeURI(portal ErrorPortal, version, id string) (string, error) {
 	schemeURI, schemeErr := url.Parse(portal.Scheme + ":")
 	if portal.Scheme == "" || schemeErr != nil || schemeURI.Scheme != portal.Scheme || schemeURI.Opaque != "" {

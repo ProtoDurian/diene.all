@@ -5,23 +5,15 @@ import (
 	"fmt"
 )
 
-// TransformOptions configures how [FromObject] folds an arbitrary value into a
-// [Problem].
+// TransformOptions configures how [FromObject] folds a value into a [Problem].
 type TransformOptions struct {
-	// Portal builds fallback type URIs for uncatalogued problems.
-	Portal ErrorPortal
-	// Registry, when non-nil, is consulted for values carrying a known
-	// `problemId`.
-	Registry *Registry
-	// DefaultStatus is the status for an uncatalogued fallback problem.
-	DefaultStatus int
-	// DefaultVersion is the version segment for fallback type URIs.
+	Portal         ErrorPortal
+	Registry       *Registry
+	DefaultStatus  int
 	DefaultVersion string
 }
 
-// DefaultTransformOptions returns options that mint fallback URIs from
-// [LocalErrorPortal] with a 500 status and the v1 version segment, and no
-// registry.
+// DefaultTransformOptions returns options with [LocalErrorPortal], status 500, version v1 and no registry.
 func DefaultTransformOptions() TransformOptions {
 	return TransformOptions{
 		Portal:         LocalErrorPortal(),
@@ -30,26 +22,13 @@ func DefaultTransformOptions() TransformOptions {
 	}
 }
 
-// FromObject folds value into a typed [Problem]. It never panics: the whole
-// point is to guarantee a Problem for any value.
-//
-//   - A [Problem] value is returned unchanged.
-//   - An error carrying a [Error] anywhere in its chain (via errors.As)
-//     yields that error's Problem.
-//   - When options.Registry recognises a `problemId` carried on a
-//     map[string]any value, the registry's type/title/status/recoverable are
-//     used and the value's `data` map is preserved.
-//   - Otherwise an uncatalogued problem (C0 §14) is produced with the
-//     [UncataloguedProblemID] fallback type.
+// FromObject folds any value into a [Problem]; anything uncatalogued becomes a plain 5xx.
 func FromObject(value any, options TransformOptions) Problem {
 	if envelope, ok := value.(Problem); ok {
 		return envelope
 	}
 	if err, ok := value.(error); ok {
-		// errors.As also succeeds for a typed-nil *Error (a non-nil error
-		// interface holding a nil pointer). Dereferencing that as a Problem —
-		// or letting it fall through to detailFrom, whose Error() call would
-		// dereference nil — panics, so treat it as an empty uncatalogued value.
+		// errors.As also matches a typed-nil *Error; reading it would panic.
 		var problemErr *Error
 		if errors.As(err, &problemErr) {
 			if problemErr != nil {
@@ -70,9 +49,9 @@ func FromObject(value any, options TransformOptions) Problem {
 					if typeErr != nil {
 						typeURI = blankType
 					}
-					problemData, dataOK := fields["data"].(map[string]any)
-					if !dataOK {
-						problemData = map[string]any{}
+					var problemData map[string]any
+					if value, ok := fields["data"].(map[string]any); ok {
+						problemData = value
 					}
 					return Problem{
 						Type:        typeURI,
@@ -109,6 +88,5 @@ func FromObject(value any, options TransformOptions) Problem {
 		Status:      options.DefaultStatus,
 		Detail:      detail,
 		Recoverable: false,
-		Data:        map[string]any{},
 	}
 }

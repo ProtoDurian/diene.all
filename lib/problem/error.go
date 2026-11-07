@@ -1,16 +1,7 @@
 package problem
 
-// Error is the Go realization of the family "result slot": a concrete
-// error that carries a [Problem] and is compatible with errors.Is/errors.As and
-// %w wrapping. Fallible APIs return the idiomatic (T, error) pair; consumers
-// recover the envelope with:
-//
-//	var pe *problem.Error
-//	if errors.As(err, &pe) {
-//		use(pe.Problem)
-//	}
+// Error is a problem-typed error that works with errors.Is, errors.As and %w wrapping.
 type Error struct {
-	// Problem is the RFC 9457 envelope this error carries.
 	Problem Problem
 	wrapped error
 }
@@ -20,8 +11,7 @@ func NewError(problem Problem) *Error {
 	return &Error{Problem: problem}
 }
 
-// WrapError creates a problem-typed error carrying problem and wrapping cause,
-// so errors.Is/errors.As traverse into the underlying error chain.
+// WrapError creates a problem-typed error carrying problem and wrapping cause.
 func WrapError(problem Problem, cause error) *Error {
 	return &Error{Problem: problem, wrapped: cause}
 }
@@ -37,8 +27,7 @@ func (e *Error) Error() string {
 	return e.Problem.String()
 }
 
-// Unwrap returns the wrapped cause (nil when none), enabling errors.Is and
-// errors.As to traverse the chain.
+// Unwrap returns the wrapped cause, or nil.
 func (e *Error) Unwrap() error {
 	if e == nil {
 		return nil

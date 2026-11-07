@@ -10,8 +10,6 @@ import (
 	"github.com/ProtoDurian/diene.go-errors-problems/testhelper"
 )
 
-// recordingT is a TestingT double: it records the first Fatalf so the meta tier
-// can assert the asserter fails on known-bad input without aborting the test.
 type recordingT struct {
 	failed  bool
 	message string
@@ -25,161 +23,186 @@ func (r *recordingT) Fatalf(format string, args ...any) {
 }
 
 func goodProblem() problem.Problem {
-	detail, instance := "missing", "/x"
+	detail, instance := "missing", "/user/42"
 	return problem.Problem{
-		Type:        "https://h/docs/l/p/s/m/v1/entity-not-found",
-		Title:       "Entity not found",
+		Type:        "https://h/docs/l/p/s/m/v1/entity_not_found",
+		Title:       "Entity Not Found",
 		Status:      404,
 		Detail:      &detail,
 		Instance:    &instance,
 		Recoverable: false,
-		Data:        map[string]any{"resource": "user", "id": 42},
+		Data:        map[string]any{"entityType": "user", "id": "42"},
 	}
 }
 
-func TestCheckProblemPassesOnEveryField(t *testing.T) {
+func TestCheckProblem(t *testing.T) {
 	t.Parallel()
 	good := goodProblem()
-	err := testhelper.CheckProblem(
-		good,
-		testhelper.ExpectType(good.Type),
-		testhelper.ExpectID("entity-not-found"),
-		testhelper.ExpectTitle(good.Title),
-		testhelper.ExpectStatus(good.Status),
-		testhelper.ExpectRecoverable(good.Recoverable),
-		testhelper.ExpectDetail(*good.Detail),
-		testhelper.ExpectInstance(*good.Instance),
-		testhelper.ExpectData(good.Data),
-	)
-	if err != nil {
-		t.Fatalf("expected pass, got %v", err)
+	noData := problem.Problem{Type: "https://h/docs/l/p/s/m/v1/unauthorized", Title: "Unauthorized", Status: 403}
+	cases := []struct {
+		name     string
+		actual   problem.Problem
+		options  []testhelper.Option
+		wantFail string
+	}{
+		{
+			name:   "every field matches",
+			actual: good,
+			options: []testhelper.Option{
+				testhelper.ExpectType(good.Type), testhelper.ExpectID("entity_not_found"), testhelper.ExpectTitle(good.Title),
+				testhelper.ExpectStatus(404), testhelper.ExpectRecoverable(false), testhelper.ExpectDetail("missing"),
+				testhelper.ExpectInstance("/user/42"), testhelper.ExpectData(map[string]any{"entityType": "user", "id": "42"}),
+			},
+		},
+		{name: "subset matches", actual: good, options: []testhelper.Option{testhelper.ExpectStatus(404)}},
+		{name: "nil data matches no data", actual: noData, options: []testhelper.Option{testhelper.ExpectData(nil)}},
+		{name: "empty data matches no data", actual: problem.Problem{Data: map[string]any{}}, options: []testhelper.Option{testhelper.ExpectData(nil)}},
+		{name: "id without slash", actual: problem.Problem{Type: "conflict"}, options: []testhelper.Option{testhelper.ExpectID("conflict")}},
+		{name: "wrong type", actual: good, options: []testhelper.Option{testhelper.ExpectType("https://other")}, wantFail: "type mismatch"},
+		{name: "wrong id", actual: good, options: []testhelper.Option{testhelper.ExpectID("conflict")}, wantFail: "id mismatch"},
+		{name: "wrong title", actual: good, options: []testhelper.Option{testhelper.ExpectTitle("Wrong")}, wantFail: "title mismatch"},
+		{name: "wrong status", actual: good, options: []testhelper.Option{testhelper.ExpectStatus(500)}, wantFail: "status mismatch"},
+		{name: "wrong recoverable", actual: good, options: []testhelper.Option{testhelper.ExpectRecoverable(true)}, wantFail: "recoverable mismatch"},
+		{name: "wrong detail", actual: good, options: []testhelper.Option{testhelper.ExpectDetail("other")}, wantFail: "detail mismatch"},
+		{name: "absent detail", actual: noData, options: []testhelper.Option{testhelper.ExpectDetail("missing")}, wantFail: "got <nil>"},
+		{name: "wrong instance", actual: good, options: []testhelper.Option{testhelper.ExpectInstance("/other")}, wantFail: "instance mismatch"},
+		{name: "absent instance", actual: noData, options: []testhelper.Option{testhelper.ExpectInstance("/x")}, wantFail: "got <nil>"},
+		{name: "wrong data", actual: good, options: []testhelper.Option{testhelper.ExpectData(map[string]any{"entityType": "user", "id": "99"})}, wantFail: "data mismatch"},
+		{name: "data where none expected", actual: good, options: []testhelper.Option{testhelper.ExpectData(nil)}, wantFail: "data mismatch"},
+		{name: "first mismatch wins", actual: good, options: []testhelper.Option{testhelper.ExpectStatus(500), testhelper.ExpectTitle("Wrong")}, wantFail: "status mismatch"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			actual := tc.actual
+
+			// Act
+			err := testhelper.CheckProblem(actual, tc.options...)
+
+			// Assert
+			if tc.wantFail == "" && err != nil {
+				t.Fatalf("known-good failed: %v", err)
+			}
+			if tc.wantFail != "" && (err == nil || !strings.Contains(err.Error(), tc.wantFail)) {
+				t.Fatalf("known-bad = %v, want %q", err, tc.wantFail)
+			}
+		})
 	}
 }
 
-func TestCheckProblemPassesWithSubsetOfFields(t *testing.T) {
+func TestAssertProblem(t *testing.T) {
 	t.Parallel()
-	if err := testhelper.CheckProblem(goodProblem(), testhelper.ExpectStatus(404)); err != nil {
-		t.Fatalf("subset check should pass, got %v", err)
+	cases := []struct {
+		name     string
+		option   testhelper.Option
+		wantFail bool
+	}{
+		{name: "known-good", option: testhelper.ExpectStatus(404)},
+		{name: "known-bad", option: testhelper.ExpectStatus(500), wantFail: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			recorder := &recordingT{}
+
+			// Act
+			testhelper.AssertProblem(recorder, goodProblem(), tc.option)
+
+			// Assert
+			if recorder.failed != tc.wantFail || (tc.wantFail && !strings.Contains(recorder.message, "problem assertion failed")) {
+				t.Fatalf("failed = %t, message %q", recorder.failed, recorder.message)
+			}
+		})
 	}
 }
 
-func TestCheckProblemFailsPerField(t *testing.T) {
+func TestCheckError(t *testing.T) {
 	t.Parallel()
-	good := goodProblem()
-	cases := map[string]testhelper.Option{
-		"type":        testhelper.ExpectType("https://other"),
-		"id":          testhelper.ExpectID("conflict"),
-		"title":       testhelper.ExpectTitle("Wrong"),
-		"status":      testhelper.ExpectStatus(500),
-		"recoverable": testhelper.ExpectRecoverable(true),
-		"detail":      testhelper.ExpectDetail("other"),
-		"instance":    testhelper.ExpectInstance("/other"),
-		"data":        testhelper.ExpectData(map[string]any{"resource": "user", "id": 99}),
+	var typedNil *problem.Error
+	cases := []struct {
+		name     string
+		err      error
+		options  []testhelper.Option
+		wantFail string
+	}{
+		{name: "wrapped problem error", err: fmt.Errorf("ctx: %w", problem.NewError(goodProblem())), options: []testhelper.Option{testhelper.ExpectID("entity_not_found")}},
+		{name: "nil error", err: nil, wantFail: "got nil"},
+		{name: "plain error", err: errors.New("plain"), wantFail: "expected a *problem.Error"},
+		{name: "typed-nil problem error", err: typedNil, wantFail: "typed-nil"},
+		{name: "field mismatch", err: problem.NewError(goodProblem()), options: []testhelper.Option{testhelper.ExpectStatus(500)}, wantFail: "status mismatch"},
 	}
-	for name, option := range cases {
-		if err := testhelper.CheckProblem(good, option); err == nil {
-			t.Fatalf("%s mismatch should fail", name)
-		} else if !strings.Contains(err.Error(), "mismatch") {
-			t.Fatalf("%s: unexpected message %q", name, err.Error())
-		}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			err := tc.err
+
+			// Act
+			recovered, checkErr := testhelper.CheckError(err, tc.options...)
+
+			// Assert
+			if tc.wantFail == "" && (checkErr != nil || !recovered.Equal(goodProblem())) {
+				t.Fatalf("known-good = %+v, %v", recovered, checkErr)
+			}
+			if tc.wantFail != "" && (checkErr == nil || !strings.Contains(checkErr.Error(), tc.wantFail) || !recovered.Equal(problem.Problem{})) {
+				t.Fatalf("known-bad = %+v, %v; want %q", recovered, checkErr, tc.wantFail)
+			}
+		})
 	}
 }
 
-func TestAssertProblemReportsPassAndFailure(t *testing.T) {
+func TestAssertError(t *testing.T) {
 	t.Parallel()
-	pass := &recordingT{}
-	testhelper.AssertProblem(pass, goodProblem(), testhelper.ExpectStatus(404))
-	if pass.failed {
-		t.Fatalf("known-good should not fail: %s", pass.message)
+	cases := []struct {
+		name       string
+		err        error
+		wantFail   bool
+		wantStatus int
+	}{
+		{name: "known-good", err: problem.NewError(goodProblem()), wantStatus: 404},
+		{name: "known-bad", err: errors.New("plain"), wantFail: true},
 	}
-	fail := &recordingT{}
-	testhelper.AssertProblem(fail, goodProblem(), testhelper.ExpectStatus(500))
-	if !fail.failed {
-		t.Fatal("known-bad should fail")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			recorder := &recordingT{}
+
+			// Act
+			recovered := testhelper.AssertError(recorder, tc.err, testhelper.ExpectID("entity_not_found"))
+
+			// Assert
+			if recorder.failed != tc.wantFail || recovered.Status != tc.wantStatus {
+				t.Fatalf("failed = %t (%q), status %d", recorder.failed, recorder.message, recovered.Status)
+			}
+		})
 	}
 }
 
-func TestCheckErrorRecoversEnvelope(t *testing.T) {
+func TestAssertionsAcceptEveryGenericProblem(t *testing.T) {
 	t.Parallel()
-	good := goodProblem()
-	err := fmt.Errorf("context: %w", problem.NewError(good))
-	recovered, checkErr := testhelper.CheckError(err, testhelper.ExpectStatus(404))
-	if checkErr != nil {
-		t.Fatalf("expected recovery, got %v", checkErr)
-	}
-	if !recovered.Equal(good) {
-		t.Fatalf("recovered mismatch: %+v", recovered)
-	}
-}
+	registry, _ := problem.NewRegistry(testhelper.SampleErrorPortal())
+	_ = problem.RegisterGenerics(registry)
+	for _, problemType := range problem.GenericProblems() {
+		t.Run(problemType.ID, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			envelope, _ := registry.NewProblem(problemType.ID, nil)
 
-func TestExpectDetailAndInstanceRejectAbsentPointers(t *testing.T) {
-	t.Parallel()
-	// A nil (absent) Detail/Instance never matches a wanted value, and the
-	// matcher reports a descriptive mismatch rather than dereferencing nil.
-	absent := problem.Problem{Type: "t", Title: "T", Status: 500}
-	detailErr := testhelper.CheckProblem(absent, testhelper.ExpectDetail("missing"))
-	if detailErr == nil || !strings.Contains(detailErr.Error(), "detail mismatch") {
-		t.Fatalf("absent detail should fail with a mismatch, got %v", detailErr)
-	}
-	instanceErr := testhelper.CheckProblem(absent, testhelper.ExpectInstance("/x"))
-	if instanceErr == nil || !strings.Contains(instanceErr.Error(), "instance mismatch") {
-		t.Fatalf("absent instance should fail with a mismatch, got %v", instanceErr)
-	}
-}
-
-func TestCheckErrorRejectsNil(t *testing.T) {
-	t.Parallel()
-	if _, err := testhelper.CheckError(nil); err == nil {
-		t.Fatal("nil error should be rejected")
-	}
-}
-
-// TestCheckErrorRejectsTypedNilProblemError is the Blocker-2 regression for the
-// consumer TestHelper: a typed-nil *problem.Error matches errors.As but must be
-// reported as a descriptive mismatch instead of panicking on a nil deref.
-func TestCheckErrorRejectsTypedNilProblemError(t *testing.T) {
-	t.Parallel()
-	var nilErr *problem.Error
-	recovered, err := testhelper.CheckError(nilErr)
-	if err == nil {
-		t.Fatal("typed-nil *problem.Error should be rejected")
-	}
-	if !strings.Contains(err.Error(), "typed-nil") {
-		t.Fatalf("expected a descriptive typed-nil mismatch, got %q", err.Error())
-	}
-	if !recovered.Equal(problem.Problem{}) {
-		t.Fatalf("expected a zero envelope on rejection, got %+v", recovered)
-	}
-}
-
-func TestCheckErrorRejectsNonError(t *testing.T) {
-	t.Parallel()
-	if _, err := testhelper.CheckError(errors.New("plain")); err == nil {
-		t.Fatal("non-Error should be rejected")
-	}
-}
-
-func TestCheckErrorPropagatesFieldMismatch(t *testing.T) {
-	t.Parallel()
-	err := problem.NewError(goodProblem())
-	if _, checkErr := testhelper.CheckError(err, testhelper.ExpectStatus(500)); checkErr == nil {
-		t.Fatal("field mismatch should propagate")
-	}
-}
-
-func TestAssertErrorReportsPassAndFailure(t *testing.T) {
-	t.Parallel()
-	pass := &recordingT{}
-	recovered := testhelper.AssertError(pass, problem.NewError(goodProblem()), testhelper.ExpectID("entity-not-found"))
-	if pass.failed {
-		t.Fatalf("known-good should not fail: %s", pass.message)
-	}
-	if recovered.Status != 404 {
-		t.Fatalf("expected recovered envelope, got %+v", recovered)
-	}
-	fail := &recordingT{}
-	testhelper.AssertError(fail, errors.New("plain"))
-	if !fail.failed {
-		t.Fatal("non-Error should fail")
+			// Act
+			_, err := testhelper.CheckError(
+				problem.NewError(envelope),
+				testhelper.ExpectID(problemType.ID),
+				testhelper.ExpectStatus(problemType.Status),
+				testhelper.ExpectRecoverable(problemType.Recoverable),
+				testhelper.ExpectData(nil),
+			)
+			// Assert
+			if err != nil {
+				t.Fatalf("generic %s: %v", problemType.ID, err)
+			}
+		})
 	}
 }

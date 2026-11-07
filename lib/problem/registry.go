@@ -1,27 +1,17 @@
 package problem
 
-// Type is a versioned problem-type declaration. Version is part of the
-// contract identity (C0 §2): bumping it mints a NEW problem type URI rather than
-// mutating an existing one.
+// Type is a versioned problem declaration; a new Version mints a new type URI.
 type Type struct {
-	// ID is the stable identifier, e.g. "entity-not-found".
-	ID string
-	// Title is a short human-readable title.
-	Title string
-	// Version is the contract version segment, e.g. "v1".
-	Version string
-	// Status is the default HTTP status hint (0 means "no default").
-	Status int
-	// Recoverable reports whether the frontend may offer a retry (C0 §2/§14).
+	ID          string
+	Title       string
+	Version     string
+	Status      int
 	Recoverable bool
-	// DataSchema is the JSON Schema describing the `data` extension payload.
-	DataSchema map[string]any
+	DataSchema  map[string]any
 }
 
-// DuplicateTypeError reports an attempt to register a problem id that is
-// already present in a [Registry].
+// DuplicateTypeError reports a problem id registered twice.
 type DuplicateTypeError struct {
-	// ID is the duplicate problem id.
 	ID string
 }
 
@@ -30,10 +20,8 @@ func (e *DuplicateTypeError) Error() string {
 	return "problem type already registered: " + e.ID
 }
 
-// UnknownTypeError reports a lookup for a problem id that is not
-// registered.
+// UnknownTypeError reports a lookup for an unregistered problem id.
 type UnknownTypeError struct {
-	// ID is the missing problem id.
 	ID string
 }
 
@@ -42,19 +30,14 @@ func (e *UnknownTypeError) Error() string {
 	return "no problem type registered for id: " + e.ID
 }
 
-// Registry is an enumerable registry of [Type]s bound to an
-// [ErrorPortal]. The portal supplies the LPSM segments every type URI is built
-// from, so a registry is the per-service×landscape source of truth the catalog
-// emitter renders into Problem CR content (C0 §14).
+// Registry is an ordered set of problem types bound to one portal.
 type Registry struct {
 	portal ErrorPortal
 	types  map[string]Type
 	order  []string
 }
 
-// NewRegistry creates a registry bound to portal, optionally
-// pre-populated with types. It returns a [DuplicateTypeError] if types
-// contains a repeated id.
+// NewRegistry creates a registry bound to portal holding types.
 func NewRegistry(portal ErrorPortal, types ...Type) (*Registry, error) {
 	registry := &Registry{portal: portal, types: make(map[string]Type, len(types))}
 	for _, problemType := range types {
@@ -65,12 +48,12 @@ func NewRegistry(portal ErrorPortal, types ...Type) (*Registry, error) {
 	return registry, nil
 }
 
-// Portal returns the error-portal block every type URI is built from.
+// Portal returns the portal every type URI is built from.
 func (r *Registry) Portal() ErrorPortal {
 	return r.portal
 }
 
-// Register adds problemType, rejecting duplicates by id.
+// Register adds problemType, rejecting a duplicate id.
 func (r *Registry) Register(problemType Type) error {
 	if _, exists := r.types[problemType.ID]; exists {
 		return &DuplicateTypeError{ID: problemType.ID}
@@ -86,8 +69,7 @@ func (r *Registry) Lookup(id string) (Type, bool) {
 	return problemType, ok
 }
 
-// Require returns the type registered for id, or an [UnknownTypeError]
-// when it is absent.
+// Require returns the type registered for id, or an [UnknownTypeError].
 func (r *Registry) Require(id string) (Type, error) {
 	problemType, ok := r.types[id]
 	if !ok {
@@ -105,63 +87,90 @@ func (r *Registry) Entries() []Type {
 	return entries
 }
 
-// TypeURIFor builds the RFC 9457 `type` URI for problemType via the
-// single-source builder and the registry's portal.
+// TypeURIFor builds the type URI for problemType from the registry's portal.
 func (r *Registry) TypeURIFor(problemType Type) (string, error) {
 	return TypeURI(r.portal, problemType.Version, problemType.ID)
 }
 
-// ValidationError is the generic 400 problem: the request body failed
-// validation. It is recoverable and carries a `fields[]` payload.
+// NewProblem builds the envelope for the registered id carrying data.
+func (r *Registry) NewProblem(id string, data map[string]any) (Problem, error) {
+	problemType, err := r.Require(id)
+	if err != nil {
+		return Problem{}, err
+	}
+	typeURI, err := r.TypeURIFor(problemType)
+	if err != nil {
+		return Problem{}, err
+	}
+	status := problemType.Status
+	if status == 0 {
+		status = defaultProblemStatus
+	}
+	return Problem{
+		Type:        typeURI,
+		Title:       problemType.Title,
+		Status:      status,
+		Recoverable: problemType.Recoverable,
+		Data:        data,
+	}, nil
+}
+
+func entityReferenceSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"entityType": map[string]any{"type": "string"},
+			"id":         map[string]any{"type": "string"},
+		},
+		"required":             []any{"entityType", "id"},
+		"additionalProperties": false,
+	}
+}
+
+// ValidationError is the generic 400 problem for a request that failed validation.
 func ValidationError() Type {
 	return Type{
-		ID:          "validation-error",
-		Title:       "Validation error",
+		ID:          "validation_error",
+		Title:       "Validation Error",
 		Version:     defaultProblemVersion,
 		Status:      400,
 		Recoverable: true,
 		DataSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"fields": map[string]any{
+				"issues": map[string]any{
 					"type": "array",
 					"items": map[string]any{
 						"type": "object",
 						"properties": map[string]any{
-							"path":    map[string]any{"type": "string"},
+							"path":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 							"message": map[string]any{"type": "string"},
+							"code":    map[string]any{"type": "string"},
 						},
-						"required": []any{"path", "message"},
+						"required":             []any{"path", "message"},
+						"additionalProperties": false,
 					},
 				},
 			},
-			"required": []any{"fields"},
+			"required":             []any{"issues"},
+			"additionalProperties": false,
 		},
 	}
 }
 
-// EntityNotFound is the generic 404 problem: the referenced entity does not
-// exist. It is not recoverable.
+// EntityNotFound is the generic 404 problem for a missing entity.
 func EntityNotFound() Type {
 	return Type{
-		ID:          "entity-not-found",
-		Title:       "Entity not found",
+		ID:          "entity_not_found",
+		Title:       "Entity Not Found",
 		Version:     defaultProblemVersion,
 		Status:      404,
 		Recoverable: false,
-		DataSchema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"resource": map[string]any{"type": "string"},
-				"id":       map[string]any{},
-			},
-			"required": []any{"resource"},
-		},
+		DataSchema:  entityReferenceSchema(),
 	}
 }
 
-// Conflict is the generic 409 problem: a state conflict (duplicate, stale
-// version, …). It is recoverable.
+// Conflict is the generic 409 problem for a state conflict on an entity.
 func Conflict() Type {
 	return Type{
 		ID:          "conflict",
@@ -169,17 +178,11 @@ func Conflict() Type {
 		Version:     defaultProblemVersion,
 		Status:      409,
 		Recoverable: true,
-		DataSchema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"resource": map[string]any{"type": "string"},
-			},
-		},
+		DataSchema:  entityReferenceSchema(),
 	}
 }
 
-// Unauthenticated is the generic 401 problem: the authenticated identity is
-// missing or invalid. It is recoverable.
+// Unauthenticated is the generic 401 problem for a missing or invalid identity.
 func Unauthenticated() Type {
 	return Type{
 		ID:          "unauthenticated",
@@ -190,8 +193,7 @@ func Unauthenticated() Type {
 	}
 }
 
-// Unauthorized is the generic 403 problem: the identity is authenticated but
-// lacks permission. It is not recoverable.
+// Unauthorized is the generic 403 problem for an identity without permission.
 func Unauthorized() Type {
 	return Type{
 		ID:          "unauthorized",
@@ -202,11 +204,10 @@ func Unauthorized() Type {
 	}
 }
 
-// InvalidJSON is the generic 400 problem: the request body was not valid JSON.
-// It is recoverable.
+// InvalidJSON is the generic 400 problem for a body that is not valid JSON.
 func InvalidJSON() Type {
 	return Type{
-		ID:          "invalid-json",
+		ID:          "invalid_json",
 		Title:       "Invalid JSON",
 		Version:     defaultProblemVersion,
 		Status:      400,
@@ -214,10 +215,7 @@ func InvalidJSON() Type {
 	}
 }
 
-// GenericProblems returns the portable v1 baseline catalog in stable order:
-// validation-error, entity-not-found, conflict, unauthenticated, unauthorized,
-// invalid-json. Domain problems stay in consumer services and are never part of
-// this set.
+// GenericProblems returns the portable v1 baseline in stable order.
 func GenericProblems() []Type {
 	return []Type{
 		ValidationError(),
@@ -229,8 +227,7 @@ func GenericProblems() []Type {
 	}
 }
 
-// RegisterGenerics registers the [GenericProblems] baseline set on registry,
-// returning the first [DuplicateTypeError] encountered.
+// RegisterGenerics registers [GenericProblems] on registry.
 func RegisterGenerics(registry *Registry) error {
 	for _, problemType := range GenericProblems() {
 		if err := registry.Register(problemType); err != nil {

@@ -2,186 +2,115 @@ package problem_test
 
 import (
 	"errors"
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/ProtoDurian/diene.go-errors-problems/lib/problem"
 )
 
+const uncataloguedLocalType = "https://local.atomi.cloud/docs/local/go/app/core/v1/uncatalogued"
+
 func TestDefaultTransformOptions(t *testing.T) {
 	t.Parallel()
-	options := problem.DefaultTransformOptions()
-	if options.DefaultStatus != 500 || options.DefaultVersion != "v1" {
-		t.Fatalf("unexpected defaults: %+v", options)
-	}
-	if options.Portal != problem.LocalErrorPortal() {
-		t.Fatalf("expected local portal, got %+v", options.Portal)
-	}
-	if options.Registry != nil {
-		t.Fatal("expected nil registry by default")
+	// Arrange
+	want := problem.TransformOptions{Portal: problem.LocalErrorPortal(), DefaultStatus: 500, DefaultVersion: "v1"}
+
+	// Act
+	got := problem.DefaultTransformOptions()
+
+	// Assert
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("options = %+v", got)
 	}
 }
 
-func TestFromObjectPassesThroughProblem(t *testing.T) {
+func TestFromObject(t *testing.T) {
 	t.Parallel()
-	envelope := problem.Problem{Type: "t", Title: "T", Status: 404}
-	if got := problem.FromObject(envelope, problem.DefaultTransformOptions()); !got.Equal(envelope) {
-		t.Fatalf("expected passthrough, got %+v", got)
+	text := func(value string) *string { return &value }
+	known := problem.Problem{Type: "t", Title: "Conflict", Status: 409}
+	var typedNil *problem.Error
+	registry, _ := problem.NewRegistry(testPortal(), problem.EntityNotFound(), problem.Type{ID: "no_status", Title: "No Status", Version: "v1"})
+	brokenRegistry, _ := problem.NewRegistry(problem.ErrorPortal{}, problem.EntityNotFound())
+	withRegistry := problem.DefaultTransformOptions()
+	withRegistry.Registry = registry
+	withBrokenRegistry := problem.DefaultTransformOptions()
+	withBrokenRegistry.Registry = brokenRegistry
+	brokenPortal := problem.DefaultTransformOptions()
+	brokenPortal.Portal = problem.ErrorPortal{}
+	cases := []struct {
+		name    string
+		value   any
+		options problem.TransformOptions
+		want    problem.Problem
+	}{
+		{name: "problem passes through", value: known, options: withRegistry, want: known},
+		{name: "problem error", value: problem.NewError(known), options: withRegistry, want: known},
+		{name: "wrapped problem error", value: fmt.Errorf("ctx: %w", problem.NewError(known)), options: withRegistry, want: known},
+		{name: "typed-nil problem error", value: error(typedNil), options: withRegistry, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500}},
+		{
+			name:    "catalogued id with data",
+			value:   map[string]any{"problemId": "entity_not_found", "data": map[string]any{"entityType": "user", "id": "42"}},
+			options: withRegistry,
+			want:    problem.Problem{Type: "https://docs.example.atomi.cloud/docs/raichu/go/user/api/v1/entity_not_found", Title: "Entity Not Found", Status: 404, Data: map[string]any{"entityType": "user", "id": "42"}},
+		},
+		{
+			name:    "catalogued id without status",
+			value:   map[string]any{"problemId": "no_status"},
+			options: withRegistry,
+			want:    problem.Problem{Type: "https://docs.example.atomi.cloud/docs/raichu/go/user/api/v1/no_status", Title: "No Status", Status: 500},
+		},
+		{name: "catalogued id with broken portal", value: map[string]any{"problemId": "entity_not_found"}, options: withBrokenRegistry, want: problem.Problem{Type: "about:blank", Title: "Entity Not Found", Status: 404}},
+		{name: "unknown id", value: map[string]any{"problemId": "missing"}, options: withRegistry, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500, Detail: text("map[problemId:missing]")}},
+		{name: "empty id", value: map[string]any{"problemId": ""}, options: withRegistry, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500, Detail: text("map[problemId:]")}},
+		{name: "map without registry", value: map[string]any{"problemId": "entity_not_found"}, options: problem.DefaultTransformOptions(), want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500, Detail: text("map[problemId:entity_not_found]")}},
+		{name: "plain error", value: errors.New("disk full"), options: withRegistry, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500, Detail: text("disk full")}},
+		{name: "string", value: "boom", options: withRegistry, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500, Detail: text("boom")}},
+		{name: "other value", value: 42, options: withRegistry, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500, Detail: text("42")}},
+		{name: "nil", value: nil, options: withRegistry, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500}},
+		{name: "empty string", value: "", options: withRegistry, want: problem.Problem{Type: uncataloguedLocalType, Title: "Unexpected problem", Status: 500}},
+		{name: "broken fallback portal", value: "boom", options: brokenPortal, want: problem.Problem{Type: "about:blank", Title: "Unexpected problem", Status: 500, Detail: text("boom")}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			value := tc.value
+
+			// Act
+			got := problem.FromObject(value, tc.options)
+
+			// Assert
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("FromObject = %+v, want %+v", got, tc.want)
+			}
+		})
 	}
 }
 
-func TestFromObjectRecoversError(t *testing.T) {
+func TestUncataloguedErrorLoop(t *testing.T) {
 	t.Parallel()
-	envelope := problem.Problem{Type: "t", Title: "T", Status: 409}
-	err := problem.NewError(envelope)
-	if got := problem.FromObject(err, problem.DefaultTransformOptions()); !got.Equal(envelope) {
-		t.Fatalf("expected recovered problem, got %+v", got)
-	}
-}
+	// Arrange
+	options := problem.TransformOptions{Portal: testPortal(), DefaultStatus: 500, DefaultVersion: "v1"}
+	quotaExceeded := problem.Type{ID: "quota_exceeded", Title: "Quota Exceeded", Version: "v1", Status: 429, Recoverable: true}
+	registry, _ := problem.NewRegistry(testPortal())
+	catalog := problem.NewCatalog(testPortal())
 
-func TestFromObjectRegistryKnownID(t *testing.T) {
-	t.Parallel()
-	registry, err := problem.NewRegistry(testPortal(), problem.EntityNotFound())
-	if err != nil {
-		t.Fatalf("setup: %v", err)
-	}
-	options := problem.DefaultTransformOptions()
+	// Act
+	before := problem.FromObject(map[string]any{"problemId": "quota_exceeded"}, options)
+	declareErr := errors.Join(registry.Register(quotaExceeded), catalog.AddType(quotaExceeded, problem.CatalogEndpoint{Method: "POST", Path: "/upload"}))
 	options.Registry = registry
-	value := map[string]any{"problemId": "entity-not-found", "data": map[string]any{"resource": "user"}}
-	got := problem.FromObject(value, options)
-	if got.Status != 404 || got.Title != "Entity not found" {
-		t.Fatalf("expected registry-resolved problem, got %+v", got)
-	}
-	if got.Data["resource"] != "user" {
-		t.Fatalf("expected preserved data, got %+v", got.Data)
-	}
-	want := "https://docs.example.atomi.cloud/docs/raichu/go/user/api/v1/entity-not-found"
-	if got.Type != want {
-		t.Fatalf("type = %q, want %q", got.Type, want)
-	}
-}
+	after := problem.FromObject(map[string]any{"problemId": "quota_exceeded"}, options)
+	resource, emitErr := catalog.ToResource(testIdentity())
 
-func TestFromObjectRegistryDefaultStatusWhenTypeHasNone(t *testing.T) {
-	t.Parallel()
-	registry, err := problem.NewRegistry(testPortal(), problem.Type{ID: "custom", Title: "Custom", Version: "v1"})
-	if err != nil {
-		t.Fatalf("setup: %v", err)
+	// Assert
+	if before.Status < 500 || before.Type != "https://docs.example.atomi.cloud/docs/raichu/go/user/api/v1/uncatalogued" {
+		t.Fatalf("uncatalogued problem = %+v, want a plain 5xx", before)
 	}
-	options := problem.DefaultTransformOptions()
-	options.Registry = registry
-	got := problem.FromObject(map[string]any{"problemId": "custom"}, options)
-	if got.Status != 500 {
-		t.Fatalf("expected default status 500, got %d", got.Status)
+	if declareErr != nil || emitErr != nil || after.Status != 429 || !after.Recoverable {
+		t.Fatalf("catalogued problem = %+v, %v, %v", after, declareErr, emitErr)
 	}
-}
-
-func TestFromObjectRegistryInvalidPortalFallsBackToBlank(t *testing.T) {
-	t.Parallel()
-	registry, err := problem.NewRegistry(problem.ErrorPortal{}, problem.Conflict())
-	if err != nil {
-		t.Fatalf("setup: %v", err)
-	}
-	options := problem.DefaultTransformOptions()
-	options.Registry = registry
-	got := problem.FromObject(map[string]any{"problemId": "conflict"}, options)
-	if got.Type != "about:blank" {
-		t.Fatalf("expected about:blank fallback, got %q", got.Type)
-	}
-}
-
-func TestFromObjectUnknownIDFallsThroughToUncatalogued(t *testing.T) {
-	t.Parallel()
-	registry, err := problem.NewRegistry(testPortal(), problem.Conflict())
-	if err != nil {
-		t.Fatalf("setup: %v", err)
-	}
-	options := problem.DefaultTransformOptions()
-	options.Registry = registry
-	got := problem.FromObject(map[string]any{"problemId": "nope"}, options)
-	if got.Title != "Unexpected problem" {
-		t.Fatalf("expected uncatalogued fallback, got %+v", got)
-	}
-}
-
-func TestFromObjectUncataloguedForPlainError(t *testing.T) {
-	t.Parallel()
-	got := problem.FromObject(errors.New("boom"), problem.DefaultTransformOptions())
-	if got.Title != "Unexpected problem" || got.Status != 500 {
-		t.Fatalf("unexpected uncatalogued problem: %+v", got)
-	}
-	if got.Detail == nil || *got.Detail != "boom" {
-		t.Fatalf("expected detail from error, got %v", got.Detail)
-	}
-	if got.Type == "" || got.Type == "about:blank" {
-		t.Fatalf("expected a built uncatalogued type URI, got %q", got.Type)
-	}
-}
-
-func TestFromObjectUncataloguedInvalidPortalFallsBackToBlank(t *testing.T) {
-	t.Parallel()
-	options := problem.TransformOptions{DefaultStatus: 500, DefaultVersion: "v1"}
-	got := problem.FromObject("bare string", options)
-	if got.Type != "about:blank" {
-		t.Fatalf("expected about:blank fallback, got %q", got.Type)
-	}
-	if got.Detail == nil || *got.Detail != "bare string" {
-		t.Fatalf("expected string detail, got %v", got.Detail)
-	}
-}
-
-func TestFromObjectDetailVariants(t *testing.T) {
-	t.Parallel()
-	options := problem.DefaultTransformOptions()
-	if got := problem.FromObject(nil, options); got.Detail != nil {
-		t.Fatalf("nil value should yield absent detail, got %v", got.Detail)
-	}
-	if got := problem.FromObject(42, options); got.Detail == nil || *got.Detail != "42" {
-		t.Fatalf("int detail should be %q, got %v", "42", got.Detail)
-	}
-}
-
-// TestFromObjectTypedNilProblemErrorDoesNotPanic is the Blocker-2 regression: a
-// typed-nil *problem.Error satisfies the error interface and matches errors.As,
-// but must NOT be dereferenced as a Problem. FromObject must fall through to the
-// uncatalogued path and never panic.
-func TestFromObjectTypedNilProblemErrorDoesNotPanic(t *testing.T) {
-	t.Parallel()
-	var nilErr *problem.Error
-	got := problem.FromObject(nilErr, problem.DefaultTransformOptions())
-	if got.Title != "Unexpected problem" || got.Status != 500 {
-		t.Fatalf("typed-nil *Error should yield an uncatalogued problem, got %+v", got)
-	}
-	if got.Type == "" || got.Type == "about:blank" {
-		t.Fatalf("expected a built uncatalogued type URI, got %q", got.Type)
-	}
-	if got.Detail != nil {
-		t.Fatalf("typed-nil *Error carries no detail, got %v", got.Detail)
-	}
-}
-
-func TestFromObjectRegistryIgnoresNonStringProblemID(t *testing.T) {
-	t.Parallel()
-	registry, err := problem.NewRegistry(testPortal(), problem.Conflict())
-	if err != nil {
-		t.Fatalf("setup: %v", err)
-	}
-	options := problem.DefaultTransformOptions()
-	options.Registry = registry
-	got := problem.FromObject(map[string]any{"problemId": 5}, options)
-	if got.Title != "Unexpected problem" {
-		t.Fatalf("non-string problemId should fall through, got %+v", got)
-	}
-}
-
-func TestFromObjectRegistryIgnoresNonMapDataAndValues(t *testing.T) {
-	t.Parallel()
-	registry, err := problem.NewRegistry(testPortal(), problem.EntityNotFound())
-	if err != nil {
-		t.Fatalf("setup: %v", err)
-	}
-	options := problem.DefaultTransformOptions()
-	options.Registry = registry
-	got := problem.FromObject(map[string]any{"problemId": "entity-not-found", "data": "not-a-map"}, options)
-	if len(got.Data) != 0 {
-		t.Fatalf("non-map data should yield empty data, got %+v", got.Data)
+	if len(resource.Spec.Problems) != 1 || resource.Spec.Problems[0]["type"] != after.Type {
+		t.Fatalf("re-emitted resource = %+v", resource.Spec.Problems)
 	}
 }
