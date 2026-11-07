@@ -65,6 +65,11 @@ stays at `1.0.0` in-branch, `probes/dotnet-lib-api-compatibility.ts` packs with
   the collector.
 - `task test:meta` independently measures `[*.TestHelper]*` at 100%. Its tests
   include known-good and known-bad assertion cases.
+- `task test:sit` proves real OTLP/HTTP export: `SitTest/` wires a host with
+  `AddAtomiOtel` and checks traces, metrics and logs reach a test-only loopback
+  receiver on port 4318 as `application/x-protobuf`. Each run binds a random
+  `127.x.y.z` address, so parallel runs never collide. It records coverage with
+  no minimum and is not part of the aggregate `task test`.
 
 CI uploads each tier's Cobertura report as a build artifact; the local merged
 thresholds are authoritative.

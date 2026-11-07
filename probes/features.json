@@ -298,5 +298,10 @@
     "template": "diene/dotnet-lib",
     "name": "dotnet-lib-probe-inventory",
     "class": "presence"
+  },
+  {
+    "template": "diene/dotnet-otel",
+    "name": "dotnet-otel-sit",
+    "class": "gate"
   }
 ]
