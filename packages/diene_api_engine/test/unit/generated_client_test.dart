@@ -103,4 +103,17 @@ void main() {
       expect(sent.path, contains('v3'));
     });
   });
+
+  group('ServiceSdk', () {
+    test('reports the version of the spec it was generated from', () {
+      // Arrange
+      const String specVersion = '1.0.0';
+
+      // Act
+      final String version = ServiceSdk.version;
+
+      // Assert
+      expect(version, specVersion);
+    });
+  });
 }
