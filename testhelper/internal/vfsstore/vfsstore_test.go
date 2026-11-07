@@ -72,6 +72,10 @@ func TestFaults(t *testing.T) {
 		run  func() error
 		id   string
 	}{
+		{"write onto a directory", func() error { return store.Write("/a", nil, interfaces.WriteOptions{}) }, "path-is-directory"},
+		{"write under a file", func() error { return store.Write("/a/file/x/y", nil, interfaces.WriteOptions{CreateParents: true}) }, "not-a-directory"},
+		{"mkdir onto a file", func() error { return store.CreateDirectory("/a/file", interfaces.DirectoryOptions{Recursive: true}) }, "path-is-file"},
+		{"mkdir under a file", func() error { return store.CreateDirectory("/a/file/x", interfaces.DirectoryOptions{}) }, "not-a-directory"},
 		{"read bytes missing", func() error { _, err := store.ReadBytes("/missing"); return err }, "path-not-found"},
 		{"read text missing", func() error { _, err := store.ReadText("/missing"); return err }, "path-not-found"},
 		{"write without parent", func() error { return store.Write("/missing/file", nil, interfaces.WriteOptions{}) }, "path-not-found"},
@@ -154,11 +158,12 @@ func TestCreateDirectory(t *testing.T) {
 
 	// Act
 	topErr := store.CreateDirectory("/top", interfaces.DirectoryOptions{})
+	againErr := store.CreateDirectory("/top", interfaces.DirectoryOptions{})
 	deepErr := store.CreateDirectory("/created/a/b", interfaces.DirectoryOptions{Recursive: true})
 
 	// Assert
-	if topErr != nil || deepErr != nil {
-		t.Fatal(topErr, deepErr)
+	if topErr != nil || againErr != nil || deepErr != nil {
+		t.Fatal(topErr, againErr, deepErr)
 	}
 	if !slices.Equal(store.Directories(), []string{"/", "/created", "/created/a", "/created/a/b", "/top"}) {
 		t.Fatalf("directories: %v", store.Directories())
@@ -191,6 +196,32 @@ func TestDeleteRootKeepsRoot(t *testing.T) {
 	// Assert
 	if err != nil || !slices.Equal(store.Directories(), []string{"/"}) || len(store.Files()) != 0 {
 		t.Fatalf("delete root: %v %v", err, store.Directories())
+	}
+}
+
+func TestFileAncestor(t *testing.T) {
+	// Arrange
+	store := vfsstore.New()
+	store.Seed(map[string][]byte{"/a/file": nil}, []string{"/a"})
+	cases := []struct {
+		path   string
+		want   string
+		wantOK bool
+	}{
+		{"/a/file/x/y", "/a/file", true},
+		{"/a/file/x", "/a/file", true},
+		{"/a/file", "", false},
+		{"/a/other", "", false},
+		{"/", "", false},
+	}
+	for _, testCase := range cases {
+		// Act
+		got, ok := store.FileAncestor(testCase.path)
+
+		// Assert
+		if got != testCase.want || ok != testCase.wantOK {
+			t.Fatalf("FileAncestor(%q) = %q, %v", testCase.path, got, ok)
+		}
 	}
 }
 

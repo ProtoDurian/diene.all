@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -26,6 +27,10 @@ type recorder struct{ failures []string }
 
 func (r *recorder) Errorf(format string, args ...any) {
 	r.failures = append(r.failures, fmt.Sprintf(format, args...))
+}
+
+func (r *recorder) tripped(step string) bool {
+	return slices.ContainsFunc(r.failures, func(failure string) bool { return strings.HasPrefix(failure, step+":") })
 }
 
 func isProblem(err error) bool {
@@ -45,68 +50,98 @@ func expectNoError(r reporter, step string, err error) {
 	}
 }
 
+func expectPresent(r reporter, vfs interfaces.Vfs, step, name string) {
+	if exists, err := vfs.Exists(context.Background(), name); err != nil || !exists {
+		r.Errorf("%s: want %q present, got %v %v", step, name, exists, err)
+	}
+}
+
+func expectAbsent(r reporter, vfs interfaces.Vfs, step, name string) {
+	if exists, err := vfs.Exists(context.Background(), name); err != nil || exists {
+		r.Errorf("%s: want %q absent, got %v %v", step, name, exists, err)
+	}
+}
+
 func vfsContract(r reporter, vfs interfaces.Vfs) {
 	ctx := context.Background()
-	if exists, err := vfs.Exists(ctx, "/"); err != nil || !exists {
-		r.Errorf("root must exist: %v %v", exists, err)
-	}
-	if exists, err := vfs.Exists(ctx, "/missing"); err != nil || exists {
-		r.Errorf("missing path must not exist: %v %v", exists, err)
-	}
+	expectPresent(r, vfs, "root exists", "/")
+	expectAbsent(r, vfs, "missing path", "/missing")
 	_, err := vfs.ReadText(ctx, "/missing")
 	expectProblem(r, "read missing text", err)
 	_, err = vfs.ReadBytes(ctx, "/missing")
 	expectProblem(r, "read missing bytes", err)
-	expectProblem(r, "write without parent", vfs.WriteText(ctx, "/no/parent.txt", "x", interfaces.WriteOptions{}))
-	if exists, _ := vfs.Exists(ctx, "/no"); exists {
-		r.Errorf("a failed write must not create its parent")
-	}
+
+	expectProblem(r, "write text without parent", vfs.WriteText(ctx, "/no/parent.txt", "x", interfaces.WriteOptions{}))
+	expectAbsent(r, vfs, "write text without parent", "/no")
+	expectProblem(r, "write bytes without parent", vfs.WriteBytes(ctx, "/nob/parent.bin", []byte{1}, interfaces.WriteOptions{}))
+	expectAbsent(r, vfs, "write bytes without parent", "/nob")
 	expectNoError(r, "write text with parents", vfs.WriteText(ctx, "/docs/a.txt", "hi", interfaces.WriteOptions{CreateParents: true}))
 	expectNoError(r, "write bytes", vfs.WriteBytes(ctx, "/docs/b.bin", []byte{1, 2, 3}, interfaces.WriteOptions{}))
+	expectNoError(r, "write nested", vfs.WriteText(ctx, "/docs/sub/c.txt", "c", interfaces.WriteOptions{CreateParents: true}))
+	expectNoError(r, "write bytes with parents", vfs.WriteBytes(ctx, "/tree/deep/d.bin", []byte{4}, interfaces.WriteOptions{CreateParents: true}))
 	if text, textErr := vfs.ReadText(ctx, "/docs/a.txt"); textErr != nil || text != "hi" {
 		r.Errorf("read text: %q %v", text, textErr)
 	}
 	if bytes, bytesErr := vfs.ReadBytes(ctx, "/docs/b.bin"); bytesErr != nil || !slices.Equal(bytes, []byte{1, 2, 3}) {
 		r.Errorf("read bytes: %v %v", bytes, bytesErr)
 	}
+	if bytes, bytesErr := vfs.ReadBytes(ctx, "/tree/deep/d.bin"); bytesErr != nil || !slices.Equal(bytes, []byte{4}) {
+		r.Errorf("write bytes with parents: %v %v", bytes, bytesErr)
+	}
+
+	expectProblem(r, "write onto a directory", vfs.WriteText(ctx, "/docs/sub", "x", interfaces.WriteOptions{}))
+	expectProblem(r, "write under a file", vfs.WriteText(ctx, "/docs/a.txt/child", "x", interfaces.WriteOptions{CreateParents: true}))
+	expectProblem(r, "mkdir onto a file", vfs.CreateDirectory(ctx, "/docs/a.txt", interfaces.DirectoryOptions{}))
+	expectProblem(r, "mkdir under a file", vfs.CreateDirectory(ctx, "/docs/a.txt/child", interfaces.DirectoryOptions{Recursive: true}))
+	expectNoError(r, "mkdir existing directory", vfs.CreateDirectory(ctx, "/docs", interfaces.DirectoryOptions{}))
+
 	want := []interfaces.VfsEntry{
 		{Path: "/docs/a.txt", Type: interfaces.VfsEntryTypeFile, Size: 2},
 		{Path: "/docs/b.bin", Type: interfaces.VfsEntryTypeFile, Size: 3},
+		{Path: "/docs/sub", Type: interfaces.VfsEntryTypeDirectory, Size: 0},
 	}
 	if entries, listErr := vfs.List(ctx, "/docs", interfaces.ListOptions{}); listErr != nil || !slices.Equal(withoutTimes(entries), want) {
 		r.Errorf("list direct: %#v %v", entries, listErr)
 	}
 	expectProblem(r, "mkdir without parent", vfs.CreateDirectory(ctx, "/x/y", interfaces.DirectoryOptions{}))
 	expectNoError(r, "mkdir recursive", vfs.CreateDirectory(ctx, "/x/y", interfaces.DirectoryOptions{Recursive: true}))
-	if entries, listErr := vfs.List(ctx, "/", interfaces.ListOptions{Recursive: true}); listErr != nil || !slices.Equal(sortedPaths(entries), []string{"/docs", "/docs/a.txt", "/docs/b.bin", "/x", "/x/y"}) {
+	wantPaths := []string{"/docs", "/docs/a.txt", "/docs/b.bin", "/docs/sub", "/docs/sub/c.txt", "/tree", "/tree/deep", "/tree/deep/d.bin", "/x", "/x/y"}
+	if entries, listErr := vfs.List(ctx, "/", interfaces.ListOptions{Recursive: true}); listErr != nil || !slices.Equal(sortedPaths(entries), wantPaths) {
 		r.Errorf("list recursive: %v %v", sortedPaths(entries), listErr)
 	}
 	_, err = vfs.List(ctx, "/missing", interfaces.ListOptions{})
 	expectProblem(r, "list missing", err)
+	_, err = vfs.List(ctx, "/docs/a.txt", interfaces.ListOptions{})
+	expectProblem(r, "list a file", err)
+
 	expectProblem(r, "delete missing", vfs.Delete(ctx, "/missing", interfaces.DirectoryOptions{}))
 	expectProblem(r, "delete non-empty", vfs.Delete(ctx, "/docs", interfaces.DirectoryOptions{}))
+	expectPresent(r, vfs, "delete non-empty", "/docs/a.txt")
 	expectNoError(r, "delete file", vfs.Delete(ctx, "/docs/a.txt", interfaces.DirectoryOptions{}))
 	expectNoError(r, "delete tree", vfs.Delete(ctx, "/docs", interfaces.DirectoryOptions{Recursive: true}))
-	if exists, _ := vfs.Exists(ctx, "/docs/b.bin"); exists {
-		r.Errorf("a recursive delete must remove descendants")
-	}
+	expectAbsent(r, vfs, "delete tree", "/docs/sub/c.txt")
 }
 
 func systemContract(r reporter, system interfaces.System, setEnvironment func(name, value string)) {
 	setEnvironment("DIENE_CONTRACT_EMPTY", "")
 	if value, err := system.Environment("DIENE_CONTRACT_EMPTY"); err != nil || value == nil || *value != "" {
-		r.Errorf("an empty variable is present: %v %v", value, err)
+		r.Errorf("empty variable: want a pointer to \"\", got %v %v", value, err)
 	}
 	if value, err := system.Environment("DIENE_CONTRACT_UNSET"); err != nil || value != nil {
-		r.Errorf("an unset variable is nil: %v %v", value, err)
+		r.Errorf("unset variable: want nil, got %v %v", value, err)
 	}
 	if directory, err := system.CurrentDirectory(); err != nil || !filepath.IsAbs(directory) {
-		r.Errorf("current directory must be absolute: %q %v", directory, err)
+		r.Errorf("current directory: want an absolute path, got %q %v", directory, err)
 	}
 	if now, err := system.NowUTC(); err != nil || now.Location() != time.UTC {
-		r.Errorf("clock must be UTC: %v %v", now, err)
+		r.Errorf("clock: want UTC, got %v %v", now, err)
 	}
 	expectNoError(r, "zero delay", system.Delay(context.Background(), 0))
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := system.Delay(cancelled, time.Hour); !isProblem(err) || !errors.Is(err, context.Canceled) {
+		r.Errorf("cancelled delay: want a problem error wrapping context.Canceled, got %v", err)
+	}
 }
 
 func withoutTimes(entries []interfaces.VfsEntry) []interfaces.VfsEntry {
@@ -175,19 +210,23 @@ func (v osVfs) WriteText(ctx context.Context, name, content string, options inte
 
 func (v osVfs) List(_ context.Context, name string, options interfaces.ListOptions) ([]interfaces.VfsEntry, error) {
 	base := rooted(name)
-	if _, err := v.root.Stat(base); err != nil {
+	info, err := v.root.Stat(base)
+	if err != nil {
 		return nil, fault(err)
 	}
+	if !info.IsDir() {
+		return nil, fault(&fs.PathError{Op: "list", Path: name, Err: syscall.ENOTDIR})
+	}
 	entries := make([]interfaces.VfsEntry, 0)
-	err := fs.WalkDir(v.root.FS(), base, func(current string, entry fs.DirEntry, walkErr error) error {
+	err = fs.WalkDir(v.root.FS(), base, func(current string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil || current == base {
 			return walkErr
 		}
-		info, infoErr := entry.Info()
+		entryInfo, infoErr := entry.Info()
 		if infoErr != nil {
 			return infoErr
 		}
-		listed := interfaces.NewVfsEntry("/"+current, interfaces.VfsEntryTypeFile, info.Size(), nil)
+		listed := interfaces.NewVfsEntry("/"+current, interfaces.VfsEntryTypeFile, entryInfo.Size(), nil)
 		if entry.IsDir() {
 			listed = interfaces.NewVfsEntry("/"+current, interfaces.VfsEntryTypeDirectory, 0, nil)
 		}
@@ -204,7 +243,13 @@ func (v osVfs) CreateDirectory(_ context.Context, name string, options interface
 	if options.Recursive {
 		return fault(v.root.MkdirAll(rooted(name), 0o750))
 	}
-	return fault(v.root.Mkdir(rooted(name), 0o750))
+	err := v.root.Mkdir(rooted(name), 0o750)
+	if errors.Is(err, fs.ErrExist) {
+		if info, statErr := v.root.Lstat(rooted(name)); statErr == nil && info.IsDir() {
+			return nil
+		}
+	}
+	return fault(err)
 }
 
 func (v osVfs) Delete(_ context.Context, name string, options interfaces.DirectoryOptions) error {
@@ -245,10 +290,16 @@ func (osSystem) Delay(ctx context.Context, d time.Duration) error {
 	}
 }
 
-type ignoresCreateParents struct{ interfaces.Vfs }
+type textIgnoresCreateParents struct{ interfaces.Vfs }
 
-func (v ignoresCreateParents) WriteText(ctx context.Context, name, content string, _ interfaces.WriteOptions) error {
+func (v textIgnoresCreateParents) WriteText(ctx context.Context, name, content string, _ interfaces.WriteOptions) error {
 	return v.Vfs.WriteText(ctx, name, content, interfaces.WriteOptions{CreateParents: true})
+}
+
+type bytesIgnoreCreateParents struct{ interfaces.Vfs }
+
+func (v bytesIgnoreCreateParents) WriteBytes(ctx context.Context, name string, bytes []byte, _ interfaces.WriteOptions) error {
+	return v.Vfs.WriteBytes(ctx, name, bytes, interfaces.WriteOptions{CreateParents: true})
 }
 
 type plainReadErrors struct{ interfaces.Vfs }
@@ -265,6 +316,12 @@ type flatList struct{ interfaces.Vfs }
 
 func (v flatList) List(ctx context.Context, name string, _ interfaces.ListOptions) ([]interfaces.VfsEntry, error) {
 	return v.Vfs.List(ctx, name, interfaces.ListOptions{})
+}
+
+type alwaysRecursiveList struct{ interfaces.Vfs }
+
+func (v alwaysRecursiveList) List(ctx context.Context, name string, _ interfaces.ListOptions) ([]interfaces.VfsEntry, error) {
+	return v.Vfs.List(ctx, name, interfaces.ListOptions{Recursive: true})
 }
 
 type alwaysRecursiveDelete struct{ interfaces.Vfs }
@@ -290,7 +347,17 @@ func (s localClock) NowUTC() (time.Time, error) {
 	return now.In(time.FixedZone("local", 3600)), err
 }
 
+type ignoresContextDelay struct{ interfaces.System }
+
+func (s ignoresContextDelay) Delay(_ context.Context, d time.Duration) error {
+	return s.System.Delay(context.Background(), d)
+}
+
 func newMemoryVfs() interfaces.Vfs { return testhelper.NewInMemoryVfs(testhelper.InMemoryVfsOptions{}) }
+
+func newMemorySystem() *testhelper.InMemorySystem {
+	return testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{})
+}
 
 func TestVfsContractParity(t *testing.T) {
 	// Arrange
@@ -316,21 +383,27 @@ func TestVfsContractParity(t *testing.T) {
 
 func TestVfsContractRejectsKnownBad(t *testing.T) {
 	// Arrange
-	implementations := map[string]interfaces.Vfs{
-		"ignores CreateParents": ignoresCreateParents{newMemoryVfs()},
-		"plain read errors":     plainReadErrors{newMemoryVfs()},
-		"flat recursive list":   flatList{newMemoryVfs()},
-		"always recursive rm":   alwaysRecursiveDelete{newMemoryVfs()},
+	cases := []struct {
+		name string
+		vfs  interfaces.Vfs
+		step string
+	}{
+		{"text ignores CreateParents", textIgnoresCreateParents{newMemoryVfs()}, "write text without parent"},
+		{"bytes ignore CreateParents", bytesIgnoreCreateParents{newMemoryVfs()}, "write bytes without parent"},
+		{"plain read errors", plainReadErrors{newMemoryVfs()}, "read missing text"},
+		{"flat recursive list", flatList{newMemoryVfs()}, "list recursive"},
+		{"always recursive list", alwaysRecursiveList{newMemoryVfs()}, "list direct"},
+		{"always recursive delete", alwaysRecursiveDelete{newMemoryVfs()}, "delete non-empty"},
 	}
-	for name, vfs := range implementations {
-		t.Run(name, func(t *testing.T) {
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
 			// Act
 			report := &recorder{}
-			vfsContract(report, vfs)
+			vfsContract(report, testCase.vfs)
 
 			// Assert
-			if len(report.failures) == 0 {
-				t.Fatal("the contract accepted a known-bad Vfs")
+			if !report.tripped(testCase.step) {
+				t.Fatalf("the contract did not trip %q: %v", testCase.step, report.failures)
 			}
 		})
 	}
@@ -338,7 +411,7 @@ func TestVfsContractRejectsKnownBad(t *testing.T) {
 
 func TestSystemContractParity(t *testing.T) {
 	// Arrange
-	memory := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{})
+	memory := newMemorySystem()
 	implementations := []struct {
 		name   string
 		system interfaces.System
@@ -361,27 +434,26 @@ func TestSystemContractParity(t *testing.T) {
 
 func TestSystemContractRejectsKnownBad(t *testing.T) {
 	// Arrange
-	implementations := map[string]func() (interfaces.System, func(name, value string)){
-		"empty is unset": func() (interfaces.System, func(name, value string)) {
-			memory := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{})
-			return emptyIsUnset{memory}, memory.SetEnvironment
-		},
-		"local clock": func() (interfaces.System, func(name, value string)) {
-			memory := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{})
-			return localClock{memory}, memory.SetEnvironment
-		},
+	cases := []struct {
+		name string
+		wrap func(interfaces.System) interfaces.System
+		step string
+	}{
+		{"empty is unset", func(s interfaces.System) interfaces.System { return emptyIsUnset{s} }, "empty variable"},
+		{"local clock", func(s interfaces.System) interfaces.System { return localClock{s} }, "clock"},
+		{"ignores context delay", func(s interfaces.System) interfaces.System { return ignoresContextDelay{s} }, "cancelled delay"},
 	}
-	for name, build := range implementations {
-		t.Run(name, func(t *testing.T) {
-			system, set := build()
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			memory := newMemorySystem()
 
 			// Act
 			report := &recorder{}
-			systemContract(report, system, set)
+			systemContract(report, testCase.wrap(memory), memory.SetEnvironment)
 
 			// Assert
-			if len(report.failures) == 0 {
-				t.Fatal("the contract accepted a known-bad System")
+			if !report.tripped(testCase.step) {
+				t.Fatalf("the contract did not trip %q: %v", testCase.step, report.failures)
 			}
 		})
 	}

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// System is the process and clock port; Environment returns nil for an unset variable.
+// System is the process and clock port; Environment returns nil for an unset variable, CurrentDirectory is absolute and Delay returns early with an error when ctx is done.
 type System interface {
 	Environment(name string) (*string, error)
 	CurrentDirectory() (string, error)

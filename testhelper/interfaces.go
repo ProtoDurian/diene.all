@@ -133,13 +133,13 @@ func (s *InMemorySystem) NowUTC() (time.Time, error) {
 	return s.state.now.UTC(), nil
 }
 
-// Delay implements interfaces.System without sleeping.
-func (s *InMemorySystem) Delay(_ context.Context, duration time.Duration) error {
+// Delay implements interfaces.System without sleeping; a done ctx fails unless a result is scripted.
+func (s *InMemorySystem) Delay(ctx context.Context, duration time.Duration) error {
 	s.state.mu.Lock()
 	defer s.state.mu.Unlock()
 	s.state.requestedDelays = append(s.state.requestedDelays, duration)
 	if len(s.state.delayResults) == 0 {
-		return nil
+		return faults.Normalize(ctx.Err())
 	}
 	err := s.state.delayResults[0]
 	s.state.delayResults = s.state.delayResults[1:]

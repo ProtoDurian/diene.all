@@ -61,6 +61,12 @@ func (s *Store) ReadText(path string) (string, error) {
 // Write stores a copy of bytes at path; a missing parent faults unless CreateParents is set.
 func (s *Store) Write(path string, bytes []byte, options interfaces.WriteOptions) error {
 	normalized := Normalize(path)
+	if _, ok := s.directories[normalized]; ok {
+		return faults.PathIsDirectory(normalized)
+	}
+	if file, ok := s.FileAncestor(normalized); ok {
+		return faults.NotADirectory(file)
+	}
 	parentPath := Parent(normalized)
 	if _, ok := s.directories[parentPath]; !ok {
 		if !options.CreateParents {
@@ -97,9 +103,15 @@ func (s *Store) List(path string, options interfaces.ListOptions) ([]interfaces.
 	return entries, nil
 }
 
-// CreateDirectory creates path; a missing parent faults unless Recursive is set.
+// CreateDirectory creates path, a no-op when it is a directory; a missing parent faults unless Recursive is set.
 func (s *Store) CreateDirectory(path string, options interfaces.DirectoryOptions) error {
 	normalized := Normalize(path)
+	if _, ok := s.files[normalized]; ok {
+		return faults.PathIsFile(normalized)
+	}
+	if file, ok := s.FileAncestor(normalized); ok {
+		return faults.NotADirectory(file)
+	}
 	parentPath := Parent(normalized)
 	if _, ok := s.directories[parentPath]; !ok && !options.Recursive {
 		return faults.PathNotFound(parentPath)
@@ -167,6 +179,16 @@ func (s *Store) Directories() []string {
 	}
 	slices.Sort(directories)
 	return directories
+}
+
+// FileAncestor returns the nearest ancestor of a normalized path that is a file.
+func (s *Store) FileAncestor(path string) (string, bool) {
+	for ancestor := Parent(path); ancestor != "/"; ancestor = Parent(ancestor) {
+		if _, ok := s.files[ancestor]; ok {
+			return ancestor, true
+		}
+	}
+	return "", false
 }
 
 // CreateParents ensures path, its ancestors and root are present as directories.

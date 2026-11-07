@@ -104,6 +104,31 @@ func TestInMemorySystemScriptedResults(t *testing.T) {
 	}
 }
 
+func TestInMemorySystemDelayHonoursContext(t *testing.T) {
+	// Arrange
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	system := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{})
+	system.EnqueueDelayResult(nil)
+
+	// Act
+	scriptedErr := system.Delay(cancelled, time.Second)
+	cancelledErr := system.Delay(cancelled, 2*time.Second)
+	liveErr := system.Delay(context.Background(), 3*time.Second)
+
+	// Assert
+	if scriptedErr != nil || liveErr != nil {
+		t.Fatalf("scripted or live delay failed: %v %v", scriptedErr, liveErr)
+	}
+	var problemErr *problem.Error
+	if !errors.As(cancelledErr, &problemErr) || !errors.Is(cancelledErr, context.Canceled) {
+		t.Fatalf("cancelled delay: %v", cancelledErr)
+	}
+	if !slices.Equal(system.RequestedDelays(), []time.Duration{time.Second, 2 * time.Second, 3 * time.Second}) {
+		t.Fatalf("delays: %v", system.RequestedDelays())
+	}
+}
+
 func TestInMemorySystemSnapshotsAreIndependent(t *testing.T) {
 	// Arrange
 	system := testhelper.NewInMemorySystem(testhelper.InMemorySystemOptions{})
@@ -138,6 +163,13 @@ func TestInMemoryVfsFaults(t *testing.T) {
 		{"delete missing", func() error { return vfs.Delete(ctx, "/missing", interfaces.DirectoryOptions{}) }, "path-not-found", 404},
 		{"delete dir holding a file", func() error { return vfs.Delete(ctx, "/a", interfaces.DirectoryOptions{}) }, "directory-not-empty", 409},
 		{"delete dir holding a dir", func() error { return vfs.Delete(ctx, "/parent", interfaces.DirectoryOptions{}) }, "directory-not-empty", 409},
+		{"write bytes onto a directory", func() error { return vfs.WriteBytes(ctx, "/a", nil, interfaces.WriteOptions{}) }, "path-is-directory", 409},
+		{"write text onto a directory", func() error { return vfs.WriteText(ctx, "/a", "", interfaces.WriteOptions{}) }, "path-is-directory", 409},
+		{"write under a file", func() error { return vfs.WriteText(ctx, "/a/file/x", "", interfaces.WriteOptions{CreateParents: true}) }, "not-a-directory", 409},
+		{"mkdir onto a file", func() error { return vfs.CreateDirectory(ctx, "/a/file", interfaces.DirectoryOptions{}) }, "path-is-file", 409},
+		{"mkdir under a file", func() error {
+			return vfs.CreateDirectory(ctx, "/a/file/x", interfaces.DirectoryOptions{Recursive: true})
+		}, "not-a-directory", 409},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

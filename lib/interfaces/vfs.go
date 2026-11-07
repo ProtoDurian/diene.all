@@ -60,7 +60,7 @@ type DirectoryOptions struct {
 // VfsDirectoryOptions is an alias of DirectoryOptions.
 type VfsDirectoryOptions = DirectoryOptions
 
-// Vfs is a filesystem port; paths are opaque and their normalization belongs to the implementation.
+// Vfs is a filesystem port over opaque paths; ReadText reads UTF-8 and creating an existing directory is a no-op.
 type Vfs interface {
 	Exists(ctx context.Context, path string) (bool, error)
 	ReadBytes(ctx context.Context, path string) ([]byte, error)

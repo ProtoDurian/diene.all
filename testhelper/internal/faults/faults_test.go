@@ -22,6 +22,9 @@ func TestIntrinsicFaults(t *testing.T) {
 	}{
 		{"path-not-found", func() error { return faults.PathNotFound("/missing") }, "path-not-found", 404, "/missing"},
 		{"directory-not-empty", func() error { return faults.DirectoryNotEmpty("/dir") }, "directory-not-empty", 409, "/dir"},
+		{"path-is-directory", func() error { return faults.PathIsDirectory("/dir") }, "path-is-directory", 409, "/dir"},
+		{"path-is-file", func() error { return faults.PathIsFile("/file") }, "path-is-file", 409, "/file"},
+		{"not-a-directory", func() error { return faults.NotADirectory("/file") }, "not-a-directory", 409, "/file"},
 		{"terminal-result-not-scripted", func() error { return faults.TerminalNotScripted("tool") }, "terminal-result-not-scripted", 500, "tool"},
 	}
 	for _, testCase := range cases {
