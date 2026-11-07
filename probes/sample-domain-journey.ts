@@ -6,10 +6,10 @@ export default {
   probes: [
     {
       name: 'baseline-sample-domain-journey-green',
-      description: 'The replaceable domain and KV adapter complete a compiled black-box journey.',
+      description: 'The replaceable domain and KV adapter complete the compiled SIT journey.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, 'nix develop .#ci -c ./scripts/validate/sample-journey.sh', 'sample-domain-journey');
+        await expectGreen(repo, 'nix develop .#ci -c ./scripts/ci/sit.sh', 'sample-domain-journey');
       },
     },
   ],
