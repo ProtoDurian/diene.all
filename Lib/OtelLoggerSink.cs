@@ -66,9 +66,7 @@ public sealed class OtelLoggerSink(ILogger logger) : ILoggerSink
         {
             using (_logger.BeginScope(State(record)))
             {
-#pragma warning disable CA2254 // The message IS the caller's data; a compile-time template cannot carry it.
                 _logger.Log(level, "{Message}", record.Message);
-#pragma warning restore CA2254
             }
 
             return Result.Ok<Unit, SeamError>(default);
