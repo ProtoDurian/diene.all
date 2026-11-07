@@ -4,7 +4,7 @@ const DEADCODE = 'nix develop .#ci -c ./scripts/ci/deadcode.sh';
 const CLASS_DECLARATION = /^(?:final |base |sealed |abstract )*class \w+[^{\n]*\{\n/m;
 
 async function findClassFile(repo: any): Promise<string> {
-  for (const candidate of (await repo.glob('packages/*/lib/src/*.dart')).sort()) {
+  for (const candidate of (await repo.glob('packages/*/lib/src/**/*.dart')).sort()) {
     if (CLASS_DECLARATION.test(await repo.read(candidate))) {
       return candidate;
     }
@@ -15,7 +15,9 @@ async function findClassFile(repo: any): Promise<string> {
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
+  setup: {
+    post: ['nix develop .#ci -c flutter pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'],
+  },
   probes: [
     {
       name: 'baseline-deadcode-whole-package-green',

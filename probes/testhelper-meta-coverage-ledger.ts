@@ -6,7 +6,9 @@ const REPORT = 'reports/meta/lcov.info';
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
+  setup: {
+    post: ['nix develop .#ci -c flutter pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'],
+  },
   probes: [
     {
       name: 'baseline-testhelper-meta-coverage-ledger-green',
@@ -15,7 +17,7 @@ export default {
       async run(repo: any) {
         await expectGreen(repo, LEDGER, 'testhelper-meta-coverage-ledger');
         const sources = (await repo.read(REPORT)).split('\n').filter((line: string) => line.startsWith('SF:'));
-        if (sources.length === 0 || !sources.every((line: string) => line.endsWith('/lib/test_helper.dart'))) {
+        if (sources.length === 0 || !sources.every((line: string) => /(:|\/)lib\/test_helper\.dart$/.test(line))) {
           throw new Error(
             `testhelper-meta-coverage-ledger: ledger is not scoped to the TestHelper: ${sources.join(', ')}`,
           );

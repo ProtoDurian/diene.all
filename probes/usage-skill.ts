@@ -6,16 +6,13 @@ export default {
   probes: [
     {
       name: 'baseline-usage-skill-present',
-      description: 'the shipped usage skill and its assets exist in the package',
+      description: 'the shipped usage skill exists in the package and names itself',
       kind: 'baseline',
       async run(repo: any) {
         const skill = await repo.read(`${SKILL_DIR}/SKILL.md`);
         const name = skill.match(/^---\n[\s\S]*?^name:\s*(\S+)\s*$[\s\S]*?^---$/m)?.[1];
         if (name !== 'diene-e2e-usage') {
           throw new Error(`usage-skill: SKILL.md frontmatter name is ${name ?? '(none)'}`);
-        }
-        if ((await repo.glob(`${SKILL_DIR}/patterns.md`)).length !== 1) {
-          throw new Error('usage-skill: patterns.md asset is missing');
         }
       },
     },

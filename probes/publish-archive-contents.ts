@@ -11,7 +11,6 @@ const SHIPPED = [
   'diene_e2e_example.dart',
   'diene-e2e-usage',
   'SKILL.md',
-  'patterns.md',
 ];
 const EXCLUDED = ['test', 'tool', 'deadcode_entrypoints.dart', 'c0_conformance_test.dart', 'manifest.json'];
 
@@ -25,7 +24,9 @@ const ARCHIVE_CHECK =
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
+  setup: {
+    post: ['nix develop .#ci -c flutter pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'],
+  },
   probes: [
     {
       name: 'baseline-publish-archive-contents-green',

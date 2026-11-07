@@ -1,14 +1,21 @@
 import { expectGreen } from './lib/helpers.ts';
 
 const INVENTORY =
-  "nix develop .#ci -c bash -c 'set -euo pipefail; dart --version; cd packages/diene_e2e; " +
-  '{ dart run pana --help 2>&1 || true; } | grep -q -- --dartdoc-version; dart run coverage:format_coverage --help >/dev/null; ' +
-  "dart run dart_code_linter:metrics --help >/dev/null; dart test --help >/dev/null'";
+  "nix develop .#ci -c bash -c 'set -euo pipefail; dart --version; flutter --version; " +
+  'export FLUTTER_ROOT=$(dirname "$(dirname "$(command -v flutter)")"); cd packages/diene_e2e; ' +
+  '{ dart pub global run pana --help 2>&1 || true; } | grep -q -- --dartdoc-version; ' +
+  "dart run dart_code_linter:metrics --help >/dev/null; { flutter test --help 2>&1 || true; } | grep -q -- --coverage-path'";
 
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
+  setup: {
+    post: [
+      'nix develop .#ci -c flutter pub get --offline',
+      'nix develop .#ci -c dart pub global activate pana 0.23.14',
+      'rm -f .git/hooks/pre-commit .git/hooks/commit-msg',
+    ],
+  },
   probes: [
     {
       name: 'baseline-dart-tool-inventory-green',
