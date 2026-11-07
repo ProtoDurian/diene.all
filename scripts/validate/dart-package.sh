@@ -20,8 +20,13 @@ sdk_range='^>=3[.][0-9]+[.][0-9]+ <4[.]0[.]0$'
 [[ $(yq -r '.topics // [] | length' "${member_pubspec}") -lt 1 ]] && echo "❌ member pubspec declares no pub.dev topics" >&2 && exit 1
 [[ $(head -n 1 "${member_dir}/LICENSE") != "MIT License" ]] && echo "❌ ${member_dir}/LICENSE is not the MIT license" >&2 && exit 1
 
-runtime_deps="$(yq -r '.dependencies // {} | length' "${member_pubspec}")"
-[[ ${runtime_deps} -ne 0 ]] && echo "❌ diene_e2e must have zero runtime dependencies (found ${runtime_deps})" >&2 && exit 1
+runtime_deps="$(yq -r '.dependencies // {} | keys | sort | join(" ")' "${member_pubspec}")"
+expected_deps='diene_api_engine diene_auth_engine diene_config diene_core_utils diene_interfaces diene_problems diene_result flutter'
+[[ ${runtime_deps} != "${expected_deps}" ]] && echo "❌ diene_e2e runtime dependencies must be exactly: ${expected_deps} (found: ${runtime_deps})" >&2 && exit 1
+[[ $(yq -r '.dependencies.flutter.sdk // ""' "${member_pubspec}") != "flutter" ]] && echo "❌ the flutter dependency must be the Flutter SDK" >&2 && exit 1
+not_hosted="$(yq -r '.dependencies | to_entries[] | select(.key != "flutter") | select((.value | tag) != "!!str" or (.value | tostring | test("^\^[0-9]+[.][0-9]+[.][0-9]+$") | not)) | .key' "${member_pubspec}")"
+[[ -n ${not_hosted} ]] && echo "❌ runtime dependencies must be hosted caret ranges: ${not_hosted//$'\n'/ }" >&2 && exit 1
+[[ $(yq -r '.dependency_overrides // {} | length' "${member_pubspec}") -ne 0 ]] && echo "❌ diene_e2e must not override dependencies" >&2 && exit 1
 
 if ! yq -r '.workspace[]' pubspec.yaml | grep -qx "packages/diene_e2e"; then
   echo "❌ root pubspec.yaml .workspace must list packages/diene_e2e" >&2
