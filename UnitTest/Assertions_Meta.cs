@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AtomiCloud.Diene.CoreUtils.Json;
 using AtomiCloud.Diene.Problems;
 using AtomiCloud.Diene.Problems.TestHelper;
@@ -117,16 +118,39 @@ public class Assertions_Meta
         // Arrange
         var dataLess = Envelope() with { Data = null };
         using var dataLessResponse = Response(dataLess, HttpStatusCode.UnprocessableEntity);
+        using var dataResponse = Response(Envelope(), HttpStatusCode.UnprocessableEntity);
 
         // Act
         var good = () => dataLess.Should().HaveNoData();
         var bad = () => Envelope().Should().HaveNoData();
         var parsed = (await dataLessResponse.Should().BeRfc9457()).Which;
+        var parsedWithData = (await dataResponse.Should().BeRfc9457()).Which;
+        var parsedBad = () => parsedWithData.Should().HaveNoData();
 
         // Assert
         good.Should().NotThrow();
         bad.Should().Throw<Exception>().WithMessage("*absent*");
         parsed.Should().HaveNoData();
+        parsedBad.Should().Throw<Exception>().WithMessage("*absent*");
+    }
+
+    [Fact]
+    public async Task It_should_reject_a_response_whose_data_member_is_null()
+    {
+        // Arrange
+        var body = JsonNode.Parse(JsonSerializer.Serialize(Envelope() with { Data = null }, AtomiJson.DefaultOptions))!.AsObject();
+        body["data"] = null;
+        using var nullData = new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+        {
+            Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/problem+json"),
+        };
+
+        // Act
+        var act = async () => await nullData.Should().BeRfc9457();
+
+        // Assert
+        body.ToJsonString().Should().Contain("\"data\":null");
+        await act.Should().ThrowAsync<Exception>().WithMessage("*omitted rather than null*");
     }
 
     [Fact]

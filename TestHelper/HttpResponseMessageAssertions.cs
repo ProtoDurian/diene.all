@@ -34,6 +34,10 @@ public static class HttpResponseProblemAssertions
             .BecauseOf(because, becauseArgs)
             .ForCondition(document is not null && RequiredMembers.All(document.ContainsKey))
             .FailWith("Expected response to contain all RFC 9457 and Diene extension members{reason}, but found {0}.", body);
+        Execute.Assertion
+            .BecauseOf(because, becauseArgs)
+            .ForCondition(document is null || !document.TryGetPropertyValue("data", out var data) || data is not null)
+            .FailWith("Expected response data to be omitted rather than null{reason}, but found {0}.", body);
 
         var envelope = JsonSerializer.Deserialize<Problem>(body, AtomiJson.DefaultOptions);
         Execute.Assertion
