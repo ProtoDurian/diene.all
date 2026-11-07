@@ -7,16 +7,9 @@ using Microsoft.Extensions.Logging;
 
 namespace AtomiCloud.DotnetBase.SitTest;
 
-/// <summary>One export request the receiver accepted.</summary>
-/// <param name="Path">The request path, e.g. <c>/v1/traces</c>.</param>
-/// <param name="ContentType">The request content type.</param>
-/// <param name="Body">The raw request body.</param>
 public sealed record OtlpRequest(string Path, string? ContentType, byte[] Body);
 
-/// <summary>
-/// A test-only OTLP/HTTP receiver on the fleet port 4318. Each instance binds a random
-/// 127.x.y.z address, so parallel runs on one host share the port without colliding.
-/// </summary>
+// Binds 4318 on a random 127.x.y.z address so parallel runs on one host never collide.
 public sealed class OtlpReceiver : IAsyncDisposable
 {
     private static readonly string[] Paths = ["/v1/traces", "/v1/metrics", "/v1/logs"];
@@ -31,13 +24,10 @@ public sealed class OtlpReceiver : IAsyncDisposable
         Endpoint = new Uri($"http://{address}:{OtelHostExtensions.OtlpPort}");
     }
 
-    /// <summary>The base endpoint to point an OTLP exporter at.</summary>
     public Uri Endpoint { get; }
 
-    /// <summary>Every request accepted so far.</summary>
     public IReadOnlyList<OtlpRequest> Requests => [.. _requests];
 
-    /// <summary>Starts a receiver, retrying on a fresh address if one is already taken.</summary>
     public static async Task<OtlpReceiver> StartAsync()
     {
         for (var attempt = 0; ; attempt++)
@@ -56,7 +46,6 @@ public sealed class OtlpReceiver : IAsyncDisposable
         }
     }
 
-    /// <summary>Waits until a request on <paramref name="path" /> arrives, or the timeout passes.</summary>
     public async Task<OtlpRequest?> WaitForAsync(string path, TimeSpan timeout)
     {
         using var deadline = new CancellationTokenSource(timeout);
@@ -75,7 +64,6 @@ public sealed class OtlpReceiver : IAsyncDisposable
         }
     }
 
-    /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         await _app.DisposeAsync();

@@ -9,10 +9,6 @@ using OtelLoggerProviderExtensions = OpenTelemetry.Logs.LoggerProviderExtensions
 
 namespace AtomiCloud.DotnetBase.SitTest;
 
-/// <summary>
-/// Real OTLP/HTTP export from a host wired by <see cref="OtelHostExtensions.AddAtomiOtel(IHostApplicationBuilder, AppIdentity, OtelOption, IReadOnlyDictionary{string, string?}?)" />
-/// to a loopback receiver on port 4318.
-/// </summary>
 public sealed class OtlpExportTests : IAsyncLifetime
 {
     private const string Service = "sit-otel-export";
