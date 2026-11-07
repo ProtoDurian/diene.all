@@ -232,7 +232,7 @@ void main() {
         // Arrange
         const List<String> referrers = <String>[
           'app_handoff=%zz',
-          'app_handoff=atomi-app-handoff%3Av1%3A$_nonce%E0%A4%A',
+          'app_handoff=atomi-app-handoff%3Av1%3A$_nonce%C3%A',
           'app_handoff=%FF',
           'utm_source=play&app_handoff=%',
         ];
