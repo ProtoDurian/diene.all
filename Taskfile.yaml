@@ -1,21 +1,7 @@
 version: '3'
 
 includes:
-  unit:
-    taskfile: tasks/Taskfile.test.yaml
-    vars:
-      MODE: unit
-      CONFIG: bunfig.unit.toml
-  int:
-    taskfile: tasks/Taskfile.test.yaml
-    vars:
-      MODE: int
-      CONFIG: bunfig.int.toml
-  meta:
-    taskfile: tasks/Taskfile.test.yaml
-    vars:
-      MODE: meta
-      CONFIG: bunfig.meta.toml
+  test: tasks/Taskfile.test.yaml
 
 tasks:
   setup:
@@ -30,8 +16,7 @@ tasks:
   clean:
     desc: Remove Bun build, dependency, and coverage artifacts
     cmds:
-      - rm -rf dist coverage
-      - '[ -d node_modules ] && find node_modules -mindepth 1 -maxdepth 1 -exec rm -rf {} + || true'
+      - ./scripts/local/clean.sh
 
   build:
     desc: Build the publishable library (ESM + CJS + types) to dist/
@@ -44,53 +29,32 @@ tasks:
       - ./scripts/local/deadcode.sh
 
   test:
-    desc: Run unit, integration, and conditional meta suites without coverage
+    desc: Run unit, integration, and meta suites without coverage
     cmds:
-      - task: unit:default
-      - task: int:default
-      - task: meta:default
-
-  test:unit:
-    desc: Run the unit suite without coverage
-    cmds:
-      - task: unit:default
-
-  test:int:
-    desc: Run the integration suite without coverage
-    cmds:
-      - task: int:default
-
-  test:meta:
-    desc: Run the TestHelper meta suite when a TestHelper exists
-    cmds:
-      - task: meta:default
+      - task: test:unit
+      - task: test:int
+      - task: test:meta
 
   test:coverage:
-    desc: Run unit, integration, and conditional meta suites with coverage
+    desc: Run every coverage-capable suite with coverage
     cmds:
-      - task: unit:coverage
-      - task: int:coverage
-      - task: meta:coverage
+      - ./scripts/local/test.sh unit --coverage
+      - ./scripts/local/test.sh int --coverage
 
   test:unit:coverage:
     desc: Run the unit suite with coverage
     cmds:
-      - task: unit:coverage
+      - ./scripts/local/test.sh unit --coverage
 
   test:int:coverage:
     desc: Run the integration suite with coverage
     cmds:
-      - task: int:coverage
-
-  test:meta:coverage:
-    desc: Run the TestHelper meta suite with coverage when a TestHelper exists
-    cmds:
-      - task: meta:coverage
+      - ./scripts/local/test.sh int --coverage
 
   test:watch:
     desc: Watch the fast unit suite
     cmds:
-      - task: unit:watch
+      - ./scripts/local/test.sh unit --watch
 
   run:
     desc: Run the Bun source entry point
