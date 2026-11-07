@@ -54,6 +54,13 @@ jobs:
     with:
       mode: meta
 
+  sit:
+    name: SIT Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-sit.yaml
+    secrets: inherit
+
   build:
     name: Build Validation
     permissions:

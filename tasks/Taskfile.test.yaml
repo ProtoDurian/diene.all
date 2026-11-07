@@ -15,3 +15,8 @@ tasks:
     desc: Run the meta tier
     cmds:
       - ./scripts/local/test.sh meta {{.CLI_ARGS}}
+
+  sit:
+    desc: Run the SIT export tier against a loopback OTLP receiver
+    cmds:
+      - ./scripts/local/test.sh sit {{.CLI_ARGS}}
