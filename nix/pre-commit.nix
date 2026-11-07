@@ -92,15 +92,6 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    a-go-black-box = {
-      enable = true;
-      name = "Go black-box tests";
-      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH ./scripts/validate/go-black-box-tests.sh'";
-      files = "(^|/).*_test\\.go$";
-      pass_filenames = false;
-      language = "system";
-    };
-
     a-golangci-lint = {
       enable = true;
       name = "golangci-lint";

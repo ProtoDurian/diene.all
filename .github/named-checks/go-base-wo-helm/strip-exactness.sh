@@ -108,7 +108,7 @@ apply_H() {
 
   # go-base's H contributions
   edit docs/developer/go-baseline.md sed_z 's|## Docker and Helm\n|## Docker\n|'
-  edit docs/developer/go-baseline.md sed_z 's| The root chart remains a minimal\nall-yes Helm surface and is intentionally independent of downstream service\nchart design\.\n|\n|'
+  edit docs/developer/go-baseline.md sed_z 's| The root chart\nremains a minimal\nall-yes Helm surface and is intentionally independent of downstream service\nchart design\.\n|\n|'
   edit docs/developer/go-baseline.md sed_z 's|surface, the Docker entrypoint and chart\nmetadata\. |surface and the Docker entrypoint.\n|'
 
   # nix: the aggregates carry H by content; take the axis-pure slices. Docker
