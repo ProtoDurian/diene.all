@@ -15,7 +15,7 @@ and export source of truth.
 | `IDomainProblem` and `Problem` | Separate typed domain data from the RFC 9457 wire envelope and its `data` and `recoverable` extensions.             |
 | `ProblemTypeUriBuilder`        | Build the only supported versioned type URI from plain ErrorPortal and LPSM values.                                 |
 | `ProblemCatalogBuilder`        | Register typed problems, statuses, recoverability, and affected endpoints explicitly.                               |
-| Baseline catalog               | Supply seven portable problems with snake_case wire ids and default status policy.                                  |
+| Baseline catalog               | Supply the six generic problems, plus two .NET-only extras, with snake_case ids and default status policy.          |
 | `ProblemExporter`              | Derive payload JSON Schema from the .NET serialization contract with the BCL exporter.                              |
 | `ProblemResourceEmitter`       | Emit one deterministic `atomi.cloud/v1alpha1` Problem resource for one catalog version.                             |
 | `ProblemGuard` and adapters    | Carry expected failures in `Result<T, IDomainProblem>` and convert them to exceptions only at framework boundaries. |
@@ -51,6 +51,40 @@ payload serialization. The HTTP envelope carries the RFC 9457 members plus the
 serialized payload in `data`, the catalog policy in `recoverable`, and arbitrary
 extensions such as `traceId`.
 
+## Generic catalog `v1`
+
+`ProblemCatalogBuilder.AddBaseline()` registers the generic catalog that every
+language ships, with the same ids, statuses and wire `data`:
+
+| id                 | status | recoverable | wire `data`                                                          |
+| ------------------ | ------ | ----------- | -------------------------------------------------------------------- |
+| `validation_error` | 400    | true        | `{ "issues": [ { "path": [..], "message": "..", "code"?: ".." } ] }` |
+| `entity_not_found` | 404    | false       | `{ "entityType": "..", "id": ".." }`                                 |
+| `conflict`         | 409    | true        | `{ "entityType": "..", "id": ".." }`                                 |
+| `unauthenticated`  | 401    | true        | none                                                                 |
+| `unauthorized`     | 403    | false       | none                                                                 |
+| `invalid_json`     | 400    | true        | none                                                                 |
+
+It also registers two .NET-only extras: `multiple_entity_not_found` (404) and
+`entity_conflict` (409). `entity_conflict` is superseded by `conflict` and stays
+registered for one more release so existing throwers keep a catalogued 409.
+
+A `ValidationIssue` path is a list of segments; the dictionary constructor of
+`ValidationError` splits each field on `.` (an empty field is the empty path).
+`code` is omitted when absent.
+
+A problem that serializes to an object with no properties has no data: its
+envelope omits `data` (never `null` or `{}`), and its exported schema is
+`{"not":{}}`. This applies to consumer problems too. An uncatalogued problem
+renders a plain 500 without `data`.
+
+This release changes the wire `data` of `entity_not_found`, `validation_error`,
+`unauthorized` and `invalid_json`, adds `conflict`, and keeps `entity_conflict`
+for one release. The previous .NET properties (`RequestIdentifier`, `TypeName`,
+`AssemblyQualifiedName`, `Errors`, `Granted`, `Required`, `InvalidString`) stay
+public for binary compatibility but no longer serialize. The release version
+is the owner's call.
+
 ## Catalog and Problem resources
 
 Each service registers its baseline and domain-specific problems in its
@@ -59,6 +93,15 @@ composition root. `ProblemExporter` derives the payload schema using
 values into schema descriptions. `ProblemResourceEmitter` validates portal
 identity, catalog version, and exported type URI before producing canonical JSON
 that is valid YAML 1.2.
+
+A Problem resource row is identified by five fields: platform, service, module,
+landscape and version. The module comes from the ErrorPortal identity; an
+explicit module must equal it. `metadata.name` is
+`{service}.{module}.{landscape}.{version}`, each segment slugified to a DNS-1123
+label and joined with dots, so `a-b` + `c` and `a` + `b-c` never collide.
+`metadata.namespace` is the platform. The `spec` fields are written in the order
+`platform, service, module, landscape, version, problems`, and `problems` is
+sorted by id.
 
 The consuming service owns the build task that writes emitted resources into its
 primordial chart. This package owns the model and emitter, not that repository

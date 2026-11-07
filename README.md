@@ -106,23 +106,36 @@ prefer the Result-returning guards and adapters:
 
 ```csharp
 var guarded = ProblemGuard.NotFound(note, noteId);
-var failed = new ValidationError("The note is invalid.", errors).ToErr<Note>();
+var failed = new ValidationError(
+    "The note is invalid.",
+    [new ValidationIssue(["title"], "Title is required.", "required")]).ToErr<Note>();
+var taken = new Conflict($"Note '{noteId}' already exists.", "Note", noteId).ToErr<Note>();
 throw new EntityNotFound(
     $"Note '{noteId}' was not found.",
     typeof(Note),
     noteId).ToException();
 ```
 
+`AddBaseline()` registers the generic catalog: `validation_error` (400),
+`entity_not_found` (404), `conflict` (409), `unauthenticated` (401),
+`unauthorized` (403) and `invalid_json` (400), plus the .NET-only
+`multiple_entity_not_found` and `entity_conflict` (superseded by `conflict`).
+`entity_not_found` and `conflict` carry `{ entityType, id }`; `validation_error`
+carries `{ issues: [{ path, message, code? }] }`. The other three carry no data:
+their envelope omits `data` and their schema is `{"not":{}}`.
+
 ## Type URIs and catalog export
 
 Resolve `IProblemTypeUriBuilder` whenever a type URI is needed. Never recreate
 the URI template in a controller or consumer. Resolve `ProblemResourceEmitter`
 from the same service provider to emit the registered single-version catalog as
-canonical JSON, which is also valid YAML 1.2:
+canonical JSON, which is also valid YAML 1.2. The resource is named
+`{service}.{module}.{landscape}.{version}` (here `notes.api.raichu.v1`) in the
+platform namespace:
 
 ```csharp
 var emitter = app.Services.GetRequiredService<ProblemResourceEmitter>();
-var resource = emitter.Emit(new ProblemResourceIdentity("dotnet", "notes", "raichu", "v1"));
+var resource = emitter.Emit(new ProblemResourceIdentity("dotnet", "notes", "api", "raichu", "v1"));
 var manifest = emitter.Serialize(resource);
 ```
 
@@ -137,6 +150,8 @@ envelope.Should().HaveStatus(404);
 envelope.Should().HaveType(expectedTypeUri);
 envelope.Should().HaveData(expectedProblem);
 envelope.Should().BeRecoverable(false);
+
+dataLessEnvelope.Should().HaveNoData();
 ```
 
 Run `nix develop .#ci -c ./scripts/ci/pkg-validate.sh` to pack both packages,
