@@ -54,7 +54,9 @@ Read the [package doc](doc/diene_problems.md) for the full contract.
 ## Development
 
 - `task setup` resolves the workspace dependencies.
-- `task test` runs the unit, conformance and TestHelper meta suites.
+- `task test` runs the unit, conformance, TestHelper meta and consumer tiers.
+- `task test:consumer` packs the package with pub, installs that local archive
+  in a fresh project, then imports, runs, compiles and type-checks it.
 - `task test:coverage` enforces the separate unit and meta ledgers.
 - `task deadcode` runs the repository and production-only dead-code passes.
 - `task package:validate` runs the release guard, publish dry-run and pana.
