@@ -30,10 +30,10 @@ void main() {
       const List<String> nonces = <String>[_nonce, _other];
 
       // Act
-      final List<bool> valid = nonces.map(isValidAppHandoffNonce).toList();
+      final bool valid = nonces.every(isValidAppHandoffNonce);
 
       // Assert
-      expect(valid, <bool>[true, true]);
+      expect(valid, isTrue);
       expect(appHandoffNonceLength, 43);
     });
 
