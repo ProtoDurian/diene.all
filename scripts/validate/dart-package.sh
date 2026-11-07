@@ -20,8 +20,12 @@ sdk_range='^>=3[.][0-9]+[.][0-9]+ <4[.]0[.]0$'
 [[ $(yq -r '.topics // [] | length' "${member_pubspec}") -lt 1 ]] && echo "❌ member pubspec declares no pub.dev topics" >&2 && exit 1
 [[ $(head -n 1 "${member_dir}/LICENSE") != "MIT License" ]] && echo "❌ ${member_dir}/LICENSE is not the MIT license" >&2 && exit 1
 
-runtime_deps="$(yq -r '.dependencies // {} | length' "${member_pubspec}")"
-[[ ${runtime_deps} -ne 0 ]] && echo "❌ diene_core_utils must have zero runtime dependencies (found ${runtime_deps})" >&2 && exit 1
+runtime_deps="$(yq -r '.dependencies // {} | keys | sort | join(",")' "${member_pubspec}")"
+[[ ${runtime_deps} != "diene_interfaces,diene_problems,diene_result,unorm_dart" ]] && echo "❌ diene_core_utils must have exactly four runtime dependencies, diene_interfaces, diene_problems, diene_result and unorm_dart (found '${runtime_deps}')" >&2 && exit 1
+caret_range='^\^[0-9]+[.][0-9]+[.][0-9]+$'
+for dep in diene_interfaces diene_problems diene_result unorm_dart; do
+  [[ $(yq -r ".dependencies.${dep} | tag" "${member_pubspec}") != "!!str" || ! $(yq -r ".dependencies.${dep}" "${member_pubspec}") =~ ${caret_range} ]] && echo "❌ ${dep} must be a hosted pub.dev dependency with a caret range (^x.y.z)" >&2 && exit 1
+done
 
 if ! yq -r '.workspace[]' pubspec.yaml | grep -qx "packages/diene_core_utils"; then
   echo "❌ root pubspec.yaml .workspace must list packages/diene_core_utils" >&2
