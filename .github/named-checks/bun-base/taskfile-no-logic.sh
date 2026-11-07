@@ -9,8 +9,6 @@ git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "â
 
 # Shell control flow only; simple command chains, `|| true` and {{...}} template expressions are allowed.
 control='(^|[;&|(){!])[[:space:]]*((if|elif|else|fi|case|esac|for|while|until|select|function)([[:space:];&|()]|$)|[[:alnum:]_.-]+[[:space:]]*\([[:space:]]*\))'
-# Quoted text and {{...}} templates are data, not shell syntax.
-data='s/\{\{[^}]*\}\}//g; s/'"'"'[^'"'"']*'"'"'//g; s/"([^"\\]|\\.)*"//g'
 # Every task form: a string, a list, or a map with cmd/cmds; each cmd a string or {cmd: ...}.
 cmds='[.tasks[] | (select(tag == "!!str"), (select(tag == "!!seq") | .[]), (select(tag == "!!map") | (.cmd, (.cmds // [])[])))] | .[] | select(tag == "!!str" or (tag == "!!map" and has("cmd"))) | with(select(tag == "!!map"); . = .cmd)'
 failed=0
@@ -31,7 +29,7 @@ for file in Taskfile.yaml tasks/*.yaml; do
   parent="$(git show "${parent_sha}:${file}" 2>/dev/null || true)"
   parent_cmds="$(yq "${cmds}" <<<"${parent}" 2>/dev/null || true)"
   while IFS= read -r line; do
-    if [[ "$(sed -E "${data}" <<<"${line}")" =~ ${control} ]]; then
+    if [[ "$(sed -E 's/\{\{[^}]*\}\}//g' <<<"${line}" | awk -f .github/named-checks/bun-base/code-only.awk)" =~ ${control} ]]; then
       judge "${parent_cmds}" "${file}" "${line}" "shell control flow in a task cmd"
     fi
   done < <(yq "${cmds}" "${file}")
