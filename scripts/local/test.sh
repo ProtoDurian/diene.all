@@ -1,30 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-tier="${1:-}"
+export TIER="${1:-}"
 
 cd "$(git rev-parse --show-toplevel)"
 
-tiers=".config/dotnet-base.test.yaml"
-[[ -n ${tier} && "$(yq ".coverage | has(\"${tier}\")" "${tiers}")" == "true" ]] || {
+export DOTNET_TEST_CONFIG="${DOTNET_TEST_CONFIG:-.config/dotnet-base.test.yaml}"
+tiers="${DOTNET_TEST_CONFIG}"
+[[ -n ${TIER} && "$(yq '.coverage | has(strenv(TIER))' "${tiers}")" == "true" ]] || {
   echo "❌ usage: $0 <$(yq '.coverage | keys | join("|")' "${tiers}")> [--watch|--coverage]" >&2
   exit 2
 }
 
-mapfile -t projects < <(yq -r ".coverage.${tier}.projects[]?" "${tiers}")
+listed="$(yq -r '.coverage[strenv(TIER)].projects[]?' "${tiers}")"
+mapfile -t projects < <(printf '%s' "${listed}")
 dirs=()
 for project in "${projects[@]}"; do
-  [[ -f ${project} ]] || { echo "❌ ${tiers} lists ${tier} project ${project}, which does not exist" >&2 && exit 1; }
+  [[ -f ${project} ]] || { echo "❌ ${tiers} lists ${TIER} project ${project}, which does not exist" >&2 && exit 1; }
   dirs+=("$(dirname "${project}")")
 done
 
-# rg exits 0 on a match, 1 on none, 2 on an error.
+# Over-match on purpose: a false "has tests" only runs dotnet test; a false "none" skips the coverage gate.
 found=1
-[[ ${#dirs[@]} -eq 0 ]] || { rg -q -g '*.cs' -g '!bin/' -g '!obj/' '\[(Fact|Theory)\b' "${dirs[@]}" && found=0 || found=$?; }
-[[ ${found} -gt 1 ]] && echo "❌ could not search the ${tier} projects for tests" >&2 && exit 1
+[[ ${#dirs[@]} -eq 0 ]] || { rg -q -g '*.cs' -g '!bin/' -g '!obj/' 'Fact|Theory' "${dirs[@]}" && found=0 || found=$?; }
+[[ ${found} -gt 1 ]] && echo "❌ could not search the ${TIER} projects for tests" >&2 && exit 1
 if [[ ${found} -eq 1 ]]; then
-  echo "✅ ${tier} tier has no test files; nothing to run"
+  echo "✅ ${TIER} tier has no test files; nothing to run"
   exit 0
 fi
 
-exec ./scripts/local/dotnet-test.sh "${tier}" "${@:2}"
+exec ./scripts/local/dotnet-test.sh "${TIER}" "${@:2}"
