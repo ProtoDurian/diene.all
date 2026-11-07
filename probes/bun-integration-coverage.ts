@@ -1,5 +1,4 @@
 import { expectBunGreen, expectBunRed } from './lib/bun-command.ts';
-import { assertScopedLcov } from './lib/lcov.ts';
 
 const command = 'nix develop .#ci -c ./scripts/ci/test.sh int';
 
@@ -9,16 +8,18 @@ export default {
   probes: [
     {
       name: 'baseline-bun-integration-coverage-green',
-      description: 'Integration coverage is complete and scoped only to src/adapters.',
+      description: 'With zero adapters the integration tier is green and emits no coverage artifact.',
       kind: 'baseline',
       async run(repo: any) {
         await expectBunGreen(repo, command, 'bun-integration-coverage');
-        await assertScopedLcov(repo, 'reports/integration/lcov.info', 'src/adapters/');
+        if ((await repo.glob('reports/integration/lcov.info')).length !== 0) {
+          throw new Error('an adapter-free integration tier must not emit a coverage artifact');
+        }
       },
     },
     {
       name: 'mutation-bun-integration-coverage-caught',
-      description: 'An uncovered adapter source file turns the integration coverage ledger red.',
+      description: 'An adapter no integration test touches turns the integration coverage ledger red.',
       kind: 'mutation',
       expectedImpact: ['bun-deadcode'],
       async run(repo: any) {
@@ -27,8 +28,18 @@ export default {
           'export function probeAdapterUncovered(): number {\n  return 1;\n}\n',
         );
         await repo.write(
-          'src/index.ts',
-          `${await repo.read('src/index.ts')}\nexport { probeAdapterUncovered } from './adapters/__probe_uncovered__';\n`,
+          'tests/integration/__probe__.test.ts',
+          [
+            "import { describe, it } from 'bun:test';",
+            "import 'should';",
+            '',
+            "describe('integration probe passing', () => {",
+            "  it('passes without the adapter', () => {",
+            '    (1).should.equal(1);',
+            '  });',
+            '});',
+            '',
+          ].join('\n'),
         );
         await expectBunRed(repo, command, 'bun-integration-coverage');
       },
