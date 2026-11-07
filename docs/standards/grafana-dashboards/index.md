@@ -72,14 +72,14 @@ The log line in the store is not what the app wrote: the logging library's JSON 
 5. **Filter the noise** with one targeted negative filter per noisy line type, e.g. `!= "grpc.health"`.
 6. **One panel per failure class**, taken from the failures named in `SIGNALS.md` (Gates 2 and 5). A panel answers one question, named by the failure, not by the level: never a bare "Errors" or "Logs" panel. Typical panels by kind of service:
 
-   | Kind of service                   | Panels (one question each)                                                                                                                                         |
-   | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-   | Request server (HTTP or gRPC API) | "Server errors (5xx)" · "Auth denials (401/403)" · "Slow requests (≥1s)", each a targeted line filter on the sampled access-log shape                              |
-   | Reconciler or controller          | "Reconcile failures" (scoped to its `module`) · "Git or repo failures" · "Processing timeline" (one line per unit of work)                                         |
-   | Batch or cron job                 | "Failed runs" · "Run outcomes" (the completion or summary lines) · the full run log (it is low-volume)                                                             |
-   | Host daemon (systemd journal)     | "OOM and kernel crashes" · "Failed systemd units" · "Disk and I/O errors", one class per panel, matched to the host alerts; never the whole journal                |
-   | Data collector                    | "Delivery failures (drops, push errors)", backing the delivery alerts · "Other collector errors" (the same level match minus the delivery class, so nothing hides) |
-   | Explorer dashboard                | the one generic panel set allowed: `$filter` over volume, errors and all lines                                                                                     |
+   | Kind of service                                                        | Panels (one question each)                                                                                                                                                           |
+   | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+   | Request server (HTTP API)                                              | "Server errors (5xx)" · "Auth denials (401/403)" · "Slow requests (≥1s)", each a targeted line filter on the sampled access-log shape                                                |
+   | Reconciler or controller                                               | "Reconcile failures" (scoped to its `module`) · "Git or repo failures" · "Processing timeline" (one line per unit of work)                                                           |
+   | Batch or cron job                                                      | "Failed runs" · "Run outcomes" (the completion or summary lines) · the full run log (it is low-volume)                                                                               |
+   | Host daemon (logs to the systemd journal, the Linux service log store) | "OOM (out of memory) and kernel crashes" · "Failed systemd units" · "Disk and I/O (read and write) errors", one class per panel, matched to the host alerts; never the whole journal |
+   | Data collector                                                         | "Delivery failures (drops, push errors)", backing the delivery alerts · "Other collector errors" (the same level match minus the delivery class, so nothing hides)                   |
+   | Explorer dashboard                                                     | the one generic panel set allowed: `$filter` over volume, errors and all lines                                                                                                       |
 
    Two rules make the set complete:
    - **Every alert has an evidence panel**: the panel that shows what happened when it fired, the first thing its runbook sends a responder to read. An alert that sets `panel` links straight to it; an alert that leaves `panel` out has the generic dashboard as its evidence.
