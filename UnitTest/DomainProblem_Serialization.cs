@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AtomiCloud.Diene.CoreUtils.Json;
@@ -96,7 +95,7 @@ public class DomainProblem_Serialization
     }
 
     [Fact]
-    public void It_should_pin_baseline_metadata_payloads_and_R_E14_wire_casing()
+    public void It_should_pin_baseline_metadata_payloads_and_snake_case_wire_ids()
     {
         // Arrange
         IDomainProblem[] subjects =
@@ -104,6 +103,7 @@ public class DomainProblem_Serialization
             new EntityNotFound("missing", typeof(string), "one"),
             new MultipleEntityNotFound("missing many", typeof(string), ["one"], ["two"]),
             new EntityConflict("conflict", typeof(string)),
+            new Conflict("conflict", typeof(string), "one"),
             new ValidationError("invalid", new Dictionary<string, string[]> { ["name"] = ["required"] }),
             new Unauthorized("forbidden", ["read"], ["write"]),
             new Unauthenticated("sign in"),
@@ -118,6 +118,7 @@ public class DomainProblem_Serialization
             "entity_not_found",
             "multiple_entity_not_found",
             "entity_conflict",
+            "conflict",
             "validation_error",
             "unauthorized",
             "unauthenticated",
@@ -133,30 +134,35 @@ public class DomainProblem_Serialization
         ((MultipleEntityNotFound)subjects[1]).RequestIdentifiers.Should().Equal("one");
         ((MultipleEntityNotFound)subjects[1]).FoundRequestIdentifiers.Should().Equal("two");
         ((EntityConflict)subjects[2]).TypeName.Should().Be(typeof(string).FullName);
-        ((ValidationError)subjects[3]).Errors.Should().ContainKey("name");
-        ((Unauthorized)subjects[4]).Granted.Should().Equal("read");
-        ((Unauthorized)subjects[4]).Required.Should().Equal("write");
-        ((InvalidJson)subjects[6]).InvalidString.Should().Be("{");
+        ((Conflict)subjects[3]).EntityId.Should().Be("one");
+        ((ValidationError)subjects[4]).Errors.Should().ContainKey("name");
+        ((Unauthorized)subjects[5]).Granted.Should().Equal("read");
+        ((Unauthorized)subjects[5]).Required.Should().Equal("write");
+        ((InvalidJson)subjects[7]).InvalidString.Should().Be("{");
         new OtherProblem().Code.Should().Be(7);
     }
 
     [Fact]
-    public void It_should_keep_the_neutral_C0_fixture_byte_exact_and_record_the_kebab_variance()
+    public void It_should_match_the_fixture_entity_not_found_envelope_data_and_snake_case_id()
     {
         // Arrange
         var path = Path.Combine(AppContext.BaseDirectory, "fixtures", "c0", "problem-v1.json");
-        var bytes = File.ReadAllBytes(path);
+        using var fixture = JsonDocument.Parse(File.ReadAllBytes(path));
+        var cases = fixture.RootElement.GetProperty("cases");
+        var envelope = cases.GetProperty("envelopes").GetProperty("valid")[0];
+        IDomainProblem problem = new EntityNotFound("User 42 does not exist", "user", "42");
 
         // Act
-        var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
-        using var fixture = JsonDocument.Parse(bytes);
-        var fixtureId = fixture.RootElement.GetProperty("cases").GetProperty("typeUri")
-            .GetProperty("valid")[0].GetProperty("segments").GetProperty("id").GetString();
+        var fixtureId = cases.GetProperty("typeUri").GetProperty("valid")[0]
+            .GetProperty("segments").GetProperty("id").GetString();
+        var fixtureData = JsonNode.Parse(envelope.GetProperty("data").GetRawText());
+        var actualData = JsonSerializer.SerializeToNode(problem, problem.GetType(), AtomiJson.DefaultOptions);
 
         // Assert
-        hash.Should().Be("a8c02554c198627df9badc6c2377218556ec8bd3a0b1edcdb20aedeebe43f988");
-        fixtureId.Should().Be("entity-not-found");
-        new EntityNotFound().Id.Should().Be("entity_not_found", "R-E14 supersedes the fixture's kebab sample");
+        fixtureId.Should().Be(problem.Id);
+        envelope.GetProperty("title").GetString().Should().Be(problem.Title);
+        envelope.GetProperty("detail").GetString().Should().Be(problem.Detail);
+        JsonNode.DeepEquals(actualData, fixtureData).Should().BeTrue();
     }
 
     [Fact]

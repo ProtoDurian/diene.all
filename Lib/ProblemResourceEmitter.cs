@@ -11,6 +11,8 @@ public sealed class ProblemResourceEmitter(
     IProblemTypeUriBuilder typeUris,
     ErrorPortalConfig portal)
 {
+    private const int DnsLabelMax = 63;
+
     private readonly IProblemCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
     private readonly IProblemExporter _exporter = exporter ?? throw new ArgumentNullException(nameof(exporter));
     private readonly IProblemTypeUriBuilder _typeUris = typeUris ?? throw new ArgumentNullException(nameof(typeUris));
@@ -21,6 +23,7 @@ public sealed class ProblemResourceEmitter(
     {
         ArgumentNullException.ThrowIfNull(identity);
         ValidateIdentity(identity);
+        var module = _portal.Identity.Module;
 
         var descriptors = _catalog.All
             .Where(descriptor => string.Equals(descriptor.Version, identity.Version, StringComparison.Ordinal))
@@ -32,7 +35,8 @@ public sealed class ProblemResourceEmitter(
             .OrderBy(descriptor => descriptor.Id, StringComparer.Ordinal)
             .Select(descriptor => ToResourceEntry(descriptor, _exporter.Export(descriptor)))
             .ToArray();
-        var name = Slug.Slugify($"{identity.Service}-{identity.Landscape}-{identity.Version}");
+        string[] segments = [identity.Service, module, identity.Landscape, identity.Version];
+        var name = string.Join('.', segments.Select(DnsLabel));
 
         return new ProblemResource(
             "atomi.cloud/v1alpha1",
@@ -41,6 +45,7 @@ public sealed class ProblemResourceEmitter(
             new ProblemResourceSpec(
                 identity.Platform,
                 identity.Service,
+                module,
                 identity.Landscape,
                 identity.Version,
                 Array.AsReadOnly(entries)));
@@ -51,6 +56,14 @@ public sealed class ProblemResourceEmitter(
     {
         ArgumentNullException.ThrowIfNull(resource);
         return JsonSerializer.Serialize(resource, AtomiJson.DefaultOptions);
+    }
+
+    private static string DnsLabel(string segment)
+    {
+        var label = Slug.Slugify(segment);
+        if (label.Length is 0 or > DnsLabelMax)
+            throw new ArgumentException($"Problem resource name segment '{segment}' is not a DNS-1123 label after slugifying.", nameof(segment));
+        return label;
     }
 
     private ProblemResourceEntry ToResourceEntry(ProblemDescriptor descriptor, ProblemExport export)
@@ -74,7 +87,8 @@ public sealed class ProblemResourceEmitter(
         var expected = _portal.Identity;
         if (identity.Platform != expected.Platform ||
             identity.Service != expected.Service ||
-            identity.Landscape != expected.Landscape)
+            identity.Landscape != expected.Landscape ||
+            (identity.Module is not null && identity.Module != expected.Module))
         {
             throw new ArgumentException("Problem resource identity must match its ErrorPortal identity.", nameof(identity));
         }

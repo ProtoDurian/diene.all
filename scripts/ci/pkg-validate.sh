@@ -34,7 +34,9 @@ printf '%s\n' \
   'problem.Should().BeProblem<EntityNotFound>();' \
   'problem.Should().HaveId("entity_not_found");' \
   'catalog.StatusOf(problem).Should().Be(404);' \
-  'typeUris.Build(problem.Version, problem.Id).AbsoluteUri.Should().EndWith("/v1/entity_not_found");' >"${scratch}/Program.cs"
+  'typeUris.Build(problem.Version, problem.Id).AbsoluteUri.Should().EndWith("/v1/entity_not_found");' \
+  'IDomainProblem conflict = new Conflict("taken", "Note", "note-42");' \
+  'catalog.StatusOf(conflict).Should().Be(409);' >"${scratch}/Program.cs"
 cat >"${scratch}/nuget.config" <<EOF
 <configuration>
   <packageSources>

@@ -1,15 +1,11 @@
 {
-  "c0Sections": [
-    "§2 Problem schema",
-    "§14 Problem catalog schema"
-  ],
   "cases": {
     "catalogEntry": {
       "samples": [
         {
           "data": {
             "properties": {
-              "fields": {
+              "issues": {
                 "type": "array"
               }
             },
@@ -21,59 +17,42 @@
               "path": "/user"
             }
           ],
-          "id": "validation-error",
+          "id": "validation_error",
           "recoverable": true,
           "status": 400,
-          "title": "Validation error",
-          "type": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/validation-error"
+          "title": "Validation Error",
+          "type": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/validation_error"
         }
       ],
-      "shape": [
-        "id",
-        "type",
-        "title",
-        "status",
-        "recoverable",
-        "data",
-        "endpoints"
-      ]
+      "shape": ["id", "type", "title", "status", "recoverable", "data", "endpoints"]
     },
     "envelopes": {
       "invalid": [],
       "valid": [
         {
           "data": {
-            "id": 42,
-            "resource": "user"
+            "entityType": "user",
+            "id": "42"
           },
           "detail": "User 42 does not exist",
           "instance": "/user/42",
           "recoverable": false,
           "status": 404,
-          "title": "Entity not found",
-          "type": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/entity-not-found"
+          "title": "Entity Not Found",
+          "type": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/entity_not_found"
         }
       ]
     },
-    "extensions": [
-      "data",
-      "recoverable"
-    ],
-    "rfc9457Members": [
-      "type",
-      "title",
-      "status",
-      "detail",
-      "instance"
-    ],
+    "extensions": ["data", "recoverable"],
+    "rfc9457Members": ["type", "title", "status", "detail", "instance"],
     "typeUri": {
       "invalid": [],
       "valid": [
         {
-          "expectedTypeUri": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/entity-not-found",
+          "expectedTypeUri": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/entity_not_found",
           "segments": {
             "host": "docs.raichu.cluster.atomi.cloud",
-            "id": "entity-not-found",
+            "id": "entity_not_found",
             "landscape": "raichu",
             "module": "api",
             "platform": "dotnet",

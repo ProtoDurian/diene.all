@@ -1,0 +1,216 @@
+{
+  "apiVersion": "atomi.cloud/v1alpha1",
+  "kind": "Problem",
+  "metadata": {
+    "name": "notes.api.lapras.v1",
+    "namespace": "dotnet"
+  },
+  "spec": {
+    "platform": "dotnet",
+    "service": "notes",
+    "module": "api",
+    "landscape": "lapras",
+    "version": "v1",
+    "problems": [
+      {
+        "id": "conflict",
+        "type": "https://docs.example.test/docs/lapras/dotnet/notes/api/v1/conflict",
+        "title": "Conflict",
+        "status": 409,
+        "recoverable": true,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "entityType": {
+              "type": ["string", "null"],
+              "description": "The type of the conflicting entity."
+            },
+            "id": {
+              "type": ["string", "null"],
+              "description": "The identifier of the conflicting entity."
+            }
+          },
+          "description": "The entity conflicts with an existing unique value or state."
+        },
+        "endpoints": []
+      },
+      {
+        "id": "entity_conflict",
+        "type": "https://docs.example.test/docs/lapras/dotnet/notes/api/v1/entity_conflict",
+        "title": "Entity Conflict",
+        "status": 409,
+        "recoverable": true,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "typeName": {
+              "type": ["string", "null"],
+              "description": "The full name of the conflicting entity type."
+            },
+            "assemblyQualifiedName": {
+              "type": ["string", "null"],
+              "description": "The assembly-qualified name of the conflicting entity type."
+            }
+          },
+          "description": "An entity conflicts with an existing unique value or state."
+        },
+        "endpoints": []
+      },
+      {
+        "id": "entity_not_found",
+        "type": "https://docs.example.test/docs/lapras/dotnet/notes/api/v1/entity_not_found",
+        "title": "Entity Not Found",
+        "status": 404,
+        "recoverable": false,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "entityType": {
+              "type": ["string", "null"],
+              "description": "The type of the requested entity."
+            },
+            "id": {
+              "type": ["string", "null"],
+              "description": "The identifier of the requested entity."
+            }
+          },
+          "description": "The requested entity could not be found by its identifier."
+        },
+        "endpoints": []
+      },
+      {
+        "id": "invalid_json",
+        "type": "https://docs.example.test/docs/lapras/dotnet/notes/api/v1/invalid_json",
+        "title": "Invalid JSON",
+        "status": 400,
+        "recoverable": true,
+        "schema": {
+          "not": {}
+        },
+        "endpoints": []
+      },
+      {
+        "id": "multiple_entity_not_found",
+        "type": "https://docs.example.test/docs/lapras/dotnet/notes/api/v1/multiple_entity_not_found",
+        "title": "Multiple Entity Not Found",
+        "status": 404,
+        "recoverable": false,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "requestIdentifiers": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "string"
+              },
+              "description": "Identifiers of requested entities that were not found."
+            },
+            "foundRequestIdentifiers": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "string"
+              },
+              "description": "Identifiers of requested entities that were found."
+            },
+            "typeName": {
+              "type": ["string", "null"],
+              "description": "The full name of the requested entity type."
+            },
+            "assemblyQualifiedName": {
+              "type": ["string", "null"],
+              "description": "The assembly-qualified name of the requested entity type."
+            }
+          },
+          "description": "Some requested entities could not be found during a batch request."
+        },
+        "endpoints": []
+      },
+      {
+        "id": "sample_problem",
+        "type": "https://docs.example.test/docs/lapras/dotnet/notes/api/v1/sample_problem",
+        "title": "Sample Problem",
+        "status": 422,
+        "recoverable": true,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": ["string", "null"],
+              "description": "The sample payload value."
+            }
+          },
+          "description": "A sample problem used by library contract tests."
+        },
+        "endpoints": [
+          {
+            "method": "POST",
+            "path": "/sample"
+          }
+        ]
+      },
+      {
+        "id": "unauthenticated",
+        "type": "https://docs.example.test/docs/lapras/dotnet/notes/api/v1/unauthenticated",
+        "title": "Unauthenticated",
+        "status": 401,
+        "recoverable": true,
+        "schema": {
+          "not": {}
+        },
+        "endpoints": []
+      },
+      {
+        "id": "unauthorized",
+        "type": "https://docs.example.test/docs/lapras/dotnet/notes/api/v1/unauthorized",
+        "title": "Unauthorized",
+        "status": 403,
+        "recoverable": false,
+        "schema": {
+          "not": {}
+        },
+        "endpoints": []
+      },
+      {
+        "id": "validation_error",
+        "type": "https://docs.example.test/docs/lapras/dotnet/notes/api/v1/validation_error",
+        "title": "Validation Error",
+        "status": 400,
+        "recoverable": true,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "issues": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The path segments to the invalid value; empty for the whole request."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The human-readable validation message."
+                  },
+                  "code": {
+                    "type": ["string", "null"],
+                    "default": null,
+                    "description": "The optional machine-readable rule code."
+                  }
+                },
+                "required": ["path", "message"],
+                "description": "One failed validation rule at a path inside the request."
+              },
+              "description": "The validation issues, each at a path inside the request."
+            }
+          },
+          "description": "The request contains one or more validation errors."
+        },
+        "endpoints": []
+      }
+    ]
+  }
+}

@@ -25,7 +25,7 @@ public class ProblemCatalogBuilder_Add
         var actual = subject.Build(NullLogger<ProblemCatalog>.Instance);
 
         // Assert
-        actual.All.Should().HaveCount(9);
+        actual.All.Should().HaveCount(10);
         actual.Find("v1", "sample_problem").Should().BeSome().Which.Status.Should().Be(422);
         actual.Find("v1", "missing").Should().BeNone();
         actual.StatusOf(new SampleProblem()).Should().Be(422);

@@ -15,7 +15,7 @@ public class C0Fixture_RoundTrip
         var cases = fixture.RootElement.GetProperty("cases");
         var vector = cases.GetProperty("typeUri").GetProperty("valid")[0];
         var segments = vector.GetProperty("segments");
-        var snakeId = segments.GetProperty("id").GetString()!.Replace('-', '_');
+        var snakeId = segments.GetProperty("id").GetString()!;
         var identity = new ProblemIdentity(
             segments.GetProperty("landscape").GetString()!,
             segments.GetProperty("platform").GetString()!,

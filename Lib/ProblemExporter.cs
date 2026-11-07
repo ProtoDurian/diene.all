@@ -25,10 +25,8 @@ public sealed class ProblemExporter(IProblemCatalog catalog, IProblemTypeUriBuil
         if (!_catalog.All.Any(candidate => ReferenceEquals(candidate, descriptor)))
             throw new ArgumentException("Only descriptors belonging to this catalog can be exported.", nameof(descriptor));
 
-        var schema = JsonSchemaExporter.GetJsonSchemaAsNode(
-            AtomiJson.DefaultOptions,
-            descriptor.Type,
-            ExporterOptions);
+        var schema = JsonSchemaExporter.GetJsonSchemaAsNode(AtomiJson.DefaultOptions, descriptor.Type, ExporterOptions);
+        if (HasNoData(schema)) schema = new JsonObject { ["not"] = new JsonObject() };
         return new ProblemExport(
             descriptor.Id,
             _typeUris.Build(descriptor.Version, descriptor.Id).AbsoluteUri,
@@ -42,6 +40,9 @@ public sealed class ProblemExporter(IProblemCatalog catalog, IProblemTypeUriBuil
     /// <inheritdoc />
     public IReadOnlyList<ProblemExport> ExportAll() =>
         Array.AsReadOnly([.. _catalog.All.Select(Export)]);
+
+    private static bool HasNoData(JsonNode schema) =>
+        schema is JsonObject members && members["type"]?.ToJsonString() == "\"object\"" && !members.ContainsKey("properties");
 
     private static JsonNode AddDescription(JsonSchemaExporterContext context, JsonNode schema)
     {

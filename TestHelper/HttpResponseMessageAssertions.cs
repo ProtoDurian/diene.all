@@ -11,7 +11,7 @@ namespace AtomiCloud.Diene.Problems.TestHelper;
 public static class HttpResponseProblemAssertions
 {
     private static readonly string[] RequiredMembers =
-        ["type", "title", "status", "detail", "instance", "data", "recoverable"];
+        ["type", "title", "status", "detail", "instance", "recoverable"];
 
     /// <summary>Asserts content type, required members, status parity, and deserializes the envelope.</summary>
     public static async Task<AndWhichConstraint<HttpResponseMessageAssertions, Problem>> BeRfc9457(

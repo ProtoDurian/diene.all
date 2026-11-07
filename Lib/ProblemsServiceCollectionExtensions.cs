@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AtomiCloud.Diene.CoreUtils.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -59,10 +60,9 @@ public static class ProblemsServiceCollectionExtensions
         context.ProblemDetails.Status = context.HttpContext.Response.StatusCode;
         context.ProblemDetails.Detail = problem.Detail;
         context.ProblemDetails.Instance ??= context.HttpContext.Request.Path;
-        context.ProblemDetails.Extensions["data"] = JsonSerializer.SerializeToNode(
-            problem,
-            problem.GetType(),
-            AtomiJson.DefaultOptions);
+        var data = JsonSerializer.SerializeToNode(problem, problem.GetType(), AtomiJson.DefaultOptions);
+        // An uncatalogued problem has no published schema, so its payload never reaches the wire.
+        if (registered && data is not JsonObject { Count: 0 }) context.ProblemDetails.Extensions["data"] = data;
         context.ProblemDetails.Extensions["recoverable"] = registered && descriptor.Get().Recoverable;
         context.ProblemDetails.Extensions.TryAdd(
             "traceId",

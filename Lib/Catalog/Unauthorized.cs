@@ -37,10 +37,12 @@ public sealed class Unauthorized : IDomainProblem
     public string Version => "v1";
 
     /// <summary>Gets permissions granted to the caller.</summary>
+    [JsonIgnore]
     [Description("Permissions granted to the caller.")]
     public IReadOnlyList<string> Granted { get; } = [];
 
     /// <summary>Gets permissions required by the resource.</summary>
+    [JsonIgnore]
     [Description("Permissions required to access the resource.")]
     public IReadOnlyList<string> Required { get; } = [];
 }

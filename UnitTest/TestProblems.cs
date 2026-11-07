@@ -130,6 +130,8 @@ internal sealed class CapturingLogger<T> : ILogger<T>
 {
     public List<string> Messages { get; } = [];
 
+    public List<LogLevel> Levels { get; } = [];
+
     public IDisposable? BeginScope<TState>(TState state)
         where TState : notnull => null;
 
@@ -140,5 +142,25 @@ internal sealed class CapturingLogger<T> : ILogger<T>
         EventId eventId,
         TState state,
         Exception? exception,
-        Func<TState, Exception?, string> formatter) => Messages.Add(formatter(state, exception));
+        Func<TState, Exception?, string> formatter)
+    {
+        Levels.Add(logLevel);
+        Messages.Add(formatter(state, exception));
+    }
+}
+
+[Description("A consumer problem that carries no data.")]
+internal sealed class EmptyProblem : IDomainProblem
+{
+    [JsonIgnore]
+    public string Id => "empty_problem";
+
+    [JsonIgnore]
+    public string Title => "Empty Problem";
+
+    [JsonIgnore]
+    public string Detail => "empty";
+
+    [JsonIgnore]
+    public string Version => "v1";
 }

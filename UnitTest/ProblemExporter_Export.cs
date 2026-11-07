@@ -42,7 +42,8 @@ public class ProblemExporter_Export
 
         resource.ApiVersion.Should().Be("atomi.cloud/v1alpha1");
         resource.Kind.Should().Be("Problem");
-        resource.Metadata.Should().Be(new ProblemResourceMetadata("notes-lapras-v1", "dotnet"));
+        resource.Metadata.Should().Be(new ProblemResourceMetadata("notes.api.lapras.v1", "dotnet"));
+        resource.Spec.Module.Should().Be("api");
         resource.Spec.Platform.Should().Be("dotnet");
         resource.Spec.Service.Should().Be("notes");
         resource.Spec.Landscape.Should().Be("lapras");

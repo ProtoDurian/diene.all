@@ -60,11 +60,12 @@ public sealed class ProblemCatalogBuilder
         return this;
     }
 
-    /// <summary>Registers the seven portable baseline problems and their default policies.</summary>
+    /// <summary>Registers the generic baseline problems, plus the .NET-only extras, and their default policies.</summary>
     public ProblemCatalogBuilder AddBaseline() =>
         Add<EntityNotFound>(404, false)
             .Add<MultipleEntityNotFound>(404, false)
             .Add<EntityConflict>(409, true)
+            .Add<Conflict>(409, true)
             .Add<ValidationError>(400, true)
             .Add<Unauthorized>(403, false)
             .Add<Unauthenticated>(401, true)

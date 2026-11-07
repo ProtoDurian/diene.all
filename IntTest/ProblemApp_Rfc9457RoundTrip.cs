@@ -47,6 +47,35 @@ public class ProblemApp_Rfc9457RoundTrip
     }
 
     [Fact]
+    public async Task It_should_render_the_generic_conflict_and_a_data_less_problem_end_to_end()
+    {
+        // Arrange
+        await using var app = ProblemApp.Build(Identity, Portal, webHost => webHost.UseTestServer());
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await app.StartAsync(cancellationToken);
+        using var client = app.GetTestClient();
+
+        // Act
+        using var conflictResponse = await client.PostAsync("/notes/note-42", null, cancellationToken);
+        using var sessionResponse = await client.GetAsync("/session", cancellationToken);
+        var conflict = (await conflictResponse.Should().BeRfc9457()).Which;
+        var session = (await sessionResponse.Should().BeRfc9457()).Which;
+
+        // Assert
+        conflict.Should().HaveType(
+            "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/notes/api/v1/conflict");
+        conflict.Should().HaveStatus(409);
+        conflict.Should().HaveData(new Conflict("ignored", "Note", "note-42"));
+        conflict.Should().BeRecoverable(true);
+
+        session.Should().HaveType(
+            "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/notes/api/v1/unauthenticated");
+        session.Should().HaveStatus(401);
+        session.Should().HaveNoData();
+        session.Should().BeRecoverable(true);
+    }
+
+    [Fact]
     public async Task It_should_turn_an_uncatalogued_typed_problem_into_500()
     {
         // Arrange
@@ -63,6 +92,6 @@ public class ProblemApp_Rfc9457RoundTrip
         actual.Should().HaveType("about:blank");
         actual.Should().HaveStatus(500);
         actual.Should().BeRecoverable(false);
-        actual.Data!["marker"]!.GetValue<string>().Should().Be("catalog-loop");
+        actual.Should().HaveNoData();
     }
 }

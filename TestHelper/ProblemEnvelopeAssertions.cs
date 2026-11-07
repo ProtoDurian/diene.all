@@ -67,6 +67,18 @@ public sealed class ProblemEnvelopeAssertions(Problem subject)
         return new(this, actual!);
     }
 
+    /// <summary>Asserts that the envelope omits the <c>data</c> extension.</summary>
+    public AndConstraint<ProblemEnvelopeAssertions> HaveNoData(
+        string because = "",
+        params object[] becauseArgs)
+    {
+        Execute.Assertion
+            .BecauseOf(because, becauseArgs)
+            .ForCondition(Subject.Data is null)
+            .FailWith("Expected problem data to be absent{reason}, but found {0}.", Subject.Data?.ToJsonString());
+        return new(this);
+    }
+
     /// <summary>Asserts the recoverability extension.</summary>
     public AndConstraint<ProblemEnvelopeAssertions> BeRecoverable(
         bool expected,

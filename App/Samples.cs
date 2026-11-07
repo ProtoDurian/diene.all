@@ -37,6 +37,12 @@ public static class Samples
         _ = ProblemGuard.NotFound<string>(null, "missing");
 
         var entityNotFound = new EntityNotFound("missing", typeof(string), "one");
+        var namedNotFound = new EntityNotFound("missing", "Note", "two");
+        var conflict = new Conflict("taken", typeof(string), "one");
+        var namedConflict = new Conflict("taken", "Note", "two");
+        var issueValidation = new ValidationError(
+            "invalid",
+            [new ValidationIssue(["address", "city"], "unknown", "enum"), new ValidationIssue([], "empty body")]);
         var multipleEntityNotFound = new MultipleEntityNotFound("missing", typeof(string), ["one"], ["two"]);
         var entityConflict = new EntityConflict("conflict", typeof(string));
         var validationError = new ValidationError(
@@ -49,6 +55,10 @@ public static class Samples
             entityNotFound,
             multipleEntityNotFound,
             entityConflict,
+            conflict,
+            namedConflict,
+            namedNotFound,
+            issueValidation,
             validationError,
             unauthorized,
             new Unauthenticated("sign in"),
@@ -61,6 +71,12 @@ public static class Samples
         _ = exporter.ExportAll();
         var emitter = new ProblemResourceEmitter(catalog, exporter, typeUris, portalConfig);
         var resource = emitter.Emit(new ProblemResourceIdentity(
+            identity.Platform,
+            identity.Service,
+            identity.Module,
+            identity.Landscape,
+            "v1"));
+        var implicitModule = emitter.Emit(new ProblemResourceIdentity(
             identity.Platform,
             identity.Service,
             identity.Landscape,
@@ -86,7 +102,9 @@ public static class Samples
         _ = JsonSerializer.Deserialize<Problem>(envelopeJson, AtomiJson.DefaultOptions);
 
         var payloadSummary =
-            $"{noteMissing.NoteId}:{entityNotFound.RequestIdentifier}:{entityNotFound.TypeName}:" +
+            $"{noteMissing.NoteId}:{entityNotFound.EntityType}:{entityNotFound.EntityId}:{entityNotFound.RequestIdentifier}:{entityNotFound.TypeName}:" +
+            $"{conflict.EntityType}:{conflict.EntityId}:{issueValidation.Issues.Count}:{issueValidation.Issues[0].Code}:" +
+            $"{string.Join('.', issueValidation.Issues[0].Path)}:{issueValidation.Issues[1].Message}:" +
             $"{entityNotFound.AssemblyQualifiedName.Length}:{multipleEntityNotFound.RequestIdentifiers.Count}:" +
             $"{multipleEntityNotFound.FoundRequestIdentifiers.Count}:{multipleEntityNotFound.TypeName}:" +
             $"{multipleEntityNotFound.AssemblyQualifiedName.Length}:{entityConflict.TypeName}:" +
@@ -95,7 +113,7 @@ public static class Samples
             $"{new UnregisteredDemoProblem().Marker}";
         var resourceSummary =
             $"{resource.ApiVersion}:{resource.Kind}:{resource.Metadata.Name}:{resource.Metadata.Namespace}:" +
-            $"{resource.Spec.Platform}:{resource.Spec.Service}:{resource.Spec.Landscape}:{resource.Spec.Version}:" +
+            $"{resource.Spec.Platform}:{resource.Spec.Service}:{resource.Spec.Module}:{implicitModule.Spec.Module}:{resource.Spec.Landscape}:{resource.Spec.Version}:" +
             $"{resourceEntry.Id}:{resourceEntry.Type}:{resourceEntry.Title}:{resourceEntry.Status}:" +
             $"{resourceEntry.Recoverable}:{resourceEntry.Schema.ToJsonString().Length}:{resourceEntry.Endpoints.Count}";
 

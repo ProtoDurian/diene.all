@@ -36,6 +36,7 @@ public sealed class InvalidJson : IDomainProblem
     public string Version => "v1";
 
     /// <summary>Gets the value that failed JSON parsing.</summary>
+    [JsonIgnore]
     [Description("The original value that failed JSON parsing.")]
     public string InvalidString { get; } = string.Empty;
 }

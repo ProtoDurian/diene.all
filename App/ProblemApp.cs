@@ -33,6 +33,8 @@ public static class ProblemApp
         app.UseExceptionHandler();
         app.MapGet("/notes/{id}", ThrowNoteMissing);
         app.MapGet("/guard/{id}", GuardMissingEntity);
+        app.MapPost("/notes/{id}", ThrowNoteConflict);
+        app.MapGet("/session", ThrowUnauthenticated);
         app.MapGet("/unregistered", ThrowUnregistered);
         return app;
     }
@@ -43,6 +45,11 @@ public static class ProblemApp
         ProblemGuard.NotFound<string>(null, id).Match<IResult>(
             value => Microsoft.AspNetCore.Http.Results.Ok(value),
             problem => throw problem.ToException());
+
+    private static IResult ThrowNoteConflict(string id) =>
+        throw new Conflict($"Note '{id}' already exists.", "Note", id).ToException();
+
+    private static IResult ThrowUnauthenticated() => throw new Unauthenticated("Sign in to read notes.").ToException();
 
     private static IResult ThrowUnregistered() => throw new UnregisteredDemoProblem().ToException();
 }

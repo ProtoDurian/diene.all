@@ -12,13 +12,28 @@ public sealed class ValidationError : IDomainProblem
     {
     }
 
-    /// <summary>Creates a populated validation problem.</summary>
+    /// <summary>Creates a populated validation problem from messages grouped by dotted field path.</summary>
     public ValidationError(string detail, IDictionary<string, string[]> errors)
     {
         Detail = detail ?? throw new ArgumentNullException(nameof(detail));
         Errors = errors is null
             ? throw new ArgumentNullException(nameof(errors))
             : new Dictionary<string, string[]>(errors, StringComparer.Ordinal);
+        Issues = Array.AsReadOnly([
+            .. Errors.SelectMany(field => field.Value.Select(message =>
+                new ValidationIssue(field.Key.Length == 0 ? [] : field.Key.Split('.'), message))),
+        ]);
+    }
+
+    /// <summary>Creates a populated validation problem from structured issues.</summary>
+    public ValidationError(string detail, IEnumerable<ValidationIssue> issues)
+    {
+        Detail = detail ?? throw new ArgumentNullException(nameof(detail));
+        ArgumentNullException.ThrowIfNull(issues);
+        Issues = Array.AsReadOnly([.. issues.Select(issue => issue ?? throw new ArgumentException("Validation issues must not be null.", nameof(issues)))]);
+        Errors = Issues
+            .GroupBy(issue => string.Join('.', issue.Path), StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Select(issue => issue.Message).ToArray(), StringComparer.Ordinal);
     }
 
     /// <inheritdoc />
@@ -37,7 +52,11 @@ public sealed class ValidationError : IDomainProblem
     [JsonIgnore]
     public string Version => "v1";
 
-    /// <summary>Gets validation messages grouped by field.</summary>
-    [Description("Validation messages grouped by the field that failed validation.")]
+    /// <summary>Gets the structured validation issues.</summary>
+    [Description("The validation issues, each at a path inside the request.")]
+    public IReadOnlyList<ValidationIssue> Issues { get; } = [];
+
+    /// <summary>Gets validation messages grouped by dotted field path.</summary>
+    [JsonIgnore]
     public IReadOnlyDictionary<string, string[]> Errors { get; } = new Dictionary<string, string[]>();
 }

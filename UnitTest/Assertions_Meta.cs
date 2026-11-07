@@ -112,6 +112,24 @@ public class Assertions_Meta
     }
 
     [Fact]
+    public async Task It_should_accept_an_envelope_without_data_and_reject_one_that_carries_data()
+    {
+        // Arrange
+        var dataLess = Envelope() with { Data = null };
+        using var dataLessResponse = Response(dataLess, HttpStatusCode.UnprocessableEntity);
+
+        // Act
+        var good = () => dataLess.Should().HaveNoData();
+        var bad = () => Envelope().Should().HaveNoData();
+        var parsed = (await dataLessResponse.Should().BeRfc9457()).Which;
+
+        // Assert
+        good.Should().NotThrow();
+        bad.Should().Throw<Exception>().WithMessage("*absent*");
+        parsed.Should().HaveNoData();
+    }
+
+    [Fact]
     public void It_should_accept_err_problem_and_reject_ok_or_wrong_problem_results()
     {
         // Arrange

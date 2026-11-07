@@ -25,7 +25,8 @@ public sealed record Problem
     /// <summary>Gets whether a caller may recover from this problem.</summary>
     public bool Recoverable { get; init; }
 
-    /// <summary>Gets the typed problem payload.</summary>
+    /// <summary>Gets the typed problem payload; absent for a problem without data.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonNode? Data { get; init; }
 
     /// <summary>Gets additional RFC 9457 extension members such as <c>traceId</c>.</summary>
