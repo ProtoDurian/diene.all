@@ -118,6 +118,7 @@ MODIFIED=(
   'probes/docker-build.ts'
   'probes/features.json'
   'probes/helm-render.ts'
+  'probes/hook-go-black-box.ts'
   'probes/hook-golangci-lint.ts'
   'probes/integration-tests.ts'
   'probes/lib/go.ts'
