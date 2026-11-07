@@ -93,6 +93,7 @@ cd_release_job() {
     permissions:
       contents: read
     uses: ./.github/workflows/⚡reusable-release-note.yaml
+    secrets: inherit
     with:
       version: ${{ github.ref_name }}
 YAML
