@@ -1,0 +1,8 @@
+[
+  "err",
+  {
+    "status": "422",
+    "title": "Invalid cart",
+    "type": "https://errors.atomi.cloud/raichu/nitroso/zinc/api/v1/validation_error"
+  }
+]

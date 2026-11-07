@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root_dir="$(git rev-parse --show-toplevel)"
-member_dir="${root_dir}/${MEMBER_DIR:-packages/diene_dart_lib}"
+member_dir="${root_dir}/${MEMBER_DIR:-packages/diene_result}"
 cd "${member_dir}"
 
 name="$(yq -r '.name' pubspec.yaml)"
@@ -69,25 +69,67 @@ YAML
   echo 'void main() {}'
 } >"${consumer}/bin/libraries.dart"
 cat >"${consumer}/bin/consumer.dart" <<DART
-import 'package:${name}/diene_dart_lib.dart';
+import 'dart:convert';
+
+import 'package:${name}/diene_result.dart';
 
 void main() {
-  const Note note = Note(title: 'Consumer', body: 'Installed from the archive.');
-  final Note decoded = Note.fromJson(note.toJson());
-  if (decoded != note) throw StateError('the wire codec did not round-trip');
-  final String summary = summarizeNote(note);
-  if (summary != 'Consumer — Installed from the archive.') throw StateError('unexpected summary: \$summary');
-  print('consumer: \$summary');
+  final Result<int> ok = const Result<int>.ok(21).map((int value) => value * 2);
+  final ResultSerial okWire = ok.serial();
+  if (jsonEncode(okWire) != '["ok",42]') throw StateError('unexpected ok wire: \$okWire');
+  if (Result<int>.fromSerial(okWire, decodeOk: (Object? value) => value! as int).unwrap() != 42) {
+    throw StateError('the ok wire did not round-trip');
+  }
+  const ResultSerial errWire = <Object?>[
+    'err',
+    <String, Object?>{
+      'data': <String, Object?>{'cartId': 'cart-1'},
+      'recoverable': true,
+      'status': 422,
+      'title': 'Invalid cart',
+      'type': 'https://errors.atomi.cloud/raichu/nitroso/zinc/api/v1/validation_error',
+    },
+  ];
+  final Result<int> err = Result<int>.fromSerial(errWire, decodeOk: (Object? value) => value! as int);
+  final String title = err.match(ok: (int value) => 'ok', err: (problem) => '\${problem.status} \${problem.title}');
+  if (title != '422 Invalid cart') throw StateError('unexpected Err match: \$title');
+  final List<Object?> errOut = jsonDecode(jsonEncode(err.serial())) as List<Object?>;
+  final Map<String, Object?> problemOut = errOut[1]! as Map<String, Object?>;
+  if (errOut.first != 'err' || problemOut['status'] != 422 || (problemOut['data']! as Map<String, Object?>)['cartId'] != 'cart-1') {
+    throw StateError('unexpected err wire: \$errOut');
+  }
+  if (Result<int>.fromSerial(errOut, decodeOk: (Object? value) => value! as int).unwrapErr() != err.unwrapErr()) {
+    throw StateError('the err wire did not round-trip');
+  }
+  try {
+    err.unwrap();
+    throw StateError('unwrap accepted an Err');
+  } on UnwrapError {
+  }
+  final String option = jsonEncode(<Object?>[Option<String>.fromNullable(null).serial(), const Option<String>.some('x').serial()]);
+  if (option != '[["none",null],["some","x"]]') throw StateError('unexpected option wire: \$option');
+  print('consumer: \$okWire \$title');
 }
 DART
-if [[ -f ${unpacked}/lib/test_helper.dart ]]; then
+if [[ -f lib/test_helper.dart ]]; then
   cat >"${consumer}/bin/test_helper.dart" <<DART
-import 'package:${name}/diene_dart_lib.dart';
+import 'package:${name}/diene_result.dart';
 import 'package:${name}/test_helper.dart';
 
 void main() {
-  const Note note = Note(title: 'Consumer', body: 'Helper.');
-  assertNoteSummary(note, summarizeNote(note));
+  if (expectOk(const Result<int>.ok(7)) != 7) throw StateError('expectOk lost the value');
+  if (expectSome(const Option<String>.some('x')) != 'x') throw StateError('expectSome lost the value');
+  expectNone(const Option<String>.none());
+  try {
+    expectSome(const Option<String>.none());
+    throw StateError('expectSome accepted None');
+  } on TestHelperFailure {}
+  try {
+    expectNone(const Option<String>.some('x'));
+  } on TestHelperFailure {
+    return;
+  }
+  throw StateError('expectNone accepted Some');
 }
 DART
 fi
