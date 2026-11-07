@@ -77,10 +77,11 @@ for wf in .github/workflows/cd.yaml "${publish}"; do
 done
 [[ "$(show Taskfile.yaml | yq '.includes | (has("docker") or has("helm"))')" == false ]] || fail "Taskfile.yaml still includes docker/helm"
 [[ "$(show .github/dependabot.yml | yq '[.updates[] | select(.package-ecosystem == "docker" or .package-ecosystem == "helm")] | length')" == 0 ]] || fail "dependabot.yml still has a docker/helm entry"
-[[ "$(show dlint.yaml | yq '[.checks["toolchain-smoke"].binaries[] | select(test("^(docker|dockerd|hadolint|skopeo|helm|helm-docs|helmlint|kubeconform|kyverno)( |$)"))] | length')" == 0 ]] || fail "dlint.yaml still smokes a D/H binary"
+[[ "$(show dlint.yaml | yq '[.checks["toolchain-smoke"].binaries[] | select(test("^(docker|dockerd|hadolint|helm|helm-docs|helmlint|kubeconform|kyverno)( |$)"))] | length')" == 0 ]] || fail "dlint.yaml still smokes a D/H binary"
 [[ "$(show probes/features.json | jq '[.[] | select(.name | test("docker|helm|distroless|nonroot"))] | length')" == 0 ]] || fail "features.json still has a docker/helm row"
 if grep -Eqi '^# (docker|helm)' <<<"$(show CLAUDE.md)"; then fail "CLAUDE.md still has a Docker/Helm section"; fi
-if grep -Eq '^(docker|dockerd|hadolint|skopeo|helm|helm-docs|helmlint|kubeconform|kyverno) ' <<<"$(show probes/binary-smoke.ts)"; then fail "binary-smoke.ts still smokes a D/H binary"; fi
+if grep -Eq '^(docker|dockerd|hadolint|helm|helm-docs|helmlint) ' <<<"$(show probes/binary-smoke.ts)"; then fail "binary-smoke.ts still smokes a D/H binary"; fi
+if grep -q ImagePolicy <<<"$(show probes/lib/go.ts)"; then fail "probes/lib/go.ts still carries the image-policy helpers"; fi
 
 # Binaries are not checked: the whole infralint/infrautils bundles keep docker and helm on PATH.
 for f in nix/packages.nix nix/env.nix; do

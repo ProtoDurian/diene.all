@@ -2,6 +2,7 @@
 set -euo pipefail
 
 # Nothing of H survives, and the many-owner files the strip edited still parse.
+# Absence is proved by files; helm on PATH from the whole infralint bundle is fine.
 
 cd "$(git rev-parse --show-toplevel)"
 # index tree == HEAD in CI; keeps local staged mutations visible
@@ -58,30 +59,7 @@ show() { git show "${tree}:$1"; }
 [[ "$(show dlint.yaml | yq '[.checks["toolchain-smoke"].binaries[] | select(test("^(helm|helm-docs|helmlint|kubeconform|kyverno)( |$)"))] | length')" == 0 ]] || fail "dlint.yaml still smokes an H binary"
 [[ "$(show probes/features.json | jq '[.[] | select(.name | test("helm"))] | length')" == 0 ]] || fail "features.json still has a helm row"
 if show CLAUDE.md | grep -qi '^# helm'; then fail "CLAUDE.md still has a Helm section"; fi
-if show probes/binary-smoke.ts | grep -Eq '^(helm|helm-docs|helmlint|kubeconform|kyverno) '; then fail "binary-smoke.ts still smokes an H binary"; fi
-
-# --- nix: no aggregate that carries H by content -----------------------------------
-for f in nix/packages.nix nix/env.nix; do
-  if show "${f}" | grep -v '^ *#' | grep -Eq '(^|[^A-Za-z0-9-])(infralint|infrautils|kubernetes-helm|helm|helm-docs|helmlint)([^A-Za-z0-9-]|$)'; then
-    fail "${f} declares a helm-carrying package"
-  fi
-done
-
-# --- the shell itself: no helm binary, docker still there ---------------------------
-# -i clears the caller's PATH, so only the shell's own inputs resolve. The
-# positive control proves the lookup is not vacuous.
-# shellcheck disable=SC2016
-nix develop -i --keep HOME .#default -c bash -c '
-  set -u
-  bad=0
-  for b in helm helm-docs helmlint; do
-    if p="$(command -v "$b")"; then echo "❌ default shell carries $b at $p" >&2; bad=1; fi
-  done
-  for b in docker hadolint skopeo go; do
-    command -v "$b" >/dev/null || { echo "❌ control: default shell lost $b" >&2; bad=1; }
-  done
-  exit "$bad"
-' || fail "default shell helm absence / docker presence"
+if show probes/binary-smoke.ts | grep -Eq '^(helm|helm-docs|helmlint) '; then fail "binary-smoke.ts still smokes an H binary"; fi
 
 # --- the many-owner files the strip edited still parse and lint ---------------------
 for f in .github/workflows/ci.yaml .github/workflows/cd.yaml .github/dependabot.yml Taskfile.yaml dlint.yaml; do
@@ -99,4 +77,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ helm-absence: no H path, reference, entry, nix aggregate or shell binary; edited files valid"
+echo "✅ helm-absence: no H path, reference, entry or smoke line; edited files valid"

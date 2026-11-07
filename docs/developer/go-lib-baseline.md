@@ -21,8 +21,8 @@ system-integration tier.
 - `Example*` functions in the package directory are the living usage docs; they
   compile and their `// Output:` is checked.
 - Tests are table-driven where a function has more than one case.
-- Every test is a black-box `package <pkg>_test`; `export_test.go` is forbidden
-  (pre-commit hook `a-go-black-box`).
+- Every test is a black-box `package <pkg>_test`, `export_test.go` included
+  (golangci-lint's `testpackage` linter).
 
 The README's library section carries one badge block: pkg.go.dev reference, the mirror's `CI`
 workflow status and the license.
