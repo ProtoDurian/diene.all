@@ -1,6 +1,6 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-const PUBIGNORE = 'packages/diene_dart_lib/.pubignore';
+const PUBIGNORE = 'packages/diene_result/.pubignore';
 const CONSUMER = 'nix develop .#ci -c ./scripts/ci/test.sh consumer';
 
 export default {
@@ -24,10 +24,10 @@ export default {
       expectedImpact: [],
       async run(repo: any) {
         await withCleanProbeState(repo, [PUBIGNORE], async () => {
-          await repo.write(PUBIGNORE, `${await repo.read(PUBIGNORE)}/lib/src/note_summary.dart\n`);
+          await repo.write(PUBIGNORE, `${await repo.read(PUBIGNORE)}/lib/src/result.dart\n`);
           await expectRedBecause(repo, CONSUMER, 'consumer-test', [
             "Error when reading '../pub-cache/hosted/",
-            "lib/src/note_summary.dart': No such file or directory",
+            "lib/src/result.dart': No such file or directory",
           ]);
         });
       },
