@@ -81,6 +81,12 @@ See [docs/standards/semantic-release/index.md](docs/standards/semantic-release/i
 
 Follow the linked standard before changing its surface.
 
+# Effect-port interfaces
+
+See [docs/standards/interfaces/index.md](docs/standards/interfaces/index.md) before
+changing the System, VFS, Terminal, logging, metrics, Result-failure, or
+test-helper contract surface.
+
 # Service-tree identity
 
 See [docs/standards/service-tree/index.md](docs/standards/service-tree/index.md).

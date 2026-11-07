@@ -1,10 +1,10 @@
-// ─── DOMAIN WIRING · the sample export surface (delete through END to replace the sample) ────────
-export * from './adapters/pino-logger';
-export * from './adapters/redis-kv-store';
-export * from './lib/sample/cleanup';
-export * from './lib/sample/config';
-export type { IKeyValueStore, ILogger } from './lib/sample/interfaces';
-export * from './lib/sample/key';
-export * from './lib/sample/service';
-export type { RedisConfigResult, RedisConnection, RedisEnvironment } from './lib/sample/structures';
+// ─── DOMAIN WIRING · dependency-light effect-port contracts ──────────────────────────────────────
+export * from './lib/error.js';
+export * from './lib/logging.js';
+export * from './lib/metrics.js';
+export * from './lib/system.js';
+export * from './lib/telemetry.js';
+export * from './lib/terminal.js';
+export type { Checked } from './lib/validation.js';
+export * from './lib/vfs.js';
 // ─── END DOMAIN WIRING ────────────────────────────────────────────────────────────────────────────
