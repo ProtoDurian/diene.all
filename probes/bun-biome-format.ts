@@ -47,13 +47,16 @@ export default {
     },
     {
       name: 'mutation-bun-biome-format-no-install',
-      description: 'Without installed dependencies the Biome member must fail and point at the setup task.',
+      description: 'Without installed dependencies the Biome member must fail, not pass silently.',
       kind: 'mutation',
       expectedImpact: ['binary-smoke', ...treefmtImpact],
       async run(repo: any) {
         const removed = await repo.exec('rm -rf node_modules');
         if (removed.exitCode !== 0) throw new Error(`failed to remove node_modules: ${removed.stderr}`);
-        await expectRedBecause(repo, gate, 'bun-biome-format', ['run the setup task first']);
+        await expectRedBecause(repo, gate, 'bun-biome-format', [
+          'formatter command not found',
+          'node_modules/.bin/biome',
+        ]);
         const absent = await repo.exec('test ! -e node_modules');
         if (absent.exitCode !== 0) throw new Error('the Biome member installed dependencies itself');
       },
