@@ -65,9 +65,10 @@ Container images are version-pinned without digests.
 
 ## Build and runtime
 
-The local build and CI build share `scripts/local/build.sh`. The Dockerfile
-uses version-pinned `oven/bun` build and runtime stages, installs from the
-frozen lockfile, bundles the sample, and runs as the unprivileged `bun` user.
+The local build and CI build share `scripts/local/build.sh`.
+The Dockerfile uses version-pinned `oven/bun` build and runtime stages,
+installs from the frozen lockfile, bundles the sample, and runs as the
+unprivileged `bun` user.
 The sample is stateless classes wired in `src/index.ts`: the domain in
 `src/lib/sample/`, pino and Redis in `src/adapters/`. It prints a composed key
 by default; `REDIS_HOST` plus `REDIS_PORT` enable a Redis round trip.
@@ -91,13 +92,25 @@ Read the TypeScript variants alongside their shared standards:
 
 ## External service / compute cost
 
-- Integration tests and Docker image builds require a Docker runtime.
-- Unit, integration, build, Docker, and Helm are separate CI jobs.
+- Integration tests require a Docker runtime.
+- Docker image builds require a Docker runtime.
+- Each of these is a separate CI job:
+  - unit
+  - integration
+  - build
+  - Docker
+  - Helm
 
 ## Template maintenance boundary
 
-Downstream templates may adapt package identity, coverage thresholds, the
-Docker entry point, badges, and the fenced illustrative `src/` plus `tests/`
-sample. They should not fork the inherited task, workflow, release, Nix, lint,
+Downstream templates may adapt:
+
+- package identity
+- coverage thresholds
+- the Docker entry point
+- badges
+- the fenced illustrative `src/` plus `tests/` sample
+
+They should not fork the inherited task, workflow, release, Nix, lint,
 or standards machinery. Shared fixes land at the earliest owning branch and
 merge down.
