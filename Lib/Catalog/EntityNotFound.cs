@@ -52,13 +52,17 @@ public sealed class EntityNotFound : IDomainProblem
 
     /// <summary>Gets the requested entity type.</summary>
     [Description("The type of the requested entity.")]
-    public string EntityType { get; } = string.Empty;
+    [JsonInclude]
+    [JsonRequired]
+    public string EntityType { get; private init; } = string.Empty;
 
     /// <summary>Gets the requested entity identifier, serialized as <c>id</c>.</summary>
     [Description("The identifier of the requested entity.")]
+    [JsonInclude]
+    [JsonRequired]
     [JsonPropertyName("id")]
     [JsonPropertyOrder(1)]
-    public string EntityId { get; } = string.Empty;
+    public string EntityId { get; private init; } = string.Empty;
 
     /// <summary>Gets the identifier that was requested.</summary>
     [JsonIgnore]

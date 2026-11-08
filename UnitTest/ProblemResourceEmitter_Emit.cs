@@ -207,6 +207,13 @@ public class ProblemResourceEmitter_Emit
             entry!.AsObject().Select(member => member.Key).SequenceEqual(new[] { "id", "type", "title", "status", "recoverable", "schema", "endpoints" }) &&
             entry["type"]!.GetValue<string>() ==
             $"https://docs.example.test/docs/lapras/dotnet/notes/api/v1/{entry["id"]!.GetValue<string>()}");
+        foreach (var id in new[] { "entity_not_found", "conflict" })
+        {
+            var schema = problems.Single(entry => entry!["id"]!.GetValue<string>() == id)!["schema"]!;
+            schema["required"]!.AsArray().Select(name => name!.GetValue<string>()).Should().BeEquivalentTo(["entityType", "id"], id);
+            schema["properties"]!.AsObject().Select(member => member.Value!["type"]!.ToJsonString())
+                .Should().Equal(["\"string\"", "\"string\""], id);
+        }
     }
 
     private static ProblemResourceEmitter Emitter(ErrorPortalConfig portal, Action<ProblemCatalogBuilder> register)

@@ -22,14 +22,15 @@
           "type": "object",
           "properties": {
             "entityType": {
-              "type": ["string", "null"],
+              "type": "string",
               "description": "The type of the conflicting entity."
             },
             "id": {
-              "type": ["string", "null"],
+              "type": "string",
               "description": "The identifier of the conflicting entity."
             }
           },
+          "required": ["entityType", "id"],
           "description": "The entity conflicts with an existing unique value or state."
         },
         "endpoints": []
@@ -66,14 +67,15 @@
           "type": "object",
           "properties": {
             "entityType": {
-              "type": ["string", "null"],
+              "type": "string",
               "description": "The type of the requested entity."
             },
             "id": {
-              "type": ["string", "null"],
+              "type": "string",
               "description": "The identifier of the requested entity."
             }
           },
+          "required": ["entityType", "id"],
           "description": "The requested entity could not be found by its identifier."
         },
         "endpoints": []
@@ -180,7 +182,7 @@
           "type": "object",
           "properties": {
             "issues": {
-              "type": ["array", "null"],
+              "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
@@ -207,6 +209,7 @@
               "description": "The validation issues, each at a path inside the request."
             }
           },
+          "required": ["issues"],
           "description": "The request contains one or more validation errors."
         },
         "endpoints": []

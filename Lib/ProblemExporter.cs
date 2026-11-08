@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Reflection;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Schema;
 using AtomiCloud.Diene.CoreUtils.Json;
@@ -15,6 +16,12 @@ public sealed class ProblemExporter(IProblemCatalog catalog, IProblemTypeUriBuil
         TransformSchemaNode = AddDescription,
     };
 
+    private static readonly JsonSerializerOptions SchemaOptions = new(AtomiJson.DefaultOptions)
+    {
+        RespectNullableAnnotations = true,
+        RespectRequiredConstructorParameters = true,
+    };
+
     private readonly IProblemCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
     private readonly IProblemTypeUriBuilder _typeUris = typeUris ?? throw new ArgumentNullException(nameof(typeUris));
 
@@ -25,7 +32,7 @@ public sealed class ProblemExporter(IProblemCatalog catalog, IProblemTypeUriBuil
         if (!_catalog.All.Any(candidate => ReferenceEquals(candidate, descriptor)))
             throw new ArgumentException("Only descriptors belonging to this catalog can be exported.", nameof(descriptor));
 
-        var schema = JsonSchemaExporter.GetJsonSchemaAsNode(AtomiJson.DefaultOptions, descriptor.Type, ExporterOptions);
+        var schema = JsonSchemaExporter.GetJsonSchemaAsNode(SchemaOptions, descriptor.Type, ExporterOptions);
         if (HasNoData(schema)) schema = new JsonObject { ["not"] = new JsonObject() };
         return new ProblemExport(
             descriptor.Id,

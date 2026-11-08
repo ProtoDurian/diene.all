@@ -33,6 +33,28 @@ public class GenericCatalog_Wire
     }
 
     [Fact]
+    public void It_should_read_entity_references_back_and_refuse_ones_missing_a_required_field()
+    {
+        // Arrange
+        const string complete = """{"entityType":"Note","id":"four"}""";
+        const string missingId = """{"entityType":"Note"}""";
+
+        // Act
+        var conflict = JsonSerializer.Deserialize<Conflict>(complete, AtomiJson.DefaultOptions)!;
+        var notFound = JsonSerializer.Deserialize<EntityNotFound>(complete, AtomiJson.DefaultOptions)!;
+        var conflictAct = () => JsonSerializer.Deserialize<Conflict>(missingId, AtomiJson.DefaultOptions);
+        var notFoundAct = () => JsonSerializer.Deserialize<EntityNotFound>(missingId, AtomiJson.DefaultOptions);
+        var issuesAct = () => JsonSerializer.Deserialize<ValidationError>("{}", AtomiJson.DefaultOptions);
+
+        // Assert
+        (conflict.EntityType, conflict.EntityId).Should().Be(("Note", "four"));
+        (notFound.EntityType, notFound.EntityId).Should().Be(("Note", "four"));
+        conflictAct.Should().Throw<JsonException>();
+        notFoundAct.Should().Throw<JsonException>();
+        issuesAct.Should().Throw<JsonException>();
+    }
+
+    [Fact]
     public void It_should_keep_the_previous_entity_not_found_views_off_the_wire()
     {
         // Arrange

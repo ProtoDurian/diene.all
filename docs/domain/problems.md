@@ -89,7 +89,8 @@ is the owner's call.
 
 Each service registers its baseline and domain-specific problems in its
 composition root. `ProblemExporter` derives the payload schema using
-`System.Text.Json.Schema.JsonSchemaExporter` and lifts `DescriptionAttribute`
+`System.Text.Json.Schema.JsonSchemaExporter`, honouring nullable annotations and
+`[JsonRequired]`, and lifts `DescriptionAttribute`
 values into schema descriptions. `ProblemResourceEmitter` validates portal
 identity, catalog version, and exported type URI before producing canonical JSON
 that is valid YAML 1.2.

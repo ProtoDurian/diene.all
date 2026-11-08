@@ -9,11 +9,15 @@ public sealed class ValidationIssue(IReadOnlyList<string> path, string message, 
 {
     /// <summary>Gets the path segments to the invalid value; empty for the whole request.</summary>
     [Description("The path segments to the invalid value; empty for the whole request.")]
-    public IReadOnlyList<string> Path { get; } = [.. path ?? throw new ArgumentNullException(nameof(path))];
+    [JsonInclude]
+    [JsonRequired]
+    public IReadOnlyList<string> Path { get; private init; } = [.. path ?? throw new ArgumentNullException(nameof(path))];
 
     /// <summary>Gets the human-readable validation message.</summary>
     [Description("The human-readable validation message.")]
-    public string Message { get; } = message ?? throw new ArgumentNullException(nameof(message));
+    [JsonInclude]
+    [JsonRequired]
+    public string Message { get; private init; } = message ?? throw new ArgumentNullException(nameof(message));
 
     /// <summary>Gets the optional machine-readable rule code.</summary>
     [Description("The optional machine-readable rule code.")]

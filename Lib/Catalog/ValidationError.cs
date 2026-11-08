@@ -54,7 +54,9 @@ public sealed class ValidationError : IDomainProblem
 
     /// <summary>Gets the structured validation issues.</summary>
     [Description("The validation issues, each at a path inside the request.")]
-    public IReadOnlyList<ValidationIssue> Issues { get; } = [];
+    [JsonInclude]
+    [JsonRequired]
+    public IReadOnlyList<ValidationIssue> Issues { get; private init; } = [];
 
     /// <summary>Gets validation messages grouped by dotted field path.</summary>
     [JsonIgnore]

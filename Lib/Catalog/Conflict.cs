@@ -44,11 +44,15 @@ public sealed class Conflict : IDomainProblem
 
     /// <summary>Gets the conflicting entity type.</summary>
     [Description("The type of the conflicting entity.")]
-    public string EntityType { get; } = string.Empty;
+    [JsonInclude]
+    [JsonRequired]
+    public string EntityType { get; private init; } = string.Empty;
 
     /// <summary>Gets the conflicting entity identifier, serialized as <c>id</c>.</summary>
     [Description("The identifier of the conflicting entity.")]
+    [JsonInclude]
+    [JsonRequired]
     [JsonPropertyName("id")]
     [JsonPropertyOrder(1)]
-    public string EntityId { get; } = string.Empty;
+    public string EntityId { get; private init; } = string.Empty;
 }
