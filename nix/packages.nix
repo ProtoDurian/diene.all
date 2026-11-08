@@ -45,6 +45,21 @@ let
       }
     );
 
+    operator = (
+      with pkgs-2605;
+      {
+        controller-gen = kubernetes-controller-tools;
+        inherit
+          bun
+          etcd
+          kubebuilder
+          kubectl
+          kubernetes
+          setup-envtest
+          ;
+      }
+    );
+
     nix-unstable = (
       with pkgs-unstable;
       {
@@ -53,4 +68,4 @@ let
   };
 in
 with all;
-atomipkgs // nix-2605 // nix-unstable
+atomipkgs // nix-2605 // nix-unstable // operator

@@ -49,28 +49,30 @@ async function first(repo: ProbeRepo, glob: string): Promise<string> {
 }
 
 export async function flipGoAssertion(repo: ProbeRepo): Promise<string> {
-  const paths = (await repo.glob('tests/unit/**/*_test.go')).sort();
-  for (const path of paths) {
-    const source = await repo.read(path);
-    if (source.includes('; got != ')) {
-      await repo.write(path, source.replace('; got != ', '; got == '));
-      return path;
-    }
-  }
-  throw new Error('no structural Go assertion target found');
+  return replaceOnce(
+    repo,
+    'tests/unit/operator/note_test.go',
+    'require.Equal(t, "note-a-copy-2", note.CopyName("note-a", 2))',
+    'require.Equal(t, "probe-wrong", note.CopyName("note-a", 2))',
+  );
 }
 
 export async function breakAdapter(repo: ProbeRepo): Promise<string> {
-  const paths = (await repo.glob('adapters/**/*.go')).sort();
-  for (const path of paths) {
-    const source = await repo.read(path);
-    const target = '.Set(ctx, key, value, 0)';
-    if (source.includes(target)) {
-      await repo.write(path, source.replace(target, '.Set(ctx, key+"-probe", value, 0)'));
-      return path;
-    }
+  return replaceOnce(
+    repo,
+    'adapters/operator/kube/resources.go',
+    'cm.Data[payloadKey] = payload',
+    'cm.Data[payloadKey] = "probe-wrong"',
+  );
+}
+
+async function replaceOnce(repo: ProbeRepo, path: string, target: string, replacement: string): Promise<string> {
+  const source = await repo.read(path);
+  if (!source.includes(target)) {
+    throw new Error(`sabotage target missing in ${path}`);
   }
-  throw new Error('no structural adapter method target found');
+  await repo.write(path, source.replace(target, replacement));
+  return path;
 }
 
 export async function plantGoFile(

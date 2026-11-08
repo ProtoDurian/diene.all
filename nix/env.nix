@@ -25,6 +25,8 @@ with packages;
   ];
 
   main = [
+    bun
+    controller-gen
     cyanprint
     git
     go
@@ -32,7 +34,9 @@ with packages;
     gotestsum
     govulncheck
     infisical
+    kubebuilder
     releaser
+    setup-envtest
     shellcheck
   ];
 

@@ -51,6 +51,17 @@ illustrative Note sample. Go variants accompany the shared standards for
 [validation](docs/standards/validation/languages/go.md), and
 [wire format](docs/standards/wire-format/languages/go.md).
 
+# Operator template
+
+The reusable kubebuilder/controller-runtime operator skeleton: one `cmd/manager`
+binary, a manager image and a manager chart, proven on the toy `Note` and
+`Journal` CRDs. Read the [operator conventions](docs/domain/operator-conventions.md)
+before changing controllers, CRDs, reconcile services, the durable ledger,
+blast-brake, observe mode or the manager chart.
+
+- `task operator:generate` regenerates CRDs, RBAC and deepcopy from the Go types.
+- `task operator:e2e` runs the k3d end-to-end journey on a throwaway cluster.
+
 # Standards
 
 The conventions this repository follows live under

@@ -1,0 +1,37 @@
+{{- if .Values.dashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "operator-template.fullname" . }}-metric-taxonomy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "operator-template.labels" . | nindent 4 }}
+data:
+  taxonomy.yaml: |
+    emittedByToy:
+      - operator_template_condition
+      - operator_template_ledger_failures_total
+      - operator_template_reconcile_ticks_total
+      - controller_runtime_reconcile_total
+      - controller_runtime_reconcile_errors_total
+      - controller_runtime_reconcile_time_seconds
+    consumerExtensions:
+      provisioning:
+        metric: operator_template_provisioning_duration_seconds
+        histogramBucket: operator_template_provisioning_duration_seconds_bucket
+      vendor:
+        metric: operator_template_vendor_api_failures_total
+        covers:
+          - dns
+          - vendor-api
+      webhook:
+        metric: operator_template_webhook_events_total
+        healthyState: owned
+        states:
+          - owned
+          - double-own
+          - no-owner
+          - misroute
+          - dead-letter
+          - lag
+{{- end }}

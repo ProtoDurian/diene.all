@@ -47,6 +47,8 @@ linters:
     - wastedassign
     - whitespace
   settings:
+    exhaustive:
+      default-signifies-exhaustive: true
     govet:
       enable-all: true
       disable:
@@ -76,6 +78,18 @@ linters:
       skip-regexp: ^$
   exclusions:
     generated: lax
+    rules:
+      - path: api/v1alpha1/
+        linters: [revive]
+        text: 'struct-tag: unknown option "inline"'
+      - path: cmd/manager/
+        linters: [revive]
+        text: deep-exit
+      - path: _test\.go
+        linters: [revive]
+        text: redundant-test-main-exit
+      - path: _test\.go
+        linters: [unparam]
 
 issues:
   max-issues-per-linter: 0

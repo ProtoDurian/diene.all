@@ -1,7 +1,9 @@
 import { restoreProbeState } from './lib/helpers.ts';
 import { expectGreen, expectRedWithDiagnostic, plantGoFile } from './lib/go.ts';
 
-const gate = 'nix develop .#ci -c pre-commit run a-golangci-lint --all-files';
+// Per-process cache: concurrent probe arms must not share golangci results.
+const gate =
+  'GOLANGCI_LINT_CACHE="$PWD/.git/cyanprint-golangci-cache-$$" nix develop .#ci -c pre-commit run a-golangci-lint --all-files';
 const whiteBox = /package should be `\w+_test` instead of `\w+` \(testpackage\)/;
 
 const plants = [

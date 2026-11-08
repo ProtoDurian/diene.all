@@ -3,45 +3,24 @@ package cli_test
 import (
 	"context"
 	"os/exec"
+	"strings"
 	"testing"
-
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func TestCompiledArtifactRedisJourney(t *testing.T) {
+func TestCompiledArtifactReportsItsInterface(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: testcontainers.ContainerRequest{
-			Image:        "redis:7.4.5-alpine",
-			ExposedPorts: []string{"6379/tcp"},
-			WaitingFor:   wait.ForLog("Ready to accept connections"),
-		},
-		Started: true,
-	})
-	if err != nil {
-		t.Fatalf("start Redis container: %v", err)
-	}
-	t.Cleanup(func() {
-		if terminateErr := container.Terminate(ctx); terminateErr != nil {
-			t.Errorf("terminate Redis container: %v", terminateErr)
-		}
-	})
-
-	endpoint, err := container.Endpoint(ctx, "")
-	if err != nil {
-		t.Fatalf("resolve Redis endpoint: %v", err)
-	}
 
 	// Act
-	// #nosec G204 -- the executable is fixed; only the isolated testcontainer endpoint is dynamic.
-	output, err := exec.CommandContext(ctx, "../../../dist/go-base", "note", endpoint, "Sample Journey", "connected").CombinedOutput()
+	// #nosec G204 -- fixed executable and arguments.
+	output, err := exec.CommandContext(ctx, "../../../dist/manager", "--help").CombinedOutput()
 	// Assert
 	if err != nil {
 		t.Fatalf("run compiled artifact: %v\n%s", err, output)
 	}
-	if got, want := string(output), "sample-journey=connected\n"; got != want {
-		t.Fatalf("compiled artifact output = %q, want %q", got, want)
+	for _, flag := range []string{"enable-note", "enable-journal", "health-probe-bind-address", "observe"} {
+		if !strings.Contains(string(output), flag) {
+			t.Fatalf("compiled manager did not report the %s flag\n%s", flag, output)
+		}
 	}
 }

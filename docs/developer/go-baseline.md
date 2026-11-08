@@ -16,20 +16,20 @@ gotestsum. Dates and times of day use `cloud.google.com/go/civil`, pinned in
 
 - `lib/` contains pure domain packages.
 - `adapters/` contains dependency implementations.
-- `cmd/go-base/` is the single composition root and wires concrete adapters
+- `cmd/manager/` is the single composition root and wires concrete adapters
   explicitly.
 - `tests/unit/` imports domain packages only through their public API.
-- `tests/int/` proves adapters against real dependencies with
+- `tests/int/` proves adapters against real dependencies with envtest and
   testcontainers-go.
 - `tests/sit/` exercises compiled artifacts from a client's perspective.
 
 ## Commands
 
 - `task setup` installs modules and synchronizes vendored skills.
-- `task build` creates `dist/go-base`.
+- `task build` creates `dist/manager`.
 - `task typecheck` compiles source packages without running tests.
 - `task test`, `task test:unit`, `task test:int`, and `task test:sit` run the
-  tiered suites; `task test:sit` runs the compiled-artifact Redis journey.
+  tiered suites; `task test:sit` runs the compiled-manager journey.
 - `task test:coverage`, `task test:unit:coverage`, and
   `task test:int:coverage` enforce the scoped ledgers.
 - `task test:unit:watch` watches the unit tier.
@@ -38,20 +38,25 @@ gotestsum. Dates and times of day use `cloud.google.com/go/civil`, pinned in
   whole repository and production only, for each tool.
 - `task deadcode` writes the nonblocking LLM review feed to
   `reports/deadcode-llm.txt`.
-- `task run -- slug "Hello World"` runs from source.
-- `task preview -- slug "Hello World"` runs the compiled artifact.
-- `task up` and `task down` manage the local Redis dependency.
+- `task run -- --help` runs the manager from source.
+- `task preview -- --help` runs the compiled manager artifact.
+- `task operator:generate` regenerates the CRDs, RBAC and deepcopy from the Go
+  types and markers.
+- `task operator:e2e` runs the k3d end-to-end journey on a throwaway cluster.
+- `task up` and `task down` manage the local MinIO ledger dependency.
 
-There is deliberately no `task dev`: this base is not a long-running server, so
-an Air hot-reload loop would add machinery without a real use case.
+There is deliberately no `task dev`: the manager is exercised through its tiers
+and the k3d journey, so an Air hot-reload loop would add machinery without a
+real use case.
 
 ## Test and coverage law
 
 Every `*_test.go` file, `export_test.go` included, must declare a package ending
 in `_test`; golangci-lint's `testpackage` linter enforces it.
 Unit coverage includes only `lib/**` and must be
-100%. Integration coverage includes only `adapters/**` and must be 100% in this
-minimal base. The checked-in ledger is `.config/go-base.coverage.yaml`. Each tier
+100%. Integration coverage includes only `adapters/**`; the operator lowers that
+threshold because defensive transport-error branches of the reconcilers and the
+S3/MinIO ledger store are not reachable with real dependencies. The checked-in ledger is `.config/go-base.coverage.yaml`. Each tier
 writes its own profile: `reports/unit/coverage.out` and
 `reports/integration/coverage.out`.
 
@@ -66,10 +71,10 @@ list. Govulncheck is a blocking CI-only job.
 ## Docker and Helm
 
 The Dockerfile builds a static binary and runs it from
-`gcr.io/distroless/static-debian12:nonroot` as UID/GID 65532. The root chart
-remains a minimal
-all-yes Helm surface and is intentionally independent of downstream service
-chart design.
+`gcr.io/distroless/static-debian12:nonroot` as UID/GID 65532. The root chart is
+the operator manager chart: CRDs (plain templates), RBAC, the manager
+Deployment, a secured metrics Service and the observability pack
+(ServiceMonitor, GrafanaAlertRuleGroup and a Grafana dashboard).
 
 ## Template-maintenance boundary
 

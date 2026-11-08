@@ -1,6 +1,6 @@
-# diene-workspace
+# operator-template
 
-Minimal workspace baseline chart
+Manager chart for the operator skeleton template (CRDs, RBAC, deployment, observability)
 
 Chart metadata (version, type, appVersion) is defined in
 [`Chart.yaml`](Chart.yaml). Configurable values and their defaults are defined in

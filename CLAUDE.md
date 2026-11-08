@@ -86,6 +86,13 @@ See [docs/standards/linting/index.md](docs/standards/linting/index.md).
 
 See [/docs/standards/observability/index.md](/docs/standards/observability/index.md).
 
+# Operator conventions
+
+Read [docs/domain/operator-conventions.md](docs/domain/operator-conventions.md)
+before changing controllers, CRDs, reconcile services, the durable ledger,
+blast-brake, observe mode or the manager chart. The reusable machinery lives
+under `lib/operator/`, `adapters/operator/` and `cmd/manager`.
+
 # Release automation
 
 See [docs/standards/semantic-release/index.md](docs/standards/semantic-release/index.md).
