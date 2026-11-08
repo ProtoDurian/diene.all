@@ -30,7 +30,7 @@ tasks:
       - rm -rf dist coverage reports node_modules
 
   build:
-    desc: Build the Bun bundle to dist/
+    desc: Build the publishable library (ESM + CJS + types) to dist/
     cmds:
       - ./scripts/local/build.sh
 

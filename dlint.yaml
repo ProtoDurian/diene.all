@@ -12,6 +12,7 @@ checks:
     orchestrators:
       - .github/workflows/ci.yaml
       - .github/workflows/release.yaml
+      - .github/workflows/cd.yaml
   toolchain-smoke:
     shell: default
     binaries:
