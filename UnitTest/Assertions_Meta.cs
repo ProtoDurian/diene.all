@@ -135,6 +135,22 @@ public class Assertions_Meta
     }
 
     [Fact]
+    public async Task It_should_accept_a_response_without_detail()
+    {
+        // Arrange
+        using var noDetail = Response(Envelope() with { Detail = null, Data = null }, HttpStatusCode.UnprocessableEntity);
+
+        // Act
+        var parsed = (await noDetail.Should().BeRfc9457()).Which;
+        var body = await noDetail.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        body.Should().NotContain("\"detail\"");
+        parsed.Detail.Should().BeNull();
+        parsed.Should().HaveType(TypeUri).And.HaveNoData();
+    }
+
+    [Fact]
     public async Task It_should_reject_a_response_whose_data_member_is_null()
     {
         // Arrange
