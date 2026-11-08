@@ -124,8 +124,8 @@ diff. The helper has no test-framework dependency.
 
 TestHelper code belongs to the `meta` tier, not unit coverage. Every helper must
 be tested as an asserter: one known-good value passes, one known-bad value throws,
-and the mismatch message/payload diff is asserted. Run `task test:meta`, or
-`task test:meta -- --coverage` for the ledger; it covers only `src/test-helper/**` at
+and the mismatch message/payload diff is asserted. Run `task test:meta` or
+`task test:meta:coverage`; the meta ledger covers only `src/test-helper/**` at
 100%. Product unit coverage covers only `src/lib/**` at 100%.
 
 ## Package boundaries
