@@ -27,7 +27,8 @@ and export source of truth.
 Registration is mandatory. A type that is absent from the catalog, or an object
 that spoofs a registered `(version, id)` with the wrong concrete type, is treated
 as an internal catalog-loop failure: the response status is 500, its type is
-`about:blank`, and `ProblemCatalog` logs an error. A missing registration must
+`about:blank`, its title is `Internal Server Error`, it has no `detail` or
+`data`, and `ProblemCatalog` logs an error. A missing registration must
 never silently become a consumer-visible 4xx response.
 
 Wire ids are snake_case and versions use the `v1` form. Their exact patterns are:
@@ -76,7 +77,7 @@ A `ValidationIssue` path is a list of segments; the dictionary constructor of
 A problem that serializes to an object with no properties has no data: its
 envelope omits `data` (never `null` or `{}`), and its exported schema is
 `{"not":{}}`. This applies to consumer problems too. An uncatalogued problem
-renders a plain 500 without `data`.
+renders a plain 500 with the generic title and no `detail` or `data`.
 
 This release changes the wire `data` of `entity_not_found`, `validation_error`,
 `unauthorized` and `invalid_json`, adds `conflict`, and keeps `entity_conflict`

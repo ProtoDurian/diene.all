@@ -56,13 +56,13 @@ public static class ProblemsServiceCollectionExtensions
         var registered = descriptor.IsSome() && descriptor.Get().Type == problem.GetType();
 
         context.ProblemDetails.Type = BuildTypeUri(typeUris, problem, registered);
-        context.ProblemDetails.Title = problem.Title;
+        // An uncatalogued problem has no published contract, so none of its own text or payload reaches the wire.
+        context.ProblemDetails.Title = registered ? problem.Title : "Internal Server Error";
         context.ProblemDetails.Status = context.HttpContext.Response.StatusCode;
-        context.ProblemDetails.Detail = problem.Detail;
+        context.ProblemDetails.Detail = registered ? problem.Detail : null;
         context.ProblemDetails.Instance ??= context.HttpContext.Request.Path;
-        var data = JsonSerializer.SerializeToNode(problem, problem.GetType(), AtomiJson.DefaultOptions);
-        // An uncatalogued problem has no published schema, so its payload never reaches the wire.
-        if (registered && data is not JsonObject { Count: 0 }) context.ProblemDetails.Extensions["data"] = data;
+        var data = registered ? JsonSerializer.SerializeToNode(problem, problem.GetType(), AtomiJson.DefaultOptions) : null;
+        if (data is not null and not JsonObject { Count: 0 }) context.ProblemDetails.Extensions["data"] = data;
         context.ProblemDetails.Extensions["recoverable"] = registered && descriptor.Get().Recoverable;
         context.ProblemDetails.Extensions.TryAdd(
             "traceId",

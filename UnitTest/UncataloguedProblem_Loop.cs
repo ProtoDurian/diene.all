@@ -31,9 +31,12 @@ public class UncataloguedProblem_Loop
         // Assert
         status.Should().Be(500);
         body["type"]!.GetValue<string>().Should().Be("about:blank");
+        body["title"]!.GetValue<string>().Should().Be("Internal Server Error");
         body["status"]!.GetValue<int>().Should().Be(500);
         body["recoverable"]!.GetValue<bool>().Should().BeFalse();
-        body.Should().NotContainKey("data");
+        body.Should().NotContainKey("data").And.NotContainKey("detail");
+        body.ToJsonString().Should().NotContain("leak").And.NotContain("sample detail").And.NotContain("Sample Problem");
+        body.Should().ContainKey("instance").And.ContainKey("traceId");
         logger.Levels.Should().ContainSingle().Which.Should().Be(LogLevel.Error);
         logger.Messages.Single().Should().Contain(typeof(SampleProblem).FullName).And.Contain("v1/sample_problem");
         resource.Spec.Problems.Should().NotContain(entry => entry.Id == "sample_problem");

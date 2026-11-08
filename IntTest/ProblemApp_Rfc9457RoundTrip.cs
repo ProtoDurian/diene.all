@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text.Json.Nodes;
 using AtomiCloud.Diene.Problems;
 using AtomiCloud.DotnetBase.App;
 using AtomiCloud.Diene.Problems.Catalog;
@@ -86,12 +88,16 @@ public class ProblemApp_Rfc9457RoundTrip
 
         // Act
         using var response = await client.GetAsync("/unregistered", cancellationToken);
-        var actual = (await response.Should().BeRfc9457()).Which;
+        var body = JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsObject();
 
         // Assert
-        actual.Should().HaveType("about:blank");
-        actual.Should().HaveStatus(500);
-        actual.Should().BeRecoverable(false);
-        actual.Should().HaveNoData();
+        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
+        body["type"]!.GetValue<string>().Should().Be("about:blank");
+        body["title"]!.GetValue<string>().Should().Be("Internal Server Error");
+        body["status"]!.GetValue<int>().Should().Be(500);
+        body["recoverable"]!.GetValue<bool>().Should().BeFalse();
+        body.Should().NotContainKey("detail").And.NotContainKey("data");
+        body.Should().ContainKey("instance").And.ContainKey("traceId");
     }
 }
