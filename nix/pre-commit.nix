@@ -92,5 +92,14 @@ pre-commit-lib.run {
       pass_filenames = true;
       language = "system";
     };
+
+    dotnetlint = {
+      enable = true;
+      name = ".NET lint";
+      entry = "${packages.dotnetlint}/bin/dotnetlint";
+      files = "^(.*\\.cs|.*\\.csproj|Directory\\.Build\\.props|Directory\\.Packages\\.props|dotnet-base\\.slnx|global\\.json)$";
+      pass_filenames = false;
+      language = "system";
+    };
   };
 }

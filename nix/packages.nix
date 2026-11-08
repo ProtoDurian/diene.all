@@ -12,6 +12,8 @@ let
           atomiutils
           cyanprint
           dlint
+          dn-inspect
+          dotnetlint
           infralint
           infrautils
           releaser
@@ -25,6 +27,7 @@ let
       {
         inherit
           actionlint
+          dotnet-sdk_10
           git
           go-task
           infisical
@@ -32,6 +35,7 @@ let
           pre-commit
           shellcheck
           treefmt
+          xmlstarlet
           ;
       }
     );
