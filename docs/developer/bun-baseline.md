@@ -25,7 +25,7 @@ rules remain in `docs/standards/`.
 - `task preview -- <args>` rebuilds and executes the bundled artifact.
 
 Each tier task is a one-line call to `scripts/local/test.sh`, and `task clean`
-calls `scripts/local/clean.sh`.
+is one `rm -rf` of `dist`, `coverage`, `reports` and `node_modules`.
 
 There is no `task dev`, `task up`, or `task down` surface in this base. Hot reload
 belongs to runnable descendants, and the integration tier owns its Redis
