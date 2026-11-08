@@ -4,7 +4,7 @@ set -euo pipefail
 # The node-owned consumer fixture: a throwaway package that `bun add`s the
 # library, then proves `import`, `require()` and the TypeScript types of both
 # conditions resolve. With no argument it consumes this tree's packed tarball;
-# pass a registry spec (e.g. @atomicloud/diene.bun-lib@1.4.0) to consume a real
+# pass a registry spec (e.g. @atomicloud/diene.result@1.0.3) to consume a real
 # publish instead.
 
 root_dir="$(git rev-parse --show-toplevel)"
@@ -23,9 +23,8 @@ work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
 
 cat >"${work}/package.json" <<JSON
-{ "name": "bun-lib-consumer-fixture", "private": true, "version": "0.0.0" }
+{ "name": "diene-result-consumer-fixture", "private": true, "version": "0.0.0" }
 JSON
-# The public types reference pino's, which need Node's: give the fixture the repo's pinned @types/node.
 cat >"${work}/tsconfig.json" <<JSON
 {
   "compilerOptions": {
@@ -33,29 +32,36 @@ cat >"${work}/tsconfig.json" <<JSON
     "moduleResolution": "nodenext",
     "strict": true,
     "noEmit": true,
-    "types": ["node"],
-    "typeRoots": ["${root_dir}/node_modules/@types"]
+    "types": []
   },
   "include": ["*.mts", "*.cts"]
 }
 JSON
 cat >"${work}/esm.mjs" <<JS
-import { KeyComposer } from '${name}';
-if (new KeyComposer('Consumer Proof').compose('ESM') !== 'consumer-proof:esm') throw new Error('ESM import returned the wrong key');
+import { Ok } from '${name}';
+import { expectOk } from '${name}/test-helper';
+if ((await expectOk(Ok(1).map((value) => value + 1))) !== 2) throw new Error('ESM import returned the wrong value');
 JS
 cat >"${work}/cjs.cjs" <<JS
-const { KeyComposer } = require('${name}');
-if (new KeyComposer('Consumer Proof').compose('CJS') !== 'consumer-proof:cjs') throw new Error('CJS require returned the wrong key');
+const { Ok } = require('${name}');
+const { expectOk } = require('${name}/test-helper');
+expectOk(Ok(1).map((value) => value + 1)).then((value) => {
+  if (value !== 2) throw new Error('CJS require returned the wrong value');
+});
 JS
 cat >"${work}/types-esm.mts" <<TS
-import { KeyComposer } from '${name}';
-const key: string = new KeyComposer('Consumer Proof').compose('ESM');
-export { key };
+import { Ok, type Result } from '${name}';
+import { expectOk } from '${name}/test-helper';
+const result: Result<number, string> = Ok<number, string>(1);
+const value: Promise<number> = expectOk(result);
+export { value };
 TS
 cat >"${work}/types-cjs.cts" <<TS
-import { KeyComposer } from '${name}';
-const key: string = new KeyComposer('Consumer Proof').compose('CJS');
-export { key };
+import { Ok, type Result } from '${name}';
+import { expectOk } from '${name}/test-helper';
+const result: Result<number, string> = Ok<number, string>(1);
+const value: Promise<number> = expectOk(result);
+export { value };
 TS
 
 echo "📥 bun add ${spec}..."

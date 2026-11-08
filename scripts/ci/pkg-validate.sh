@@ -26,7 +26,14 @@ if [[ ${mode} == "content" || ${mode} == "all" ]]; then
     package/dist/index.cjs
     package/dist/index.d.ts
     package/dist/index.d.cts
-    package/skills/diene-bun-lib-usage/SKILL.md
+    package/dist/test-helper.js
+    package/dist/test-helper.cjs
+    package/dist/test-helper.d.ts
+    package/dist/test-helper.d.cts
+    package/skills/diene-result-usage/SKILL.md
+    package/skills/diene-result-usage/assets/consumer.ts
+    package/skills/diene-result-usage/assets/consumer.cjs
+    package/skills/diene-result-usage/assets/test-helper.md
   )
   missing=0
   for path in "${expected[@]}"; do
@@ -47,6 +54,8 @@ fi
 if [[ ${mode} == "attw" || ${mode} == "all" ]]; then
   echo "🔎 Checking type resolvability (attw)..."
   ./node_modules/.bin/attw pkg.tgz
+  echo "🔎 Checking root and TestHelper type identity..."
+  ./node_modules/.bin/tsc -p fixtures/package-consumer/tsconfig.json
 fi
 
 if [[ ${mode} == "consumer" || ${mode} == "all" ]]; then
