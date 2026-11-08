@@ -18,7 +18,7 @@ rules remain in `docs/standards/`.
   test tiers without coverage through `scripts/local/test.sh <tier>`.
 - `task test:coverage`, `task test:unit:coverage`, and
   `task test:int:coverage` write scoped LCOV artifacts.
-- `task test:watch` watches the unit tier.
+- `task test:unit:watch` watches the unit tier.
 - `task build` bundles `src/index.ts` to `dist/index.js`.
 - `task deadcode` runs the two non-blocking LLM Knip views.
 - `task run -- <args>` executes the source entry point.
