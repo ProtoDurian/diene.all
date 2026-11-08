@@ -26,3 +26,11 @@ desktop.ini
 *~
 .kagent/
 .kloop/
+
+### dart
+.dart_tool/
+.pub-cache/
+build/
+doc/api/
+pubspec.lock
+reports/

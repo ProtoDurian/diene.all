@@ -3,7 +3,20 @@ name: CD
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (v*.*.*)
+        required: true
+        type: string
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   release:
@@ -14,3 +27,11 @@ jobs:
     secrets: inherit
     with:
       version: ${{ github.ref_name }}
+  publish:
+    name: Publish to pub.dev
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-publish.yaml
+    secrets: inherit
+    with:
+      tag: ${{ inputs.tag || github.ref_name }}

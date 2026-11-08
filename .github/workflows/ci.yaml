@@ -27,3 +27,51 @@ jobs:
       contents: read
     uses: ./.github/workflows/⚡reusable-named-checks.yaml
     secrets: inherit
+
+  analyze:
+    name: Static Analysis
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-analyze.yaml
+    secrets: inherit
+
+  unit:
+    name: Unit and C0 Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-test.yaml
+    secrets: inherit
+    with:
+      mode: unit
+
+  meta:
+    name: TestHelper Meta Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-test.yaml
+    secrets: inherit
+    with:
+      mode: meta
+
+  consumer:
+    name: Consumer Test
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-test.yaml
+    secrets: inherit
+    with:
+      mode: consumer
+
+  deadcode:
+    name: Dead Code
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-deadcode.yaml
+    secrets: inherit
+
+  package-validate:
+    name: Package Validation
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-package-validate.yaml
+    secrets: inherit

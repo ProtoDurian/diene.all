@@ -1,0 +1,17 @@
+name: ⚡ Reusable Dart Dead Code
+
+on:
+  workflow_call:
+
+jobs:
+  deadcode:
+    name: Repository and Production Dead Code
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 30
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Run both dead-code passes
+        run: nix develop .#ci -c ./scripts/ci/deadcode.sh
