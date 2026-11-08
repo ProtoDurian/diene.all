@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # The inherited Helm-free state holds, and the many-owner files the strip
-# edited still parse (D removed cd.yaml, so only ci.yaml is checked).
+# edited still parse, and CD is the release-only stub, which publishes no chart.
 # Absence is proved by files; helm on PATH from the whole infralint bundle is fine.
 
 cd "$(git rev-parse --show-toplevel)"
@@ -61,8 +61,18 @@ show() { git show "${tree}:$1"; }
 if show CLAUDE.md | grep -qi '^# helm'; then fail "CLAUDE.md still has a Helm section"; fi
 if show probes/binary-smoke.ts | grep -Eq '^(helm|helm-docs|helmlint) '; then fail "binary-smoke.ts still smokes an H binary"; fi
 
+# --- the CD stub publishes no chart ------------------------------------------------
+cd_path=(.github/workflows/cd.yaml '.github/workflows/⚡reusable-release-note.yaml' scripts/ci/release-note.sh)
+[[ "$(show .github/workflows/cd.yaml | yq -o=json -I=0 '.jobs | keys')" == '["release"]' ]] || fail "cd.yaml must have exactly the release job"
+[[ "$(show .github/workflows/cd.yaml | yq '.jobs.release.uses')" == "./${cd_path[1]}" ]] || fail "cd.yaml release job must call ${cd_path[1]}"
+[[ "$(show dlint.yaml | yq '[.checks["ci-wiring"].orchestrators[] | select(. == ".github/workflows/cd.yaml")] | length')" == 1 ]] || fail "dlint.yaml must wire cd.yaml as an orchestrator"
+rc=0
+hits="$(git -c core.quotePath=false grep -n -i -E 'helm|chart' "${tree}" -- "${cd_path[@]}")" || rc=$?
+[[ ${rc} -le 1 ]] || fail "git grep failed (exit ${rc})"
+[[ -z ${hits} ]] || fail "the CD path names a chart:"$'\n'"${hits}"
+
 # --- the many-owner files the strip edited still parse and lint ---------------------
-for f in .github/workflows/ci.yaml .github/dependabot.yml Taskfile.yaml dlint.yaml; do
+for f in .github/workflows/ci.yaml .github/workflows/cd.yaml .github/dependabot.yml Taskfile.yaml dlint.yaml; do
   yq e '.' "${f}" >/dev/null 2>&1 || fail "${f} is not valid YAML"
 done
 jq -e . probes/features.json >/dev/null 2>&1 || fail "probes/features.json is not valid JSON"
@@ -77,4 +87,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ helm-absence: no H path, reference, entry or smoke line; edited files valid"
+echo "✅ helm-absence: no H path, reference, entry or smoke line; CD publishes no chart; edited files valid"

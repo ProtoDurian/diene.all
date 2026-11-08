@@ -70,11 +70,33 @@ for wf in .github/workflows/ci.yaml .github/workflows/cd.yaml; do
   [[ "$(show "${wf}" | yq '[.jobs[] | select(.uses // "" | test("docker|helm"))] | length')" == 0 ]] || fail "${wf} still calls a docker/helm workflow"
   [[ "$(show "${wf}" | yq '.jobs | (has("docker") or has("helm"))')" == false ]] || fail "${wf} still has a docker/helm job"
 done
-[[ "$(show .github/workflows/cd.yaml | yq '.jobs | keys | join(",")')" == publish ]] || fail "cd.yaml carries a job other than publish"
+[[ "$(show .github/workflows/cd.yaml | yq -o=json -I=0 '.jobs | keys')" == '["release","publish"]' ]] || fail "cd.yaml must have exactly the release and publish jobs"
 [[ "$(show .github/workflows/cd.yaml | yq '.jobs.publish.uses')" == "./${publish}" ]] || fail "cd.yaml publish does not call ${publish}"
 for wf in .github/workflows/cd.yaml "${publish}"; do
   [[ "$(show "${wf}" | yq '[.jobs[].steps[]? | (.uses // "") + " " + (.run // "") | select(test("(?i)docker|helm"))] | length')" == 0 ]] || fail "${wf} carries a docker/helm step"
 done
+
+note_wf='.github/workflows/⚡reusable-release-note.yaml'
+note_sh=scripts/ci/release-note.sh
+for p in "${note_wf}" "${note_sh}"; do
+  git cat-file -e "${tree}:${p}" 2>/dev/null || fail "CD stub file missing: ${p}"
+done
+[[ "$(show .github/workflows/cd.yaml | yq -o=json -I=0 '.on')" == '{"push":{"tags":["v*.*.*"]}}' ]] || fail "cd.yaml must run on v*.*.* tags only"
+[[ "$(show .github/workflows/cd.yaml | yq '.jobs.release.uses')" == "./${note_wf}" ]] || fail "cd.yaml release job must call ${note_wf}"
+[[ "$(show .github/workflows/cd.yaml | yq -o=json -I=0 '.jobs.release.permissions')" == '{"contents":"read"}' ]] || fail "cd.yaml release job must grant only contents: read"
+# shellcheck disable=SC2016
+[[ "$(show .github/workflows/cd.yaml | yq -o=json -I=0 '.jobs.release.with')" == '{"version":"${{ github.ref_name }}"}' ]] || fail "cd.yaml release job must pass only version: the tag"
+[[ "$(show dlint.yaml | yq '[.checks["ci-wiring"].orchestrators[] | select(. == ".github/workflows/cd.yaml")] | length')" == 1 ]] || fail "dlint.yaml must wire cd.yaml as an orchestrator"
+[[ "$(show "${note_wf}" | yq -o=json -I=0 '.jobs | keys')" == '["release-note"]' ]] || fail "${note_wf} must have exactly the release-note job"
+[[ "$(show "${note_wf}" | yq '[.jobs[].steps[] | select(has("run")) | .run | select(test("[$][{][{]"))] | length')" == 0 ]] || fail "${note_wf} inlines a \${{ }} template in run:"
+[[ "$(show "${note_wf}" | yq -o=json -I=0 '[.jobs[].steps[] | select(has("run")) | .run]')" == "[\"nix develop .#cd -c ./${note_sh}\"]" ]] || fail "${note_wf} must run only ${note_sh} in the cd shell"
+[[ "$(show "${note_wf}" | yq '[.jobs[].steps[] | select(has("uses")) | .uses | select(test("^AtomiCloud/actions[.]setup-nix@") | not)] | length')" == 0 ]] || fail "${note_wf} uses an action other than setup-nix"
+# shellcheck disable=SC2016
+[[ "$(show "${note_sh}" | grep -Ev '^(#|set -euo pipefail$|$)')" == 'echo "Released ${VERSION}"' ]] || fail "${note_sh} must only echo the release"
+rc=0
+hits="$(git -c core.quotePath=false grep -n -i -E 'helm|chart|docker|image' "${tree}" -- "${note_wf}" "${note_sh}")" || rc=$?
+[[ ${rc} -le 1 ]] || fail "git grep failed (exit ${rc})"
+[[ -z ${hits} ]] || fail "the release-note path names an image or chart:"$'\n'"${hits}"
 [[ "$(show Taskfile.yaml | yq '.includes | (has("docker") or has("helm"))')" == false ]] || fail "Taskfile.yaml still includes docker/helm"
 [[ "$(show .github/dependabot.yml | yq '[.updates[] | select(.package-ecosystem == "docker" or .package-ecosystem == "helm")] | length')" == 0 ]] || fail "dependabot.yml still has a docker/helm entry"
 [[ "$(show dlint.yaml | yq '[.checks["toolchain-smoke"].binaries[] | select(test("^(docker|dockerd|hadolint|helm|helm-docs|helmlint|kubeconform|kyverno)( |$)"))] | length')" == 0 ]] || fail "dlint.yaml still smokes a D/H binary"
@@ -90,7 +112,7 @@ for f in nix/packages.nix nix/env.nix; do
   fi
 done
 
-for f in .github/workflows/ci.yaml .github/workflows/cd.yaml "${publish}" .github/dependabot.yml Taskfile.yaml dlint.yaml; do
+for f in .github/workflows/ci.yaml .github/workflows/cd.yaml "${publish}" "${note_wf}" .github/dependabot.yml Taskfile.yaml dlint.yaml; do
   yq e '.' "${f}" >/dev/null 2>&1 || fail "${f} is not valid YAML"
 done
 jq -e . probes/features.json >/dev/null 2>&1 || fail "probes/features.json is not valid JSON"
@@ -105,4 +127,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ stripped-axis-absence: no D/H path, reference, entry, or nix package; cd.yaml is publish-only; edited files valid"
+echo "✅ stripped-axis-absence: no D/H path, reference, entry, or nix package; cd.yaml is release + publish, the release note publishes nothing; edited files valid"

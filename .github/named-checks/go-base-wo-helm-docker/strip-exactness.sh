@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The diff from go-base-wo-helm's .3 commit is exactly the D (docker) strip.
+# The diff from go-base-wo-helm's .3 commit is exactly the D (docker) strip
+# plus the release-only CD stub.
 # Proof by recomputation: copy go-base-wo-helm's .3 tree, apply the D ledger
 # below, and require the result to equal HEAD's tree byte for byte (content and
 # mode), ignoring only this directory. Any hunk the ledger does not declare
@@ -16,8 +17,6 @@ D_PATHS=(
   infra/Dockerfile
   .dockerignore
   '.github/workflows/⚡reusable-docker.yaml'
-  # cd.yaml's only job is the docker one once H is gone
-  .github/workflows/cd.yaml
   tasks/Taskfile.docker.yaml
   scripts/ci/docker.sh
   .claude/skills/docker-push
@@ -92,20 +91,89 @@ drop_yaml_job() {
 # drop_lines <first regex> <last regex>: that line range and the blank line after it.
 drop_lines() { awk -v a="$1" -v b="$2" 'skip == 0 && $0 ~ a { skip = 1 } skip == 1 { if ($0 ~ b) skip = 2; next } skip == 2 && $0 == "" { skip = 0; next } { if (skip == 2) skip = 0; print }' "$3" >"${3}.new" && mv "${3}.new" "$3"; }
 
+# --- the CD stub: a v*.*.* tag runs CD, which publishes nothing ----------------
+# add <path> <mode> <writer>: a file the parent must not have.
+add() {
+  if [[ -e $1 ]]; then
+    fail "stub file $1 already in parent tree (stale anchor)"
+    return
+  fi
+  "$3" "$1"
+  chmod "$2" "$1"
+}
+cd_stub() {
+  cat >"$1" <<'EOF'
+name: CD
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    name: Release
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-release-note.yaml
+    secrets: inherit
+    with:
+      version: ${{ github.ref_name }}
+EOF
+}
+release_note_workflow() {
+  cat >"$1" <<'EOF'
+name: ⚡ Reusable Release Note
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+  release-note:
+    name: Release Note
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 20
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Release note
+        env:
+          VERSION: ${{ inputs.version }}
+        run: nix develop .#cd -c ./scripts/ci/release-note.sh
+EOF
+}
+release_note_script() {
+  cat >"$1" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Released ${VERSION}"
+EOF
+}
+
 apply_D() {
   rm_paths "${D_PATHS[@]}"
   rmdir infra || fail "infra/ is not empty after the D strip"
+  edit .github/workflows/cd.yaml cd_stub
+  add '.github/workflows/⚡reusable-release-note.yaml' 644 release_note_workflow
+  add scripts/ci/release-note.sh 755 release_note_script
   # workspace ledger
   edit .github/workflows/ci.yaml drop_yaml_job '  docker:'
   edit Taskfile.yaml sed_e '/^  docker: tasks\/Taskfile\.docker\.yaml$/d'
   edit .github/dependabot.yml yq_del 'del(.updates[] | select(.package-ecosystem == "docker"))'
-  edit dlint.yaml sed_e '/^      - docker$/d;/^      - hadolint$/d;/^      - \.github\/workflows\/cd\.yaml$/d'
+  edit dlint.yaml sed_e '/^      - docker$/d;/^      - hadolint$/d'
   edit CLAUDE.md drop_section '# Docker build and publishing'
   edit probes/features.json yq_del 'del(.[] | select(.name == "docker-build" or .name == "distroless-base-policy" or .name == "nonroot-image-policy"))'
   edit probes/binary-smoke.ts drop_lines '^docker --version' '^docker info'
   edit probes/binary-smoke.ts drop_lines '^hadolint --version' '^hadolint infra/Dockerfile'
   edit docs/standards/taskfile/index.md sed_z 's#Docker tasks are keyed by the artifact they act on — one task set per Dockerfile.\nSee \[the Docker standard\](\.\./docker/index\.md) for that naming convention\.\n\n##'
-  # infra/ and cd.yaml leave whole, so prose that points at them goes too
+  # infra/ leaves whole and CD loses its caller jobs, so prose that points at them goes too
   # shellcheck disable=SC2016
   edit docs/standards/service-tree/index.md sed_z 's#; the published artifact names this repository uses are the\n`with:` inputs on the Docker and Helm caller jobs in `\.github/workflows/ci\.yaml` and\n`\.github/workflows/cd\.yaml`\.#.#'
   # shellcheck disable=SC2016
@@ -153,4 +221,4 @@ if [[ ${failed} -ne 0 ]]; then
   exit 1
 fi
 
-echo "✅ strip-exactness: HEAD == go-base-wo-helm .3 ${parent_sha} minus exactly the D ledger"
+echo "✅ strip-exactness: HEAD == go-base-wo-helm .3 ${parent_sha} + exactly the D ledger and CD stub"

@@ -3,9 +3,18 @@ name: CD
 on:
   push:
     tags:
-      - v*.*.*
+      - 'v*.*.*'
 
 jobs:
+  release:
+    name: Release
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-release-note.yaml
+    secrets: inherit
+    with:
+      version: ${{ github.ref_name }}
+
   publish:
     name: Verify Go proxy publication
     permissions:
