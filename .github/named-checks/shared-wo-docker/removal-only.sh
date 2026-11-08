@@ -31,6 +31,11 @@ while IFS=$'\t' read -r added dels path; do
   removed=$((removed + dels))
 done <<<"${numstat}"
 
+not_dm="$(git -c core.quotePath=false diff --no-renames --name-status --diff-filter=ACTUXB "${parent_sha}" "${tree}" "${scope[@]}")"
+[[ -z ${not_dm} ]] || fail "paths added or retyped over shared .3:"$'\n'"${not_dm}"
+modes="$(git -c core.quotePath=false diff --no-renames --summary "${parent_sha}" "${tree}" "${scope[@]}" | grep 'mode change' || true)"
+[[ -z ${modes} ]] || fail "file modes changed over shared .3:"$'\n'"${modes}"
+
 [[ ${removed} -gt 0 ]] || fail "no line removed from shared .3 ${parent_sha}: the strip is empty"
 
 if [[ ${failed} -ne 0 ]]; then
