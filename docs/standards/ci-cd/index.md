@@ -47,6 +47,8 @@ about gets the strictest pin, and there is no list to maintain.
 
 > **Every `run:` step enters a Nix shell that declares what it needs.**
 
+The Docker job is the one exception: it runs `./scripts/ci/docker.sh` directly, with no Nix shell and no Nix store cache label.
+
 In practice a `run:` step is exactly one line:
 
 ```text
