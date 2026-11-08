@@ -31,3 +31,6 @@ desktop.ini
 *~
 .kagent/
 .kloop/
+
+### go-lib
+deadcode-runner.*

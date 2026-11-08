@@ -6,12 +6,12 @@ export default {
   probes: [
     {
       name: 'baseline-build-artifact-green',
-      description: 'The build task emits an executable that performs a real command.',
+      description: 'The build task compiles every package of the library module.',
       kind: 'baseline',
       async run(repo: any) {
         await expectGreen(
           repo,
-          'nix develop .#ci -c bash -lc \'task build && test -x dist/go-base && test "$(./dist/go-base slug Diene)" = diene\'',
+          "nix develop .#ci -c bash -lc 'task build && go list ./... >/dev/null'",
           'build-artifact',
         );
       },

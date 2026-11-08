@@ -14,5 +14,5 @@ jobs:
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
       - uses: AtomiCloud/actions.cache-go@v2
-      - name: Build Go binary
+      - name: Build Go module
         run: nix develop .#ci -c ./scripts/ci/build.sh

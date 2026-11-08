@@ -26,12 +26,14 @@ with packages;
     cyanprint
     git
     go
+    gorelease
     go-task
     gotestsum
     govulncheck
     infisical
     releaser
     shellcheck
+    zip
   ];
 
   releaser = [

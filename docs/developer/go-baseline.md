@@ -16,30 +16,29 @@ gotestsum. Dates and times of day use `cloud.google.com/go/civil`, pinned in
 
 - `lib/` contains pure domain packages.
 - `adapters/` contains dependency implementations.
-- `cmd/go-base/` is the single composition root and wires concrete adapters
-  explicitly.
+- `testhelper/` ships consumer-facing fakes; there is no `cmd/`: a library has no
+  composition root ([Go library baseline](go-lib-baseline.md)).
 - `tests/unit/` imports domain packages only through their public API.
 - `tests/int/` proves adapters against real dependencies with
   testcontainers-go.
-- `tests/sit/` exercises compiled artifacts from a client's perspective.
+- `tests/meta/` proves the `testhelper` package through its public API.
 
 ## Commands
 
 - `task setup` installs modules and synchronizes vendored skills.
-- `task build` creates `dist/go-base`.
+- `task build` compiles every package of the module.
 - `task typecheck` compiles source packages without running tests.
-- `task test`, `task test:unit`, `task test:int`, and `task test:sit` run the
-  tiered suites; `task test:sit` runs the compiled-artifact Redis journey.
-- `task test:coverage`, `task test:unit:coverage`, and
-  `task test:int:coverage` enforce the scoped ledgers.
+- `task test`, `task test:unit`, `task test:int`, and `task test:meta` run the
+  tiered suites.
+- `task test:coverage`, `task test:unit:coverage`, `task test:int:coverage`,
+  and `task test:meta:coverage` enforce the scoped ledgers.
 - `task test:unit:watch` watches the unit tier.
 - `task vuln` scans dependencies with govulncheck.
 - `task deadcode:strict` runs the four blocking staticcheck/deadcode passes:
   whole repository and production only, for each tool.
 - `task deadcode` writes the nonblocking LLM review feed to
   `reports/deadcode-llm.txt`.
-- `task run -- slug "Hello World"` runs from source.
-- `task preview -- slug "Hello World"` runs the compiled artifact.
+- `task validate` runs the library gates.
 - `task up` and `task down` manage the local Redis dependency.
 
 There is deliberately no `task dev`: this base is not a long-running server, so
@@ -52,8 +51,8 @@ in `_test`; golangci-lint's `testpackage` linter enforces it.
 Unit coverage includes only `lib/**` and must be
 100%. Integration coverage includes only `adapters/**` and must be 100% in this
 minimal base. The checked-in ledger is `.config/go-base.coverage.yaml`. Each tier
-writes its own profile: `reports/unit/coverage.out` and
-`reports/integration/coverage.out`.
+writes its own profile: `reports/unit/coverage.out`,
+`reports/integration/coverage.out` and `reports/meta/coverage.out`.
 
 ## Deadcode and vulnerability law
 
@@ -68,5 +67,5 @@ list. Govulncheck is a blocking CI-only job.
 Downstream authors may adapt package/module identity, sample domain code,
 coverage thresholds after adding real surface.
 They must preserve black-box tests, tier scoping,
-all four staticcheck/deadcode components, the CI-only vulnerability gate, one
-composition root, and generated hook/probe coverage.
+all four staticcheck/deadcode components, the CI-only vulnerability gate, and
+generated hook/probe coverage.
