@@ -5,7 +5,7 @@ using AtomiCloud.Diene.CoreUtils.Json;
 namespace AtomiCloud.Diene.Problems;
 
 /// <summary>Emits deterministic Problem custom resources from a registered catalog.</summary>
-public sealed partial class ProblemResourceEmitter(
+public sealed class ProblemResourceEmitter(
     IProblemCatalog catalog,
     IProblemExporter exporter,
     IProblemTypeUriBuilder typeUris,
@@ -13,6 +13,10 @@ public sealed partial class ProblemResourceEmitter(
 {
     private const int DnsLabelMax = 63;
     private const int DnsSubdomainMax = 253;
+
+    private static readonly Regex DnsLabelPattern = new(
+        @"\A[a-z0-9]([-a-z0-9]*[a-z0-9])?\z",
+        RegexOptions.CultureInvariant);
 
     private readonly IProblemCatalog _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
     private readonly IProblemExporter _exporter = exporter ?? throw new ArgumentNullException(nameof(exporter));
@@ -69,12 +73,9 @@ public sealed partial class ProblemResourceEmitter(
 
     private static void RequireDnsLabel(string value, string field)
     {
-        if (value.Length > DnsLabelMax || !DnsLabelPattern().IsMatch(value))
+        if (value.Length > DnsLabelMax || !DnsLabelPattern.IsMatch(value))
             throw new ArgumentException($"Problem resource {field} '{value}' must be a DNS-1123 label.", field);
     }
-
-    [GeneratedRegex(@"\A[a-z0-9]([-a-z0-9]*[a-z0-9])?\z")]
-    private static partial Regex DnsLabelPattern();
 
     private ProblemResourceEntry ToResourceEntry(ProblemDescriptor descriptor, ProblemExport export)
     {
