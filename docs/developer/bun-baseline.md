@@ -94,7 +94,7 @@ Read the TypeScript variants alongside their shared standards:
 
 - Integration tests require a Docker runtime.
 - Docker image builds require a Docker runtime.
-- Each of these is a separate CI job:
+- Separate CI jobs:
   - unit
   - integration
   - build
