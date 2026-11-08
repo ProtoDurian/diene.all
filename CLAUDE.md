@@ -98,3 +98,9 @@ See [docs/standards/shell-scripts/index.md](docs/standards/shell-scripts/index.m
 # Taskfile conventions
 
 See [docs/standards/taskfile/index.md](docs/standards/taskfile/index.md).
+
+# .NET library template
+
+Read [the .NET library baseline](docs/developer/dotnet-lib-baseline.md) before
+changing package identity, release/versioning, package validation, TestHelper,
+meta coverage, or shipped skills.

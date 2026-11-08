@@ -1,4 +1,4 @@
-namespace AtomiCloud.DotnetBase.Lib.Note;
+namespace AtomiCloud.Diene.Note;
 
 public class NoteSummariser : INoteSummariser
 {
