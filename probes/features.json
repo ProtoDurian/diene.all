@@ -216,6 +216,11 @@
   },
   {
     "template": "diene/dart-lib",
+    "name": "consumer-test",
+    "class": "gate"
+  },
+  {
+    "template": "diene/dart-lib",
     "name": "pana-score",
     "class": "gate"
   },
