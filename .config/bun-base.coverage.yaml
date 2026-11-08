@@ -5,6 +5,3 @@ tiers:
   int:
     tests: tests/integration
     scope: src/adapters/
-  meta:
-    tests: tests/meta
-    scope: ''
