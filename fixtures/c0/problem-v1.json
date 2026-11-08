@@ -3,14 +3,6 @@
     "catalogEntry": {
       "samples": [
         {
-          "data": {
-            "properties": {
-              "issues": {
-                "type": "array"
-              }
-            },
-            "type": "object"
-          },
           "endpoints": [
             {
               "method": "POST",
@@ -19,12 +11,20 @@
           ],
           "id": "validation_error",
           "recoverable": true,
+          "schema": {
+            "properties": {
+              "issues": {
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
           "status": 400,
           "title": "Validation Error",
           "type": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/validation_error"
         }
       ],
-      "shape": ["id", "type", "title", "status", "recoverable", "data", "endpoints"]
+      "shape": ["id", "type", "title", "status", "recoverable", "schema", "endpoints"]
     },
     "envelopes": {
       "invalid": [],

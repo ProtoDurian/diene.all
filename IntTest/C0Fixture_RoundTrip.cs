@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AtomiCloud.Diene.Problems;
 using FluentAssertions;
 
@@ -21,23 +22,31 @@ public class C0Fixture_RoundTrip
             segments.GetProperty("platform").GetString()!,
             segments.GetProperty("service").GetString()!,
             segments.GetProperty("module").GetString()!);
-        var subject = new ProblemTypeUriBuilder(new ErrorPortalConfig(
+        var portal = new ErrorPortalConfig(
             segments.GetProperty("scheme").GetString()!,
             segments.GetProperty("host").GetString()!,
-            identity));
+            identity);
+        var subject = new ProblemTypeUriBuilder(portal);
+        var catalog = new ProblemCatalogBuilder().AddBaseline().Build();
+        var emitter = new ProblemResourceEmitter(catalog, new ProblemExporter(catalog, subject), subject, portal);
+        var sample = cases.GetProperty("catalogEntry").GetProperty("samples")[0];
 
         // Act
         var actual = subject.Build(segments.GetProperty("version").GetString()!, snakeId);
         var members = cases.GetProperty("rfc9457Members").EnumerateArray().Select(value => value.GetString()).ToArray();
         var extensions = cases.GetProperty("extensions").EnumerateArray().Select(value => value.GetString()).ToArray();
         var shape = cases.GetProperty("catalogEntry").GetProperty("shape")
-            .EnumerateArray().Select(value => value.GetString()).ToArray();
+            .EnumerateArray().Select(value => value.GetString()!).ToArray();
+        var resource = emitter.Emit(new ProblemResourceIdentity(identity.Platform, identity.Service, identity.Landscape, "v1"));
+        var entries = JsonNode.Parse(emitter.Serialize(resource))!["spec"]!["problems"]!.AsArray();
 
         // Assert
         actual.AbsoluteUri.Should().Be(
             "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/entity_not_found");
         members.Should().Equal("type", "title", "status", "detail", "instance");
         extensions.Should().Equal("data", "recoverable");
-        shape.Should().Equal("id", "type", "title", "status", "recoverable", "data", "endpoints");
+        shape.Should().Equal("id", "type", "title", "status", "recoverable", "schema", "endpoints");
+        sample.EnumerateObject().Select(member => member.Name).Should().BeEquivalentTo(shape);
+        entries.Should().NotBeEmpty().And.OnlyContain(entry => entry!.AsObject().Select(member => member.Key).SequenceEqual(shape));
     }
 }
