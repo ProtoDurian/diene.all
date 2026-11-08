@@ -7,7 +7,14 @@ title: .NET Baseline
 
 `dotnet-base` is the .NET 10 foundation for the dotnet template family. It
 replays the real `AtomiCloud/diene.dotnet-base` sample while retaining the current
-shared workspace, standards, Docker, Helm, secret, and release surfaces.
+shared surfaces:
+
+- workspace
+- standards
+- Docker
+- Helm
+- secrets
+- release
 
 ## Local commands
 
@@ -73,11 +80,21 @@ The `dotnetlint` pre-commit hook runs `dotnet format --no-restore`, so it expect
 `dotnet restore dotnet-base.slnx` to have run; `task setup` and CI's pre-commit
 script both restore first.
 
-## Docker, Helm, and release
+## Docker
 
-The Dockerfile and the Helm chart are the parent template's stubs, unchanged, for
-descendants to replace; the Helm surface (chart, lint hook, tasks, OCI packaging,
-CI/CD jobs, dependabot entry) is identical to `bun-base`'s. Releaser stamps the version in `App/App.csproj`; its canonical
+The Dockerfile is the parent template's stub, unchanged, for descendants to
+replace.
+
+## Helm
+
+The Helm chart is the parent template's stub, unchanged, for descendants to
+replace.
+The Helm surface (chart, lint hook, tasks, OCI packaging, CI/CD jobs, dependabot
+entry) is identical to `bun-base`'s.
+
+## Release
+
+Releaser stamps the version in `App/App.csproj`; its canonical
 `release.yaml` is the single commit-type vocabulary.
 
 ## C# standards
@@ -95,9 +112,16 @@ C# variants accompany the shared standards:
 
 ## Template-maintenance boundary
 
-Downstream nodes may adapt package/artifact identity, coverage thresholds, Docker
-runtime, chart contents, badges, and the illustrative Note source/tests. Keep
-`dotnet-base.slnx`, `.config/dotnet-base.test.yaml`, and the
+Downstream nodes may adapt:
+
+- package/artifact identity
+- coverage thresholds
+- the Docker runtime
+- the chart contents
+- badges
+- the illustrative Note source/tests
+
+Keep `dotnet-base.slnx`, `.config/dotnet-base.test.yaml`, and the
 `AtomiCloud.DotnetBase.*` root namespaces base-named for merge stability.
 
 Observability is deliberately absent on this branch and arrives only through the
