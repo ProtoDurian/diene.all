@@ -8,7 +8,7 @@ export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
   baseline: {
     name: 'baseline-dotnet-lib-coverage-ledger-green',
-    description: 'The unit ledger holds the shipped AtomiCloud.Diene.Note assembly at 100%.',
+    description: 'The unit ledger holds the shipped AtomiCloud.Diene.Problems assembly at 100%.',
     async run(repo: any) {
       await expectGreen(repo, UNIT_COVERAGE, 'dotnet-lib-coverage-ledger');
     },
@@ -20,7 +20,7 @@ export default defineGate({
     async run(repo: any) {
       await repo.write(
         'Lib/ShippedCoverageGap.cs',
-        'namespace AtomiCloud.Diene.Note;\n\npublic static class ShippedCoverageGap\n{\n    public static int Uncovered() => 42;\n}\n',
+        'namespace AtomiCloud.Diene.Problems;\n\npublic static class ShippedCoverageGap\n{\n    public static int Uncovered() => 42;\n}\n',
       );
       await expectRedBecause(repo, UNIT_COVERAGE, 'dotnet-lib-coverage-ledger', [
         'line coverage is below the specified 100',

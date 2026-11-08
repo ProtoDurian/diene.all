@@ -1,0 +1,69 @@
+{
+  "cases": {
+    "catalogEntry": {
+      "samples": [
+        {
+          "endpoints": [
+            {
+              "method": "POST",
+              "path": "/user"
+            }
+          ],
+          "id": "validation_error",
+          "recoverable": true,
+          "schema": {
+            "properties": {
+              "issues": {
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "status": 400,
+          "title": "Validation Error",
+          "type": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/validation_error"
+        }
+      ],
+      "shape": ["id", "type", "title", "status", "recoverable", "schema", "endpoints"]
+    },
+    "envelopes": {
+      "invalid": [],
+      "valid": [
+        {
+          "data": {
+            "entityType": "user",
+            "id": "42"
+          },
+          "detail": "User 42 does not exist",
+          "instance": "/user/42",
+          "recoverable": false,
+          "status": 404,
+          "title": "Entity Not Found",
+          "type": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/entity_not_found"
+        }
+      ]
+    },
+    "extensions": ["data", "recoverable"],
+    "rfc9457Members": ["type", "title", "status", "detail", "instance"],
+    "typeUri": {
+      "invalid": [],
+      "valid": [
+        {
+          "expectedTypeUri": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/entity_not_found",
+          "segments": {
+            "host": "docs.raichu.cluster.atomi.cloud",
+            "id": "entity_not_found",
+            "landscape": "raichu",
+            "module": "api",
+            "platform": "dotnet",
+            "scheme": "https",
+            "service": "user",
+            "version": "v1"
+          }
+        }
+      ]
+    },
+    "typeUriTemplate": "{scheme}://{host}/docs/{landscape}/{platform}/{service}/{module}/{version}/{id}"
+  },
+  "domain": "problem"
+}

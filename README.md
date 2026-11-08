@@ -2,7 +2,7 @@
 
 See the [.NET baseline](docs/developer/dotnet-baseline.md) for the
 language-specific toolchain, task surface, test tiers, coverage ledgers, dead-code
-passes, and the illustrative Note domain ([docs/domain/note.md](docs/domain/note.md)).
+passes, and the typed-problem contract ([docs/domain/problems.md](docs/domain/problems.md)).
 C# variants accompany the shared standards for
 [date/time](docs/standards/datetime/languages/csharp.md),
 [domain-driven design](docs/standards/domain-driven-design/languages/csharp.md),
@@ -64,27 +64,97 @@ This tree is the all-features workspace baseline inherited by every downstream s
 
 # Publishable library packages
 
-[![NuGet version](https://img.shields.io/nuget/v/AtomiCloud.Diene.Note)](https://www.nuget.org/packages/AtomiCloud.Diene.Note)
-[![NuGet downloads](https://img.shields.io/nuget/dt/AtomiCloud.Diene.Note)](https://www.nuget.org/packages/AtomiCloud.Diene.Note)
+[![NuGet version](https://img.shields.io/nuget/v/AtomiCloud.Diene.Problems)](https://www.nuget.org/packages/AtomiCloud.Diene.Problems)
+[![NuGet downloads](https://img.shields.io/nuget/dt/AtomiCloud.Diene.Problems)](https://www.nuget.org/packages/AtomiCloud.Diene.Problems)
 
-This template publishes `AtomiCloud.Diene.Note` and the companion
-`AtomiCloud.Diene.Note.TestHelper` package at one committed version. The Note
-domain is illustrative; the package lifecycle is the reusable product.
+`AtomiCloud.Diene.Problems` provides typed domain problems, a consumer-owned
+catalog, the canonical type-URI builder, RFC 9457 rendering, schema export, and
+Problem custom-resource emission. `AtomiCloud.Diene.Problems.TestHelper`
+provides FluentAssertions for domain, result, envelope, and HTTP boundaries.
 
 ```bash
-dotnet add package AtomiCloud.Diene.Note
-dotnet add package AtomiCloud.Diene.Note.TestHelper
+dotnet add package AtomiCloud.Diene.Problems
+dotnet add package AtomiCloud.Diene.Problems.TestHelper
 ```
+
+## Register and render problems
+
+Problem types do not enter the runtime implicitly. Register every baseline and
+consumer-owned problem at composition time, then enable ASP.NET Core's exception
+handler middleware:
 
 ```csharp
-using AtomiCloud.Diene.Note;
-using AtomiCloud.Diene.Note.TestHelper.Note;
+using AtomiCloud.Diene.Problems;
+using AtomiCloud.Diene.Problems.Catalog;
 
-var summariser = new NoteSummariser();
-var note = new NoteRecord { Title = "Hello", Body = "world" };
-summariser.AssertSummary(note, 80, "Hello — world");
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddAtomiProblems(
+    new ProblemIdentity("raichu", "dotnet", "notes", "api"),
+    new ErrorPortalOption
+    {
+        Scheme = "https",
+        Host = "docs.raichu.cluster.atomi.cloud",
+    },
+    catalog => catalog.AddBaseline());
+
+var app = builder.Build();
+app.UseExceptionHandler();
 ```
 
-`nix develop .#ci -c ./scripts/ci/pkg-validate.sh` packs both packages, validates
-metadata and symbols, and restores them into a scratch consumer. See [the library baseline](docs/developer/dotnet-lib-baseline.md)
-for release and promotion guidance.
+Throw a registered problem only at a framework boundary. Within domain code,
+prefer the Result-returning guards and adapters:
+
+```csharp
+var guarded = ProblemGuard.NotFound(note, noteId);
+var failed = new ValidationError(
+    "The note is invalid.",
+    [new ValidationIssue(["title"], "Title is required.", "required")]).ToErr<Note>();
+var taken = new Conflict($"Note '{noteId}' already exists.", "Note", noteId).ToErr<Note>();
+throw new EntityNotFound(
+    $"Note '{noteId}' was not found.",
+    typeof(Note),
+    noteId).ToException();
+```
+
+`AddBaseline()` registers the generic catalog: `validation_error` (400),
+`entity_not_found` (404), `conflict` (409), `unauthenticated` (401),
+`unauthorized` (403) and `invalid_json` (400), plus the .NET-only
+`multiple_entity_not_found` and `entity_conflict` (superseded by `conflict`).
+`entity_not_found` and `conflict` carry `{ entityType, id }`; `validation_error`
+carries `{ issues: [{ path, message, code? }] }`. The other three carry no data:
+their envelope omits `data` and their schema is `{"not":{}}`.
+
+## Type URIs and catalog export
+
+Resolve `IProblemTypeUriBuilder` whenever a type URI is needed. Never recreate
+the URI template in a controller or consumer. Resolve `ProblemResourceEmitter`
+from the same service provider to emit the registered single-version catalog as
+canonical JSON, which is also valid YAML 1.2. The resource is named
+`{service}.{module}.{landscape}.{version}` (here `notes.api.raichu.v1`) in the
+platform namespace:
+
+```csharp
+var emitter = app.Services.GetRequiredService<ProblemResourceEmitter>();
+var resource = emitter.Emit(new ProblemResourceIdentity("dotnet", "notes", "api", "raichu", "v1"));
+var manifest = emitter.Serialize(resource);
+```
+
+## Assert the wire contract
+
+```csharp
+using AtomiCloud.Diene.Problems.TestHelper;
+using FluentAssertions;
+
+var envelope = (await response.Should().BeRfc9457()).Which;
+envelope.Should().HaveStatus(404);
+envelope.Should().HaveType(expectedTypeUri);
+envelope.Should().HaveData(expectedProblem);
+envelope.Should().BeRecoverable(false);
+
+dataLessEnvelope.Should().HaveNoData();
+```
+
+Run `nix develop .#ci -c ./scripts/ci/pkg-validate.sh` to pack both packages,
+validate metadata and symbols, and restore them into a scratch consumer. See
+[the library baseline](docs/developer/dotnet-lib-baseline.md) for release and
+promotion guidance.

@@ -19,16 +19,43 @@ trap 'rm -rf "${scratch}"' EXIT
 
 echo "🧪 Restoring both packages into a scratch consumer..."
 dotnet new console --framework net10.0 --no-restore --output "${scratch}" >/dev/null
-dotnet add "${scratch}" package AtomiCloud.Diene.Note --version "${version}" --source "$(pwd)/${artifacts}" --no-restore >/dev/null
-dotnet add "${scratch}" package AtomiCloud.Diene.Note.TestHelper --version "${version}" --source "$(pwd)/${artifacts}" --no-restore >/dev/null
+dotnet add "${scratch}" package AtomiCloud.Diene.Problems --version "${version}" --source "$(pwd)/${artifacts}" --no-restore >/dev/null
+dotnet add "${scratch}" package AtomiCloud.Diene.Problems.TestHelper --version "${version}" --source "$(pwd)/${artifacts}" --no-restore >/dev/null
 printf '%s\n' \
-  'using AtomiCloud.Diene.Note;' \
-  'using AtomiCloud.Diene.Note.TestHelper.Note;' \
+  'using AtomiCloud.Diene.Problems;' \
+  'using AtomiCloud.Diene.Problems.Catalog;' \
+  'using AtomiCloud.Diene.Problems.TestHelper;' \
+  'using FluentAssertions;' \
   '' \
-  'var subject = new NoteSummariser();' \
-  'var note = new NoteRecord { Title = "Hello", Body = "world" };' \
-  'subject.AssertSummary(note, 80, "Hello — world");' >"${scratch}/Program.cs"
-dotnet restore "${scratch}" --source "$(pwd)/${artifacts}" --packages "${scratch}/packages" >/dev/null
+  'var identity = new ProblemIdentity("raichu", "dotnet", "notes", "api");' \
+  'var typeUris = new ProblemTypeUriBuilder(new ErrorPortalConfig("https", "docs.example.test", identity));' \
+  'var catalog = new ProblemCatalogBuilder().AddBaseline().Build();' \
+  'IDomainProblem problem = new EntityNotFound("missing", typeof(string), "note-42");' \
+  'problem.Should().BeProblem<EntityNotFound>();' \
+  'problem.Should().HaveId("entity_not_found");' \
+  'catalog.StatusOf(problem).Should().Be(404);' \
+  'typeUris.Build(problem.Version, problem.Id).AbsoluteUri.Should().EndWith("/v1/entity_not_found");' \
+  'IDomainProblem conflict = new Conflict("taken", "Note", "note-42");' \
+  'catalog.StatusOf(conflict).Should().Be(409);' >"${scratch}/Program.cs"
+cat >"${scratch}/nuget.config" <<EOF
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="local" value="$(pwd)/${artifacts}" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="local">
+      <package pattern="AtomiCloud.Diene.Problems" />
+      <package pattern="AtomiCloud.Diene.Problems.TestHelper" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+EOF
+dotnet restore "${scratch}" --packages "${scratch}/packages" >/dev/null
 dotnet build "${scratch}" -c Release --no-restore >/dev/null
 
 echo "✅ Package validation and scratch consumption passed"
