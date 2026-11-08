@@ -17,8 +17,8 @@ export default defineGate({
     expectedImpact: [],
     async run(repo: any) {
       await repo.write(
-        'TestHelper/Note/MetaCoverageGap.cs',
-        'namespace AtomiCloud.Diene.Note.TestHelper.Note;\n\npublic static class MetaCoverageGap\n{\n    public static int Uncovered() => 42;\n}\n',
+        'TestHelper/MetaCoverageGap.cs',
+        'namespace AtomiCloud.Diene.Interfaces.TestHelper;\n\npublic static class MetaCoverageGap\n{\n    public static int Uncovered() => 42;\n}\n',
       );
       await expectRedBecause(repo, 'nix develop .#ci -c task test:meta:coverage', 'dotnet-lib-testhelper-meta-ledger', [
         'line coverage is below the specified 100',

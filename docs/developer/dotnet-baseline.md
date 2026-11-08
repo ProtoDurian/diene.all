@@ -19,7 +19,6 @@ shared workspace, standards, secret, and release surfaces.
 | `task dev`                         | Run the App through `dotnet watch`.                            |
 | `task run -- <args>`               | Run the App in development mode.                               |
 | `task preview -- <args>`           | Build and run the compiled Release artifact.                   |
-| `task up` / `task down`            | Start or stop the local Redis dependency.                      |
 | `task test`                        | Run unit and integration tiers.                                |
 | `task test:unit` / `task test:int` | Run one tier.                                                  |
 | `task test:unit:coverage`          | Enforce the merged unit coverage ledger.                       |

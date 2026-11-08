@@ -9,8 +9,8 @@ This branch turns the `.NET 10` base into a publishable library template. It
 keeps the base `App` as a non-packable consumer and publishes two lockstep
 packages from one solution:
 
-- `AtomiCloud.Diene.Note` contains the illustrative Note domain;
-- `AtomiCloud.Diene.Note.TestHelper` contains consumer assertions and references
+- `AtomiCloud.Diene.Interfaces` contains the shared seams, the `SeamError` catalog and the C0 wire codecs;
+- `AtomiCloud.Diene.Interfaces.TestHelper` contains the in-memory mocks, contract suites and assertions, and references
   the main package.
 
 Both package ids and assembly names are consumer-visible, real identities.
@@ -53,14 +53,14 @@ stays at `1.0.0` in-branch, `probes/dotnet-lib-api-compatibility.ts` packs with
 
 ## Testing tiers
 
-- `task test:unit` measures the real `AtomiCloud.Diene.Note` assembly plus the
+- `task test:unit` measures the real `AtomiCloud.Diene.Interfaces` assembly plus the
   inherited `[Lib*]*` scaling wildcard at 100%, and explicitly excludes
   `*.TestHelper` assemblies. The scope guard in
   `scripts/local/dotnet-test.sh` reads the allowed assembly names from the
   `AssemblyName` each `Lib*` project declares, so it scales with a renamed
   library instead of naming one.
-- `task test:int` retains the base Testcontainers-backed adapter boundary and
-  measures only `[App*]*`.
+- `task test:int` runs the shipped contract suites against the host-backed
+  adapters in `App`, without a container, and measures only `[App*]*`.
 - `task test:meta` independently measures `[*.TestHelper]*` at 100%. Its tests
   include known-good and known-bad assertion cases.
 
