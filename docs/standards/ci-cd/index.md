@@ -86,6 +86,11 @@ service name, and changing the OS rotates the tag and costs one cold build befor
 warm reuse resumes. The merge gatekeeper is a poller with no Nix, so it stays on
 GitHub-hosted `ubuntu-26.04`.
 
+The release-note job (`⚡reusable-release-note.yaml`) is the other exception.
+It only echoes the release version, so it runs on GitHub-hosted
+`ubuntu-latest` with `actions/checkout` and no Nix, and calls
+`./scripts/ci/release-note.sh` directly.
+
 ## Dependency materialisation
 
 Each lane's `run:` line enters a Nix shell, and the shell is the whole of that
@@ -108,15 +113,16 @@ nix develop .#ci -c ./scripts/ci/pre-commit.sh
 That line reproduces the pre-commit workflow. Workspace names no runtime, so its
 `a-skills-sync` hook is deliberately inert here.
 
-The Docker and Helm scripts build locally by default. Their reusable workflows set
-the documented environment contract to enable publishing.
+The Helm scripts build locally by default.
+Their reusable workflows set the documented environment contract to enable
+publishing.
 
 ## Artifact publishing
 
-Docker and Helm callers pass per-repository image or chart values through workflow
-`with:` inputs. Empty release versions produce commit builds; CD passes the tag as
-the version. Add another image or chart as another caller job rather than putting
-repository-specific branching into the reusable workflow.
+Helm callers pass per-repository chart values through workflow `with:` inputs.
+Empty release versions produce commit builds; CD passes the tag as the version.
+Add another chart as another Helm caller job.
+Keep repository-specific branching out of the reusable workflows.
 
 Release execution runs the real tool: `⚡reusable-release.yaml` enters the
 `releaser` shell and calls `scripts/ci/release.sh`, which invokes
