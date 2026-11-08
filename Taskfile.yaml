@@ -10,7 +10,18 @@ vars:
 includes:
   compile: tasks/Taskfile.compile.yaml
   docker: tasks/Taskfile.docker.yaml
-  test: tasks/Taskfile.test.yaml
+  test:unit:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: unit
+  test:int:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: int
+  test:meta:
+    taskfile: tasks/Taskfile.test.yaml
+    vars:
+      MODE: meta
 
 tasks:
   setup:
@@ -48,19 +59,15 @@ tasks:
   test:coverage:
     desc: Run every coverage-capable suite with coverage
     cmds:
-      - ./scripts/local/test.sh unit --coverage
-      - ./scripts/local/test.sh int --coverage
+      - task: test:unit:coverage
+      - task: test:int:coverage
       - task: test:sit:coverage
 
-  test:unit:coverage:
-    desc: Run the unit suite with coverage
+  test:sit:
+    desc: Run the SIT tier through the freshly compiled binary
+    deps: [compile]
     cmds:
-      - ./scripts/local/test.sh unit --coverage
-
-  test:int:coverage:
-    desc: Run the integration suite with coverage
-    cmds:
-      - ./scripts/local/test.sh int --coverage
+      - SIT_DRIVER=binary CLI_BIN=dist/bin/{{.ARTIFACT}} ./scripts/local/test.sh sit {{.CLI_ARGS}}
 
   test:sit:coverage:
     desc: Run SIT journeys in-process and emit the full-system ledger
@@ -68,11 +75,6 @@ tasks:
       - rm -rf reports/e2e
       - SIT_DRIVER=inprocess ./scripts/local/test.sh sit --coverage
       - test -f reports/e2e/lcov.info
-
-  test:watch:
-    desc: Watch the fast unit suite
-    cmds:
-      - ./scripts/local/test.sh unit --watch
 
   run:
     desc: Run the CLI source entry point

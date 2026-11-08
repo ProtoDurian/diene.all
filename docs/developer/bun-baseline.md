@@ -20,7 +20,7 @@ rules remain in `docs/standards/`.
 - `task test:coverage`, `task test:unit:coverage`,
   `task test:int:coverage`, and `task test:sit:coverage` write scoped LCOV
   artifacts. SIT coverage uses the in-process driver only.
-- `task test:watch` watches the unit tier.
+- `task test:unit:watch` watches the unit tier.
 - `task build` bundles the `package.json` `bin` entry to `dist/bun-cli.js`.
 - `task compile` emits the three supported standalone binaries under `dist/bin/`.
 - `task deadcode` runs the two non-blocking LLM Knip views.
