@@ -14,6 +14,9 @@ mkdir -p "${consumer}"
 
 export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=mod GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="${tmp}/gitconfig"
 git config --global protocol.file.allow always
+# Background gc rewrites the shallow file under Go's later fetch --unshallow.
+git config --global maintenance.auto false
+git config --global gc.auto 0
 git config --global url."file://${source_repo}".insteadOf "https://github.com/${mirror}"
 
 echo "📦 Packing ${module}@${revision} the way the module proxy does (go mod download from git)..."
