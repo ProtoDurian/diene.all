@@ -2,13 +2,15 @@
 set -euo pipefail
 
 root_dir="$(git rev-parse --show-toplevel)"
-member_dir="${root_dir}/${MEMBER_DIR:-packages/diene_dart_lib}"
+member_dir="${root_dir}/${MEMBER_DIR:-packages/diene_auth_engine}"
 cd "${member_dir}"
 
 name="$(yq -r '.name' pubspec.yaml)"
 sdk="$(yq -r '.environment.sdk' pubspec.yaml)"
 version="$(yq -r '.version' pubspec.yaml)-consumer"
 user_cache="${PUB_CACHE:-${HOME}/.pub-cache}"
+flutter_sdk="$(yq -r '.environment.flutter' pubspec.yaml)"
+export FLUTTER_ROOT="${FLUTTER_ROOT:-$(dirname "$(dirname "$(command -v flutter)")")}"
 
 work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
@@ -17,7 +19,7 @@ installable="${work}/installable.tar.gz"
 unpacked="${work}/package"
 consumer="${work}/consumer"
 export PUB_CACHE="${work}/pub-cache"
-mkdir -p "${unpacked}" "${consumer}/bin" "${PUB_CACHE}/hosted/pub.dev" "${PUB_CACHE}/hosted-hashes/pub.dev"
+mkdir -p "${unpacked}" "${consumer}/test" "${PUB_CACHE}/hosted/pub.dev" "${PUB_CACHE}/hosted-hashes/pub.dev"
 
 echo "📦 Packing ${name} with pub..."
 dart pub publish --skip-validation --to-archive="${archive}"
@@ -53,8 +55,14 @@ name: consumer_fixture
 publish_to: none
 environment:
   sdk: '${sdk}'
+  flutter: '${flutter_sdk}'
 dependencies:
+  flutter:
+    sdk: flutter
   ${name}: ${version}
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
 YAML
 cat >"${consumer}/analysis_options.yaml" <<'YAML'
 analyzer:
@@ -66,41 +74,57 @@ YAML
 {
   echo '// ignore_for_file: unused_import'
   for library in "${libraries[@]}"; do echo "import 'package:${name}/${library}';"; done
-  echo 'void main() {}'
-} >"${consumer}/bin/libraries.dart"
-cat >"${consumer}/bin/consumer.dart" <<DART
-import 'package:${name}/diene_dart_lib.dart';
+  echo "import 'package:flutter_test/flutter_test.dart';"
+  echo "void main() => test('every public library imports', () {});"
+} >"${consumer}/test/libraries_test.dart"
+cat >"${consumer}/test/consumer_test.dart" <<DART
+import 'package:${name}/diene_auth_engine.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const Note note = Note(title: 'Consumer', body: 'Installed from the archive.');
-  final Note decoded = Note.fromJson(note.toJson());
-  if (decoded != note) throw StateError('the wire codec did not round-trip');
-  final String summary = summarizeNote(note);
-  if (summary != 'Consumer — Installed from the archive.') throw StateError('unexpected summary: \$summary');
-  print('consumer: \$summary');
+  test('returnTo, Doc B and claims work from the installed archive', () {
+    final Uri target = Uri.parse('/cart/7?tab=items#top');
+    final Uri login = ReturnTo.buildLoginRedirect(Uri.parse('https://app.test/login'), target).unwrap();
+    expect(ReturnTo.continueFrom(login, fallback: Uri.parse('/')), target);
+    expect(ReturnTo.capture(Uri.parse('//evil.test/x')).match(ok: (String value) => 0, err: (problem) => problem.status), 400);
+    final LandscapeSelectorDoc doc = LandscapeSelectorDoc.fromJson(<String, Object?>{
+      'platform': 'lithium',
+      'tier': 'prod',
+      'landscapes': <Object?>[<String, Object?>{'name': 'lapras', 'region': 'sg'}],
+    });
+    expect(doc.landscapes.single.name, 'lapras');
+    expect(
+      () => LandscapeSelectorDoc.fromJson(<String, Object?>{'platform': 'lithium', 'tier': 'prod', 'landscapes': <Object?>[], 'issuer': 'x'}),
+      throwsFormatException,
+    );
+    expect(Claims.registrationKey(platform: 'Lithium', service: 'auth-api'), 'lithium_auth_api');
+  });
 }
 DART
-if [[ -f ${unpacked}/lib/test_helper.dart ]]; then
-  cat >"${consumer}/bin/test_helper.dart" <<DART
-import 'package:${name}/diene_dart_lib.dart';
+if [[ -f lib/test_helper.dart ]]; then
+  cat >"${consumer}/test/test_helper_test.dart" <<DART
+import 'package:${name}/diene_auth_engine.dart';
 import 'package:${name}/test_helper.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const Note note = Note(title: 'Consumer', body: 'Helper.');
-  assertNoteSummary(note, summarizeNote(note));
+  test('the TestHelper works from the installed archive', () {
+    expect(AuthExpect.ok(ReturnTo.capture(Uri.parse('/home'))), '/home');
+    AuthExpect.status(AuthExpect.err(ReturnTo.capture(Uri.parse('https://evil.test/'))), 400);
+    expect(() => AuthExpect.ok(ReturnTo.capture(Uri.parse('//evil.test'))), throwsA(isA<AuthAssertionError>()));
+    expect(Claims.home(Claims.decode(AuthFixtures.jwt(<String, Object?>{'home_landscape': 'lapras'}))), 'lapras');
+  });
 }
 DART
 fi
 
 cd "${consumer}"
-dart pub get --offline
+flutter pub get --offline
 root_uri="$(jq -r --arg n "${name}" '.packages[] | select(.name == $n) | .rootUri' .dart_tool/package_config.json)"
 [[ ${root_uri} != "file://${PUB_CACHE}/hosted/pub.dev/${name}-${version}" ]] && echo "❌ ${name} resolved to ${root_uri}, not the preloaded archive" >&2 && exit 1
 
-echo "🔎 Importing every public library (${libraries[*]}), running, compiling and type-checking..."
-for entry in bin/*.dart; do dart run "${entry}"; done
-dart compile exe bin/consumer.dart -o "${work}/consumer.exe"
-"${work}/consumer.exe"
-dart analyze --fatal-infos
+echo "🔎 Importing every public library (${libraries[*]}), compiling, running and type-checking..."
+flutter test --reporter=expanded
+flutter analyze --fatal-infos
 
-echo "✅ consumer test: ${name} packs, installs from the local archive, imports, runs, compiles and type-checks"
+echo "✅ consumer test: ${name} packs, installs from the local archive, imports, compiles, runs and type-checks"

@@ -1,12 +1,14 @@
 import { expectGreen, expectRedBecause, withCleanProbeState } from './lib/helpers.ts';
 
-const PUBIGNORE = 'packages/diene_dart_lib/.pubignore';
+const PUBIGNORE = 'packages/diene_auth_engine/.pubignore';
 const CONSUMER = 'nix develop .#ci -c ./scripts/ci/test.sh consumer';
 
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
-  setup: { post: ['nix develop .#ci -c dart pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'] },
+  setup: {
+    post: ['nix develop .#ci -c flutter pub get --offline', 'rm -f .git/hooks/pre-commit .git/hooks/commit-msg'],
+  },
   probes: [
     {
       name: 'baseline-consumer-test-green',
@@ -24,10 +26,10 @@ export default {
       expectedImpact: [],
       async run(repo: any) {
         await withCleanProbeState(repo, [PUBIGNORE], async () => {
-          await repo.write(PUBIGNORE, `${await repo.read(PUBIGNORE)}/lib/src/note_summary.dart\n`);
+          await repo.write(PUBIGNORE, `${await repo.read(PUBIGNORE)}/lib/src/returnto/return_to.dart\n`);
           await expectRedBecause(repo, CONSUMER, 'consumer-test', [
             "Error when reading '../pub-cache/hosted/",
-            "lib/src/note_summary.dart': No such file or directory",
+            "lib/src/returnto/return_to.dart': No such file or directory",
           ]);
         });
       },
