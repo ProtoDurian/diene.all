@@ -28,6 +28,10 @@ D_TOKENS=(
   docker-push standards/docker docker/index.md docker-build
 )
 SCAN_EXEMPT=(':!.github/named-checks/**' ':!Changelog.md' ':!probes/lib/**')
+D_PROSE=(
+  'Each Dockerfile is a build artifact.' 'Docker tasks are keyed' 'repository-specific image values'
+  'The Docker scripts build' 'Docker callers pass' 'another Docker caller job' 'published Docker image names'
+)
 H_PATHS=(
   infra/root_chart/Chart.yaml
   '.github/workflows/⚡reusable-helm.yaml'
@@ -48,6 +52,10 @@ args=()
 for t in "${D_TOKENS[@]}"; do args+=(-e "${t}"); done
 hits="$(git -c core.quotePath=false grep -n -F "${args[@]}" "${tree}" -- . "${SCAN_EXEMPT[@]}" || true)"
 [[ -z ${hits} ]] || fail "files still reference removed D paths:"$'\n'"${hits}"
+args=()
+for t in "${D_PROSE[@]}"; do args+=(-e "${t}"); done
+hits="$(git -c core.quotePath=false grep -n -F "${args[@]}" "${tree}" -- . "${SCAN_EXEMPT[@]}" || true)"
+[[ -z ${hits} ]] || fail "files still carry Docker lines the strip deletes:"$'\n'"${hits}"
 
 show() { git show "${tree}:$1"; }
 for f in .github/workflows/ci.yaml .github/workflows/cd.yaml; do
@@ -59,6 +67,7 @@ done
 [[ "$(show dlint.yaml | yq '[.checks["toolchain-smoke"].binaries[] | select(test("^(docker|hadolint)( |$)"))] | length')" == 0 ]] || fail "dlint.yaml still smokes a D binary"
 [[ "$(show probes/features.json | jq '[.[] | select(.name | test("docker"))] | length')" == 0 ]] || fail "features.json still has a docker row"
 if show CLAUDE.md | grep -qi '^# docker'; then fail "CLAUDE.md still has a Docker section"; fi
+if show README.md | grep -qx -- "- Docker"; then fail "README.md still lists Docker as a feature"; fi
 if show probes/binary-smoke.ts | grep -Eq '^(docker|hadolint) '; then fail "binary-smoke.ts still smokes a D binary"; fi
 
 # Positive control: the Helm surface helm-wrapper consumes is intact.
