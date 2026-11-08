@@ -1,5 +1,5 @@
 import { restoreProbeState } from './lib/helpers.ts';
-import { breakAdapter, expectGreen, expectRedWithDiagnostic } from './lib/go.ts';
+import { expectGreen, expectRedWithDiagnostic } from './lib/go.ts';
 
 const gate = 'nix develop .#ci -c task test:int';
 
@@ -9,7 +9,7 @@ export default {
   probes: [
     {
       name: 'baseline-integration-tests-green',
-      description: 'Adapter tests pass against a real testcontainers dependency.',
+      description: 'The integration tier is green, including the empty tier of a library with no adapters.',
       kind: 'baseline',
       async run(repo: any) {
         await expectGreen(repo, gate, 'integration-tests');
@@ -17,14 +17,18 @@ export default {
     },
     {
       name: 'mutation-integration-tests-caught',
-      description: 'Breaking an adapter write must turn the integration tier red.',
+      description: 'A failing test under tests/int must turn the integration tier red, even with no adapters.',
       kind: 'mutation',
       async run(repo: any) {
-        const mutated = await breakAdapter(repo);
+        const planted = 'tests/int/probefail/probe_fail_test.go';
+        await repo.write(
+          planted,
+          'package probefail_test\n\nimport "testing"\n\nfunc TestProbeIntegrationFails(t *testing.T) {\n\tt.Fatal("probe: integration tier ran a failing test")\n}\n',
+        );
         try {
-          await expectRedWithDiagnostic(repo, gate, 'integration-tests', /Load\(\) error = redis: nil/);
+          await expectRedWithDiagnostic(repo, gate, 'integration-tests', /probe: integration tier ran a failing test/);
         } finally {
-          await restoreProbeState(repo, [mutated]);
+          await restoreProbeState(repo, ['tests/int/probefail']);
         }
       },
     },

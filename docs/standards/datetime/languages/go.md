@@ -4,9 +4,9 @@
 
 `time.Time` is always an instant in some location, so it cannot hold "a calendar
 date" or "a time of day" without inventing a zone. `cloud.google.com/go/civil`
-(module `cloud.google.com/go` v0.123.0, pinned in `go.mod`) adds the wall-clock
+(module `cloud.google.com/go` v0.123.0) adds the wall-clock
 types. Instants, durations and zones stay in the standard `time` package.
-`github.com/sosodev/duration` (v1.4.0, pinned in `go.mod`) reads and writes
+`github.com/sosodev/duration` (v1.4.0) reads and writes
 ISO 8601 durations, which `time` cannot.
 
 ```bash

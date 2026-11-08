@@ -9,8 +9,8 @@ downstream nodes.
 
 The Nix shells provide Go (from the AtomiCloud registry, which pins the patch
 level), golangci-lint, govulncheck, deadcode, staticcheck, gofumpt and
-gotestsum. Dates and times of day use `cloud.google.com/go/civil`, pinned in
-`go.mod` (`pins.go` keeps it there until code imports it).
+gotestsum. Dates and times of day use `cloud.google.com/go/civil`; this
+library has no dependencies, so its `go.mod` carries no pin.
 
 ## Repository shape
 

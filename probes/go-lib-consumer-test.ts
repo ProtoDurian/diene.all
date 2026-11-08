@@ -2,7 +2,7 @@ import { expectSuccess } from './lib/exec.ts';
 import { expectGreen, expectRedWithDiagnostic } from './lib/go.ts';
 
 const gate = 'nix develop .#ci -c ./scripts/validate/go-consumer-test.sh';
-const dropped = 'lib/note/key.go';
+const dropped = 'lib/problem/type_uri.go';
 
 export default {
   contractVersion: 1,
@@ -34,7 +34,7 @@ export default {
           repo,
           gate,
           'go-lib-consumer-test',
-          /-github\.com\/\S+\/lib\/note\/key\.go[\s\S]*does not ship exactly the files its package manifest declares/,
+          /-github\.com\/\S+\/lib\/problem\/type_uri\.go[\s\S]*does not ship exactly the files its package manifest declares/,
         );
       },
     },

@@ -14,6 +14,9 @@ mkdir -p "${consumer}"
 
 export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=mod GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="${tmp}/gitconfig"
 git config --global protocol.file.allow always
+# Background gc rewrites the shallow file under Go's later fetch --unshallow.
+git config --global maintenance.auto false
+git config --global gc.auto 0
 git config --global url."file://${source_repo}".insteadOf "https://github.com/${mirror}"
 
 echo "📦 Packing ${module}@${revision} the way the module proxy does (go mod download from git)..."
@@ -52,31 +55,40 @@ cat "${dir}/go.sum" >"${consumer}/go.sum"
   for package in "${packages[@]}"; do printf '\t_ "%s"\n' "${package}"; done
   printf ')\n\nfunc main() {}\n'
 } >"${consumer}/main.go"
-# DOMAIN WIRING: replaceable Note sample consumer test.
 cat >"${consumer}/consumer_test.go" <<GO
 package main_test
 
 import (
-	"context"
+	"encoding/json"
+	"fmt"
 	"testing"
 
-	"${module}/lib/note"
+	"${module}/lib/problem"
 	"${module}/testhelper"
 )
 
 func TestPackedLibraryRoundTrip(t *testing.T) {
-	service := note.NewService(testhelper.NewMemoryStore(), note.NewKeyComposer("notes"))
-	created, err := service.Create(context.Background(), "Consumer Test", "packed")
-	if err != nil || created.Slug != "consumer-test" {
-		t.Fatalf("created %+v, %v", created, err)
+	registry, err := problem.NewRegistry(testhelper.SampleErrorPortal(), problem.GenericProblems()...)
+	if err != nil {
+		t.Fatal(err)
 	}
-	loaded, err := service.Load(context.Background(), created.Slug)
-	if err != nil || loaded != created {
-		t.Fatalf("loaded %+v, %v; want %+v", loaded, err, created)
+	data := map[string]any{"entityType": "user", "id": "42"}
+	envelope, err := registry.NewProblem("entity_not_found", data)
+	if err != nil {
+		t.Fatal(err)
 	}
+	encoded, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded problem.Problem
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	testhelper.AssertError(t, fmt.Errorf("loading user: %w", problem.NewError(decoded)),
+		testhelper.ExpectID("entity_not_found"), testhelper.ExpectStatus(404), testhelper.ExpectData(data))
 }
 GO
-# END DOMAIN WIRING
 
 (
   cd "${consumer}"

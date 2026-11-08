@@ -4,7 +4,7 @@
 
 Reach for the standard library first: `slices`, `maps`, `strings` and `cmp`
 cover sorting, searching, cloning and comparing. Use `github.com/samber/lo`
-(v1.53.0, pinned in `go.mod`) only for what the standard library lacks:
+(v1.53.0) only for what the standard library lacks:
 map/filter/reduce, grouping, set operations, case conversion and the like.
 
 ```bash

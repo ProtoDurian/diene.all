@@ -1,6 +1,6 @@
 # Go library baseline
 
-This template publishes the Go module `github.com/ProtoDurian/diene.go-lib`. The
+This template publishes the Go module `github.com/ProtoDurian/diene.go-errors-problems`. The
 module path is the mirror repository path. A library generated from it replaces
 the final `go-lib` token with its own name in `go.mod`, `.config/go-lib.yaml`,
 imports, `README.md` (text and badges), the API baseline fixture,
@@ -27,9 +27,9 @@ system-integration tier.
 The README's library section carries one badge block: pkg.go.dev reference, the mirror's `CI`
 workflow status and the license.
 
-The sample sits between `DOMAIN WIRING` fences for wholesale replacement: `lib/note`
-(with its examples), the `adapters/kv` Redis adapter, `testhelper`, their unit, integration
-and meta tests, and the consumer test's round trip.
+This library ships `lib/problem` (problem errors, type-URI builder, catalog and
+`Problem` resource export) and `testhelper` (Problem assertions). It has no
+adapters, so the int tier is empty.
 
 ## Test pyramid and TestHelper
 

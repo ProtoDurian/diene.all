@@ -2,7 +2,7 @@
 
 ## Library: `go-playground/validator`
 
-`github.com/go-playground/validator/v10` (v10.30.6, pinned in `go.mod`) checks
+`github.com/go-playground/validator/v10` (v10.30.6) checks
 request shape from struct tags. It validates the adapter's request types only.
 Domain rules stay in domain constructors that return `(T, error)`.
 
