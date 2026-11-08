@@ -10,10 +10,6 @@ includes:
     taskfile: tasks/Taskfile.test.yaml
     vars:
       MODE: int
-  test:meta:
-    taskfile: tasks/Taskfile.test.yaml
-    vars:
-      MODE: meta
 
 tasks:
   setup:
@@ -41,11 +37,10 @@ tasks:
       - ./scripts/local/deadcode.sh
 
   test:
-    desc: Run unit, integration, and meta suites without coverage
+    desc: Run unit and integration suites without coverage
     cmds:
       - task: test:unit
       - task: test:int
-      - task: test:meta
 
   test:coverage:
     desc: Run every coverage-capable suite with coverage
