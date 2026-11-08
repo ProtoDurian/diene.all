@@ -48,13 +48,19 @@ in its own meta tests. A library with no `testhelper` package skips the meta tie
 `task validate` runs `scripts/local/pkg-validate.sh` (CI job `Package Validation`);
 each mode can run alone (`task validate -- vet`):
 
-| Mode          | Gate                                                                  |
-| ------------- | --------------------------------------------------------------------- |
-| `module-path` | `go.mod` equals `.config/go-lib.yaml` `module` and the mirror path    |
-| `vet`         | `go vet ./...`                                                        |
-| `api-compat`  | `gorelease` against the sealed baseline `tests/fixtures/api-baseline` |
-| `export-docs` | revive `exported` over every package (`.golangci.docs.yaml`)          |
-| `examples`    | every `Example*` compiles and passes                                  |
+| Mode            | Gate                                                                  |
+| --------------- | --------------------------------------------------------------------- |
+| `module-path`   | `go.mod` equals `.config/go-lib.yaml` `module` and the mirror path    |
+| `vet`           | `go vet ./...`                                                        |
+| `api-compat`    | `gorelease` against the sealed baseline `tests/fixtures/api-baseline` |
+| `export-docs`   | revive `exported` over every package (`.golangci.docs.yaml`)          |
+| `examples`      | every `Example*` compiles and passes                                  |
+| `consumer-test` | a fresh module consumes the packed module through a local replace     |
+
+The consumer test packs `HEAD` with `go mod download` from this repository, the
+same zip the Go proxy serves for a tag, so only committed files ship. A fresh
+module outside the repo requires it by `replace`, imports every public package,
+builds, vets and tests. The files it sees must equal what `go list ./...` declares.
 
 Production dead code is measured from a consumer of the public API,
 `tests/fixtures/deadcode-consumer.go.txt`: a library has no `main` of its own.

@@ -14,5 +14,5 @@ jobs:
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
       - uses: AtomiCloud/actions.cache-go@v2
-      - name: Validate library (module path, vet, API compatibility, export docs, examples)
+      - name: Validate library (module path, vet, API compatibility, export docs, examples, consumer test)
         run: nix develop .#ci -c ./scripts/ci/pkg-validate.sh

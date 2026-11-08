@@ -276,6 +276,11 @@
   },
   {
     "template": "diene/go-lib",
+    "name": "go-lib-consumer-test",
+    "class": "gate"
+  },
+  {
+    "template": "diene/go-lib",
     "name": "go-lib-publish-workflow-wiring",
     "class": "gate"
   },

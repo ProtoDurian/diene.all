@@ -40,7 +40,7 @@ tasks:
       - ./scripts/local/typecheck.sh
 
   validate:
-    desc: Run the library gates (module path, vet, API compatibility, export docs, examples)
+    desc: Run the library gates (module path, vet, API compatibility, export docs, examples, consumer test)
     cmds:
       - ./scripts/local/pkg-validate.sh {{.CLI_ARGS}}
 
