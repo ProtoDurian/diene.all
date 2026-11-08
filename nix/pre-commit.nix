@@ -92,5 +92,23 @@ pre-commit-lib.run {
       pass_filenames = true;
       language = "system";
     };
+
+    a-deadcode = {
+      enable = true;
+      name = "Go dead code";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH CGO_ENABLED=0 ./scripts/local/deadcode-strict.sh'";
+      files = "(^|/).*\\.go$|^go\\.(mod|sum)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-golangci-lint = {
+      enable = true;
+      name = "golangci-lint";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH CGO_ENABLED=0 ${packages.golangci-lint}/bin/golangci-lint run --timeout 5m ./...'";
+      files = "(^|/).*\\.go$|^go\\.(mod|sum)$|^\\.golangci\\.yaml$";
+      pass_filenames = false;
+      language = "system";
+    };
   };
 }

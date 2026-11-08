@@ -1,0 +1,20 @@
+version: '3'
+
+vars:
+  MODE: '{{.MODE | default "unit"}}'
+
+tasks:
+  default:
+    desc: Run the {{.MODE}} test tier
+    cmds:
+      - ./scripts/local/test.sh {{.MODE}} false false
+
+  coverage:
+    desc: Run the {{.MODE}} test tier with its blocking coverage gate
+    cmds:
+      - ./scripts/local/test.sh {{.MODE}} true false
+
+  watch:
+    desc: Watch the {{.MODE}} test tier
+    cmds:
+      - ./scripts/local/test.sh {{.MODE}} false true

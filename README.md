@@ -38,6 +38,21 @@ See [docs/standards/nix/index.md](docs/standards/nix/index.md) for the full guid
 - Formatters and pre-commit hooks
 - Adding registries
 
+# Go base template
+
+See the [Go baseline](docs/developer/go-baseline.md) for the language-specific
+toolchain, task surface, test tiers, coverage ledgers, dead-code passes and the
+illustrative Note sample. Go variants accompany the shared standards for
+[date/time](docs/standards/datetime/languages/go.md),
+[domain-driven design](docs/standards/domain-driven-design/languages/go.md),
+[functional practices](docs/standards/functional-practices/languages/go.md),
+[SOLID](docs/standards/solid-principles/languages/go.md),
+[stateless OOP/DI](docs/standards/stateless-oop-di/languages/go.md),
+[testing](docs/standards/testing/languages/go.md),
+[utilities](docs/standards/utilities/languages/go.md),
+[validation](docs/standards/validation/languages/go.md), and
+[wire format](docs/standards/wire-format/languages/go.md).
+
 # Standards
 
 The conventions this repository follows live under

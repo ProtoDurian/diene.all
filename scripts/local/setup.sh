@@ -7,4 +7,6 @@ cd "${root_dir}"
 releaser conventions -c release.yaml
 skills-sync sync
 
+go mod download
+
 echo "✅ setup completed"

@@ -6,6 +6,7 @@ let
     # enable or disable formatters, see https://github.com/numtide/treefmt-nix#supported-programs
     programs = {
       actionlint.enable = true;
+      gofumpt.enable = true;
       nixfmt.enable = true;
       prettier = {
         enable = true;
