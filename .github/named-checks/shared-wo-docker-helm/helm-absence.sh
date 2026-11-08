@@ -54,8 +54,9 @@ note="$(show '.github/workflows/⚡reusable-release-note.yaml' 2>/dev/null || tr
 [[ -n ${note} ]] || fail "⚡reusable-release-note.yaml missing"
 [[ "$(yq -o=json -I=0 '.on | keys' <<<"${note}")" == '["workflow_call"]' ]] || fail "⚡reusable-release-note.yaml is not workflow_call only"
 [[ "$(yq -o=json -I=0 '{"jobs": (.jobs | keys), "uses": [.jobs[] | select(has("uses"))] | length}' <<<"${note}")" == '{"jobs":["release-note"],"uses":0}' ]] || fail "⚡reusable-release-note.yaml must have exactly the release-note job"
-[[ "$(yq -o=json -I=0 '[.jobs[].steps[] | select(has("uses")) | .uses]' <<<"${note}")" == '["AtomiCloud/actions.setup-nix@v3"]' ]] || fail "⚡reusable-release-note.yaml uses an action beyond setup-nix"
-[[ "$(yq -o=json -I=0 '[.jobs[].steps[] | select(has("run")) | {"run": .run, "env": .env}]' <<<"${note}")" == '[{"run":"nix develop .#cd -c ./scripts/ci/release-note.sh","env":{"VERSION":"${{ inputs.version }}"}}]' ]] || fail "⚡reusable-release-note.yaml must only run release-note.sh, VERSION through env"
+[[ "$(yq -o=json -I=0 '.jobs["release-note"] | {"runs-on": .["runs-on"], "timeout-minutes": .["timeout-minutes"]}' <<<"${note}")" == '{"runs-on":"ubuntu-latest","timeout-minutes":5}' ]] || fail "⚡reusable-release-note.yaml must run on ubuntu-latest with a 5-minute timeout"
+[[ "$(yq -o=json -I=0 '[.jobs[].steps[] | select(has("uses")) | .uses]' <<<"${note}")" == '["actions/checkout@v4"]' ]] || fail "⚡reusable-release-note.yaml uses an action beyond actions/checkout"
+[[ "$(yq -o=json -I=0 '[.jobs[].steps[] | select(has("run")) | {"run": .run, "env": .env}]' <<<"${note}")" == '[{"run":"./scripts/ci/release-note.sh","env":{"VERSION":"${{ inputs.version }}"}}]' ]] || fail "⚡reusable-release-note.yaml must only run release-note.sh, VERSION through env"
 [[ "$(show scripts/ci/release-note.sh)" == "$(printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' '' "[ -z \"\${VERSION:-}\" ] && echo \"❌ 'VERSION' env var not set\" >&2 && exit 1" '' 'echo "Released ${VERSION}"')" ]] || fail "scripts/ci/release-note.sh does more than echo the version"
 [[ "$(show probes/features.json | jq '[.[] | select(.name | test("helm"))] | length')" == 0 ]] || fail "features.json still has a helm row"
 if show CLAUDE.md | grep -qi '^# helm'; then fail "CLAUDE.md still has a Helm section"; fi

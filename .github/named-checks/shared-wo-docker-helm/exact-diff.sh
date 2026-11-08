@@ -113,17 +113,14 @@ on:
 jobs:
   release-note:
     name: Release Note
-    runs-on:
-      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
-      - nscloud-cache-size-20gb
-      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
-    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: AtomiCloud/actions.setup-nix@v3
+      - uses: actions/checkout@v4
       - name: Release note
         env:
           VERSION: ${{ inputs.version }}
-        run: nix develop .#cd -c ./scripts/ci/release-note.sh
+        run: ./scripts/ci/release-note.sh
 YAML
   add_file scripts/ci/release-note.sh <<'SH'
 #!/usr/bin/env bash
@@ -136,6 +133,15 @@ SH
   chmod +x scripts/ci/release-note.sh
 }
 
+cicd_stub_paragraph() {
+  awk '{ print } $0 == "GitHub-hosted `ubuntu-26.04`." { print ""; while ((getline l < "/dev/stdin") > 0) print l }' "$1" >"${1}.new" <<'MD' && mv "${1}.new" "$1"
+The publish-nothing CD stub (`⚡reusable-release-note.yaml`) is the other
+exception. It only echoes the release version, so it runs on GitHub-hosted
+`ubuntu-latest` with `actions/checkout` and no Nix, and calls
+`./scripts/ci/release-note.sh` directly.
+MD
+}
+
 apply_H() {
   rm_paths "${H_PATHS[@]}"
   rm_empty_dir infra
@@ -144,6 +150,7 @@ apply_H() {
   edit .github/workflows/cd.yaml drop_yaml_job '  helm:'
   edit .github/workflows/cd.yaml cd_release_job
   add_release_note
+  edit docs/standards/ci-cd/index.md cicd_stub_paragraph
   edit Taskfile.yaml sed_z 's#includes:\n  helm: tasks/Taskfile\.helm\.yaml\n\n##'
   edit .github/dependabot.yml sed_z "s#  - package-ecosystem: helm\n    directory: /infra/root_chart\n    schedule:\n      interval: weekly\n    groups:\n      all:\n        patterns:\n          - '\*'\n    open-pull-requests-limit: 2\n##"
   edit CLAUDE.md drop_section '# Helm charts and publishing'

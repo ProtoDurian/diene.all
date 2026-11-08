@@ -10,14 +10,11 @@ on:
 jobs:
   release-note:
     name: Release Note
-    runs-on:
-      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
-      - nscloud-cache-size-20gb
-      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
-    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: AtomiCloud/actions.setup-nix@v3
+      - uses: actions/checkout@v4
       - name: Release note
         env:
           VERSION: ${{ inputs.version }}
-        run: nix develop .#cd -c ./scripts/ci/release-note.sh
+        run: ./scripts/ci/release-note.sh
