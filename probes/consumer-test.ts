@@ -32,5 +32,20 @@ export default {
         });
       },
     },
+    {
+      name: 'mutation-consumer-test-helper-dropped-caught',
+      description: 'the TestHelper smoke still runs, and fails, once .pubignore drops the public lib/test_helper.dart',
+      kind: 'mutation',
+      expectedImpact: [],
+      async run(repo: any) {
+        await withCleanProbeState(repo, [PUBIGNORE], async () => {
+          await repo.write(PUBIGNORE, `${await repo.read(PUBIGNORE)}/lib/test_helper.dart\n`);
+          await expectRedBecause(repo, CONSUMER, 'consumer-test', [
+            "Error when reading '../pub-cache/hosted/",
+            "lib/test_helper.dart': No such file or directory",
+          ]);
+        });
+      },
+    },
   ],
 };

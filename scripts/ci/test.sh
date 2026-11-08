@@ -14,7 +14,11 @@ meta_test_path="${META_TEST_PATH:-test/meta}"
 root_dir="$(git rev-parse --show-toplevel)"
 cd "${root_dir}"
 
-[[ ${mode} == "consumer" ]] && exec ./scripts/ci/consumer-test.sh
+if [[ ${mode} == "consumer" ]]; then
+  # the consumer resolves offline, so hosted dependencies must already be in the pub cache
+  dart pub get
+  exec ./scripts/ci/consumer-test.sh
+fi
 
 if [[ ${mode} == "meta" && ! -f "${member_dir}/${test_helper_path}" ]]; then
   echo "✅ Meta tier inactive: this package has no TestHelper"

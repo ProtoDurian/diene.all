@@ -80,7 +80,7 @@ void main() {
   print('consumer: \$summary');
 }
 DART
-if [[ -f ${unpacked}/lib/test_helper.dart ]]; then
+if [[ -f lib/test_helper.dart ]]; then
   cat >"${consumer}/bin/test_helper.dart" <<DART
 import 'package:${name}/diene_dart_lib.dart';
 import 'package:${name}/test_helper.dart';
