@@ -14,7 +14,7 @@ docs="docs/developer/dotnet-baseline\\.md|docs/domain/note\\.md|docs/standards/a
 added_pattern="^((${projects})|(${config})|(${scripts})|(${probes})|(${docs})|tasks/Taskfile\\.test\\.yaml|\\.github/workflows/⚡reusable-(build|test|dead-code)\\.yaml|\\.claude/skills/(authorization|dotnet-base)/SKILL\\.md|\\.github/named-checks/dotnet-base/[^/]+)$"
 insert_only_pattern='^(\.dockerignore|\.gitignore|\.github/dependabot\.yml|\.github/workflows/ci\.yaml|CLAUDE\.md|README\.md|Taskfile\.yaml|nix/(env|packages|pre-commit)\.nix|probes/features\.json|scripts/ci/pre-commit\.sh|scripts/local/setup\.sh)$'
 # Parent files with a line-local rewrite, and how many parent lines each may drop.
-declare -A rewrite_max=(['docs/standards/taskfile/index.md']=2 ['release.yaml']=3)
+declare -A rewrite_max=(['release.yaml']=3)
 
 # index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"

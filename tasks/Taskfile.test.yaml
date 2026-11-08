@@ -1,47 +1,17 @@
 version: '3'
 
 tasks:
-  unit:
-    desc: Run the unit tier
+  default:
+    desc: Run the {{.MODE}} test tier
     cmds:
-      - ./scripts/local/test.sh unit
+      - ./scripts/local/test.sh {{.MODE}}
 
-  unit:coverage:
-    desc: Run the unit tier with merged blocking coverage
+  coverage:
+    desc: Run the {{.MODE}} test tier with coverage
     cmds:
-      - ./scripts/local/test.sh unit --coverage
+      - ./scripts/local/test.sh {{.MODE}} --coverage
 
-  unit:watch:
-    desc: Watch the unit tier
+  watch:
+    desc: Watch the {{.MODE}} test tier
     cmds:
-      - ./scripts/local/test.sh unit --watch
-
-  int:
-    desc: Run the integration tier
-    cmds:
-      - ./scripts/local/test.sh int
-
-  int:coverage:
-    desc: Run the integration tier with merged blocking coverage
-    cmds:
-      - ./scripts/local/test.sh int --coverage
-
-  int:watch:
-    desc: Watch the integration tier
-    cmds:
-      - ./scripts/local/test.sh int --watch
-
-  meta:
-    desc: Run the TestHelper meta tier
-    cmds:
-      - ./scripts/local/test.sh meta
-
-  meta:coverage:
-    desc: Run the TestHelper meta tier with merged blocking coverage
-    cmds:
-      - ./scripts/local/test.sh meta --coverage
-
-  meta:watch:
-    desc: Watch the TestHelper meta tier
-    cmds:
-      - ./scripts/local/test.sh meta --watch
+      - ./scripts/local/test.sh {{.MODE}} --watch
