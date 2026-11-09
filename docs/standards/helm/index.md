@@ -27,6 +27,25 @@ directly and also runs in `task lint`. Generated chart docs are produced by
 Adding a chart means adding its own task set under its own key. Never generalize
 the existing tasks into one `lint` that switches on a shared chart variable.
 
+## Render and chart checks
+
+The chart is the only artifact: rendered YAML is never committed. `scripts/local/helm-render.sh <chart>`
+renders every values stack of a chart into the gitignored `infra/rendered/<chart>/<stack>.yaml` —
+`values.yaml` is the `default` stack and each `values.<name>.yaml` overlay is the stack `<name>`.
+`scripts/local/helm-check.sh <chart>` renders fresh, then runs two checks on the result:
+
+1. `kubeconform -strict` against the Kubernetes schemas. An object with no schema fails, so a chart
+   that ships CRDs must also bring their schemas.
+2. `kyverno apply` with the ValidatingAdmissionPolicies in `infra/policies/`. Workspace ships one,
+   `require-lpsm-labels.yaml`: every object carries the four LPSM `atomi.cloud/*` labels. The full
+   cluster policy set is the vanadium chart; workspace never depends on it, so downstream repos add
+   their own policies to `infra/policies/` instead.
+
+The `a-helm-check` pre-commit hook runs the check script, and CI runs it through the pre-commit job,
+so the same render is checked on every commit. Locally use `task helm:root_chart:render` to inspect
+the YAML and `task helm:root_chart:check` to run the checks. `helm lint` and `helm template` keep
+running as before (`a-helm-lint`, `scripts/ci/helm.sh`).
+
 ## CI/CD release structure
 
 Publishing is driven by the `⚡reusable-helm.yaml` reusable workflow, called from `ci.yaml`
@@ -41,7 +60,7 @@ Publishing is driven by the `⚡reusable-helm.yaml` reusable workflow, called fr
    published version and destination: read its version assignment to see what a commit build
    versus a release tag publishes, and its push command for where charts land.
 
-In CI, Helm linting runs through the pre-commit hook (not a separate job).
+In CI, Helm linting and the render checks run through the pre-commit hooks (not a separate job).
 
 ### Adding more charts
 

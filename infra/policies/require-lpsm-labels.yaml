@@ -1,0 +1,22 @@
+# Workspace-level admission policy for the root chart's rendered objects.
+# `kyverno apply` evaluates it offline against infra/rendered/. The cluster-side policy set is
+# the vanadium chart (charts/vap-policies); workspace must not depend on it, so this is the
+# smallest policy that still proves the VAP wiring: every object carries all four LPSM labels.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: require-lpsm-labels
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ['*']
+        apiVersions: ['*']
+        operations: [CREATE, UPDATE]
+        resources: ['*']
+  validations:
+    - expression: >-
+        has(object.metadata.labels) &&
+        ['atomi.cloud/landscape', 'atomi.cloud/platform', 'atomi.cloud/service', 'atomi.cloud/module']
+        .all(k, k in object.metadata.labels)
+      message: Every object must carry the LPSM labels atomi.cloud/landscape, platform, service and module.

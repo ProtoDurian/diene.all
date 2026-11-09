@@ -42,6 +42,15 @@ pre-commit-lib.run {
       language = "system";
     };
 
+    a-helm-check = {
+      enable = true;
+      name = "Helm render check";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH bash scripts/local/helm-check.sh infra/root_chart'";
+      files = "^(infra/root_chart/.*|infra/policies/.*|scripts/local/helm-(render|check)\\.sh)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
     a-infisical = {
       enable = true;
       name = "Secrets scan";

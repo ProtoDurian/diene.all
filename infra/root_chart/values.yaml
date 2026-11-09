@@ -1,1 +1,8 @@
 message: diene workspace
+
+# Service-tree (LPSM) identity stamped on every object as atomi.cloud/<key> labels.
+serviceTree:
+  landscape: local
+  platform: diene
+  service: workspace
+  module: root

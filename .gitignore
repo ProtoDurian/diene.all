@@ -1,5 +1,6 @@
 ### helm
 infra/root_chart/uploads/
+infra/rendered/
 
 ### nix-init
 .direnv
