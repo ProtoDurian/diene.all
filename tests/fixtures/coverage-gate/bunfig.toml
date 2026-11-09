@@ -1,4 +1,3 @@
-# Isolated ledger driven green and sabotaged by tests/unit/coverage-gate.test.ts.
 [test]
 root = "tests/fixtures/coverage-gate/spec"
 coverageReporter = ["text", "lcov"]

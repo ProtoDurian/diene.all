@@ -63,9 +63,9 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@atomicloud/diene.core-utils": "1.0.0",
-    "@atomicloud/diene.problems": "1.0.0",
-    "@atomicloud/diene.result": "1.0.2",
+    "@atomicloud/diene.core-utils": "^1.0.0",
+    "@atomicloud/diene.problems": "^1.0.0",
+    "@atomicloud/diene.result": "^1.0.2",
     "@js-temporal/polyfill": "^0.5.1",
     "@logto/js": "^6.1.2",
     "ioredis": "^5.11.1",

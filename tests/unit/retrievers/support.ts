@@ -1,6 +1,6 @@
 import type { Problem } from '@atomicloud/diene.problems';
 import { Ok, type Result } from '@atomicloud/diene.result';
-import type { AuthState, UserInfo } from '../../../src/lib/retriever';
+import type { UserInfo } from '../../../src/lib/retriever';
 import type { FetchLike } from '../../../src/lib/retrievers/client';
 import type { AuthSessionAccessor } from '../../../src/lib/retrievers/server';
 
@@ -52,5 +52,3 @@ export class FakeSession implements AuthSessionAccessor {
     return this.#userInfo;
   }
 }
-
-export type { AuthState };

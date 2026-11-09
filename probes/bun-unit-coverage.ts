@@ -13,7 +13,7 @@ export default {
       kind: 'baseline',
       async run(repo: any) {
         await expectBunGreen(repo, command, 'bun-unit-coverage');
-        await assertScopedLcov(repo, 'coverage/unit/lcov.info', 'src/lib/');
+        await assertScopedLcov(repo, 'reports/unit/lcov.info', 'src/lib/');
       },
     },
     {

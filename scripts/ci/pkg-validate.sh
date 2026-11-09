@@ -6,9 +6,9 @@ cd "${root_dir}"
 
 mode="${1:-all}"
 case "${mode}" in
-content | publint | attw | all) ;;
+content | publint | attw | consumer | all) ;;
 *)
-  echo "❌ mode must be 'content', 'publint', 'attw', or 'all'" >&2
+  echo "❌ mode must be 'content', 'publint', 'attw', 'consumer', or 'all'" >&2
   exit 1
   ;;
 esac
@@ -73,6 +73,11 @@ if [[ ${mode} == "attw" || ${mode} == "all" ]]; then
   ./node_modules/.bin/attw pkg.tgz --profile node16
   echo "🔎 Dogfooding the packed tarball in the scratch consumer..."
   ./fixtures/scratch-consumer/validate.sh
+fi
+
+if [[ ${mode} == "consumer" || ${mode} == "all" ]]; then
+  echo "🔎 Consuming the tarball (consumer fixture)..."
+  ./scripts/ci/consumer-smoke.sh
 fi
 
 echo "✅ Package validation (${mode}) passed"
