@@ -8,7 +8,7 @@ git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "�
 topics='datetime|domain-driven-design|functional-practices|software-design-philosophy|solid-principles|stateless-oop-di|testing|three-layer-architecture|utilities|validation|wire-format'
 added_pattern="^(docs/standards/(${topics})/index\.md|\.claude/skills/(${topics})/SKILL\.md|probes/(docs-markdownlint|docs-prettier|standards-inventory|thin-skills)\.ts|\.github/named-checks/shared/[^/]+|\.markdownlint-cli2\.jsonc|\.github/workflows/⚡reusable-release-note\.yaml|scripts/ci/release-note\.sh)$"
 insert_only_pattern='^(nix/pre-commit\.nix|probes/features\.json|\.github/workflows/cd\.yaml)$'
-split_pattern='^(README\.md|docs/standards/(ci-cd|docker|helm|service-tree|taskfile)/index\.md|\.github/workflows/⚡reusable-docker\.yaml)$'
+split_pattern='^(README\.md|docs/standards/(ci-cd|service-tree|taskfile)/index\.md)$'
 
 # index tree == HEAD in CI; keeps local staged mutations visible
 tree="$(git write-tree)"

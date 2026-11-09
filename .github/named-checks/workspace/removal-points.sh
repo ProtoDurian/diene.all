@@ -88,6 +88,8 @@ apply_D() {
   edit CLAUDE.md drop_section '# Docker build and publishing'
   edit probes/features.json yq_del 'del(.[] | select(.name == "docker-build"))'
   edit probes/binary-smoke.ts sed_d '/^docker --version/d;/^docker info/d;/^hadolint/d'
+  # shellcheck disable=SC2016
+  edit docs/standards/ci-cd/index.md sed_z 's#\n\nThe Docker job is the one exception: it runs `\./scripts/ci/docker\.sh` directly, with no Nix shell and no Nix store cache label\.##'
 }
 
 apply_H() {
