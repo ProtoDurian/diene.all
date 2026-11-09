@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
 const probesDir = fileURLToPath(new URL('../', import.meta.url));
-// Main's probe files (rules/PROBES.md §5): never wrap their shell entries here.
+// Main's probe files: never wrap their shell entries here.
 const INHERITED = new Set([
   'binary-smoke.ts',
   'dev-shell.ts',
