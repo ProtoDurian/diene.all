@@ -24,8 +24,8 @@ export default defineGate({
     expectedImpact: [],
     async run(repo: any) {
       await repo.patch('chart/values.yaml', {
-        find: '    tag: 6.9.2\n  # The upstream chart cannot read',
-        replace: '    tag: latest\n  # The upstream chart cannot read',
+        find: '            repository: ghcr.io/stefanprodan/podinfo\n            tag: 6.9.2\n',
+        replace: '            repository: ghcr.io/stefanprodan/podinfo\n            tag: latest\n',
       });
       await expectRedBecause(repo, command, 'wrapper-rendered-manifests', ['vanadium-disallowlatest']);
     },

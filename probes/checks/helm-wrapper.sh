@@ -64,14 +64,13 @@ expect_contract_refusal() {
 
 stacks=("" "--values chart/values.example.yaml" "--values chart/values.example.yaml --values chart/values.lapras.yaml" "--values chart/values.example.yaml --values probes/fixtures/values.all-on.yaml")
 
-# The podinfo helm-test hook Pods are upstream-named and only exist on `helm test`.
 render_upstream() {
   helm template "${release}" chart --namespace "${namespace}" "${ex[@]}" --set upstream.enabled=true --skip-tests
 }
 
 expect_dns_names() {
   local file="$1"
-  yq eval-all -o=json '.' "${file}" | jq -s -e 'map(select(.kind != null) | .metadata.name, (.spec.target.name? // empty)) | length > 0 and all(.[]; type == "string" and test("^[a-z0-9]+-[a-z0-9]+$"))' >/dev/null ||
+  yq eval-all -o=json '.' "${file}" | jq -s -e 'map(select(.kind != null and .kind != "Problem") | .metadata.name, (.spec.target.name? // empty)) | length > 0 and all(.[]; type == "string" and test("^[a-z0-9]+-[a-z0-9]+$"))' >/dev/null ||
     { echo "❌ a rendered or generated name in ${file} is not <service>-<token>" >&2 && yq eval-all -o=json '.' "${file}" | jq -s -r 'map(select(.kind != null) | .metadata.name, (.spec.target.name? // empty))[]' >&2 && exit 1; }
 }
 
@@ -84,7 +83,7 @@ labels)
   helm template "${release}" chart --namespace "${namespace}" "${ex[@]}" --values chart/values.lapras.yaml >"${tmp}/rendered.yaml"
   yq eval-all -o=json '.' "${tmp}/rendered.yaml" | jq -s -e 'map(select(.kind != null)) | length > 0 and all(.[]; .metadata.labels["atomi.cloud/platform"] == "sample" and .metadata.labels["atomi.cloud/service"] == "wrapper" and .metadata.labels["atomi.cloud/module"] == "api" and .metadata.labels["atomi.cloud/layer"] == "2" and .metadata.labels["atomi.cloud/landscape"] == "example" and .metadata.labels["atomi.cloud/cluster"] == "lapras" and .metadata.annotations["atomi.cloud/platform"] == "sample")' >/dev/null
   helm template "${release}" chart --namespace "${namespace}" "${ex[@]}" --values chart/values.lapras.yaml --set labelPrefix=example.dev >"${tmp}/override.yaml"
-  yq eval-all -o=json '.' "${tmp}/override.yaml" | jq -s -e 'map(select(.kind != null)) | length > 0 and all(.[]; .metadata.labels["example.dev/platform"] == "sample" and .metadata.annotations["example.dev/service"] == "wrapper" and .metadata.labels["atomi.cloud/platform"] == null and .metadata.annotations["atomi.cloud/service"] == null)' >/dev/null
+  yq eval-all -o=json '.' "${tmp}/override.yaml" | jq -s -e 'map(select(.kind != null and .metadata.name != "wrapper-upstream")) | length > 0 and all(.[]; .metadata.labels["example.dev/platform"] == "sample" and .metadata.annotations["example.dev/service"] == "wrapper" and .metadata.labels["atomi.cloud/platform"] == null and .metadata.annotations["atomi.cloud/service"] == null)' >/dev/null
   ;;
 reloader)
   helm template "${release}" chart --namespace "${namespace}" "${ex[@]}" >"${tmp}/default.yaml"
@@ -123,7 +122,7 @@ primordial)
   chart-checks check "${tmp}/primordial-crs.yaml"
   yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "PlatformDependency"))[0].spec as $spec | [$spec.database, $spec.kv, $spec.cache, $spec.store] | map(. // {}) | add | to_entries | all(.[]; (.value.engine | keys) == [.value.type])' >/dev/null
   yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "LogtoApp")) | map(.metadata.name) == ["wrapper-identityexample", "wrapper-identityserving"] and map(.spec.identityRef) == [{platform: "sample", landscape: "example"}, {platform: "sample", landscape: "serving"}] and map(.metadata.annotations["atomi.cloud/identity-issuer"]) == ["api.lithium.aldehyde.example.cluster.atomi.cloud", "api.lithium.aldehyde.serving.cluster.atomi.cloud"] and map(.metadata.annotations["atomi.cloud/credential-destination"]) == ["example:/wrapper", "serving:/wrapper"]' >/dev/null
-  yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "Problem")) | length == 1 and (.[0].spec | has("module") | not) and .[0].metadata.name == "wrapper-problemsapi"' >/dev/null
+  yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "Problem")) | length == 1 and (.[0].spec | has("module") | not) and .[0].spec.version == "v1" and .[0].metadata.name == "wrapper-example-v1"' >/dev/null
   if rg -n '(^|[[:space:]])(share|sharedVia|redirectUris|desiredVersion):' "${tmp}/primordial.yaml" >&2; then
     echo "❌ primordial CRs carry a forbidden sharing/redirect/version field" >&2 && exit 1
   fi
@@ -196,7 +195,7 @@ task-surface)
   rg -q 'atomi.cloud/cluster: "lapras"' "${tmp}/task-template.yaml" || { echo "❌ example:lapras:template did not stack values.lapras.yaml" >&2 && exit 1; }
   ;;
 all-on-manifests)
-  # The shipped manifests hook checks the three committed stacks; probes also check the all-on stack.
+  # The shipped manifests hook checks the two overlay stacks; probes also check the all-on stack.
   helm template "${release}" chart --namespace "${namespace}" "${ex[@]}" --values chart/values.lapras.yaml --skip-tests >"${tmp}/all-on.yaml"
   chart-checks check "${tmp}/all-on.yaml"
   ;;

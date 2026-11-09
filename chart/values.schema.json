@@ -478,7 +478,8 @@
                             }
                         },
                         "version": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^v[0-9]+$"
                         }
                     }
                 },

@@ -16,12 +16,12 @@ Run `task build` or `task example:lapras:template`. `debug` and `template` rende
 
 ## Default shape
 
-`upstream.enabled` is `true` (podinfo is the stand-in upstream), so a plain `values.yaml` render holds only the upstream objects. Everything wrapper-owned is off:
+`upstream.enabled` is `true` (app-template running the podinfo image is the stand-in upstream), so a plain `values.yaml` render holds only the upstream objects. Everything wrapper-owned is off:
 
 - `workload.enabled` (the wrapper Deployment, Service and config ConfigMap) is one switch, default `false`;
 - `migration`, `secret`, `gateway`, `webhookRoute` and `primordial` default `false`, and so do the four primordial sub-switches (`virtualLandscapeService`, `logtoApp`, `problem`, `cloudflareDeploy`).
 
-Template probes switch everything on with `probes/fixtures/values.all-on.yaml`, stacked on the committed values. The upstream chart cannot read `labelPrefix`, so the `upstream:` block carries the platform annotations under the default prefix, with values taken from `serviceTree` through YAML anchors (landscape and cluster come from the overlays).
+Template probes switch everything on with `probes/fixtures/values.all-on.yaml`, stacked on the committed values. The upstream chart cannot read `labelPrefix`, so `upstream.global` carries the platform labels and annotations under the default prefix, with values taken from `serviceTree` through YAML anchors (landscape and cluster come from the overlays).
 
 ## Identity and naming
 
@@ -33,7 +33,7 @@ Template probes switch everything on with `probes/fixtures/values.all-on.yaml`, 
 - `instance` is opaque: the helper accepts only one lowercase DNS-1123 label of at most 63 bytes and refuses dots, uppercase, an explicit empty string and longer values. An absent instance gives the ordinary form.
 - The fleet identity endpoint is `api.lithium.aldehyde.<landscape>.cluster.atomi.cloud` for a concrete landscape. The `identityIssuer` helper accepts only a landscape listed in `primordial.identity.concreteLandscapes`. It refuses anything else, and it names the consumer platform (release namespace) and `primordial.vlandscape` explicitly.
 - Physical ids are repository-qualified before normalization. DNS-1123 labels longer than 63 characters are shortened with a stable hash, while original and normalized values are stored together as annotations.
-- Resource names use `<service>-<token>` with exactly one dash. Tokens fuse components (`main-cache` → `maincache`). The primary workload token is `serviceTree.module`, so `fullnameOverride` must equal `<service>-<module>`. Every enabled dependency receives an explicit conforming `fullnameOverride`; the `fullname` check renders the sub-chart and also covers generated Secret names.
+- Resource names use `<service>-<token>` with exactly one dash (Problem excepted, below). Tokens fuse components (`main-cache` → `maincache`). The primary workload token is `serviceTree.module`, so `fullnameOverride` must equal `<service>-<module>`. Every enabled dependency receives an explicit conforming `fullnameOverride`; the `fullname` check renders the sub-chart and also covers generated Secret names.
 
 The helpers are generic by design. Final environment-owned instance segments, hosted profile fixtures, and exposure semantics stay outside this node until their owning work lands.
 
@@ -69,7 +69,7 @@ A chart instance keeps exactly three chart-check pre-commit hooks. CI's existing
 
 - `a-wrapper-helm-lint` — `helm lint` and `helm template` on the three committed stacks (`values.yaml`; `+ values.example.yaml`; `+ values.example.yaml + values.lapras.yaml`). `helm lint` also validates each stack against `values.schema.json`.
 - `a-wrapper-values-schema` — a generator: it regenerates `chart/values.schema.json` in place with `scripts/local/generate-chart-schema.sh`, so a stale schema makes pre-commit fail.
-- `a-wrapper-manifests` — renders the same three stacks and runs `chart-checks check` on them: `kubectl-validate` against the Kubernetes schemas plus the installed CRDs, then `kyverno apply` with the installed vanadium VAP definitions. No kind pre-filter and no object is dropped: each VAP's `matchConstraints` selects.
+- `a-wrapper-manifests` — renders the two overlay stacks (`+ values.example.yaml`; `+ values.example.yaml + values.lapras.yaml`) and runs `chart-checks check` on them; the bare `values.yaml` stack has no landscape, so it is only linted: `kubectl-validate` against the Kubernetes schemas plus the installed CRDs, then `kyverno apply` with the installed vanadium VAP definitions. No kind pre-filter and no object is dropped: each VAP's `matchConstraints` selects.
 
 `a-wrapper-helm-docs` stays as it is: it generates `chart/README.md` and is not a check. `scripts/validate/helm-wrapper.sh` ships only the modes these hooks call (`lint`, `schema`, `manifests`). Every other check of this template (labels, Reloader, secret, fullname, primordial, LPSM, LB, task surface, publish modes, version and release lint) runs from `probes/checks/` only, which is chain-side and never materialized. The contracts ConfigMap (LPSM and instance vectors) lives in the probe fixture chart `probes/fixtures/contracts-chart/`, which takes `chart/` as a `file://` dependency so its template renders the shipped helpers.
 
@@ -89,7 +89,7 @@ The sample renders the frozen current shapes for `PlatformDependency`, `VirtualL
 - LogtoApp renders one CR per `primordial.logtoApp.landscapes` entry, each with `identityRef: {platform, landscape}`; the issuer and the credential destination (`<landscape>:/<service>`) are recorded as annotations because T3 derives them and defines no spec field for them; a repeated or name-colliding landscape, the consumer platform, the v-landscape or any landscape not in `primordial.identity.concreteLandscapes` refuses;
 - LogtoApp declares paths, `extraRedirectUris`, and `resourceRefs`, never per-row redirects;
 - Problem is `atomi.cloud/v1alpha1` and the other kinds `fleet.atomi.cloud/v1alpha1` (the installed CRDs decide; `primordial.apiVersions` holds them);
-- Problem fuses the module into its name and carries no `spec.module`: the installed CRD has no such field;
+- Problem is named `<service>-<landscape>-<version>` (for example `wrapper-example-v1`, version `v<N>`) and carries no `spec.module`, as its installed CRD requires;
 - CloudflareDeploy uses `desiredVersionFrom.tag`, never a hand-pinned version id.
 
 These are helper contracts, not CRD ownership. The T3/operator nodes own final API groups, controllers, and installed CRDs.

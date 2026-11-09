@@ -46,6 +46,15 @@
 {{- printf "%s-%s" $service $token -}}
 {{- end -}}
 
+{{- define "diene-helm-wrapper.problemName" -}}
+{{- $service := required "serviceTree.service is required" .Values.serviceTree.service | lower -}}
+{{- $version := .Values.primordial.problem.version -}}
+{{- if not (regexMatch "^v[0-9]+$" $version) -}}
+{{- fail (printf "primordial.problem.version %q must be v<N>" $version) -}}
+{{- end -}}
+{{- printf "%s-%s-%s" $service (required "primordial.targetLandscape is required" .Values.primordial.targetLandscape) $version -}}
+{{- end -}}
+
 {{- define "diene-helm-wrapper.primaryName" -}}
 {{- $expected := include "diene-helm-wrapper.resourceName" (dict "root" . "token" (required "serviceTree.module is required" .Values.serviceTree.module)) -}}
 {{- if ne .Values.fullnameOverride $expected -}}

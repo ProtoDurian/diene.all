@@ -177,7 +177,7 @@ primordial:
     landscapes: [example] # @schema item:string
   problem:
     enabled: false
-    version: 0.1.0
+    version: v1 # @schema pattern:^v[0-9]+$
     entries:
       - id: example
         type: https://errors.example.invalid/example

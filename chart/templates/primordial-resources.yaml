@@ -75,7 +75,7 @@ spec:
 apiVersion: {{ .Values.primordial.apiVersions.problem }}
 kind: Problem
 metadata:
-  name: {{ include "diene-helm-wrapper.resourceName" (dict "root" . "token" (printf "problems%s" .Values.serviceTree.module)) }}
+  name: {{ include "diene-helm-wrapper.problemName" . }}
   labels:
     {{- include "diene-helm-wrapper.labels" . | nindent 4 }}
   annotations:

@@ -32,9 +32,9 @@ schema)
 manifests)
   files=()
   index=0
-  for stack in "${stacks[@]}"; do
+  # The bare stack has no landscape (the overlays add it), so it is linted, not checked.
+  for stack in "${stacks[@]:1}"; do
     index=$((index + 1))
-    # The podinfo helm-test hook Pods are upstream-named and only exist on `helm test`.
     # shellcheck disable=SC2086
     helm template "${release}" chart --namespace "${namespace}" --skip-tests ${stack} >"${tmp}/stack-${index}.yaml"
     files+=("${tmp}/stack-${index}.yaml")
