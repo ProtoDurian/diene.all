@@ -119,22 +119,7 @@ This branch adds the wrapper chart, stacked values, generated schema, rendered-m
 "
   after nix/packages.nix "          dlint" "          helm-schema
 "
-  replace nix/packages.nix "let" 'let
-  # chart-checks pin: THE ONE LINE TO CHANGE. A v5 atomipkgs release does not carry packages.chart-checks yet
-  # (v5.12.0 does not), so it comes from the registry merge commit of nix-registry PR 103. Once a v5 release
-  # carries it, delete this line and the chart-checks set below, and add chart-checks to the atomipkgs
-  # inherit list.
-  chartChecksRegistry = "github:AtomiCloud/nix-registry/2e9e31f44ca537bfcb2bba8d1586d1114b994861";
-'
-  replace nix/packages.nix "    nix-2605 = (" '    chart-checks = {
-      inherit ((builtins.getFlake chartChecksRegistry).packages.${pkgs-2605.stdenv.hostPlatform.system})
-        chart-checks
-        ;
-    };
-
-    nix-2605 = (
-'
-  replace nix/packages.nix "atomipkgs // nix-2605 // nix-unstable" "atomipkgs // chart-checks // nix-2605 // nix-unstable
+  after nix/packages.nix "          atomiutils" "          chart-checks
 "
   after nix/pre-commit.nix '        "^infra/root_chart/"' '        "^chart/"
         "^probes/fixtures/contracts-chart/templates/"
@@ -222,6 +207,14 @@ git archive "${parent_sha}" | tar -x -C "${copy}"
   }
 ) || failed=1
 
+# A registry bump moves only the locked atomipkgs node: every other node and the root inputs stay as in the parent.
+lock_ok() {
+  local parent_lock head_lock
+  parent_lock="$(git show "${parent_sha}:flake.lock" | jq -S -c 'del(.nodes.atomipkgs.locked)')"
+  head_lock="$(git show "${tree}:flake.lock" | jq -S -c 'del(.nodes.atomipkgs.locked)')" || return 1
+  [[ ${parent_lock} == "${head_lock}" ]]
+}
+
 features_ok() {
   local parent_rows head_rows
   parent_rows="$(git show "${parent_sha}:probes/features.json" | jq -c '.')"
@@ -240,6 +233,8 @@ while IFS=$'\t' read -r status path; do
   M)
     if [[ ${path} == probes/features.json ]]; then
       features_ok || fail "probes/features.json: parent rows must stay unchanged, followed only by diene/helm-wrapper rows"
+    elif [[ ${path} == flake.lock ]]; then
+      lock_ok || fail "flake.lock: only the locked atomipkgs node (a registry bump) may differ from the parent"
     elif [[ -z ${LEDGER[${path}]:-} ]]; then
       fail "inherited file changed outside the ledger: ${path}"
     fi
