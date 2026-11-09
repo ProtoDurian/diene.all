@@ -6,7 +6,7 @@ git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch 
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ shared .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 
 topics='datetime|domain-driven-design|functional-practices|solid-principles|stateless-oop-di|testing|utilities|validation'
-config='package\.json|bun\.lock|tsconfig\.json|biome\.json|bunfig\.(unit|int|meta)\.toml|knip(\.production)?(\.llm)?\.json'
+config='package\.json|bun\.lock|tsconfig\.json|biome\.json|bunfig\.(unit|int)\.toml|knip(\.production)?(\.llm)?\.json'
 scripts='scripts/ci/(build|test)\.sh|scripts/local/(build|deadcode|test)\.sh|scripts/release/bump\.sh'
 probes='probes/bun-[a-z-]+\.ts|probes/lib/(bun-command|lcov)\.ts'
 added_pattern="^((${config})|\.config/bun-base\.coverage\.yaml|src/.+\.ts|tests/.+\.(ts|toml)|tasks/Taskfile\.test\.yaml|${scripts}|${probes}|\.github/workflows/⚡reusable-(build|test)\.yaml|docs/developer/bun-baseline\.md|docs/standards/(${topics}|wire-format)/languages/typescript\.md|\.github/named-checks/bun-base/[^/]+)$"

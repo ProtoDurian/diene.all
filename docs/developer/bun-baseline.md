@@ -14,8 +14,8 @@ rules remain in `docs/standards/`.
 - `task setup` installs the locked Bun dependencies after synchronizing vendored
   package skills.
 - `task lint` runs every generated pre-commit hook.
-- `task test`, `task test:unit`, `task test:int`, and `task test:meta` run the
-  test tiers without coverage through `scripts/local/test.sh <tier>`.
+- `task test`, `task test:unit`, and `task test:int` run the test tiers without
+  coverage through `scripts/local/test.sh <tier>`.
 - `task test:coverage`, `task test:unit:coverage`, and
   `task test:int:coverage` write scoped LCOV artifacts.
 - `task test:unit:watch` watches the unit tier.
@@ -45,7 +45,7 @@ uses strict no-emit typechecking. Knip has four dead-code modes, none with ignor
 
 ## Test and coverage tiers
 
-- `.config/bun-base.coverage.yaml` lists the tiers (`unit`, `int`, `meta`), each
+- `.config/bun-base.coverage.yaml` lists the tiers (`unit`, `int`), each
   with its test folder and coverage scope; `scripts/ci/test.sh <tier>` and
   `scripts/local/test.sh <tier>` read it.
   A tier with no test files passes and writes no coverage file.
