@@ -22,6 +22,7 @@ pre-commit-lib.run {
         "^Changelog\\.md$"
         "^docs/developer/CommitConventions\\.md$"
         "^infra/root_chart/"
+        "^infra/policies/"
       ];
     };
 
@@ -46,7 +47,7 @@ pre-commit-lib.run {
       enable = true;
       name = "Helm render check";
       entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH bash scripts/local/helm-check.sh infra/root_chart'";
-      files = "^(infra/root_chart/.*|infra/policies/.*|scripts/local/helm-(render|check)\\.sh)$";
+      files = "^(infra/root_chart/.*|infra/policies/.*|chart-checks\\.yaml|scripts/local/helm-(render|check)\\.sh)$";
       pass_filenames = false;
       language = "system";
     };

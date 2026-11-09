@@ -38,7 +38,7 @@ tasks:
       - ./scripts/local/helm-render.sh {{.CHART}}
 
   root_chart:check:
-    desc: Render, then run kubeconform and kyverno (VAP) on infra/root_chart
+    desc: Render, then run chart-checks (schemas + VAP) on infra/root_chart
     vars:
       CHART: infra/root_chart
     cmds:

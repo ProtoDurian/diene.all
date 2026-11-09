@@ -32,13 +32,14 @@ H_PATHS=(
   probes/hook-helm-lint.ts
   scripts/local/helm-render.sh
   scripts/local/helm-check.sh
+  chart-checks.yaml
   probes/helm-check.ts
   probes/hook-helm-check.ts
 )
 H_TOKENS=(
   root_chart reusable-helm Taskfile.helm helm.sh helm-push standards/helm
   helm/index.md a-helm-lint a-helm-check helm-lint helm-render helm-check
-  infra/rendered infra/policies
+  infra/rendered infra/policies chart-checks
 )
 
 DH_PATHS=(infra)
@@ -104,15 +105,17 @@ apply_H() {
   edit .github/workflows/cd.yaml yq_del 'del(.jobs.helm)'
   edit Taskfile.yaml yq_del 'del(.includes.helm)'
   edit .github/dependabot.yml yq_del 'del(.updates[] | select(.package-ecosystem == "helm"))'
-  edit dlint.yaml yq_del 'del(.checks["toolchain-smoke"].binaries[] | select(. == "helm version" or . == "helm-docs" or . == "kubeconform -v" or . == "kyverno version"))'
+  edit dlint.yaml yq_del 'del(.checks["toolchain-smoke"].binaries[] | select(. == "helm version" or . == "helm-docs" or . == "kubeconform -v" or . == "kyverno version" or . == "chart-checks --version"))'
   edit CLAUDE.md drop_section '# Helm charts and publishing'
   edit probes/features.json yq_del 'del(.[] | select(.name == "helm-lint" or .name == "helm-render" or .name == "hook-helm-lint" or .name == "helm-check" or .name == "hook-helm-check"))'
-  edit probes/binary-smoke.ts sed_d '/^helm-docs/d;/^helm version/d;/^helm template/d'
+  edit probes/binary-smoke.ts sed_d '/^chart-checks/d;/^helm-docs/d;/^helm version/d;/^helm template/d'
   edit nix/pre-commit.nix drop_nix_block '    a-helm-lint = {'
   edit nix/pre-commit.nix drop_nix_block '    a-helm-check = {'
-  edit nix/pre-commit.nix sed_d '/"\^infra\/root_chart\/"/d'
-  edit nix/fmt.nix sed_d '/"infra\/root_chart\/\*\*"/d'
-  edit .gitignore sed_z 's|^### helm\ninfra/root_chart/uploads/\ninfra/rendered/\n\n||'
+  edit nix/pre-commit.nix sed_d '/"\^infra\/\(root_chart\|policies\)\/"/d'
+  edit nix/fmt.nix sed_d '/"infra\/\(root_chart\|policies\)\/\*\*"/d'
+  edit .gitignore sed_z 's|^### helm\ninfra/root_chart/uploads/\ninfra/rendered/\n.chart-checks/\n\n||'
+  edit nix/packages.nix sed_d '/^          chart-checks$/d'
+  edit nix/env.nix sed_d '/^    chart-checks$/d'
 }
 
 apply_set_edits() {

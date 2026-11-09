@@ -32,19 +32,36 @@ the existing tasks into one `lint` that switches on a shared chart variable.
 The chart is the only artifact: rendered YAML is never committed. `scripts/local/helm-render.sh <chart>`
 renders every values stack of a chart into the gitignored `infra/rendered/<chart>/<stack>.yaml` —
 `values.yaml` is the `default` stack and each `values.<name>.yaml` overlay is the stack `<name>`.
-`scripts/local/helm-check.sh <chart>` renders fresh, then runs two checks on the result:
+`scripts/local/helm-check.sh <chart>` renders fresh, then runs `chart-checks check` (the AtomiCloud
+nix-registry tool, configured by the root `chart-checks.yaml`) on the result. It always runs two stages:
 
-1. `kubeconform -strict` against the Kubernetes schemas. An object with no schema fails, so a chart
-   that ships CRDs must also bring their schemas.
-2. `kyverno apply` with the ValidatingAdmissionPolicies in `infra/policies/`. Workspace ships one,
-   `require-lpsm-labels.yaml`: every object carries the four LPSM `atomi.cloud/*` labels. The full
-   cluster policy set is the vanadium chart; workspace never depends on it, so downstream repos add
-   their own policies to `infra/policies/` instead.
+1. **Schemas** — the Kubernetes core schemas for the version in `chart-checks.yaml`
+   (`kubernetes:`), unknown fields refused. A kind with no schema fails, so a chart that ships CRDs
+   must list them under `crds:` in `chart-checks.yaml`.
+2. **Policies** — every `policies:` entry is rendered with `helm template` and its
+   `ValidatingAdmissionPolicy` objects are evaluated against each rendered object. Workspace lists one
+   local entry, the chart `infra/policies`, whose `require-lpsm-labels` policy needs the four LPSM
+   labels. The full cluster policy set is the vanadium chart; workspace never depends on it, so
+   downstream repos add their own `policies:` entries.
+
+### Label prefix
+
+Labels are `<labelPrefix>/landscape`, `/platform`, `/service` and `/module`, taken from the root
+chart's `serviceTree:` values. `labelPrefix` (default `durian.cloud`) is one value in
+`infra/root_chart/values.yaml`, and the policy chart reads the same key in
+`infra/policies/values.yaml`. Change both together: if they differ, the check fails.
+
+### Where it runs
 
 The `a-helm-check` pre-commit hook runs the check script, and CI runs it through the pre-commit job,
 so the same render is checked on every commit. Locally use `task helm:root_chart:render` to inspect
 the YAML and `task helm:root_chart:check` to run the checks. `helm lint` and `helm template` keep
 running as before (`a-helm-lint`, `scripts/ci/helm.sh`).
+
+`.chart-checks/` (the tool's install folder) is gitignored. With only `path` policies and no `crds:`
+nothing is fetched, so CI needs no cache for it. The day `chart-checks.yaml` gains an `oci`, `url`
+or `git` entry, add an `actions/cache` step on `.chart-checks/` keyed on
+`hashFiles('chart-checks.yaml')` to the pre-commit job.
 
 ## CI/CD release structure
 

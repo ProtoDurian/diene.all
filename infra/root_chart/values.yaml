@@ -1,6 +1,9 @@
 message: diene workspace
 
-# Service-tree (LPSM) identity stamped on every object as atomi.cloud/<key> labels.
+# Label key prefix. infra/policies/values.yaml must carry the same value.
+labelPrefix: durian.cloud
+
+# Service-tree (LPSM) identity stamped on every object as <labelPrefix>/<key> labels.
 serviceTree:
   landscape: local
   platform: diene

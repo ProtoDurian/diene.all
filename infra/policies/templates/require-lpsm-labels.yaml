@@ -1,0 +1,23 @@
+# Workspace-level admission policy for the root chart's rendered objects.
+# chart-checks renders this chart and evaluates its ValidatingAdmissionPolicy offline against
+# infra/rendered/. The cluster-side policy set is the vanadium chart (charts/vap-policies);
+# workspace must not depend on it, so this is the smallest policy that still proves the VAP
+# wiring: every object carries all four LPSM labels, under the same labelPrefix as the root chart.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: require-lpsm-labels
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ['*']
+        apiVersions: ['*']
+        operations: [CREATE, UPDATE]
+        resources: ['*']
+  validations:
+    - expression: >-
+        has(object.metadata.labels) &&
+        ['landscape', 'platform', 'service', 'module']
+        .all(k, ('{{ .Values.labelPrefix }}/' + k) in object.metadata.labels)
+      message: Every object must carry the LPSM labels {{ .Values.labelPrefix }}/landscape, platform, service and module.

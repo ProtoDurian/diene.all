@@ -1,0 +1,5 @@
+apiVersion: v2
+name: workspace-policies
+description: Workspace's own admission policy, evaluated offline by chart-checks against the rendered root chart
+type: application
+version: 0.1.0

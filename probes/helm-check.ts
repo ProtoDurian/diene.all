@@ -6,7 +6,7 @@ export default {
   probes: [
     {
       name: 'baseline-helm-check-green',
-      description: 'The fresh render of the root chart passes kubeconform -strict and the kyverno VAP check.',
+      description: 'The fresh render of the root chart passes chart-checks (schemas and the workspace VAP).',
       kind: 'baseline',
       async run(repo: any) {
         await expectGreen(repo, 'nix develop .#ci -c ./scripts/local/helm-check.sh infra/root_chart', 'helm-check');

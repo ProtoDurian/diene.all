@@ -4,7 +4,7 @@ metadata:
   name: {{ .Release.Name }}-workspace
   labels:
     {{- range $key, $value := .Values.serviceTree }}
-    atomi.cloud/{{ $key }}: {{ $value | quote }}
+    {{ $.Values.labelPrefix }}/{{ $key }}: {{ $value | quote }}
     {{- end }}
 data:
   message: {{ .Values.message | quote }}
