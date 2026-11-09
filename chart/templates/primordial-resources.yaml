@@ -72,7 +72,7 @@ spec:
 {{- end }}
 {{- end }}
 {{- if .Values.primordial.problem.enabled }}
-apiVersion: {{ .Values.primordial.apiVersions.fleet }}
+apiVersion: {{ .Values.primordial.apiVersions.problem }}
 kind: Problem
 metadata:
   name: {{ include "diene-helm-wrapper.resourceName" (dict "root" . "token" (printf "problems%s" .Values.serviceTree.module)) }}
@@ -91,7 +91,7 @@ spec:
 ---
 {{- end }}
 {{- if .Values.primordial.cloudflareDeploy.enabled }}
-apiVersion: {{ .Values.primordial.apiVersions.edge }}
+apiVersion: {{ .Values.primordial.apiVersions.fleet }}
 kind: CloudflareDeploy
 metadata:
   name: {{ include "diene-helm-wrapper.resourceName" (dict "root" . "token" "edge") }}

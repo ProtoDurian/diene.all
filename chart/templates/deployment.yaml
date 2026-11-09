@@ -1,3 +1,4 @@
+{{- if .Values.workload.enabled -}}
 {{- include "diene-helm-wrapper.validateServiceTree" . -}}
 apiVersion: apps/v1
 kind: Deployment
@@ -56,3 +57,5 @@ spec:
         - name: config
           configMap:
             name: {{ include "diene-helm-wrapper.resourceName" (dict "root" . "token" "config") }}
+
+{{- end }}

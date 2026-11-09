@@ -1,0 +1,39 @@
+labelPrefix: atomi.cloud
+fullnameOverride: wrapper-api
+
+serviceTree:
+  platform: sample
+  service: wrapper
+  module: api
+  layer: '2'
+  landscape: example
+
+instance:
+  physicalId: example-repository:run-001
+
+contracts:
+  health:
+    path: /healthz
+    expectedStatus: 2xx
+  webhook:
+    provider: example
+    pathPrefix: /internal/webhooks
+  lpsm:
+    landscape: example
+    module: api
+    service: wrapper
+    instance: run001
+    ordinaryZone: cluster.atomi.cloud
+    instanceZone: local.example.invalid
+    parseHostname: ''
+    identityLandscape: example
+
+primordial:
+  vlandscape: example-vlandscape
+  identity:
+    concreteLandscapes: [example]
+
+# The shipped chart is only a helper library here: render none of its objects.
+diene-helm-wrapper:
+  upstream:
+    enabled: false

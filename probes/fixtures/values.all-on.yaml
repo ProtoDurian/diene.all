@@ -1,0 +1,30 @@
+# Template probes only: switches every optional surface of the wrapper on.
+# Stack it after the committed values (for example values.yaml + values.example.yaml).
+workload:
+  enabled: true
+
+migration:
+  enabled: true
+
+secret:
+  enabled: true
+
+gateway:
+  enabled: true
+
+webhookRoute:
+  enabled: true
+
+primordial:
+  enabled: true
+  virtualLandscapeService:
+    enabled: true
+  logtoApp:
+    enabled: true
+  problem:
+    enabled: true
+  cloudflareDeploy:
+    enabled: true
+
+upstream:
+  enabled: true

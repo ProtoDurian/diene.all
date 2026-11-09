@@ -1,0 +1,9 @@
+apiVersion: v2
+name: contracts-fixture
+description: Probe-only chart that renders the LPSM and instance contract vectors through the shipped chart's helpers
+type: application
+version: 0.1.0
+dependencies:
+  - name: diene-helm-wrapper
+    version: 0.1.0
+    repository: file://../../../chart

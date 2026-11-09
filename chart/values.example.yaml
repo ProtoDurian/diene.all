@@ -1,5 +1,12 @@
 serviceTree:
-  landscape: example
+  landscape: &landscape example
 
 primordial:
-  targetLandscape: example
+  targetLandscape: *landscape
+
+upstream:
+  podAnnotations:
+    atomi.cloud/landscape: *landscape
+  service:
+    annotations:
+      atomi.cloud/landscape: *landscape

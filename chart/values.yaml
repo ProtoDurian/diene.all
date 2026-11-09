@@ -9,20 +9,21 @@ fullnameOverride: wrapper-api
 # -- Stable four-slot service-tree projection. Landscape and cluster are added by independent overlays.
 serviceTree:
   # @schema pattern:^[a-z0-9]+$;required:true
-  platform: sample
+  platform: &platform sample
   # @schema pattern:^[a-z0-9]+$;required:true
-  service: wrapper
+  service: &service wrapper
   # @schema pattern:^[a-z0-9]+$;required:true
-  module: api
+  module: &module api
   # @schema pattern:^[0-9]+$;required:true
-  layer: '2'
+  layer: &layer '2'
 
 # -- Optional physical-instance metadata. The instance remains outside LPSM.
 instance:
   physicalId: example-repository:run-001
 
-# -- Wrapper-owned sample workload.
+# -- Wrapper-owned sample workload (Deployment, Service and config ConfigMap). Off by default.
 workload:
+  enabled: false
   replicas: 1 # @schema minimum:1
   image:
     repository: ghcr.io/stefanprodan/podinfo
@@ -54,7 +55,7 @@ workload:
 
 # -- Separate pre-sync migration hook. It never owns or recreates the Deployment.
 migration:
-  enabled: true
+  enabled: false
   image:
     repository: busybox
     tag: 1.37.0-glibc # @schema pattern:^[A-Za-z0-9][A-Za-z0-9._-]*$
@@ -72,7 +73,7 @@ migration:
 
 # -- One service-scoped ExternalSecret with folder-prefix rewrites.
 secret:
-  enabled: true
+  enabled: false
   refreshInterval: 1h
   store:
     kind: SecretStore # @schema enum:[SecretStore, ClusterSecretStore]
@@ -82,7 +83,7 @@ secret:
 
 # -- Provider-managed LoadBalancer service for the gateway.
 gateway:
-  enabled: true
+  enabled: false
   provider: digitalocean # @schema enum:[aws, oci, digitalocean]
   port: 80 # @schema minimum:1;maximum:65535
   aws:
@@ -91,7 +92,7 @@ gateway:
   oci:
     reservedPublicIp: ''
 
-# -- Current health and webhook delivery conventions.
+# -- Current health and webhook delivery conventions. The LPSM and instance contract vectors live in the probe fixture chart.
 contracts:
   health:
     path: /healthz # @schema pattern:^/.*
@@ -99,29 +100,20 @@ contracts:
   webhook:
     provider: example # @schema pattern:^[a-z0-9-]+$
     pathPrefix: /internal/webhooks # @schema pattern:^/.*
-  lpsm:
-    landscape: example # @schema pattern:^[a-z0-9-]+$
-    module: api # @schema pattern:^[a-z0-9-]+$
-    service: wrapper # @schema pattern:^[a-z0-9-]+$
-    instance: run001
-    ordinaryZone: cluster.atomi.cloud
-    instanceZone: local.example.invalid
-    parseHostname: ''
-    identityLandscape: example # @schema pattern:^[a-z0-9-]+$
 
 # -- Optional Gateway API route scaffold for a webhook receiver.
 webhookRoute:
-  enabled: true
+  enabled: false
   parentGateway: sample-gateway
   parentNamespace: gateway-system
 
 # -- Reusable primordial-chart CR helper inputs against the frozen T3 shapes.
 primordial:
-  enabled: true
+  enabled: false
   apiVersions:
     fleet: fleet.atomi.cloud/v1alpha1
     identity: identity.atomi.cloud/v1alpha1
-    edge: edge.atomi.cloud/v1alpha1
+    problem: atomi.cloud/v1alpha1
   targetLandscape: example
   vlandscape: example-vlandscape
   identity:
@@ -175,16 +167,16 @@ primordial:
           engine:
             tigris: {}
   virtualLandscapeService:
-    enabled: true
+    enabled: false
     serve: true
   logtoApp:
-    enabled: true
+    enabled: false
     paths: [/auth/callback]
     extraRedirectUris: [] # @schema item:string;uniqueItems:true
     resourceRefs: [wrapper-api] # @schema item:string;uniqueItems:true
     landscapes: [example] # @schema item:string
   problem:
-    enabled: true
+    enabled: false
     version: 0.1.0
     entries:
       - id: example
@@ -197,20 +189,32 @@ primordial:
           - method: GET
             path: /
   cloudflareDeploy:
-    enabled: true
+    enabled: false
     scriptName: wrapper-web
     tag: 0.1.0
     pin: true
 
 # -- Pinned optional upstream chart. Every instantiated dependency must receive a conforming override.
 upstream:
-  enabled: false
+  enabled: true
   fullnameOverride: wrapper-upstream # @schema pattern:^[a-z0-9]+-[a-z0-9]+$
   image:
     repository: ghcr.io/stefanprodan/podinfo
     tag: 6.9.2
+  # The upstream chart cannot read labelPrefix, so these keys carry the default prefix (atomi.cloud) and
+  # take their values from serviceTree through YAML anchors; landscape and cluster come from the overlays.
   podAnnotations:
     reloader.stakater.com/auto: 'true'
+    atomi.cloud/platform: *platform
+    atomi.cloud/service: *service
+    atomi.cloud/module: *module
+    atomi.cloud/layer: *layer
+  service:
+    annotations:
+      atomi.cloud/platform: *platform
+      atomi.cloud/service: *service
+      atomi.cloud/module: *module
+      atomi.cloud/layer: *layer
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 10000
