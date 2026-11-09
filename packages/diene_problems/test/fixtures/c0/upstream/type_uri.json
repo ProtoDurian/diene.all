@@ -1,0 +1,18 @@
+{
+  "invalid": [],
+  "valid": [
+    {
+      "expectedTypeUri": "https://docs.raichu.cluster.atomi.cloud/docs/raichu/dotnet/user/api/v1/entity-not-found",
+      "segments": {
+        "host": "docs.raichu.cluster.atomi.cloud",
+        "id": "entity-not-found",
+        "landscape": "raichu",
+        "module": "api",
+        "platform": "dotnet",
+        "scheme": "https",
+        "service": "user",
+        "version": "v1"
+      }
+    }
+  ]
+}

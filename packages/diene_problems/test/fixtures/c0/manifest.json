@@ -1,0 +1,13 @@
+{
+  "contract": "diene.problems.wire.v1",
+  "authority": "local-regression-only",
+  "provenance": "Locally derived Problem envelope, type URI, catalog entry and Problem CR fixtures; not a source-owned C0 fixture set.",
+  "algorithm": "sha256",
+  "fixtures": {
+    "catalog_entry.json": "ae4dc33c4194cb6a8c5208d4602441212bd089ab554af3e732c6faf3dc7a2daf",
+    "envelope.json": "9ee7dcee2884667a5da76756d6d5596979df59ad8f50988fe2d23322ba7f6585",
+    "envelope_no_data.json": "308d8316965f352647cc5c4b15af3774f28253292b4c6dcac048316b919eb036",
+    "problem_cr.json": "b28c18899bd2501536d02e0d3e4f57454ea1521836c9366ae7d7f8b7d93efc52",
+    "type_uri.json": "f1cc62e405e43d7d1d2c289d6b9157abbdad79982064b4ff0f60161de04b0a48"
+  }
+}

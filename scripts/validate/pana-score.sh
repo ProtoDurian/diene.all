@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root_dir="$(git rev-parse --show-toplevel)"
-cd "${root_dir}/packages/diene_dart_lib"
+cd "${root_dir}/packages/diene_problems"
 
 report="$(mktemp)"
 trap 'rm -f "${report}"' EXIT
@@ -19,7 +19,7 @@ verdict="$(jq -r '
     elif $lost == 10 and ($failed | length) == 1 and $failed[0].id == "convention"
       and ($failed[0].summary | [scan("<summary>")] | length) == 1
       and ($failed[0].summary | test("Failed to verify repository URL[.]"))
-      and ($failed[0].summary | test("but got `https://github[.]com/AtomiCloud/diene[.]dart_lib`"))
+      and ($failed[0].summary | test("but got `https://github[.]com/AtomiCloud/diene[.]dart_problems`"))
     then "mirror-main-seed"
     else "lost \($lost): " + ([$failed[] | "\(.id) \(.grantedPoints)/\(.maxPoints)"] | join(", "))
     end' "${report}")"

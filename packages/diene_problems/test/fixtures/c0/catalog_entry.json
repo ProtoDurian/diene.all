@@ -1,0 +1,46 @@
+{
+  "id": "validation_error",
+  "type": "https://errors.atomi.cloud/docs/raichu/nitroso/zinc/api/v1/validation_error",
+  "title": "Validation error",
+  "status": 400,
+  "recoverable": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "issues": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "message": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": ["path", "message"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["issues"],
+    "additionalProperties": false
+  },
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/notes"
+    },
+    {
+      "method": "PUT",
+      "path": "/notes/{id}"
+    }
+  ]
+}

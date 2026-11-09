@@ -1,0 +1,40 @@
+{
+  "authority": "c0-fixtures-r2",
+  "source": {
+    "commit": "fe77520d591f81a9762c40ebf68dc9c0106502d3",
+    "path": "contracts/c0/cases/problem.json",
+    "sha256": "a8c02554c198627df9badc6c2377218556ec8bd3a0b1edcdb20aedeebe43f988"
+  },
+  "algorithm": "sha256 of the subtree printed by jq -cS (sorted keys, no whitespace, trailing newline)",
+  "vectors": {
+    "catalog_entry.json": {
+      "pointer": "/cases/catalogEntry",
+      "sha256": "6f43d471e41704349fef23482c09366d7bddc5713ca1244dc31ff9b93bc6ed04",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/problem.json | jq -cS .cases.catalogEntry | sha256sum",
+      "adaptations": [
+        "The id is spelled in snake case: validation-error becomes validation_error, in the id and in the last segment of the type URI.",
+        "The data schema is published under schema, not data.",
+        "The data schema itself is not compared: validation_error data is now an issues list, not fields."
+      ]
+    },
+    "envelopes.json": {
+      "pointer": "/cases/envelopes",
+      "sha256": "60277932b59b62a34eb1752b01e1c2c24d14fc7a12d206fc7a22538f83f45872",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/problem.json | jq -cS .cases.envelopes | sha256sum",
+      "adaptations": [
+        "None for the codec: each valid envelope must decode and encode back unchanged.",
+        "The sample data is not checked against the entity_not_found schema: it is now { entityType, id }, both strings, not { id, resource }.",
+        "A problem with no data omits data on the wire; no sample covers that, so the local fixture envelope_no_data.json does."
+      ]
+    },
+    "type_uri.json": {
+      "pointer": "/cases/typeUri",
+      "sha256": "adfe048f5b4b23fa6843b69c349b09d7493acf8c4f4023691e8904e8cf34ee68",
+      "reproduce": "git show fe77520d591f81a9762c40ebf68dc9c0106502d3:contracts/c0/cases/problem.json | jq -cS .cases.typeUri | sha256sum",
+      "adaptations": [
+        "The id is spelled in snake case: entity-not-found becomes entity_not_found, in the id and in the last segment of the expected URI.",
+        "The kebab-case id itself must be rejected by the builder."
+      ]
+    }
+  }
+}
