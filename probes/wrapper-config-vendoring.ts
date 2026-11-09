@@ -9,7 +9,7 @@ export default defineSmoke({
     async run(repo: any) {
       await expectGreen(
         repo,
-        'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh config-vendoring',
+        'nix develop .#ci -c ./probes/checks/helm-wrapper.sh config-vendoring',
         'wrapper-config-vendoring',
       );
     },

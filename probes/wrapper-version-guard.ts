@@ -7,11 +7,7 @@ export default defineGate({
     name: 'baseline-wrapper-version-guard-green',
     description: 'Chart manifest and release tag match before packaging.',
     async run(repo: any) {
-      await expectGreen(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh version',
-        'wrapper-version-guard',
-      );
+      await expectGreen(repo, 'nix develop .#ci -c ./probes/checks/helm-wrapper.sh version', 'wrapper-version-guard');
     },
   },
   mutation: {
@@ -23,11 +19,7 @@ export default defineGate({
       const original = await repo.read(path);
       try {
         await repo.patch(path, { find: 'version: 0.1.0', replace: 'version: 0.2.0' });
-        await expectRed(
-          repo,
-          'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh version',
-          'wrapper-version-guard',
-        );
+        await expectRed(repo, 'nix develop .#ci -c ./probes/checks/helm-wrapper.sh version', 'wrapper-version-guard');
       } finally {
         await repo.write(path, original);
       }

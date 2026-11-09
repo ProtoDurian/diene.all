@@ -8,7 +8,7 @@ export default defineSmoke({
     description:
       'Ordinary, localhost, Boron and ENTEI hostname vectors, inverse parsing, opaque-instance and identity-issuer refusals, normalization and collision checks pass.',
     async run(repo: any) {
-      await expectGreen(repo, 'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh lpsm', 'wrapper-lpsm-hostnames');
+      await expectGreen(repo, 'nix develop .#ci -c ./probes/checks/helm-wrapper.sh lpsm', 'wrapper-lpsm-hostnames');
     },
   },
 });

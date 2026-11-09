@@ -9,7 +9,7 @@ export default defineGate({
     async run(repo: any) {
       await expectGreen(
         repo,
-        'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh publish-https-dep',
+        'nix develop .#ci -c ./probes/checks/helm-wrapper.sh publish-https-dep',
         'wrapper-publish-https-dep',
       );
     },
@@ -28,7 +28,7 @@ export default defineGate({
         });
         await expectRed(
           repo,
-          'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh publish-https-dep',
+          'nix develop .#ci -c ./probes/checks/helm-wrapper.sh publish-https-dep',
           'wrapper-publish-https-dep',
         );
       } finally {

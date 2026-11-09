@@ -10,7 +10,7 @@ export default defineGate({
     async run(repo: any) {
       await expectGreen(
         repo,
-        'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh primordial',
+        'nix develop .#ci -c ./probes/checks/helm-wrapper.sh primordial',
         'wrapper-primordial-crs',
       );
     },
@@ -29,7 +29,7 @@ export default defineGate({
         });
         await expectRed(
           repo,
-          'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh primordial',
+          'nix develop .#ci -c ./probes/checks/helm-wrapper.sh primordial',
           'wrapper-primordial-crs',
         );
       } finally {

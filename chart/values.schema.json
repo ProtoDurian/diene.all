@@ -8,7 +8,7 @@
     ],
     "properties": {
         "contracts": {
-            "description": "Current health and webhook delivery conventions.",
+            "description": "Current health and webhook delivery conventions. The LPSM and instance contract vectors live in the probe fixture chart.",
             "type": "object",
             "properties": {
                 "health": {
@@ -20,39 +20,6 @@
                         "path": {
                             "type": "string",
                             "pattern": "^/.*"
-                        }
-                    }
-                },
-                "lpsm": {
-                    "type": "object",
-                    "properties": {
-                        "identityLandscape": {
-                            "type": "string",
-                            "pattern": "^[a-z0-9-]+$"
-                        },
-                        "instance": {
-                            "type": "string"
-                        },
-                        "instanceZone": {
-                            "type": "string"
-                        },
-                        "landscape": {
-                            "type": "string",
-                            "pattern": "^[a-z0-9-]+$"
-                        },
-                        "module": {
-                            "type": "string",
-                            "pattern": "^[a-z0-9-]+$"
-                        },
-                        "ordinaryZone": {
-                            "type": "string"
-                        },
-                        "parseHostname": {
-                            "type": "string"
-                        },
-                        "service": {
-                            "type": "string",
-                            "pattern": "^[a-z0-9-]+$"
                         }
                     }
                 },
@@ -217,13 +184,13 @@
                 "apiVersions": {
                     "type": "object",
                     "properties": {
-                        "edge": {
-                            "type": "string"
-                        },
                         "fleet": {
                             "type": "string"
                         },
                         "identity": {
+                            "type": "string"
+                        },
+                        "problem": {
                             "type": "string"
                         }
                     }
@@ -620,6 +587,10 @@
                 "podAnnotations": {
                     "type": "object",
                     "properties": {
+                        "atomi.cloud/layer": {},
+                        "atomi.cloud/module": {},
+                        "atomi.cloud/platform": {},
+                        "atomi.cloud/service": {},
                         "reloader.stakater.com/auto": {
                             "type": "string"
                         }
@@ -696,6 +667,20 @@
                             "type": "integer"
                         }
                     }
+                },
+                "service": {
+                    "type": "object",
+                    "properties": {
+                        "annotations": {
+                            "type": "object",
+                            "properties": {
+                                "atomi.cloud/layer": {},
+                                "atomi.cloud/module": {},
+                                "atomi.cloud/platform": {},
+                                "atomi.cloud/service": {}
+                            }
+                        }
+                    }
                 }
             }
         },
@@ -715,9 +700,12 @@
             }
         },
         "workload": {
-            "description": "Wrapper-owned sample workload.",
+            "description": "Wrapper-owned sample workload (Deployment, Service and config ConfigMap). Off by default.",
             "type": "object",
             "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
                 "image": {
                     "type": "object",
                     "properties": {

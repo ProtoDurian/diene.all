@@ -1,3 +1,4 @@
+{{- if .Values.workload.enabled -}}
 {{- include "diene-helm-wrapper.validateServiceTree" . -}}
 apiVersion: v1
 kind: Service
@@ -16,3 +17,5 @@ spec:
       port: {{ .Values.workload.port }}
       targetPort: http
       protocol: TCP
+
+{{- end }}

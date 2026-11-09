@@ -23,6 +23,7 @@ pre-commit-lib.run {
         "^docs/developer/CommitConventions\\.md$"
         "^infra/root_chart/"
         "^chart/"
+        "^probes/fixtures/contracts-chart/templates/"
       ];
     };
 
@@ -108,6 +109,26 @@ pre-commit-lib.run {
       name = "Helm wrapper lint";
       entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH bash scripts/validate/helm-wrapper.sh lint'";
       files = "^(chart/.*|config/.*|scripts/(local|validate)/.*)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-wrapper-manifests = {
+      enable = true;
+      name = "Helm wrapper manifests";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH bash scripts/validate/helm-wrapper.sh manifests'";
+      files = "^(chart/.*|config/.*|chart-checks\\.yaml|scripts/(local|validate)/.*)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    # Generator hook: it rewrites chart/values.schema.json in place, so pre-commit goes red when the
+    # committed file is stale.
+    a-wrapper-values-schema = {
+      enable = true;
+      name = "Helm wrapper values schema";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH bash scripts/validate/helm-wrapper.sh schema'";
+      files = "^(chart/values\\.yaml|chart/values\\.schema\\.json|scripts/local/generate-chart-schema\\.sh)$";
       pass_filenames = false;
       language = "system";
     };

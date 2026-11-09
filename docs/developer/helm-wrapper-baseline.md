@@ -12,7 +12,16 @@ Render values in two independent dimensions:
 
 The sample stack is `values.yaml` → `values.example.yaml` → `values.lapras.yaml`. Landscape and cluster vocabularies must remain disjoint. Do not create cross-product filenames.
 
-Run `task build`, `task example:lapras:template`, or `task test:unit`. `debug` and `template` render from the committed `chart/charts/` and need no network; `install` runs `helm dependency build` first. `task test:int` creates an ephemeral k3d cluster, installs the local stack, waits for healthy pods, and proves an OCI push/pull against the cluster's local registry.
+Run `task build` or `task example:lapras:template`. `debug` and `template` render from the committed `chart/charts/` and need no network; `install` runs `helm dependency build` first and works against any kube context. There is no local cluster: install is proven on Garden lapras, never in this template.
+
+## Default shape
+
+`upstream.enabled` is `true` (podinfo is the stand-in upstream), so a plain `values.yaml` render holds only the upstream objects. Everything wrapper-owned is off:
+
+- `workload.enabled` (the wrapper Deployment, Service and config ConfigMap) is one switch, default `false`;
+- `migration`, `secret`, `gateway`, `webhookRoute` and `primordial` default `false`, and so do the four primordial sub-switches (`virtualLandscapeService`, `logtoApp`, `problem`, `cloudflareDeploy`).
+
+Template probes switch everything on with `probes/fixtures/values.all-on.yaml`, stacked on the committed values. The upstream chart cannot read `labelPrefix`, so the `upstream:` block carries the platform annotations under the default prefix, with values taken from `serviceTree` through YAML anchors (landscape and cluster come from the overlays).
 
 ## Identity and naming
 
@@ -54,15 +63,21 @@ The migration Job is a separate object with:
 
 The Deployment always uses `RollingUpdate`; the hook never recreates it.
 
-## Rendered-manifest validation
+## Chart checks
 
-`scripts/validate/helm-wrapper.sh rendered-manifests` runs the generic chart-bearing-repository stage:
+A chart instance keeps exactly three chart-check pre-commit hooks. CI's existing `precommit` job runs them, and restores `.chart-checks/` from `actions/cache` keyed on `hashFiles('chart-checks.yaml')` first.
 
-1. Helm renders every stack (`values.yaml`, `+example`, `+example+lapras`) and once more with `upstream.enabled=true`. The upstream render passes `--skip-tests`, because podinfo's `helm test` Pods have upstream-fixed names.
-2. kubeconform validates Kubernetes objects plus the checked-in local CR schemas.
-3. Kyverno CLI evaluates definition-only native ValidatingAdmissionPolicy fixtures against the resources named by those policies' `resourceRules`. kubeconform still validates the complete render; the narrow Kyverno input avoids its offline GVR lookup failure on unrelated custom resources.
+- `a-wrapper-helm-lint` — `helm lint` and `helm template` on the three committed stacks (`values.yaml`; `+ values.example.yaml`; `+ values.example.yaml + values.lapras.yaml`). `helm lint` also validates each stack against `values.schema.json`.
+- `a-wrapper-values-schema` — a generator: it regenerates `chart/values.schema.json` in place with `scripts/local/generate-chart-schema.sh`, so a stale schema makes pre-commit fail.
+- `a-wrapper-manifests` — renders the same three stacks and runs `chart-checks check` on them: `kubectl-validate` against the Kubernetes schemas plus the installed CRDs, then `kyverno apply` with the installed vanadium VAP definitions. No kind pre-filter and no object is dropped: each VAP's `matchConstraints` selects.
 
-The local VAP profile covers explicit non-latest tags, requests/limits, non-root baseline-plus security, and the NodePort prohibition. The wrapper proves the wiring with one `:latest` fault; the future policy chart owns per-rule negative fixtures.
+`a-wrapper-helm-docs` stays as it is: it generates `chart/README.md` and is not a check. `scripts/validate/helm-wrapper.sh` ships only the modes these hooks call (`lint`, `schema`, `manifests`). Every other check of this template (labels, Reloader, secret, fullname, primordial, LPSM, LB, task surface, publish modes, version and release lint) runs from `probes/checks/` only, which is chain-side and never materialized. The contracts ConfigMap (LPSM and instance vectors) lives in the probe fixture chart `probes/fixtures/contracts-chart/`, which takes `chart/` as a `file://` dependency so its template renders the shipped helpers.
+
+`chart-checks.yaml` at the repo root is the pinned list (`kubernetes: "1.30"`, every `sha256` and `commit` quoted): the vanadium policy chart, the dependency-operator and logto-operator CRDs, the ExternalSecret CRDs and the Gateway API CRDs. `chart-checks install` (run by `scripts/local/setup.sh`) fetches them into the gitignored `.chart-checks/`; `chart-checks check` reads only that folder. Until vanadium and the two operators publish, those three entries point at today's copies at pinned `diene.all` commits and carry `temporary: true` with a reason; the LogtoApp entry is a JSON-schema entry because no LogtoApp CRD exists yet. Instances add their own entries to their own `chart-checks.yaml`.
+
+The tool comes from `atomipkgs` (`packages.chart-checks`); `kubectl-validate` and `kyverno` arrive inside its closure. The tool is a normal member of the `atomipkgs` inherit list in `nix/packages.nix`; the registry major pin is inherited and never re-pinned here (v5.13.0 is the first release that carries it).
+
+The platform conventions (labels, the Reloader annotation unless opted out, `<service>-<token>` names, the ExternalSecret folder-prefix shape) are vanadium rules. The wiring probe carries one sabotage (an upstream image tagged `latest`); per-rule proof lives in vanadium.
 
 ## Primordial helpers
 
@@ -73,6 +88,7 @@ The sample renders the frozen current shapes for `PlatformDependency`, `VirtualL
 - VLS carries no free-form hostname;
 - LogtoApp renders one CR per `primordial.logtoApp.landscapes` entry, each with `identityRef: {platform, landscape}`; the issuer and the credential destination (`<landscape>:/<service>`) are recorded as annotations because T3 derives them and defines no spec field for them; a repeated or name-colliding landscape, the consumer platform, the v-landscape or any landscape not in `primordial.identity.concreteLandscapes` refuses;
 - LogtoApp declares paths, `extraRedirectUris`, and `resourceRefs`, never per-row redirects;
+- Problem is `atomi.cloud/v1alpha1` and the other kinds `fleet.atomi.cloud/v1alpha1` (the installed CRDs decide; `primordial.apiVersions` holds them);
 - Problem carries `spec.module` and fuses the module into its name;
 - CloudflareDeploy uses `desiredVersionFrom.tag`, never a hand-pinned version id.
 
@@ -88,7 +104,7 @@ The gateway Service is always `type: LoadBalancer`:
 
 NodePort and hostPort are absent. TLS terminates at the gateway platform, not this Service.
 
-Every gateway exposes `/healthz` and must return a 2xx response. Webhook receivers use `/internal/webhooks/{provider}`. Mercury probes every candidate: exactly one `200` (the owner) and `421` from every other candidate (a non-owner disclaiming, nothing else). Any other response is a real delivery failure. The contracts ConfigMap records this as `webhook.owner`, `webhook.nonOwner` and `webhook.other`. The checked-in HTTPRoute is a scaffold only; product handlers implement the protocol.
+Every gateway exposes the health path `contracts.health.path` (`/healthz`) and must return a 2xx response. Webhook receivers use `/internal/webhooks/{provider}`. Mercury probes every candidate: exactly one `200` (the owner) and `421` from every other candidate (a non-owner disclaiming, nothing else). Any other response is a real delivery failure. The probe fixture chart's contracts ConfigMap records this as `webhook.owner`, `webhook.nonOwner` and `webhook.other`. The checked-in HTTPRoute is a scaffold only; product handlers implement the protocol.
 
 ## Publishing
 
@@ -100,16 +116,20 @@ OCI is the default publish/consume mode. Git chart repositories remain secondary
 
 Tokenize these isolated scalars when materializing an instance:
 
-- chart and release name;
-- `serviceTree` platform/service/module/layer values;
+- chart and release name (`<service>-<token>`, exactly one dash);
+- serviceTree platform/service/module/layer values;
 - `labelPrefix`;
-- upstream chart name/version/repository and vendored archive filename;
-- upstream image references used by `latest`;
-- OCI organization/repository path and secondary git repository URL;
-- landscape and cluster overlay filenames;
-- k3d cluster and local registry names;
-- repository-qualified physical instance id, normalized DNS label, and original-id annotation;
-- selected hostname zone;
-- CR API versions once their owning operators freeze them.
+- upstream chart name/version/repository;
+- vendored tgz filename;
+- skopeo image refs used by `latest`;
+- OCI/ghcr organization path;
+- git repository URL (the secondary git-as-chart-repo mode);
+- landscape overlay filenames (`values.<landscape>.yaml`);
+- cluster overlay filenames (`values.<cluster>.yaml`);
+- `chart-checks.yaml` entries;
+- repository-qualified physical instance id;
+- normalized instance DNS label;
+- original-instance metadata annotation;
+- hostname zone selection.
 
-Held ENV profile names, final parser fixtures, frontend exposure rules, hosted substrate behavior, and final bootstrap enumeration are not tokenized here because this node does not own those decisions.
+Held ENV profile names, final parser fixtures, frontend exposure rules, hosted substrate behavior, final bootstrap enumeration and the CR API versions (their owning operators freeze them) are not tokenized here because this node does not own those decisions.

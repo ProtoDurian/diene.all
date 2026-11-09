@@ -1,0 +1,36 @@
+# Pinned inputs for `chart-checks` (registry tool, `packages.chart-checks`).
+# `chart-checks install` fetches them into the gitignored `.chart-checks/`;
+# `chart-checks check` reads only that folder. Quote every sha256 and commit.
+kubernetes: '1.30' # newest core schemas the validator embeds (1.23 to 1.30)
+policies:
+  - name: vanadium
+    git: https://github.com/ProtoDurian/diene.all
+    commit: 'ce05f0bce1be0065fcf5681f3523ed071d2b11a2'
+    subpath: chart
+    temporary: true
+    reason: vanadium has not published its OCI chart yet; this is chart/ on the diene.all ref charts/vanadium at a pinned commit
+crds:
+  - name: dependency-operator
+    git: https://github.com/ProtoDurian/diene.all
+    commit: '034747f0036dc5b5954f16cedd676fe35da89adb'
+    subpath: infra/root_chart/templates/crds
+    temporary: true
+    reason: the dependency-operator has not published its chart yet; this is infra/root_chart/templates/crds/ on the diene.all ref dependency-operator at a pinned commit
+  - name: logto-operator
+    git: https://github.com/ProtoDurian/diene.all
+    commit: '83b244777cbac313a329e0ebb94b1f32553fbfeb'
+    subpath: schemas/logtoapp.json
+    format: json-schema
+    group: identity.atomi.cloud
+    kind: LogtoApp
+    crdVersion: v1alpha1
+    temporary: true
+    reason: no LogtoApp CRD exists yet; this is the last schemas/logtoapp.json of the helm-wrapper branch at a pinned commit (a JSON-schema entry, not a CRD)
+  - name: external-secrets
+    url: https://github.com/external-secrets/external-secrets/releases/download/v2.14.0/external-secrets.yaml
+    version: v2.14.0
+    sha256: '21d51ab38bf7016a3d01e1259a92d40c23e83e68182ae6c4ca816af18717cb55'
+  - name: gateway-api
+    url: https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.7.0/standard-install.yaml
+    version: v1.7.0
+    sha256: '4e2602c4cbe1afbc394d86f4ac6522e1a5263b01133bba1e40a6d1a549e753a1'

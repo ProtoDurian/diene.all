@@ -10,7 +10,7 @@ export default defineSmoke({
     async run(repo: any) {
       await expectGreen(
         repo,
-        'nix develop .#default -c ./scripts/validate/helm-wrapper.sh task-surface',
+        'nix develop .#default -c ./probes/checks/helm-wrapper.sh task-surface',
         'wrapper-cluster-task-surface',
       );
     },

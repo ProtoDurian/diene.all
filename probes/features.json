@@ -186,11 +186,6 @@
   },
   {
     "template": "diene/helm-wrapper",
-    "name": "wrapper-schema-drift",
-    "class": "gate"
-  },
-  {
-    "template": "diene/helm-wrapper",
     "name": "wrapper-lpsm-labels",
     "class": "gate"
   },
@@ -241,11 +236,6 @@
   },
   {
     "template": "diene/helm-wrapper",
-    "name": "wrapper-k3d-install",
-    "class": "smoke"
-  },
-  {
-    "template": "diene/helm-wrapper",
     "name": "wrapper-external-secret",
     "class": "gate"
   },
@@ -291,22 +281,17 @@
   },
   {
     "template": "diene/helm-wrapper",
-    "name": "wrapper-gateway-webhook-scaffold",
-    "class": "presence"
-  },
-  {
-    "template": "diene/helm-wrapper",
-    "name": "wrapper-tokenization-surface",
-    "class": "presence"
-  },
-  {
-    "template": "diene/helm-wrapper",
     "name": "wrapper-hook-helm-lint",
     "class": "gate"
   },
   {
     "template": "diene/helm-wrapper",
     "name": "wrapper-hook-helm-docs",
+    "class": "gate"
+  },
+  {
+    "template": "diene/helm-wrapper",
+    "name": "wrapper-hook-values-schema",
     "class": "gate"
   }
 ]

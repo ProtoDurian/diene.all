@@ -34,3 +34,4 @@ desktop.ini
 chart/files/config/
 dist/
 probe-report.json
+.chart-checks/

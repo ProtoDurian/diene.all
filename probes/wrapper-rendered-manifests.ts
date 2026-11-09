@@ -1,30 +1,33 @@
 import { defineGate } from './lib/definition.ts';
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRedBecause } from './lib/helpers.ts';
+
+const command = 'nix develop .#ci -c pre-commit run a-wrapper-manifests --all-files';
 
 export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
   baseline: {
     name: 'baseline-wrapper-rendered-manifests-green',
-    description: 'Helm, kubeconform, and definition-only VAP evaluation accept every stack and the upstream sub-chart.',
+    description:
+      'chart-checks (kubectl-validate with the installed CRDs, then the installed vanadium VAP definitions) accepts every committed stack, upstream objects included, and the all-on stack.',
     async run(repo: any) {
+      await expectGreen(repo, command, 'wrapper-rendered-manifests');
       await expectGreen(
         repo,
-        'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh rendered-manifests',
+        'nix develop .#ci -c ./probes/checks/helm-wrapper.sh all-on-manifests',
         'wrapper-rendered-manifests',
       );
     },
   },
   mutation: {
     name: 'mutation-wrapper-rendered-manifests-caught',
-    description: 'The one wiring fault, an image tagged latest, is denied by the VAP stage.',
+    description: 'The one wiring fault, an upstream image tagged latest, is denied by the vanadium rule.',
     expectedImpact: [],
     async run(repo: any) {
-      await repo.patch('chart/values.yaml', { find: 'tag: 6.9.2 # @schema', replace: 'tag: latest # @schema' });
-      await expectRed(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh rendered-manifests',
-        'wrapper-rendered-manifests',
-      );
+      await repo.patch('chart/values.yaml', {
+        find: '    tag: 6.9.2\n  # The upstream chart cannot read',
+        replace: '    tag: latest\n  # The upstream chart cannot read',
+      });
+      await expectRedBecause(repo, command, 'wrapper-rendered-manifests', ['vanadium-disallowlatest']);
     },
   },
 });

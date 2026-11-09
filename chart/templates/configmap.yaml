@@ -1,3 +1,4 @@
+{{- if .Values.workload.enabled -}}
 {{- include "diene-helm-wrapper.validateServiceTree" . -}}
 apiVersion: v1
 kind: ConfigMap
@@ -12,3 +13,5 @@ data:
   {{ base $path }}: |-
     {{- $bytes | toString | nindent 4 }}
   {{- end }}
+
+{{- end }}
