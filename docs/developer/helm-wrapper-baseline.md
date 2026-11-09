@@ -75,7 +75,7 @@ A chart instance keeps exactly three chart-check pre-commit hooks. CI's existing
 
 `chart-checks.yaml` at the repo root is the pinned list (`kubernetes: "1.30"`, every `sha256` and `commit` quoted): the vanadium policy chart, the dependency-operator and logto-operator CRDs, the ExternalSecret CRDs and the Gateway API CRDs. `chart-checks install` (run by `scripts/local/setup.sh`) fetches them into the gitignored `.chart-checks/`; `chart-checks check` reads only that folder. Until vanadium and the two operators publish, those three entries point at today's copies at pinned `diene.all` commits and carry `temporary: true` with a reason; the LogtoApp entry is a JSON-schema entry because no LogtoApp CRD exists yet. Instances add their own entries to their own `chart-checks.yaml`.
 
-The tool comes from `atomipkgs` (`packages.chart-checks`); `kubectl-validate` and `kyverno` arrive inside its closure. Until a v5 release carries it, `nix/packages.nix` takes it from the registry merge commit named on the `chartChecksRegistry` line: that one line is the pin to change.
+The tool comes from `atomipkgs` (`packages.chart-checks`); `kubectl-validate` and `kyverno` arrive inside its closure. The tool is a normal member of the `atomipkgs` inherit list in `nix/packages.nix`; the registry major pin is inherited and never re-pinned here (v5.13.0 is the first release that carries it).
 
 The platform conventions (labels, the Reloader annotation unless opted out, `<service>-<token>` names, the ExternalSecret folder-prefix shape) are vanadium rules. The wiring probe carries one sabotage (an upstream image tagged `latest`); per-rule proof lives in vanadium.
 
