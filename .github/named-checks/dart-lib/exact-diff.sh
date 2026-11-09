@@ -7,7 +7,6 @@ set -euo pipefail
 
 ADDED=(
   '.github/named-checks/dart-lib/*'
-  .github/workflows/cd.yaml
   '.github/workflows/⚡reusable-analyze.yaml'
   '.github/workflows/⚡reusable-deadcode.yaml'
   '.github/workflows/⚡reusable-package-validate.yaml'
