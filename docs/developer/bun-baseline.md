@@ -30,7 +30,7 @@ rules remain in `docs/standards/`.
 - `task docker:build` and `task docker:run` build and run the Bun image.
 
 Each tier task is a one-line call to `scripts/local/test.sh`, and `task clean`
-calls `scripts/local/clean.sh`.
+is one `rm -rf` of `dist`, `prebuilt`, `coverage`, `reports` and `node_modules`.
 
 There is no `task dev` surface. Integration and SIT own isolated Redis containers;
 `up`/`down` exist only for interactive sample commands.
