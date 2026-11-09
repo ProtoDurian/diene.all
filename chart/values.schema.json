@@ -566,109 +566,126 @@
             "description": "Pinned optional upstream chart. Every instantiated dependency must receive a conforming override.",
             "type": "object",
             "properties": {
-                "enabled": {
-                    "type": "boolean"
-                },
-                "fullnameOverride": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9]+-[a-z0-9]+$"
-                },
-                "image": {
+                "controllers": {
                     "type": "object",
                     "properties": {
-                        "repository": {
-                            "type": "string"
-                        },
-                        "tag": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "podAnnotations": {
-                    "type": "object",
-                    "properties": {
-                        "atomi.cloud/layer": {},
-                        "atomi.cloud/module": {},
-                        "atomi.cloud/platform": {},
-                        "atomi.cloud/service": {},
-                        "reloader.stakater.com/auto": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "podSecurityContext": {
-                    "type": "object",
-                    "properties": {
-                        "runAsGroup": {
-                            "type": "integer"
-                        },
-                        "runAsNonRoot": {
-                            "type": "boolean"
-                        },
-                        "runAsUser": {
-                            "type": "integer"
-                        }
-                    }
-                },
-                "resources": {
-                    "type": "object",
-                    "properties": {
-                        "limits": {
+                        "main": {
                             "type": "object",
                             "properties": {
-                                "cpu": {
-                                    "type": "string"
+                                "annotations": {
+                                    "type": "object",
+                                    "properties": {
+                                        "reloader.stakater.com/auto": {
+                                            "type": "string"
+                                        }
+                                    }
                                 },
-                                "memory": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "requests": {
-                            "type": "object",
-                            "properties": {
-                                "cpu": {
-                                    "type": "string"
+                                "containers": {
+                                    "type": "object",
+                                    "properties": {
+                                        "main": {
+                                            "type": "object",
+                                            "properties": {
+                                                "image": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "repository": {
+                                                            "type": "string"
+                                                        },
+                                                        "tag": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                },
+                                                "resources": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "limits": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "cpu": {
+                                                                    "type": "string"
+                                                                },
+                                                                "memory": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        },
+                                                        "requests": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "cpu": {
+                                                                    "type": "string"
+                                                                },
+                                                                "memory": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                "securityContext": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "allowPrivilegeEscalation": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "capabilities": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "drop": {
+                                                                    "type": "array",
+                                                                    "items": {
+                                                                        "type": "string"
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        "readOnlyRootFilesystem": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "runAsGroup": {
+                                                            "type": "integer"
+                                                        },
+                                                        "runAsNonRoot": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "runAsUser": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 },
-                                "memory": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
-                },
-                "securityContext": {
-                    "type": "object",
-                    "properties": {
-                        "allowPrivilegeEscalation": {
-                            "type": "boolean"
-                        },
-                        "capabilities": {
-                            "type": "object",
-                            "properties": {
-                                "drop": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string"
+                                "pod": {
+                                    "type": "object",
+                                    "properties": {
+                                        "securityContext": {
+                                            "type": "object",
+                                            "properties": {
+                                                "runAsGroup": {
+                                                    "type": "integer"
+                                                },
+                                                "runAsNonRoot": {
+                                                    "type": "boolean"
+                                                },
+                                                "runAsUser": {
+                                                    "type": "integer"
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
-                        },
-                        "readOnlyRootFilesystem": {
-                            "type": "boolean"
-                        },
-                        "runAsGroup": {
-                            "type": "integer"
-                        },
-                        "runAsNonRoot": {
-                            "type": "boolean"
-                        },
-                        "runAsUser": {
-                            "type": "integer"
                         }
                     }
                 },
-                "service": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "global": {
                     "type": "object",
                     "properties": {
                         "annotations": {
@@ -678,6 +695,45 @@
                                 "atomi.cloud/module": {},
                                 "atomi.cloud/platform": {},
                                 "atomi.cloud/service": {}
+                            }
+                        },
+                        "fullnameOverride": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9]+-[a-z0-9]+$"
+                        },
+                        "labels": {
+                            "type": "object",
+                            "properties": {
+                                "atomi.cloud/layer": {},
+                                "atomi.cloud/module": {},
+                                "atomi.cloud/platform": {},
+                                "atomi.cloud/service": {}
+                            }
+                        }
+                    }
+                },
+                "service": {
+                    "type": "object",
+                    "properties": {
+                        "main": {
+                            "type": "object",
+                            "properties": {
+                                "controller": {
+                                    "type": "string"
+                                },
+                                "ports": {
+                                    "type": "object",
+                                    "properties": {
+                                        "http": {
+                                            "type": "object",
+                                            "properties": {
+                                                "port": {
+                                                    "type": "integer"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

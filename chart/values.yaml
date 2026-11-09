@@ -197,39 +197,51 @@ primordial:
 # -- Pinned optional upstream chart. Every instantiated dependency must receive a conforming override.
 upstream:
   enabled: true
-  fullnameOverride: wrapper-upstream # @schema pattern:^[a-z0-9]+-[a-z0-9]+$
-  image:
-    repository: ghcr.io/stefanprodan/podinfo
-    tag: 6.9.2
-  # The upstream chart cannot read labelPrefix: default-prefix keys, values from serviceTree anchors.
-  podAnnotations:
-    reloader.stakater.com/auto: 'true'
-    atomi.cloud/platform: *platform
-    atomi.cloud/service: *service
-    atomi.cloud/module: *module
-    atomi.cloud/layer: *layer
-  service:
+  global:
+    fullnameOverride: wrapper-upstream # @schema pattern:^[a-z0-9]+-[a-z0-9]+$
+    # The upstream chart cannot read labelPrefix: default-prefix keys, values from serviceTree anchors.
+    labels:
+      atomi.cloud/platform: *platform
+      atomi.cloud/service: *service
+      atomi.cloud/module: *module
+      atomi.cloud/layer: *layer
     annotations:
       atomi.cloud/platform: *platform
       atomi.cloud/service: *service
       atomi.cloud/module: *module
       atomi.cloud/layer: *layer
-  podSecurityContext:
-    runAsNonRoot: true
-    runAsUser: 10000
-    runAsGroup: 10000
-  securityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    runAsUser: 10000
-    runAsGroup: 10000
-    capabilities:
-      drop: [ALL]
-  resources:
-    requests:
-      cpu: 10m
-      memory: 32Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
+  controllers:
+    main:
+      annotations:
+        reloader.stakater.com/auto: 'true'
+      pod:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10000
+          runAsGroup: 10000
+      containers:
+        main:
+          image:
+            repository: ghcr.io/stefanprodan/podinfo
+            tag: 6.9.2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+  service:
+    main:
+      controller: main
+      ports:
+        http:
+          port: 9898

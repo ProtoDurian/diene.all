@@ -2,8 +2,8 @@ serviceTree:
   cluster: &cluster lapras
 
 upstream:
-  podAnnotations:
-    atomi.cloud/cluster: *cluster
-  service:
+  global:
+    labels:
+      atomi.cloud/cluster: *cluster
     annotations:
       atomi.cloud/cluster: *cluster

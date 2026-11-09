@@ -115,7 +115,7 @@ fullname)
   expect_dns_names "${tmp}/upstream.yaml"
   yq eval-all -o=json '.' "${tmp}/upstream.yaml" | jq -s -e 'map(select(.kind == "Deployment") | .metadata.name) | sort == ["wrapper-api", "wrapper-upstream"]' >/dev/null ||
     { echo "❌ the upstream sub-chart did not render under its fullnameOverride" >&2 && exit 1; }
-  yq -e '.upstream.fullnameOverride | test("^[a-z0-9]+-[a-z0-9]+$")' chart/values.yaml >/dev/null
+  yq -e '.upstream.global.fullnameOverride | test("^[a-z0-9]+-[a-z0-9]+$")' chart/values.yaml >/dev/null
   ;;
 primordial)
   helm template "${release}" chart --namespace "${namespace}" "${ex[@]}" --set primordial.enabled=true --set 'primordial.identity.concreteLandscapes={example,serving}' --set 'primordial.logtoApp.landscapes={example,serving}' >"${tmp}/primordial.yaml"

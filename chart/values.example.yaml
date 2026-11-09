@@ -5,8 +5,8 @@ primordial:
   targetLandscape: *landscape
 
 upstream:
-  podAnnotations:
-    atomi.cloud/landscape: *landscape
-  service:
+  global:
+    labels:
+      atomi.cloud/landscape: *landscape
     annotations:
       atomi.cloud/landscape: *landscape
