@@ -125,7 +125,7 @@ primordial)
   chart-checks check "${tmp}/primordial-crs.yaml"
   yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "PlatformDependency"))[0].spec as $spec | [$spec.database, $spec.kv, $spec.cache, $spec.store] | map(. // {}) | add | to_entries | all(.[]; (.value.engine | keys) == [.value.type])' >/dev/null
   yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "LogtoApp")) | map(.metadata.name) == ["wrapper-identityexample", "wrapper-identityserving"] and map(.spec.identityRef) == [{platform: "sample", landscape: "example"}, {platform: "sample", landscape: "serving"}] and map(.metadata.annotations["atomi.cloud/identity-issuer"]) == ["api.lithium.aldehyde.example.cluster.atomi.cloud", "api.lithium.aldehyde.serving.cluster.atomi.cloud"] and map(.metadata.annotations["atomi.cloud/credential-destination"]) == ["example:/wrapper", "serving:/wrapper"]' >/dev/null
-  yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "Problem")) | length == 1 and .[0].spec.module == "api" and .[0].metadata.name == "wrapper-problemsapi"' >/dev/null
+  yq eval-all -o=json '.' "${tmp}/primordial.yaml" | jq -s -e 'map(select(.kind == "Problem")) | length == 1 and (.[0].spec | has("module") | not) and .[0].metadata.name == "wrapper-problemsapi"' >/dev/null
   if rg -n '(^|[[:space:]])(share|sharedVia|redirectUris|desiredVersion):' "${tmp}/primordial.yaml" >&2; then
     echo "❌ primordial CRs carry a forbidden sharing/redirect/version field" >&2 && exit 1
   fi

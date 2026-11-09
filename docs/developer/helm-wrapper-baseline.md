@@ -89,7 +89,7 @@ The sample renders the frozen current shapes for `PlatformDependency`, `VirtualL
 - LogtoApp renders one CR per `primordial.logtoApp.landscapes` entry, each with `identityRef: {platform, landscape}`; the issuer and the credential destination (`<landscape>:/<service>`) are recorded as annotations because T3 derives them and defines no spec field for them; a repeated or name-colliding landscape, the consumer platform, the v-landscape or any landscape not in `primordial.identity.concreteLandscapes` refuses;
 - LogtoApp declares paths, `extraRedirectUris`, and `resourceRefs`, never per-row redirects;
 - Problem is `atomi.cloud/v1alpha1` and the other kinds `fleet.atomi.cloud/v1alpha1` (the installed CRDs decide; `primordial.apiVersions` holds them);
-- Problem carries `spec.module` and fuses the module into its name;
+- Problem fuses the module into its name and carries no `spec.module`: the installed CRD has no such field;
 - CloudflareDeploy uses `desiredVersionFrom.tag`, never a hand-pinned version id.
 
 These are helper contracts, not CRD ownership. The T3/operator nodes own final API groups, controllers, and installed CRDs.

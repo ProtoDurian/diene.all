@@ -83,7 +83,6 @@ metadata:
 spec:
   platform: {{ .Release.Namespace }}
   service: {{ .Values.serviceTree.service }}
-  module: {{ .Values.serviceTree.module }}
   landscape: {{ .Values.primordial.targetLandscape }}
   version: {{ .Values.primordial.problem.version | quote }}
   problems:
