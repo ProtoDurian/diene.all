@@ -1,5 +1,4 @@
-# Template probes only: switches every optional surface of the wrapper on.
-# Stack it after the committed values (for example values.yaml + values.example.yaml).
+# Probes only: every optional surface on; stack it after the committed values.
 workload:
   enabled: true
 

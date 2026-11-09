@@ -2,7 +2,6 @@
 set -euo pipefail
 
 # Probe-only checks of the helm-wrapper template (chain-side; never materialized).
-# The shipped chart-check hooks live in scripts/validate/helm-wrapper.sh.
 
 mode="${1:-}"
 release="${RELEASE:-helm-wrapper}"
@@ -17,8 +16,7 @@ bash ./scripts/local/vendor-chart-config.sh >/dev/null
 # Probes switch everything on: committed example landscape stacked with the all-on fixture.
 ex=(--values chart/values.example.yaml --values probes/fixtures/values.all-on.yaml)
 
-# The contracts ConfigMap lives in the fixture chart, which takes chart/ as a file:// dependency
-# so its template renders the shipped chart's _helpers.tpl helpers.
+# The fixture chart takes chart/ as a file:// dependency to render its _helpers.tpl.
 fixture="${tmp}/contracts-chart"
 prepare_contracts_fixture() {
   [ -d "${fixture}" ] && return 0

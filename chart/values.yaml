@@ -201,8 +201,7 @@ upstream:
   image:
     repository: ghcr.io/stefanprodan/podinfo
     tag: 6.9.2
-  # The upstream chart cannot read labelPrefix, so these keys carry the default prefix (atomi.cloud) and
-  # take their values from serviceTree through YAML anchors; landscape and cluster come from the overlays.
+  # The upstream chart cannot read labelPrefix: default-prefix keys, values from serviceTree anchors.
   podAnnotations:
     reloader.stakater.com/auto: 'true'
     atomi.cloud/platform: *platform

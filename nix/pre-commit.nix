@@ -122,8 +122,7 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    # Generator hook: it rewrites chart/values.schema.json in place, so pre-commit goes red when the
-    # committed file is stale.
+    # Generator hook: a stale committed schema turns pre-commit red.
     a-wrapper-values-schema = {
       enable = true;
       name = "Helm wrapper values schema";

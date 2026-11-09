@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The three chart-check hooks of a wrapper-chart instance call this script:
-#   lint       helm lint + helm template on the three committed value stacks
-#   schema     regenerate chart/values.schema.json in place (a generator hook)
-#   manifests  render the same three stacks and run `chart-checks check` on them
-# Every other check of the template runs from probes/ only.
+# Modes of the three chart-check hooks; every other check runs from probes/ only.
 
 mode="${1:-}"
 release="${RELEASE:-helm-wrapper}"

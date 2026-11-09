@@ -1,6 +1,4 @@
-# Pinned inputs for `chart-checks` (registry tool, `packages.chart-checks`).
-# `chart-checks install` fetches them into the gitignored `.chart-checks/`;
-# `chart-checks check` reads only that folder. Quote every sha256 and commit.
+# Pinned inputs for `chart-checks`; quote every sha256 and commit.
 kubernetes: '1.30' # newest core schemas the validator embeds (1.23 to 1.30)
 policies:
   - name: vanadium
