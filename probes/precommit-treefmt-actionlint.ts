@@ -41,6 +41,9 @@ const definition: ProbeDefinition = {
       timeoutMs: 240000,
       async run(repo) {
         await repo.write('.github/workflows/probe-actionlint.yaml', workflow);
+        // The fixture is removed once the red is asserted: the other features run
+        // as controls against this sandbox, and a child that adds its own workflow
+        // checks must not see an invalid workflow it cannot list.
         try {
           const staged = await repo.exec('git add .github/workflows/probe-actionlint.yaml');
           if (staged.exitCode !== 0) {
