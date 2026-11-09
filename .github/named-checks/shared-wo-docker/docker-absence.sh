@@ -30,7 +30,7 @@ D_TOKENS=(
 SCAN_EXEMPT=(':!.github/named-checks/**' ':!Changelog.md' ':!probes/lib/**')
 D_PROSE=(
   'Each Dockerfile is a build artifact.' 'Docker tasks are keyed' 'repository-specific image values'
-  'The Docker scripts build' 'Docker callers pass' 'another Docker caller job' 'published Docker image names'
+  'The Docker job is the one exception' 'The Docker scripts build' 'Docker callers pass' 'another Docker caller job' 'published Docker image names'
 )
 H_PATHS=(
   infra/root_chart/Chart.yaml

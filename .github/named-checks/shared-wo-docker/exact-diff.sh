@@ -84,6 +84,7 @@ apply_D() {
   edit README.md drop_seq '- Docker'
   edit docs/standards/taskfile/index.md drop_seq 'Docker tasks are keyed by the artifact they act on: one task set per Dockerfile. See [the Docker standard](../docker/index.md).'
   edit docs/standards/taskfile/index.md drop_seq '1. Put repository-specific image values in Taskfile `vars:` blocks, scoped to the' '   task that uses them rather than shared across artifacts.'
+  edit docs/standards/ci-cd/index.md drop_seq 'The Docker job is the one exception: it runs `./scripts/ci/docker.sh` directly, with no Nix shell and no Nix store cache label.' ''
   edit docs/standards/ci-cd/index.md drop_seq 'The Docker scripts build locally by default.'
   edit docs/standards/ci-cd/index.md drop_seq 'Docker callers pass per-repository image values through workflow `with:` inputs.'
   edit docs/standards/ci-cd/index.md drop_seq 'Add another image as another Docker caller job.'
