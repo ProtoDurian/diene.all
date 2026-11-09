@@ -23,7 +23,6 @@ rules remain in `docs/standards/`.
 - `task deadcode` runs the two non-blocking LLM Knip views.
 - `task run -- <args>` executes the source entry point.
 - `task preview -- <args>` rebuilds and executes the bundled artifact.
-- `task docker:build` and `task docker:run` build and run the Bun image.
 
 Each tier task is a one-line call to `scripts/local/test.sh`, and `task clean`
 is one `rm -rf` of `dist`, `coverage`, `reports` and `node_modules`.
@@ -64,9 +63,7 @@ Container images are version-pinned without digests.
 
 ## Build and runtime
 
-The local build and CI build share `scripts/local/build.sh`. The Dockerfile
-uses version-pinned `oven/bun` build and runtime stages, installs from the
-frozen lockfile, bundles the sample, and runs as the unprivileged `bun` user.
+The local build and CI build share `scripts/local/build.sh`.
 The sample is stateless classes wired in `src/index.ts`: the domain in
 `src/lib/sample/`, pino and Redis in `src/adapters/`. It prints a composed key
 by default; `REDIS_HOST` plus `REDIS_PORT` enable a Redis round trip.
@@ -90,13 +87,13 @@ Read the TypeScript variants alongside their shared standards:
 
 ## External service / compute cost
 
-- Integration tests and Docker image builds require a Docker runtime.
-- Unit, integration, build, and Docker are separate CI jobs.
+- Integration tests require a Docker runtime.
+- Unit, integration, and build are separate CI jobs.
 
 ## Template maintenance boundary
 
-Downstream templates may adapt package identity, coverage thresholds, the
-Docker entry point, badges, and the fenced illustrative `src/` plus `tests/`
+Downstream templates may adapt package identity, coverage thresholds,
+badges, and the fenced illustrative `src/` plus `tests/`
 sample. They should not fork the inherited task, workflow, release, Nix, lint,
 or standards machinery. Shared fixes land at the earliest owning branch and
 merge down.
