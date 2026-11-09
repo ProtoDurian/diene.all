@@ -34,6 +34,7 @@ Publishing is driven by the `⚡reusable-docker.yaml` reusable workflow, called 
 1. The reusable workflow sets up the builder with `AtomiCloud/actions.setup-docker` — a
    Namespace (nscloud) backed buildx builder with managed layer caching, so you do **not**
    manage the cache yourself.
+   The Docker job does not use Nix: Docker and buildx come from the runner.
 2. It runs [`./scripts/ci/docker.sh`](../../../scripts/ci/docker.sh), which reads its build
    and publish settings from the environment the reusable workflow sets. That script owns the
    tag set and the destination: read its `image_id` assignment for where images land, and the

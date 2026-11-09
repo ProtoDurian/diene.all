@@ -35,8 +35,7 @@ Publishing is driven by the `⚡reusable-helm.yaml` reusable workflow, called fr
 1. The reusable workflow uses `AtomiCloud/actions.setup-nix` and runs inside `nix develop .#cd`,
    so `helm`/`yq` come from the Nix store. The store is restored from the shared Nix cache —
    one cache for all Nix jobs, no per-service keys (see
-   [the service-tree standard](../service-tree/index.md)) — which is why Helm needs Nix while
-   Docker does not.
+   [the service-tree standard](../service-tree/index.md)).
 2. It runs [`./scripts/ci/helm.sh`](../../../scripts/ci/helm.sh), which reads the chart path
    and release version from the environment the reusable workflow sets. That script owns the
    published version and destination: read its version assignment to see what a commit build
