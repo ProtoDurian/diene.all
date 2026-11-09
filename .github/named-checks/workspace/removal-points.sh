@@ -35,8 +35,8 @@ H_TOKENS=(
   helm/index.md a-helm-lint helm-lint helm-render
 )
 
-DH_PATHS=(infra .github/workflows/cd.yaml)
-DH_TOKENS=('](infra)' 'infra/' workflows/cd.yaml)
+DH_PATHS=(infra)
+DH_TOKENS=('](infra)' 'infra/')
 
 SCAN_EXEMPT=('!.github/named-checks/**' '!Changelog.md' '!probes/lib/**')
 
@@ -116,7 +116,6 @@ apply_set_edits() {
   DH)
     edit "${doc}" sed_z 's#Docker and Helm tasks are keyed by the artifact they act on — one task set per\nDockerfile and per chart. See \[the Docker standard\](\.\./docker/index\.md) and\n\[the Helm standard\](\.\./helm/index\.md) for that naming convention\.\n\n##'
     rm_paths "${DH_PATHS[@]}"
-    edit dlint.yaml yq_del 'del(.checks["ci-wiring"].orchestrators[] | select(. == ".github/workflows/cd.yaml"))'
     # shellcheck disable=SC2016
     edit README.md sed_z 's#declared in \[`Taskfile.yaml`\](Taskfile.yaml), whose `includes:` block maps each\nnamespace to a file under \[`tasks/`\](tasks); a task shown as `<namespace>:<task>`\nis that key in the included file. Build artifacts — Dockerfiles and Helm charts —\nlive under \[`infra/`\](infra) and may be plural, so their tasks are keyed per\nartifact\. See#declared in [`Taskfile.yaml`](Taskfile.yaml). See#'
     edit Taskfile.yaml yq_del 'del(.includes)'
@@ -146,6 +145,9 @@ assert_valid() {
   while IFS= read -r f; do
     nix-instantiate --parse "${f}" >/dev/null 2>"${work}/nix.out" || fail "[${axes}] ${f} does not parse: $(head -3 "${work}/nix.out")"
   done < <(find . -name '*.nix' | sort)
+
+  [[ $(yq '.jobs | keys | .[0]' .github/workflows/cd.yaml 2>/dev/null) == release ]] || fail "[${axes}] cd.yaml lost its release job"
+  rg -q --fixed-strings 'The release-note job (`⚡reusable-release-note.yaml`)' docs/standards/ci-cd/index.md || fail "[${axes}] ci-cd doc lost the release-note paragraph"
 
   case "${axes}" in
   D) tokens=("${D_TOKENS[@]}") ;;
