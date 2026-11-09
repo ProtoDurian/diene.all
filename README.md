@@ -6,7 +6,6 @@ Its `includes:` block maps each namespace to a file under [`tasks/`](tasks); a t
 shown as `<namespace>:<task>` is that key in the included file.
 Build artifacts live under [`infra/`](infra) and may be plural, so their tasks are
 keyed per artifact.
-Each Dockerfile is a build artifact.
 Each Helm chart is a build artifact.
 See [the Taskfile standard](docs/standards/taskfile/index.md) for the conventions.
 
@@ -51,7 +50,6 @@ checks that it names every surface.
 This tree is the all-features workspace baseline inherited by every downstream sample:
 
 - split CI/CD
-- Docker
 - Helm
 - secrets
 - release configuration

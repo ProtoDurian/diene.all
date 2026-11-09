@@ -47,8 +47,6 @@ about gets the strictest pin, and there is no list to maintain.
 
 > **Every `run:` step enters a Nix shell that declares what it needs.**
 
-The Docker job is the one exception: it runs `./scripts/ci/docker.sh` directly, with no Nix shell and no Nix store cache label.
-
 In practice a `run:` step is exactly one line:
 
 ```text
@@ -115,17 +113,14 @@ nix develop .#ci -c ./scripts/ci/pre-commit.sh
 That line reproduces the pre-commit workflow. Workspace names no runtime, so its
 `a-skills-sync` hook is deliberately inert here.
 
-The Docker scripts build locally by default.
 The Helm scripts build locally by default.
 Their reusable workflows set the documented environment contract to enable
 publishing.
 
 ## Artifact publishing
 
-Docker callers pass per-repository image values through workflow `with:` inputs.
 Helm callers pass per-repository chart values through workflow `with:` inputs.
 Empty release versions produce commit builds; CD passes the tag as the version.
-Add another image as another Docker caller job.
 Add another chart as another Helm caller job.
 Keep repository-specific branching out of the reusable workflows.
 

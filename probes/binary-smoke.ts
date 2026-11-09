@@ -78,12 +78,6 @@ actionlint "$tmp/workflow.yaml"
 
 dlint exec-bits >/dev/null
 
-docker --version >/dev/null
-docker info --format '{{.ServerVersion}}' >/dev/null
-
-hadolint --version >/dev/null
-hadolint infra/Dockerfile
-
 helm-docs --version >/dev/null
 helm-docs --dry-run --chart-search-root infra/root_chart >/dev/null 2>&1
 

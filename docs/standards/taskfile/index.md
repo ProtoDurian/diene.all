@@ -24,7 +24,6 @@ writer, `skills-sync sync`. Setup is repair-capable; the pre-commit hook
 (`skills-sync sync --frozen`, which CI runs) refuses rather than silently staging or
 repairing a commit.
 
-Docker tasks are keyed by the artifact they act on: one task set per Dockerfile. See [the Docker standard](../docker/index.md).
 Helm tasks are keyed by the artifact they act on: one task set per chart. See [the Helm standard](../helm/index.md).
 
 ## Rules
@@ -33,8 +32,6 @@ Helm tasks are keyed by the artifact they act on: one task set per chart. See [t
 1. Move conditional or multi-step local logic to `scripts/local/`.
 1. Never call `scripts/ci/*` from a Taskfile; workflows own those entry points.
 1. Use lowercase names and colon-separated namespaces.
-1. Put repository-specific image values in Taskfile `vars:` blocks, scoped to the
-   task that uses them rather than shared across artifacts.
 1. Put repository-specific chart values in Taskfile `vars:` blocks, scoped to the
    task that uses them rather than shared across artifacts.
 1. Do not add progress-only `echo` commands; the runner already displays each

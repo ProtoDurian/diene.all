@@ -130,8 +130,6 @@ the isolation lanes that carry no cache at all.
 The platform and service identify the service in the LPSM tree and appear in published
 artifact names. They are **not** passed as reusable-workflow inputs (the shared cache
 makes that unnecessary).
-The published Docker image names are the `with:` inputs on the Docker caller jobs
-in `.github/workflows/ci.yaml` and `.github/workflows/cd.yaml`.
 The published Helm chart names are the `with:` inputs on the Helm caller jobs in
 `.github/workflows/ci.yaml` and `.github/workflows/cd.yaml`.
 
