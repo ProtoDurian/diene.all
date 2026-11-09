@@ -29,3 +29,9 @@ desktop.ini
 *~
 .kagent/
 .kloop/
+
+### helm-wrapper
+chart/files/config/
+dist/
+probe-report.json
+.chart-checks/

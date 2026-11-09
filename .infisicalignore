@@ -1,0 +1,9 @@
+# sample preview leaseKey from the chart example instance (pr-12345), copied into the helm-docs README; not a credential
+109d66ddfd241323e6cc856474a3166913545985:chart/README.md:generic-api-key:22
+109d66ddfd241323e6cc856474a3166913545985:chart/README.md:generic-api-key:23
+109d66ddfd241323e6cc856474a3166913545985:chart/README.md:generic-api-key:26
+109d66ddfd241323e6cc856474a3166913545985:chart/README.md:generic-api-key:32
+4fa5436c49d8b8ffff230de5ef601b04daba2f27:chart/README.md:generic-api-key:22
+4fa5436c49d8b8ffff230de5ef601b04daba2f27:chart/README.md:generic-api-key:24
+4fa5436c49d8b8ffff230de5ef601b04daba2f27:chart/README.md:generic-api-key:30
+6fe6df7899d96f35cb888762b5ae265e43963664:chart/README.md:generic-api-key:24

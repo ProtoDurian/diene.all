@@ -26,3 +26,13 @@ jobs:
     with:
       chart_path: ./infra/root_chart
       version: ${{ github.ref_name }}
+
+  chart:
+    name: OCI Chart
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/⚡reusable-chart-publish.yaml
+    secrets: inherit
+    with:
+      version: ${{ github.ref_name }}

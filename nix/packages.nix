@@ -10,8 +10,10 @@ let
       {
         inherit
           atomiutils
+          chart-checks
           cyanprint
           dlint
+          helm-schema
           infralint
           infrautils
           releaser

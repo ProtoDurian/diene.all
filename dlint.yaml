@@ -18,18 +18,17 @@ checks:
     binaries:
       - actionlint
       - bash
+      - chart-checks --version
       - cyanprint
       - dlint
       - git
       - gomplate
       - helm version
       - helm-docs
+      - helm-schema --help
       - infisical
       - jq
-      - k3d
-      - kubeconform -v
       - kubectl version --client
-      - kyverno version
       - nix
       - pre-commit
       - releaser

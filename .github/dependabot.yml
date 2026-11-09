@@ -18,3 +18,12 @@ updates:
         patterns:
           - '*'
     open-pull-requests-limit: 2
+  - package-ecosystem: helm
+    directory: /chart
+    schedule:
+      interval: weekly
+    groups:
+      all:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 2

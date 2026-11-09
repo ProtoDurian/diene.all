@@ -55,3 +55,12 @@ This tree is the all-features workspace baseline inherited by every downstream s
 - release configuration
 - validators
 - standards
+
+# Helm wrapper
+
+This branch adds the wrapper chart, stacked values, generated schema, rendered-manifest validation, and dual publish modes.
+
+- `task build` — vendor external config and build pinned chart dependencies.
+- `pre-commit run --all-files` — run the three chart-check hooks: helm lint, the values-schema generator, and `chart-checks` on the rendered manifests.
+- `task example:lapras:template` — render the independent landscape + cluster stack.
+- [Helm wrapper baseline](docs/developer/helm-wrapper-baseline.md)

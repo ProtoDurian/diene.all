@@ -1,0 +1,9 @@
+serviceTree:
+  cluster: &cluster lapras
+
+upstream:
+  global:
+    labels:
+      atomi.cloud/cluster: *cluster
+    annotations:
+      atomi.cloud/cluster: *cluster

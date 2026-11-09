@@ -165,6 +165,8 @@ release:
     assets:
       - Changelog.md
       - docs/developer/CommitConventions.md
+      - chart/Chart.yaml
+      - chart/README.md
   github:
     enabled: true
     successComment: 'Released in ${version}.'
@@ -172,5 +174,7 @@ release:
       - released
   hooks:
     # A file a hook writes joins commit.assets in the same edit.
-    prepare: []
+    prepare:
+      - phase: afterWrite
+        command: './scripts/release/bump.sh ${version}'
     success: []

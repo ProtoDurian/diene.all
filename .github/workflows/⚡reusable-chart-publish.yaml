@@ -1,0 +1,32 @@
+name: ⚡ Reusable Chart Publish
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+  publish:
+    name: Publish OCI Chart
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-20gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+      - name: Publish chart
+        env:
+          OCI_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          OCI_REGISTRY: ghcr.io
+          OCI_REPOSITORY: ${{ github.repository_owner }}/charts
+          OCI_USERNAME: ${{ github.actor }}
+          PUBLISH_DRY_RUN: 'false'
+          PUBLISH_MODE: oci
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: nix develop .#ci -c ./scripts/ci/publish.sh

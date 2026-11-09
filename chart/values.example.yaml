@@ -1,0 +1,12 @@
+serviceTree:
+  landscape: &landscape example
+
+primordial:
+  targetLandscape: *landscape
+
+upstream:
+  global:
+    labels:
+      atomi.cloud/landscape: *landscape
+    annotations:
+      atomi.cloud/landscape: *landscape
