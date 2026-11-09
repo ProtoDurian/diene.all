@@ -7,7 +7,7 @@ export default defineGate({
     name: 'baseline-wrapper-fullname-green',
     description: 'Every rendered, generated-Secret, and sub-chart name uses service plus one dash plus fused token.',
     async run(repo: any) {
-      await expectGreen(repo, 'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh fullname', 'wrapper-fullname');
+      await expectGreen(repo, 'nix develop .#ci -c ./probes/checks/helm-wrapper.sh fullname', 'wrapper-fullname');
     },
   },
   mutation: {
@@ -22,7 +22,7 @@ export default defineGate({
           find: 'fullnameOverride: wrapper-api',
           replace: 'fullnameOverride: wrapper-main-cache',
         });
-        await expectRed(repo, 'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh fullname', 'wrapper-fullname');
+        await expectRed(repo, 'nix develop .#ci -c ./probes/checks/helm-wrapper.sh fullname', 'wrapper-fullname');
       } finally {
         await repo.write(path, original);
       }

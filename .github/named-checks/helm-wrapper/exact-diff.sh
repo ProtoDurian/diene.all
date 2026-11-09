@@ -21,7 +21,7 @@ fail() {
   failed=1
 }
 
-LEDGER_FILES=(.github/dependabot.yml .github/workflows/ci.yaml .github/workflows/cd.yaml .gitignore CLAUDE.md README.md Taskfile.yaml dlint.yaml nix/fmt.nix nix/env.nix nix/packages.nix nix/pre-commit.nix release.yaml)
+LEDGER_FILES=(.github/dependabot.yml .github/workflows/⚡reusable-precommit.yaml scripts/local/setup.sh .github/workflows/cd.yaml .gitignore CLAUDE.md README.md Taskfile.yaml dlint.yaml nix/fmt.nix nix/env.nix nix/packages.nix nix/pre-commit.nix release.yaml probes/binary-smoke.ts)
 declare -A LEDGER=()
 for f in "${LEDGER_FILES[@]}"; do LEDGER["${f}"]=1; done
 
@@ -31,6 +31,8 @@ replace() { L="$2" B="$3" awk 'BEGIN { n = 0 } $0 == ENVIRON["L"] { n++; printf 
 append() { printf '%s' "$2" >>"$1"; }
 # before_tail <file> <n> <block>: insert before the file's last n lines.
 before_tail() { N="$2" B="$3" awk '{ line[NR] = $0 } END { for (i = 1; i <= NR; i++) { if (i == NR - ENVIRON["N"] + 1) printf "%s", ENVIRON["B"]; print line[i] } }' "$1" >"$1.new" && mv "$1.new" "$1"; }
+# squeeze <file>: collapse runs of blank lines left by deleted lines.
+squeeze() { cat -s "$1" >"$1.new" && mv "$1.new" "$1"; }
 
 apply_ledger() {
   append .github/dependabot.yml "  - package-ecosystem: helm
@@ -42,14 +44,6 @@ apply_ledger() {
         patterns:
           - '*'
     open-pull-requests-limit: 2
-"
-  append .github/workflows/ci.yaml "
-  helm-wrapper:
-    name: Helm Wrapper
-    permissions:
-      contents: read
-    uses: ./.github/workflows/⚡reusable-helm-wrapper.yaml
-    secrets: inherit
 "
   append .github/workflows/cd.yaml '
   chart:
@@ -67,6 +61,7 @@ apply_ledger() {
 chart/files/config/
 dist/
 probe-report.json
+.chart-checks/
 "
   append CLAUDE.md '
 # Helm wrapper
@@ -76,11 +71,10 @@ Read [docs/developer/helm-wrapper-baseline.md](docs/developer/helm-wrapper-basel
   append README.md '
 # Helm wrapper
 
-This branch adds the wrapper chart, stacked values, generated schema, rendered-manifest validation, k3d proof, and dual publish modes.
+This branch adds the wrapper chart, stacked values, generated schema, rendered-manifest validation, and dual publish modes.
 
 - `task build` — vendor external config and build pinned chart dependencies.
-- `task test:unit` — run schema, lint, render, contracts, VAP, and publish dry-runs.
-- `task test:int` — install on ephemeral k3d and round-trip the chart through a local OCI registry.
+- `pre-commit run --all-files` — run the three chart-check hooks: helm lint, the values-schema generator, and `chart-checks` on the rendered manifests.
 - `task example:lapras:template` — render the independent landscape + cluster stack.
 - [Helm wrapper baseline](docs/developer/helm-wrapper-baseline.md)
 '
@@ -108,36 +102,42 @@ This branch adds the wrapper chart, stacked values, generated schema, rendered-m
     desc: Resolve the latest real upstream chart and image tags
     cmds:
       - ./scripts/local/latest-chart-upstreams.sh
-
-  test:unit:
-    desc: Run schema, lint, render, policy, and contract validation
-    cmds:
-      - ./scripts/ci/helm-wrapper.sh
-
-  test:int:
-    desc: Run the local k3d installation proof
-    cmds:
-      - ./scripts/validate/helm-wrapper-k3d.sh
-
-  start:cluster:
-    desc: Start the local k3d lapras proof cluster
-    cmds:
-      - ./scripts/local/create-k3d-cluster.sh
-
-  stop:cluster:
-    desc: Delete the local k3d lapras proof cluster
-    cmds:
-      - ./scripts/local/delete-k3d-cluster.sh
 "
   after dlint.yaml "      - helm-docs" "      - helm-schema --help
 "
+  after dlint.yaml "      - bash" "      - chart-checks --version
+"
+  replace dlint.yaml "      - k3d" ""
+  replace dlint.yaml "      - kubeconform -v" ""
+  replace dlint.yaml "      - kyverno version" ""
   after nix/fmt.nix '          "infra/root_chart/**"' '          "chart/**"
+          "probes/fixtures/contracts-chart/templates/**"
 '
   after nix/env.nix "    dlint" "    helm-schema
 "
+  after nix/env.nix "    actionlint" "    chart-checks
+"
   after nix/packages.nix "          dlint" "          helm-schema
 "
+  replace nix/packages.nix "let" 'let
+  # chart-checks pin: THE ONE LINE TO CHANGE. A v5 atomipkgs release does not carry packages.chart-checks yet
+  # (v5.12.0 does not), so it comes from the registry merge commit of nix-registry PR 103. Once a v5 release
+  # carries it, delete this line and the chart-checks set below, and add chart-checks to the atomipkgs
+  # inherit list.
+  chartChecksRegistry = "github:AtomiCloud/nix-registry/2e9e31f44ca537bfcb2bba8d1586d1114b994861";
+'
+  replace nix/packages.nix "    nix-2605 = (" '    chart-checks = {
+      inherit ((builtins.getFlake chartChecksRegistry).packages.${pkgs-2605.stdenv.hostPlatform.system})
+        chart-checks
+        ;
+    };
+
+    nix-2605 = (
+'
+  replace nix/packages.nix "atomipkgs // nix-2605 // nix-unstable" "atomipkgs // chart-checks // nix-2605 // nix-unstable
+"
   after nix/pre-commit.nix '        "^infra/root_chart/"' '        "^chart/"
+        "^probes/fixtures/contracts-chart/templates/"
 '
   before_tail nix/pre-commit.nix 2 '
     a-wrapper-helm-docs = {
@@ -157,6 +157,44 @@ This branch adds the wrapper chart, stacked values, generated schema, rendered-m
       pass_filenames = false;
       language = "system";
     };
+
+    a-wrapper-manifests = {
+      enable = true;
+      name = "Helm wrapper manifests";
+      entry = "${packages.atomiutils}/bin/bash -c '"'"'PATH=${envPath}:\$PATH bash scripts/validate/helm-wrapper.sh manifests'"'"'";
+      files = "^(chart/.*|config/.*|chart-checks\\.yaml|scripts/(local|validate)/.*)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    # Generator hook: it rewrites chart/values.schema.json in place, so pre-commit goes red when the
+    # committed file is stale.
+    a-wrapper-values-schema = {
+      enable = true;
+      name = "Helm wrapper values schema";
+      entry = "${packages.atomiutils}/bin/bash -c '"'"'PATH=${envPath}:\$PATH bash scripts/validate/helm-wrapper.sh schema'"'"'";
+      files = "^(chart/values\\.yaml|chart/values\\.schema\\.json|scripts/local/generate-chart-schema\\.sh)$";
+      pass_filenames = false;
+      language = "system";
+    };
+'
+  replace probes/binary-smoke.ts "helm template diene-workspace infra/root_chart | kubeconform -strict -summary >/dev/null" "helm template diene-workspace infra/root_chart >/dev/null
+
+chart-checks --version >/dev/null
+"
+  replace probes/binary-smoke.ts "k3d version >/dev/null" ""
+  replace probes/binary-smoke.ts "k3d cluster list --no-headers >/dev/null" ""
+  replace probes/binary-smoke.ts "kubeconform -v >/dev/null" ""
+  replace probes/binary-smoke.ts "kyverno version >/dev/null" ""
+  replace probes/binary-smoke.ts "printf '%s\n' '{\"probe\":{\"ok\":true}}' | kyverno jp query 'probe.ok' 2>/dev/null | tail -n 1 | rg -qx true" ""
+  squeeze probes/binary-smoke.ts
+  after scripts/local/setup.sh "skills-sync sync" "chart-checks install
+"
+  after .github/workflows/⚡reusable-precommit.yaml "      - uses: AtomiCloud/actions.setup-nix@v3" '      - name: Restore chart-checks inputs
+        uses: actions/cache@v4
+        with:
+          path: .chart-checks
+          key: chart-checks-${{ hashFiles('"'"'chart-checks.yaml'"'"') }}
 '
   after release.yaml "      - docs/developer/CommitConventions.md" "      - chart/Chart.yaml
       - chart/README.md
@@ -222,8 +260,8 @@ for f in "${LEDGER_FILES[@]}"; do
 done
 
 self_files="$(git ls-tree --name-only "${tree}" -- "${self_dir}/" | LC_ALL=C sort | tr '\n' ' ')"
-expected="${self_dir}/branch-ancestry.sh ${self_dir}/docker-absence.sh ${self_dir}/doppler-absence.sh ${self_dir}/exact-diff.sh ${self_dir}/no-vendored-artifacts.sh ${self_dir}/parent.sha "
-[[ ${self_files} == "${expected}" ]] || fail "${self_dir} holds files beyond the five checks and parent.sha: ${self_files}"
+expected="${self_dir}/baseline-doc.sh ${self_dir}/branch-ancestry.sh ${self_dir}/docker-absence.sh ${self_dir}/doppler-absence.sh ${self_dir}/exact-diff.sh ${self_dir}/no-vendored-artifacts.sh ${self_dir}/parent.sha "
+[[ ${self_files} == "${expected}" ]] || fail "${self_dir} holds files beyond the six checks and parent.sha: ${self_files}"
 
 [[ ${failed} -eq 0 ]] || exit 1
 echo "✅ exact-diff: HEAD == shared-wo-docker .3 ${parent_sha} + new files + the ledger"

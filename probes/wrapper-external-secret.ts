@@ -7,11 +7,7 @@ export default defineGate({
     name: 'baseline-wrapper-external-secret-green',
     description: 'Folder-derived ExternalSecret prefixes produce collision-proof service and shared keys.',
     async run(repo: any) {
-      await expectGreen(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh secret',
-        'wrapper-external-secret',
-      );
+      await expectGreen(repo, 'nix develop .#ci -c ./probes/checks/helm-wrapper.sh secret', 'wrapper-external-secret');
     },
   },
   mutation: {
@@ -29,7 +25,7 @@ export default defineGate({
         });
         await expectRedBecause(
           repo,
-          'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh secret',
+          'nix develop .#ci -c ./probes/checks/helm-wrapper.sh secret',
           'wrapper-external-secret',
           ['ExternalSecret declares hand-written key mappings (spec.data)'],
         );

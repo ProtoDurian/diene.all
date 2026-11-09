@@ -10,6 +10,7 @@ with packages;
 
   lint = [
     actionlint
+    chart-checks
     dlint
     helm-schema
     infralint

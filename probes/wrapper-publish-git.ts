@@ -7,11 +7,7 @@ export default defineSmoke({
     name: 'baseline-wrapper-publish-git-green',
     description: 'The secondary git chart-repository package and index dry-run succeeds.',
     async run(repo: any) {
-      await expectGreen(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh publish-git',
-        'wrapper-publish-git',
-      );
+      await expectGreen(repo, 'nix develop .#ci -c ./probes/checks/helm-wrapper.sh publish-git', 'wrapper-publish-git');
     },
   },
 });

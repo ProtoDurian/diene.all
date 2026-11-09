@@ -7,11 +7,7 @@ export default defineSmoke({
     name: 'baseline-wrapper-loadbalancer-modes-green',
     description: 'AWS, OCI, and DigitalOcean LoadBalancer modes render the correct fixed-IP contract.',
     async run(repo: any) {
-      await expectGreen(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh lb',
-        'wrapper-loadbalancer-modes',
-      );
+      await expectGreen(repo, 'nix develop .#ci -c ./probes/checks/helm-wrapper.sh lb', 'wrapper-loadbalancer-modes');
     },
   },
 });

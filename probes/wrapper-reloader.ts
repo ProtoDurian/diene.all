@@ -7,7 +7,7 @@ export default defineGate({
     name: 'baseline-wrapper-reloader-green',
     description: 'Workloads receive Reloader by default and an unsafe workload can opt out.',
     async run(repo: any) {
-      await expectGreen(repo, 'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh reloader', 'wrapper-reloader');
+      await expectGreen(repo, 'nix develop .#ci -c ./probes/checks/helm-wrapper.sh reloader', 'wrapper-reloader');
     },
   },
   mutation: {
@@ -16,7 +16,7 @@ export default defineGate({
     expectedImpact: [],
     async run(repo: any) {
       await repo.patch('chart/templates/_helpers.tpl', { find: '{{- if .enabled }}', replace: '{{- if true }}' });
-      await expectRed(repo, 'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh reloader', 'wrapper-reloader');
+      await expectRed(repo, 'nix develop .#ci -c ./probes/checks/helm-wrapper.sh reloader', 'wrapper-reloader');
     },
   },
 });

@@ -6,5 +6,6 @@ cd "${root_dir}"
 
 releaser conventions -c release.yaml
 skills-sync sync
+chart-checks install
 
 echo "✅ setup completed"

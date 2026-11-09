@@ -15,6 +15,7 @@ let
           "docs/developer/CommitConventions.md"
           "infra/root_chart/**"
           "chart/**"
+          "probes/fixtures/contracts-chart/templates/**"
         ];
       };
       shfmt.enable = true;

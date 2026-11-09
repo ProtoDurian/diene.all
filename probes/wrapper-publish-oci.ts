@@ -7,11 +7,7 @@ export default defineSmoke({
     name: 'baseline-wrapper-publish-oci-green',
     description: 'The default OCI package/ref dry-run succeeds without publishing externally.',
     async run(repo: any) {
-      await expectGreen(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh publish-oci',
-        'wrapper-publish-oci',
-      );
+      await expectGreen(repo, 'nix develop .#ci -c ./probes/checks/helm-wrapper.sh publish-oci', 'wrapper-publish-oci');
     },
   },
 });

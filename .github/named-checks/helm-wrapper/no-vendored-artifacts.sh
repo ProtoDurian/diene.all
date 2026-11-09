@@ -11,7 +11,7 @@ fail() {
 
 files="$(git -c core.quotePath=false ls-tree -r --name-only "${tree}")"
 
-built="$(grep -E '^(chart/files/config/|dist/|reports/|coverage/|result(-[^/]*)?$|result/|\.direnv/|node_modules/)|(^|/)probe-report\.json$' <<<"${files}" || true)"
+built="$(grep -E '^(chart/files/config/|\.chart-checks/|dist/|reports/|coverage/|result(-[^/]*)?$|result/|\.direnv/|node_modules/)|(^|/)probe-report\.json$' <<<"${files}" || true)"
 [[ -z ${built} ]] || fail "build outputs are tracked:"$'\n'"${built}"
 
 # The only committed archives are the Chart.lock dependencies (goal: vendored upstream deps).
@@ -19,7 +19,7 @@ want="$(git show "${tree}:chart/Chart.lock" | yq -r '.dependencies[] | "chart/ch
 have="$(grep -E '\.(tgz|tar\.gz|tar|zip)$' <<<"${files}" | LC_ALL=C sort || true)"
 [[ ${have} == "${want}" ]] || fail "tracked archives differ from Chart.lock dependencies: have [${have//$'\n'/ }], want [${want//$'\n'/ }]"
 
-for p in chart/files/config/application.yaml dist/x probe-report.json; do
+for p in chart/files/config/application.yaml .chart-checks/stamp dist/x probe-report.json; do
   git check-ignore -q --no-index "${p}" || fail "${p} is not gitignored"
 done
 

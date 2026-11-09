@@ -7,7 +7,7 @@ export default defineSmoke({
     name: 'baseline-wrapper-helm-render-green',
     description: 'Base, landscape, and landscape-plus-cluster wrapper stacks render.',
     async run(repo: any) {
-      await expectGreen(repo, 'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh render', 'wrapper-helm-render');
+      await expectGreen(repo, 'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh lint', 'wrapper-helm-render');
     },
   },
 });

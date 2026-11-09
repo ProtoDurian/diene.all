@@ -1,22 +1,20 @@
 import { defineGate } from './lib/definition.ts';
 import { expectGreen, expectRed } from './lib/helpers.ts';
 
+const command = 'nix develop .#ci -c pre-commit run a-wrapper-values-schema --all-files';
+
 export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
   baseline: {
-    name: 'baseline-wrapper-schema-drift-green',
-    description: 'The checked-in values schema matches the annotated values source.',
+    name: 'baseline-wrapper-hook-values-schema-green',
+    description: 'The generator hook leaves the checked-in values schema unchanged.',
     async run(repo: any) {
-      await expectGreen(
-        repo,
-        'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh schema-drift',
-        'wrapper-schema-drift',
-      );
+      await expectGreen(repo, command, 'wrapper-hook-values-schema');
     },
   },
   mutation: {
-    name: 'mutation-wrapper-schema-drift-caught',
-    description: 'Changing a schema annotation without regeneration is detected.',
+    name: 'mutation-wrapper-hook-values-schema-caught',
+    description: 'Changing a schema annotation without regenerating turns the generator hook red.',
     expectedImpact: [],
     async run(repo: any) {
       const path = 'chart/values.yaml';
@@ -26,11 +24,7 @@ export default defineGate({
           find: 'provider: digitalocean # @schema enum:[aws, oci, digitalocean]',
           replace: 'provider: digitalocean # @schema enum:[oci, digitalocean]',
         });
-        await expectRed(
-          repo,
-          'nix develop .#ci -c ./scripts/validate/helm-wrapper.sh schema-drift',
-          'wrapper-schema-drift',
-        );
+        await expectRed(repo, command, 'wrapper-hook-values-schema');
       } finally {
         await repo.write(path, original);
       }

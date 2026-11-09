@@ -50,10 +50,9 @@ This tree is the all-features workspace baseline inherited by every downstream s
 
 # Helm wrapper
 
-This branch adds the wrapper chart, stacked values, generated schema, rendered-manifest validation, k3d proof, and dual publish modes.
+This branch adds the wrapper chart, stacked values, generated schema, rendered-manifest validation, and dual publish modes.
 
 - `task build` — vendor external config and build pinned chart dependencies.
-- `task test:unit` — run schema, lint, render, contracts, VAP, and publish dry-runs.
-- `task test:int` — install on ephemeral k3d and round-trip the chart through a local OCI registry.
+- `pre-commit run --all-files` — run the three chart-check hooks: helm lint, the values-schema generator, and `chart-checks` on the rendered manifests.
 - `task example:lapras:template` — render the independent landscape + cluster stack.
 - [Helm wrapper baseline](docs/developer/helm-wrapper-baseline.md)

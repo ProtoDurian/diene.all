@@ -1,7 +1,7 @@
 import { defineGate } from './lib/definition.ts';
 import { expectGreen, expectRed } from './lib/helpers.ts';
 
-const command = 'nix develop .#ci -c ./scripts/validate/release-lint.sh types';
+const command = 'nix develop .#ci -c ./probes/checks/release-lint.sh types';
 
 export default defineGate({
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
