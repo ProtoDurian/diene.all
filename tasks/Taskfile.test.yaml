@@ -1,0 +1,17 @@
+version: '3'
+
+tasks:
+  default:
+    desc: Run the {{.MODE}} test tier
+    cmds:
+      - ./scripts/local/test.sh {{.MODE}}
+
+  coverage:
+    desc: Run the {{.MODE}} test tier with coverage
+    cmds:
+      - ./scripts/local/test.sh {{.MODE}} --coverage
+
+  watch:
+    desc: Watch the {{.MODE}} test tier
+    cmds:
+      - ./scripts/local/test.sh {{.MODE}} --watch

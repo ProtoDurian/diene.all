@@ -4,6 +4,13 @@
 tree writes it: the tool that does is consumed per-template from the Nix registry,
 and this tree declares no packages for it to vendor.
 
+# Bun and TypeScript
+
+Read [the Bun baseline](docs/developer/bun-baseline.md) before changing the Bun
+toolchain, task surface, test tiers, coverage ledgers, build, or illustrative
+sample. Follow the TypeScript variants linked from that baseline alongside the
+shared engineering standards.
+
 # CI/CD workflows
 
 See [docs/standards/ci-cd/index.md](docs/standards/ci-cd/index.md).

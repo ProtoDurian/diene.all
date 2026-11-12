@@ -25,10 +25,12 @@ let
       {
         inherit
           actionlint
+          bun
           git
           go-task
           infisical
           nix
+          nodejs
           pre-commit
           shellcheck
           treefmt

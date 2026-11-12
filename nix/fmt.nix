@@ -14,9 +14,40 @@ let
           "Changelog.md"
           "docs/developer/CommitConventions.md"
           "infra/root_chart/**"
+          "*.ts"
+          "*.tsx"
+          "*.mts"
+          "*.cts"
+          "*.js"
+          "*.jsx"
+          "*.mjs"
+          "*.cjs"
+          "*.json"
+          "*.jsonc"
         ];
       };
       shfmt.enable = true;
+    };
+
+    settings.formatter.biome = {
+      command = "./node_modules/.bin/biome";
+      options = [
+        "format"
+        "--write"
+        "--no-errors-on-unmatched"
+      ];
+      includes = [
+        "*.ts"
+        "*.tsx"
+        "*.mts"
+        "*.cts"
+        "*.js"
+        "*.jsx"
+        "*.mjs"
+        "*.cjs"
+        "*.json"
+        "*.jsonc"
+      ];
     };
 
   };

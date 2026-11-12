@@ -1,3 +1,11 @@
+### bun-base
+*.tsbuildinfo
+coverage
+dist
+node_modules
+reports
+tests
+
 ### nix
 result
 result-*
