@@ -1,4 +1,4 @@
-import { capturedEnvCommand, expectGreen, expectRed } from './lib/helpers.ts';
+import { capturedEnvCommand, expectGreen, expectRed, expectRedBecause } from './lib/helpers.ts';
 
 const CHECK = 'nix develop .#ci -c ./scripts/local/helm-check.sh infra/root_chart';
 const LPSM = ['landscape', 'platform', 'service', 'module'].map(k => `{{ $.Values.labelPrefix }}/${k}: x`).join(', ');
@@ -152,7 +152,7 @@ export default {
         const entry = '    path: infra/policies';
         const extra = '\n  - name: extra-policy\n    path: infra/rendered/extra-policy';
         await repo.patch('chart-checks.yaml', { find: entry, replace: entry + extra });
-        await expectRed(repo, CHECK, 'helm-check');
+        await expectRedBecause(repo, CHECK, 'helm-check', ['extra-deny-configmaps']);
         await repo.patch('chart-checks.yaml', { find: entry + extra, replace: entry });
         await expectGreen(repo, CHECK, 'helm-check');
       },
