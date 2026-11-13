@@ -1,6 +1,12 @@
 schemaVersion: 2
 
 types:
+  - type: amend
+    desc: Small amendments and typo fixes
+    scopes:
+      default:
+        desc: Amend existing work
+        release: false
   - type: build
     desc: Build-system changes
     scopes:
@@ -65,12 +71,6 @@ types:
       default:
         desc: Fix a bug
         release: patch
-  - type: merge
-    desc: Branch merges
-    scopes:
-      default:
-        desc: Merge a branch
-        release: false
   - type: perf
     desc: Performance improvements
     section: 🚀 Performance Improvement 🚀
