@@ -1,23 +1,34 @@
 # Commit conventions
 
 This repository follows [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+Write `type: subject`, with no scope.
 
-- `release.yaml` is the machine-readable source of truth: it owns the
-  commit types, the scopes valid for each one, and the version bump each scope
-  causes.
+## Types
+
+| Type | Use for |
+| --- | --- |
+| `amend` | Small amendments and typo fixes |
+| `build` | Build-system changes |
+| `chore` | Repository chores |
+| `ci` | CI/CD changes |
+| `config` | Configuration changes |
+| `dep` | Dependency updates |
+| `docs` | Documentation changes |
+| `feat` | New features |
+| `fix` | Bug fixes |
+| `perf` | Performance improvements |
+| `refactor` | Refactors |
+| `style` | Non-functional style changes |
+| `test` | Test changes |
+
+- `release.yaml` is the machine-readable source of truth for the types.
 - [The conventional-commits standard](../standards/conventional-commits/index.md)
-  explains how to read that vocabulary and how to mark a breaking change.
+  explains how to mark a breaking change.
+- This file is generated: `releaser conventions` writes it from the
+  `conventions.template` value in `release.yaml`, and a release run rewrites
+  it. Change the template there rather than editing this file.
 
-## Status of this file
-
-This file is generated. `release.yaml` names this path in its
-`conventions.path` value, `releaser conventions` writes it, and a release run
-rewrites it as well. Change `release.yaml` and regenerate rather than
-editing this file: everything up to here comes from that file's
-`conventions.template`, and everything from the `type(scope)` line below is
-generated from the commit vocabulary.
-
-Use `type(scope)!: subject`. Omit `(scope)` only when the type's `default` scope applies.
+<!-- Generated scope reference, hidden on purpose: Use `type(scope)!: subject`. Omit `(scope)` only when the type's `default` scope applies.
 
 
 
@@ -133,4 +144,4 @@ Use `type(scope)!: subject`. Omit `(scope)` only when the type's `default` scope
 
 ## V.A.E. guidance
 
-No V.A.E. guidance is configured.
+No V.A.E. guidance is configured. -->
