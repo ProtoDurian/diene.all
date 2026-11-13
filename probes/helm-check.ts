@@ -85,6 +85,10 @@ export default {
       kind: 'mutation',
       expectedImpact: ['hook-helm-check'],
       async run(repo: any) {
+        await repo.patch('infra/root_chart/Chart.yaml', {
+          find: "appVersion: '0.1.0'",
+          replace: "appVersion: '0.1.0'\ndependencies:\n  - name: upstream\n    version: 0.1.0",
+        });
         await repo.write(
           'infra/root_chart/charts/upstream/Chart.yaml',
           'apiVersion: v2\nname: upstream\nversion: 0.1.0\n',
