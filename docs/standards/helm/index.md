@@ -51,6 +51,31 @@ chart's `serviceTree:` values. `labelPrefix` (default `durian.cloud`) is one val
 `infra/root_chart/values.yaml`, and the policy chart reads the same key in
 `infra/policies/values.yaml`. Change both together: if they differ, the check fails.
 
+### Reload label
+
+Every Pod (so every workload pod template) carries `<labelPrefix>/reload` with the value `live` or `restart`. The
+`reload` chart value is required and has no default: the render fails when it is missing or neither. The policy chart's
+`reload-label-required` policy refuses a missing label or any other value, and `chart-checks` evaluates the same policy
+on the render. The root chart's `root.reload.*` helpers (`templates/_helpers.tpl`) map the value:
+
+- `root.reload.label` writes the pod label; `root.reload.annotations` writes the workload annotations Reloader reads;
+  `root.reload.podAnnotations` and `root.reload.podinfoVolume` / `root.reload.podinfoMount` add the pod annotation
+  `<labelPrefix>/restart-configs` and the downward-API volume (`/etc/podinfo`: labels and annotations).
+- `restart` → `reloader.stakater.com/auto: "true"`: Reloader restarts the workload when any ConfigMap or Secret it uses changes.
+- `live` → never `auto`. The app re-reads its whole-folder config in place. Only the start-only inputs listed in the
+  `restartOnlyConfigs` value (`{kind: secret|configmap, name, via: env|envFrom|subPath}`) are named in
+  `secret.reloader.stakater.com/reload` / `configmap.reloader.stakater.com/reload`, so Reloader restarts the workload for
+  those alone. There is no checksum annotation on a live pod template.
+
+The helpers fail the render when the `reload` value is missing or not `live|restart`, when a `live` workload gets config by `env`,
+`envFrom` or a `subPath` mount of a ConfigMap, Secret or projected volume (unless that object is in `restartOnlyConfigs`),
+when a `live` workload sets an `ATOMI_*` env var, or when a `restartOnlyConfigs` entry has a bad `kind` or `via`. The
+`reload-live-inputs` policy refuses the same inputs on a live pod unless the object is in the pod's `restart-configs`
+annotation. Every template and example uses `restart` until the app passes the live-reload test.
+
+Helm test hooks and the named Alloy operator Deployment and Job (`alloyOperator` in `infra/policies/values.yaml`) are
+exempt from the label rules; the exception names those objects exactly and is not a general opt-out.
+
 ### Where it runs
 
 The `a-helm-check` pre-commit hook runs the check script, and CI runs it through the pre-commit job,
@@ -58,10 +83,9 @@ so the same render is checked on every commit. Locally use `task helm:root_chart
 the YAML and `task helm:root_chart:check` to run the checks. `helm lint` and `helm template` keep
 running as before (`a-helm-lint`, `scripts/ci/helm.sh`).
 
-`.chart-checks/` (the tool's install folder) is gitignored. With only `path` policies and no `crds:`
-nothing is fetched, so CI needs no cache for it. The day `chart-checks.yaml` gains an `oci`, `url`
-or `git` entry, add an `actions/cache` step on `.chart-checks/` keyed on
-`hashFiles('chart-checks.yaml')` to the pre-commit job.
+`.chart-checks/` (the tool's install folder) is gitignored and never committed. The pre-commit workflow restores it
+with `actions/cache` keyed on `hashFiles('chart-checks.yaml')`, so the pinned inputs are downloaded once per change of
+that file. `helm lint` runs inside the same task, before `chart-checks check`.
 
 ## CI/CD release structure
 

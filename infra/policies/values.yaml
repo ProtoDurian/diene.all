@@ -1,2 +1,10 @@
-# Label key prefix. Must equal `labelPrefix` in infra/root_chart/values.yaml.
+# Label key prefix. Must equal `labelPrefix` in infra/root_chart/values.yaml (scripts/local/helm-check.sh fails when they differ).
 labelPrefix: durian.cloud
+
+# The one named exception to the label rules: the Alloy operator's own objects, which its chart cannot label.
+# Exact kind and name pairs; not a general opt-out.
+alloyOperator:
+  - kind: Deployment
+    name: alloy-operator
+  - kind: Job
+    name: alloy-operator-crds

@@ -1,11 +1,11 @@
 # Workspace-level admission policy for the root chart's rendered objects.
-# chart-checks renders this chart and evaluates its ValidatingAdmissionPolicy offline against
+# chart-checks renders this chart and evaluates its ValidatingAdmissionPolicy objects offline against
 # infra/rendered/. The cluster-side policy set is the vanadium chart (charts/vap-policies);
 # workspace must not depend on it, so this is the smallest policy that still proves the VAP
 # wiring under the same labelPrefix as the root chart.
 #
-# Scope: workloads only (Helm test hooks exempt, below). Every Pod and every workload (object AND its pod template) carries all
-# four LPSM labels. Upstream non-workload objects (RBAC, CRDs, hooks, ...) are not asked for
+# Scope: workloads only (exemptions in _helpers.tpl). Every Pod and every workload (object AND its pod template)
+# carries all four LPSM labels. Upstream non-workload objects (RBAC, CRDs, hooks, ...) are not asked for
 # them: in a cluster this policy also admits upstream charts, and most cannot label those.
 # The root chart's own objects of any kind are checked by scripts/local/helm-check.sh instead.
 apiVersion: admissionregistration.k8s.io/v1
@@ -16,36 +16,14 @@ spec:
   failurePolicy: Fail
   matchConstraints:
     resourceRules:
-      - apiGroups: ['']
-        apiVersions: ['*']
-        operations: [CREATE, UPDATE]
-        resources: [pods]
-      - apiGroups: [apps]
-        apiVersions: ['*']
-        operations: [CREATE, UPDATE]
-        resources: [deployments, statefulsets, daemonsets, replicasets]
-      - apiGroups: [batch]
-        apiVersions: ['*']
-        operations: [CREATE, UPDATE]
-        resources: [jobs, cronjobs]
-  # Helm test hooks (helm.sh/hook: test, test-success, test-failure) are exempt: they run only on
-  # `helm test`, never in a deploy, and several upstream charts cannot label their test Pods.
+      {{- include "policies.workloadRules" . | nindent 6 }}
   matchConditions:
-    - name: not-a-helm-test-hook
-      expression: >-
-        !(has(object.metadata.annotations) &&
-        'helm.sh/hook' in object.metadata.annotations &&
-        object.metadata.annotations['helm.sh/hook'].split(',')
-        .exists(h, h.trim() in ['test', 'test-success', 'test-failure']))
+    {{- include "policies.exemptions" . | nindent 4 }}
   variables:
     - name: keys
       expression: >-
         ['landscape', 'platform', 'service', 'module'].map(k, '{{ .Values.labelPrefix }}/' + k)
-    - name: podMeta
-      expression: >-
-        object.kind == 'Pod' ? object.metadata :
-        object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.metadata :
-        object.spec.template.metadata
+    {{- include "policies.podMeta" . | nindent 4 }}
   validations:
     - expression: >-
         has(object.metadata.labels) &&

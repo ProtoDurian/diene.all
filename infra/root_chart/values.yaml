@@ -9,3 +9,12 @@ serviceTree:
   platform: diene
   service: workspace
   module: root
+
+# Every pod carries <labelPrefix>/reload: restart (Reloader restarts the workload when any ConfigMap or Secret it uses
+# changes) or live (the app re-reads its whole-folder config in place). Required, no default: the render fails when it is
+# missing or neither. Every template uses restart until the app passes the live-reload test.
+reload: restart
+
+# Start-only inputs of a live pod (env, envFrom or subPath, e.g. from a third-party chart); Reloader restarts the pod when
+# they change. Entries: {kind: secret|configmap, name: x, via: env|envFrom|subPath}. A whole-folder mount is never start-only.
+restartOnlyConfigs: []

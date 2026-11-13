@@ -1,7 +1,7 @@
 import { expectGreen, expectRed } from './lib/helpers.ts';
 
 const CHECK = 'nix develop .#ci -c ./scripts/local/helm-check.sh infra/root_chart';
-const LPSM = ['landscape', 'platform', 'service', 'module'].map(k => `durian.cloud/${k}: x`).join(', ');
+const LPSM = ['landscape', 'platform', 'service', 'module'].map(k => `{{ $.Values.labelPrefix }}/${k}: x`).join(', ');
 
 export default {
   contractVersion: 1,
@@ -38,7 +38,7 @@ export default {
             'kind: Deployment',
             'metadata:',
             '  name: probe',
-            `  labels: {${LPSM}}`,
+            `  labels: { ${LPSM} }`,
             'spec:',
             '  selector: {matchLabels: {app: probe}}',
             '  template:',
@@ -49,6 +49,32 @@ export default {
             '',
           ].join('\n'),
         );
+        await expectRed(repo, CHECK, 'helm-check');
+      },
+    },
+    {
+      name: 'mutation-helm-check-schema-caught',
+      description: 'A schema-invalid object (unknown field) must turn the helm-check mechanism red.',
+      kind: 'mutation',
+      expectedImpact: ['hook-helm-check'],
+      async run(repo: any) {
+        await repo.patch('infra/root_chart/templates/configmap.yaml', {
+          find: 'data:',
+          replace: 'bogusField: true\ndata:',
+        });
+        await expectRed(repo, CHECK, 'helm-check');
+      },
+    },
+    {
+      name: 'mutation-helm-check-prefix-caught',
+      description: 'A label under a different prefix must turn the helm-check mechanism red.',
+      kind: 'mutation',
+      expectedImpact: ['hook-helm-check'],
+      async run(repo: any) {
+        await repo.patch('infra/root_chart/templates/configmap.yaml', {
+          find: '{{ $.Values.labelPrefix }}/{{ $key }}',
+          replace: 'other.example/{{ $key }}',
+        });
         await expectRed(repo, CHECK, 'helm-check');
       },
     },

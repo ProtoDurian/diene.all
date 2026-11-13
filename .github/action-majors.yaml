@@ -1,0 +1,6 @@
+# Latest major of every trusted action the workflows use. Raise a major here and in the workflows together.
+majors:
+  actions/checkout: 7
+  AtomiCloud/actions.setup-nix: 3
+  AtomiCloud/actions.setup-docker: 2
+  actions/cache: 6

@@ -52,6 +52,15 @@ pre-commit-lib.run {
       language = "system";
     };
 
+    a-action-majors = {
+      enable = true;
+      name = "Trusted action majors";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH bash scripts/local/action-majors.sh'";
+      files = "^(\\.github/(workflows/.*|action-majors\\.yaml)|dlint\\.yaml|scripts/local/action-majors\\.sh)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
     a-infisical = {
       enable = true;
       name = "Secrets scan";

@@ -35,10 +35,12 @@ H_PATHS=(
   chart-checks.yaml
   probes/helm-check.ts
   probes/hook-helm-check.ts
+  probes/helm-reload.ts
+  probes/lib/helm-workload.ts
 )
 H_TOKENS=(
   root_chart reusable-helm Taskfile.helm helm.sh helm-push standards/helm
-  helm/index.md a-helm-lint a-helm-check helm-lint helm-render helm-check
+  helm/index.md a-helm-lint a-helm-check helm-lint helm-render helm-check helm-reload helm-workload
   infra/rendered infra/policies chart-checks
 )
 
@@ -104,10 +106,11 @@ apply_H() {
   edit .github/workflows/ci.yaml yq_del 'del(.jobs.helm)'
   edit .github/workflows/cd.yaml yq_del 'del(.jobs.helm)'
   edit Taskfile.yaml yq_del 'del(.includes.helm)'
+  edit .github/workflows/⚡reusable-precommit.yaml yq_del 'del(.jobs.precommit.steps[] | select(.name == "Cache chart-checks schemas"))'
   edit .github/dependabot.yml yq_del 'del(.updates[] | select(.package-ecosystem == "helm"))'
   edit dlint.yaml yq_del 'del(.checks["toolchain-smoke"].binaries[] | select(. == "helm version" or . == "helm-docs" or . == "kubeconform -v" or . == "kyverno version" or . == "chart-checks --version"))'
   edit CLAUDE.md drop_section '# Helm charts and publishing'
-  edit probes/features.json yq_del 'del(.[] | select(.name == "helm-lint" or .name == "helm-render" or .name == "hook-helm-lint" or .name == "helm-check" or .name == "hook-helm-check"))'
+  edit probes/features.json yq_del 'del(.[] | select(.name == "helm-lint" or .name == "helm-render" or .name == "hook-helm-lint" or .name == "helm-check" or .name == "hook-helm-check" or .name == "helm-reload"))'
   edit probes/binary-smoke.ts sed_d '/^chart-checks/d;/^helm-docs/d;/^helm version/d;/^helm template/d'
   edit nix/pre-commit.nix drop_nix_block '    a-helm-lint = {'
   edit nix/pre-commit.nix drop_nix_block '    a-helm-check = {'

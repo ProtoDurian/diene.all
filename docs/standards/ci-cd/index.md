@@ -41,7 +41,12 @@ Trusted actions use major pins; every other action uses an exact 40-character SH
 plus its tag in a trailing comment. Which actions are trusted is one regex,
 `dlint.yaml`'s `checks["action-pins"].trustedPattern`: an action matching it is
 trusted, everything else is non-trusted by default — so an action nobody thought
-about gets the strictest pin, and there is no list to maintain.
+about gets the strictest pin.
+
+A trusted action must also be on its latest major. `.github/action-majors.yaml` records that major for every trusted
+action the workflows use, and the `a-action-majors` hook (`scripts/local/action-majors.sh`, run in CI through pre-commit)
+is red when a trusted action is below its recorded major, used but unlisted, or the list is empty or unreadable. Raising
+a major is an edit to that file and to the workflows in the same change.
 
 ## Every job declares its dependencies
 

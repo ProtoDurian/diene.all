@@ -2,10 +2,11 @@
 set -euo pipefail
 
 # Renders a chart fresh into the gitignored infra/rendered/<chart>/ (scripts/local/helm-render.sh),
-# then checks every rendered file in two steps:
+# runs `helm lint`, then checks every rendered file in two steps:
 #   1. `chart-checks check`: Kubernetes schemas (unknown fields refused) and the
 #      ValidatingAdmissionPolicies of the policy charts listed in chart-checks.yaml. The LPSM
-#      label rule there covers workloads and pod templates only, upstream subcharts included.
+#      label rule and the reload label rule there cover workloads and pod templates only, upstream
+#      subcharts included.
 #   2. First-party labels: every object from the chart's OWN templates (not its subcharts),
 #      of any kind, carries the four LPSM labels under the policy chart's labelPrefix.
 # Nothing is committed and nothing is dropped from step 1.
@@ -17,7 +18,19 @@ policy_values="infra/policies/values.yaml"
 root="$(git rev-parse --show-toplevel)"
 cd "${root}"
 
+name="$(yq -r '.name' "${chart}/Chart.yaml")"
+prefix="$(yq -r '.labelPrefix' "${policy_values}")"
+[ -n "${prefix}" ] && [ "${prefix}" != "null" ] || {
+  echo "❌ ${policy_values} has no labelPrefix" >&2
+  exit 1
+}
+[ "$(yq -r '.labelPrefix' "${chart}/values.yaml")" = "${prefix}" ] || {
+  echo "❌ labelPrefix in ${chart}/values.yaml and ${policy_values} differ" >&2
+  exit 1
+}
+
 ./scripts/local/helm-render.sh "${chart}"
+helm lint "${chart}"
 
 files=("${rendered}"/*.yaml)
 [ -e "${files[0]}" ] || {
@@ -26,13 +39,6 @@ files=("${rendered}"/*.yaml)
 }
 
 chart-checks check -c chart-checks.yaml "${files[@]}"
-
-name="$(yq -r '.name' "${chart}/Chart.yaml")"
-prefix="$(yq -r '.labelPrefix' "${policy_values}")"
-[ -n "${prefix}" ] && [ "${prefix}" != "null" ] || {
-  echo "❌ ${policy_values} has no labelPrefix" >&2
-  exit 1
-}
 
 # Helm marks each document with "# Source: <chart>/templates/..." (own) or
 # "# Source: <chart>/charts/<sub>/..." (subchart); turn it into a key yq can select on.
