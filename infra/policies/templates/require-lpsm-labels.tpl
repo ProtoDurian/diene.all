@@ -1,3 +1,4 @@
+{{- $_ := required "labelPrefix is empty: scripts/local/helm-check.sh sets it from the root chart" .Values.labelPrefix }}
 # Workspace-level admission policy for the root chart's rendered objects.
 # chart-checks renders this chart and evaluates its ValidatingAdmissionPolicy objects offline against
 # infra/rendered/. The cluster-side policy set is the vanadium chart (charts/vap-policies);

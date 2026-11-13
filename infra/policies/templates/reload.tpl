@@ -1,3 +1,4 @@
+{{- $_ := required "labelPrefix is empty: scripts/local/helm-check.sh sets it from the root chart" .Values.labelPrefix }}
 {{- $k := printf "%s/reload" .Values.labelPrefix }}
 {{- $rc := printf "%s/restart-configs" .Values.labelPrefix }}
 # 1. Every pod, and every workload's pod template, carries <labelPrefix>/reload: live or restart.

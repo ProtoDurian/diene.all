@@ -19,6 +19,13 @@ recorded="$(yq -r '.majors | to_entries | .[] | .key + " " + (.value | tostring)
 }
 
 fail=0
+while read -r rname rmajor; do
+  [[ ${rmajor} =~ ^[0-9]+$ ]] || {
+    echo "❌ ${list}: ${rname} has a non-integer major '${rmajor}'" >&2
+    fail=1
+  }
+done <<<"${recorded}"
+[ "${fail}" -eq 0 ] || exit 1
 while read -r uses; do
   [[ ${uses} =~ ${trusted} ]] || continue
   name="$(cut -d/ -f1,2 <<<"${uses%@*}")"

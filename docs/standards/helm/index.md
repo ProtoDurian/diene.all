@@ -48,8 +48,8 @@ nix-registry tool, configured by the root `chart-checks.yaml`) on the result. It
 
 Labels are `<labelPrefix>/landscape`, `/platform`, `/service` and `/module`, taken from the root
 chart's `serviceTree:` values. `labelPrefix` (default `durian.cloud`) is one value in
-`infra/root_chart/values.yaml`, and the policy chart reads the same key in
-`infra/policies/values.yaml`. Change both together: if they differ, the check fails.
+`infra/root_chart/values.yaml`; the policy chart reads the same key, set from it. Change it in
+`infra/root_chart/values.yaml` only: `scripts/local/helm-check.sh` renders the policy chart with the root chart's value (per values stack), so one change moves every label and check.
 
 ### Reload label
 
