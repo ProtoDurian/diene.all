@@ -67,8 +67,8 @@ The footer keywords that count as breaking are the `keywords:` list in
 
 | Aspect            | Pattern                                         |
 | ----------------- | ----------------------------------------------- |
-| **Format**        | `type(scope): description`                      |
+| **Format**        | `type: subject` (no scope)                      |
 | **Configuration** | `release.yaml`                                  |
-| **Reference**     | the file named by its `conventions.path`        |
+| **Reference**     | `docs/developer/CommitConventions.md`           |
 | **Release**       | each scope's `release:` value in `release.yaml` |
 | **Breaking**      | Add `!` or a footer keyword from `keywords:`    |
