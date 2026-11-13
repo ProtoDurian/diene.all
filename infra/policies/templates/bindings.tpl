@@ -7,4 +7,8 @@ metadata:
 spec:
   policyName: {{ . }}
   validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+        - { key: kubernetes.io/metadata.name, operator: NotIn, values: {{ toJson $.Values.exemptNamespaces }} }
 {{- end }}

@@ -40,6 +40,11 @@ stack_prefix() {
 }
 
 policy_dir="infra/rendered/policies"
+tmp="$(mktemp -d)"
+trap 'rm -rf "${tmp}"' EXIT
+mkdir -p "${root}/.chart-checks"
+ln -s "${root}/.chart-checks" "${tmp}/.chart-checks"
+rel_root="$(realpath --relative-to="${tmp}" "${root}")"
 for file in "${files[@]}"; do
   [ "$(basename "${file}")" = "chart-checks.yaml" ] && continue
   stack="$(basename "${file}" .yaml)"
@@ -53,12 +58,14 @@ for file in "${files[@]}"; do
   mkdir -p "${policy_dir}"
   cp -R infra/policies/. "${policy_dir}/"
   PREFIX="${prefix}" yq -i '.labelPrefix = strenv(PREFIX)' "${policy_dir}/values.yaml"
-  POLICY_DIR="${policy_dir}" yq '.policies[].path = strenv(POLICY_DIR)' chart-checks.yaml >"${root}/.chart-checks.stack.yaml"
-  chart-checks check -c .chart-checks.stack.yaml "${file}" || {
-    rm -f .chart-checks.stack.yaml
-    exit 1
-  }
-  rm -f .chart-checks.stack.yaml
+  # Only the workspace policy entry points at the rendered copy; every other entry keeps its
+  # own path. chart-checks resolves paths next to the config file, so they are given relative to the
+  # temporary config directory.
+  ROOT="${rel_root}" POLICY_DIR="${rel_root}/${policy_dir}" yq '
+    (.policies[] | select(.name == "workspace-policies") | .path) = strenv(POLICY_DIR)
+    | (.policies[] | select(.name != "workspace-policies") | .path | select(. != null)) |= strenv(ROOT) + "/" + .
+  ' chart-checks.yaml >"${tmp}/chart-checks.yaml"
+  chart-checks check -c "${tmp}/chart-checks.yaml" "${file}"
 
   # Helm marks each document with "# Source: <chart>/templates/..." (own) or
   # "# Source: <chart>/charts/<sub>/..." (subchart); turn it into a key yq can select on.
