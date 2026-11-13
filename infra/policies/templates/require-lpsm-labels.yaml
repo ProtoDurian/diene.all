@@ -4,7 +4,7 @@
 # workspace must not depend on it, so this is the smallest policy that still proves the VAP
 # wiring under the same labelPrefix as the root chart.
 #
-# Scope: workloads only. Every Pod and every workload (object AND its pod template) carries all
+# Scope: workloads only (Helm test hooks exempt, below). Every Pod and every workload (object AND its pod template) carries all
 # four LPSM labels. Upstream non-workload objects (RBAC, CRDs, hooks, ...) are not asked for
 # them: in a cluster this policy also admits upstream charts, and most cannot label those.
 # The root chart's own objects of any kind are checked by scripts/local/helm-check.sh instead.
@@ -28,6 +28,15 @@ spec:
         apiVersions: ['*']
         operations: [CREATE, UPDATE]
         resources: [jobs, cronjobs]
+  # Helm test hooks (helm.sh/hook: test, test-success, test-failure) are exempt: they run only on
+  # `helm test`, never in a deploy, and several upstream charts cannot label their test Pods.
+  matchConditions:
+    - name: not-a-helm-test-hook
+      expression: >-
+        !(has(object.metadata.annotations) &&
+        'helm.sh/hook' in object.metadata.annotations &&
+        object.metadata.annotations['helm.sh/hook'].split(',')
+        .exists(h, h.trim() in ['test', 'test-success', 'test-failure']))
   variables:
     - name: keys
       expression: >-

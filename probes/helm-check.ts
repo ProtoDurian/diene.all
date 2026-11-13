@@ -55,7 +55,7 @@ export default {
     {
       name: 'mutation-helm-check-upstream-scope',
       description:
-        'An upstream subchart may ship unlabelled non-workload objects (green), but an unlabelled upstream Pod must turn the helm-check mechanism red.',
+        'An upstream subchart may ship unlabelled non-workload objects and Helm test-hook Pods (green), but an unlabelled upstream Pod must turn the helm-check mechanism red.',
       kind: 'mutation',
       expectedImpact: ['hook-helm-check'],
       async run(repo: any) {
@@ -66,6 +66,10 @@ export default {
         await repo.write(
           'infra/root_chart/charts/upstream/templates/role.yaml',
           'apiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata:\n  name: upstream\nrules: []\n',
+        );
+        await repo.write(
+          'infra/root_chart/charts/upstream/templates/test-pod.yaml',
+          'apiVersion: v1\nkind: Pod\nmetadata:\n  name: upstream-test\n  annotations:\n    helm.sh/hook: test\nspec:\n  containers: [{name: c, image: "nginx:1.27"}]\n',
         );
         await expectGreen(repo, CHECK, 'helm-check');
         await repo.write(
