@@ -1,19 +1,12 @@
 import { expectGreen, expectRed } from './lib/helpers.ts';
-import { NO_START_ONLY, RELOAD_LINE, VALUES, workload } from './lib/helm-workload.ts';
+import { setValues, workload } from './lib/helm-workload.ts';
 
 const CHECK = 'nix develop .#ci -c ./scripts/local/helm-check.sh infra/root_chart';
 const TEMPLATE = 'infra/root_chart/templates/probe-deploy.yaml';
 const container = { name: 'c', image: 'nginx:1.27' };
 const envFrom = { containers: [{ ...container, envFrom: [{ configMapRef: { name: 'cfg' } }] }] };
 const atomiEnv = { containers: [{ ...container, env: [{ name: 'ATOMI_DB__HOST', value: 'x' }] }] };
-const startOnly = (via: string) => `restartOnlyConfigs: [{kind: configmap, name: cfg, via: ${via}}]`;
-
-async function live(repo: any) {
-  await repo.patch(VALUES, { find: RELOAD_LINE, replace: '\nreload: live\n' });
-}
-async function listStartOnly(repo: any, via = 'envFrom') {
-  await repo.patch(VALUES, { find: NO_START_ONLY, replace: startOnly(via) });
-}
+const envFromListed = [{ kind: 'configmap', name: 'cfg', via: 'envFrom' }];
 
 export default {
   contractVersion: 1,
@@ -25,6 +18,7 @@ export default {
       kind: 'baseline',
       async run(repo: any) {
         await repo.write(TEMPLATE, workload());
+        await setValues(repo, { reload: 'restart' });
         await expectGreen(repo, CHECK, 'helm-reload');
       },
     },
@@ -34,7 +28,7 @@ export default {
       kind: 'baseline',
       async run(repo: any) {
         await repo.write(TEMPLATE, workload());
-        await live(repo);
+        await setValues(repo, { reload: 'live' });
         await expectGreen(repo, CHECK, 'helm-reload');
       },
     },
@@ -44,8 +38,7 @@ export default {
       kind: 'baseline',
       async run(repo: any) {
         await repo.write(TEMPLATE, workload({ spec: envFrom }));
-        await live(repo);
-        await listStartOnly(repo);
+        await setValues(repo, { reload: 'live', startOnly: envFromListed });
         await expectGreen(repo, CHECK, 'helm-reload');
       },
     },
@@ -56,8 +49,7 @@ export default {
       kind: 'baseline',
       async run(repo: any) {
         await repo.write(TEMPLATE, workload({ spec: envFrom, helperChecks: false }));
-        await live(repo);
-        await listStartOnly(repo);
+        await setValues(repo, { reload: 'live', startOnly: envFromListed });
         await expectGreen(repo, CHECK, 'helm-reload');
       },
     },
@@ -91,7 +83,7 @@ export default {
       expectedImpact: [],
       async run(repo: any) {
         await repo.write(TEMPLATE, workload());
-        await repo.patch(VALUES, { find: RELOAD_LINE, replace: '\n' });
+        await setValues(repo, { reload: null });
         await expectRed(repo, CHECK, 'helm-reload');
       },
     },
@@ -102,7 +94,7 @@ export default {
       expectedImpact: [],
       async run(repo: any) {
         await repo.write(TEMPLATE, workload({ spec: envFrom }));
-        await live(repo);
+        await setValues(repo, { reload: 'live' });
         await expectRed(repo, CHECK, 'helm-reload');
       },
     },
@@ -114,7 +106,7 @@ export default {
       expectedImpact: [],
       async run(repo: any) {
         await repo.write(TEMPLATE, workload({ spec: envFrom, helperChecks: false }));
-        await live(repo);
+        await setValues(repo, { reload: 'live' });
         await expectRed(repo, CHECK, 'helm-reload');
       },
     },
@@ -125,7 +117,7 @@ export default {
       expectedImpact: [],
       async run(repo: any) {
         await repo.write(TEMPLATE, workload({ spec: atomiEnv }));
-        await live(repo);
+        await setValues(repo, { reload: 'live' });
         await expectRed(repo, CHECK, 'helm-reload');
       },
     },
@@ -136,8 +128,7 @@ export default {
       expectedImpact: [],
       async run(repo: any) {
         await repo.write(TEMPLATE, workload());
-        await live(repo);
-        await listStartOnly(repo, 'folder');
+        await setValues(repo, { reload: 'live', startOnly: [{ kind: 'configmap', name: 'cfg', via: 'folder' }] });
         await expectRed(repo, CHECK, 'helm-reload');
       },
     },

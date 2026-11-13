@@ -6,8 +6,6 @@ export interface WorkloadOptions {
 }
 
 export const VALUES = 'infra/root_chart/values.yaml';
-export const RELOAD_LINE = '\nreload: restart\n';
-export const NO_START_ONLY = 'restartOnlyConfigs: []';
 
 export function workload(opts: WorkloadOptions = {}): string {
   const spec = opts.spec ?? { containers: [{ name: 'c', image: 'nginx:1.27' }] };
@@ -46,4 +44,17 @@ export function workload(opts: WorkloadOptions = {}): string {
     '      {{- toYaml $spec | nindent 6 }}',
     '',
   ].join('\n');
+}
+
+export interface ValuesOptions {
+  reload: string | null; // null removes the key
+  startOnly?: object[]; // restartOnlyConfigs entries
+}
+
+// Sets the two reload values of the root chart. Idempotent, so probes that share a sandbox never see each other's state.
+export async function setValues(repo: any, opts: ValuesOptions): Promise<void> {
+  const reload = opts.reload === null ? "sed -i '/^reload:/d'" : `sed -i 's/^reload:.*/reload: ${opts.reload}/'`;
+  const startOnly = `sed -i 's/^restartOnlyConfigs:.*/restartOnlyConfigs: ${JSON.stringify(opts.startOnly ?? []).replaceAll('/', '\\/')}/'`;
+  const result = await repo.exec(`${reload} ${VALUES} && ${startOnly} ${VALUES}`);
+  if (result.exitCode !== 0) throw new Error(`could not set the root chart values: ${result.stderr || result.stdout}`);
 }
