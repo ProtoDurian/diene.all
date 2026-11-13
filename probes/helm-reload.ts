@@ -78,11 +78,10 @@ export default {
     },
     {
       name: 'mutation-helm-reload-required-caught',
-      description: 'A chart with no reload value must fail the render.',
+      description: 'The shipped root chart with no reload value must fail the render.',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        await repo.write(TEMPLATE, workload());
         await setValues(repo, { reload: null });
         await expectRed(repo, CHECK, 'helm-reload');
       },

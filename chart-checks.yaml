@@ -1,5 +1,5 @@
 # chart-checks: offline schema + policy check of the rendered root chart (scripts/local/helm-check.sh).
-kubernetes: '1.30' # core schemas are embedded in the tool (1.23 to 1.30)
+kubernetes: '1.30' # core schemas ship in the nix-pinned kubectl-validate (1.23 to 1.30); install downloads only crds and policies into .chart-checks
 policies:
   - name: workspace-policies
     path: infra/policies
