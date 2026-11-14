@@ -3,11 +3,13 @@ set -euo pipefail
 
 # A cache-tag label needs a setup-nix step; the OIDC token permission needs flakehub-login off; a cached shell needs DURIAN_SHELL_KEEP.
 
+dir="${1:-.github/workflows}"
+[ -d "${dir}" ] && dir="$(cd "${dir}" && pwd)"
 cd "$(git rev-parse --show-toplevel)"
 
 fail=0
 # shellcheck disable=SC2016
-for file in .github/workflows/*.y*ml; do
+for file in "${dir}"/*.y*ml; do
   [ -e "${file}" ] || continue
   while IFS=$'\t' read -r job tag nix idtoken login cache keep; do
     [ -n "${job}" ] || continue
