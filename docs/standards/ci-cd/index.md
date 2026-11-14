@@ -25,8 +25,9 @@ their trigger block:
   `durian-shell .#<shell> -c ./scripts/ci/<script>.sh`. `durian-shell` comes from
   `AtomiCloud/actions.setup-nix` (`devshell-cache: 'true'`): it is `nix develop -c` with the
   evaluated shell kept on the cache volume, and plain `nix develop` anywhere it cannot
-  cache. Every job with `devshell-cache: 'true'` sets job-level `DURIAN_SHELL_KEEP: '64'` so repositories
-  sharing the cache volume do not evict each other's shells. A setup-nix step in a job with
+  cache. Every job with `devshell-cache: 'true'` sets job-level `DURIAN_SHELL_KEEP: '20'` so repositories
+  sharing the cache volume do not evict each other's shells. Every setup-nix step sets
+  `store-gc-at-percent: '75'` so the Nix store is collected before the volume fills. A setup-nix step in a job with
   `id-token: write` sets `flakehub-login: 'false'`. Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
   Jobs that read no `GITHUB_*_SLUG` variable set `github-slug: 'false'`. The pre-commit script runs
   every hook, including `a-skills-sync` (`skills-sync sync --frozen`), so CI

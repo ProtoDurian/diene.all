@@ -60,5 +60,13 @@ fresh
 sed -i '/^    env:$/{N;/DURIAN_SHELL_KEEP/d}' "${nix_file}"
 expect_red "devshell-cache without DURIAN_SHELL_KEEP" "DURIAN_SHELL_KEEP"
 
+fresh
+sed -i "/store-gc-at-percent/d" "${nix_file}"
+expect_red "setup-nix without store-gc-at-percent" "store-gc-at-percent"
+
+fresh
+sed -i "s|DURIAN_SHELL_KEEP: '20'|DURIAN_SHELL_KEEP: '64'|" "${nix_file}"
+expect_red "DURIAN_SHELL_KEEP not 20" "is not '20'"
+
 [ "${fail}" -eq 0 ] || exit 1
 echo "✅ ci-cache-rules is green unchanged and red on every planted case"

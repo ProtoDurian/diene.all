@@ -14,6 +14,7 @@ jobs:
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
         with:
+          store-gc-at-percent: '75'
           auth-bot-app-id: ${{ vars.AUTH_BOT_APP_ID }}
           auth-bot-secret-key: ${{ secrets.AUTH_BOT_SECRET_KEY }}
       - name: Release
