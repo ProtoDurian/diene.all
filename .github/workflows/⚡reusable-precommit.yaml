@@ -11,6 +11,8 @@ jobs:
       - nscloud-cache-size-20gb
       - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
     timeout-minutes: 20
+    env:
+      DURIAN_SHELL_KEEP: '64'
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
         with:
@@ -22,4 +24,4 @@ jobs:
           path: .chart-checks
           key: chart-checks-${{ hashFiles('chart-checks.yaml') }}
       - name: Run pre-commit
-        run: atomi-develop .#ci -c ./scripts/ci/pre-commit.sh
+        run: durian-shell .#ci -c ./scripts/ci/pre-commit.sh

@@ -22,10 +22,12 @@ their trigger block:
   block to see when.
 - **Reusable workflows** — `on.workflow_call` only, named with a `⚡` prefix.
   Each owns runner selection and setup and ends in a `run:` line of the form
-  `atomi-develop .#<shell> -c ./scripts/ci/<script>.sh`. `atomi-develop` comes from
+  `durian-shell .#<shell> -c ./scripts/ci/<script>.sh`. `durian-shell` comes from
   `AtomiCloud/actions.setup-nix` (`devshell-cache: 'true'`): it is `nix develop -c` with the
   evaluated shell kept on the cache volume, and plain `nix develop` anywhere it cannot
-  cache. Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
+  cache. Every job with `devshell-cache: 'true'` sets job-level `DURIAN_SHELL_KEEP: '64'` so repositories
+  sharing the cache volume do not evict each other's shells. A setup-nix step in a job with
+  `id-token: write` sets `flakehub-login: 'false'`. Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
   Jobs that read no `GITHUB_*_SLUG` variable set `github-slug: 'false'`. The pre-commit script runs
   every hook, including `a-skills-sync` (`skills-sync sync --frozen`), so CI
   enforces the vendored skills without a separate step.
@@ -105,7 +107,9 @@ It only echoes the release version, so it runs on GitHub-hosted
 `./scripts/ci/release-note.sh` directly. No `runs-on` label in
 `.github/workflows/` may end in `-latest` (GitHub moves it to a new image
 without a commit here): the `a-runner-labels` hook (`scripts/local/runner-labels.sh`,
-run in CI through pre-commit) is red on one.
+run in CI through pre-commit) is red on one. The `a-ci-cache-rules` hook (`scripts/local/ci-cache-rules.sh`)
+is red on a cache-tag label without a setup-nix step, on `id-token: write` without
+`flakehub-login: 'false'`, and on `devshell-cache` without `DURIAN_SHELL_KEEP`.
 
 ## Dependency materialisation
 
