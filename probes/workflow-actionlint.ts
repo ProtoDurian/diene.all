@@ -37,7 +37,7 @@ export default {
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        const check = 'nix develop .#ci -c ./scripts/local/runner-labels.sh';
+        const check = 'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-runner-labels --all-files';
         await expectGreen(repo, check, 'workflow-actionlint');
         await repo.patch('.github/workflows/⚡reusable-release-note.yaml', {
           find: 'runs-on: ubuntu-26.04',
