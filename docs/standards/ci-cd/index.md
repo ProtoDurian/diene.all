@@ -73,9 +73,11 @@ a major is an edit to that file and to the workflows in the same change.
 
 > **Every `run:` step enters a Nix shell that declares what it needs.**
 
-The Docker job is the one exception: it runs `./scripts/ci/docker.sh` directly, with no Nix shell and no Nix store cache label.
+The Docker job is one exception: it runs `./scripts/ci/docker.sh` directly, with no Nix shell and no Nix store cache label.
+The `Nix store clean-up` job is the other: its final `Report` step is a multi-line script on the runner's own `df`, `awk`,
+`find` and `wc`, because the job checks out nothing and builds no shell.
 
-In practice a `run:` step is exactly one line:
+In practice a `run:` step outside those two jobs is exactly one line:
 
 ```text
 nix develop .#<shell> -c <command>
