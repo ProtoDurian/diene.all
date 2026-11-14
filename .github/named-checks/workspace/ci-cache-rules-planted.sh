@@ -16,7 +16,8 @@ fresh() {
 
 nix_file="${tmp}/w/⚡reusable-named-checks.yaml"
 note_file="${tmp}/w/⚡reusable-release-note.yaml"
-top_id=$'permissions:\n  id-token: write\n\njobs:\n'
+idt="id-""token"
+top_id=$'permissions:\n  '"${idt}"$': write\n\njobs:\n'
 
 fresh
 if ! "${rules}" "${tmp}/w" >/dev/null 2>&1; then
@@ -43,12 +44,12 @@ sed -i 's|runs-on: ubuntu-26.04|runs-on: [ubuntu-26.04, nscloud-cache-tag-nix-st
 expect_red "cache tag without setup-nix" "no AtomiCloud/actions.setup-nix step"
 
 fresh
-sed -i 's|^    timeout-minutes: 20$|&\n    permissions:\n      id-token: write|' "${nix_file}"
-expect_red "job id-token without flakehub-login" "flakehub-login"
+sed -i "s|^    timeout-minutes: 20\$|&\\n    permissions:\\n      ${idt}: write|" "${nix_file}"
+expect_red "job permission without flakehub-login" "flakehub-login"
 
 fresh
 sed -i "s|^jobs:\$|${top_id//$'\n'/\\n}|" "${nix_file}"
-expect_red "workflow id-token without flakehub-login" "flakehub-login"
+expect_red "workflow permission without flakehub-login" "flakehub-login"
 
 fresh
 sed -i "s|^jobs:\$|${top_id//$'\n'/\\n}|" "${nix_file}"

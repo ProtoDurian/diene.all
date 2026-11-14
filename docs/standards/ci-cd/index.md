@@ -107,9 +107,7 @@ It only echoes the release version, so it runs on GitHub-hosted
 `./scripts/ci/release-note.sh` directly. No `runs-on` label in
 `.github/workflows/` may end in `-latest` (GitHub moves it to a new image
 without a commit here): the `a-runner-labels` hook (`scripts/local/runner-labels.sh`,
-run in CI through pre-commit) is red on one. The `ci-cache-rules` named check (template CI only)
-is red on a cache-tag label without a setup-nix step, on `id-token: write` without
-`flakehub-login: 'false'`, and on `devshell-cache` without `DURIAN_SHELL_KEEP`.
+run in CI through pre-commit) is red on one.
 
 ## Dependency materialisation
 
