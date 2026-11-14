@@ -176,8 +176,11 @@ export default {
       kind: 'mutation',
       expectedImpact: ['hook-helm-check'],
       async run(repo: any) {
-        await repo.patch('chart-checks.yaml', { find: PIN, replace: `    commit: ${'0'.repeat(40)}\n` });
-        await expectExit(repo, 4, []);
+        await repo.patch('chart-checks.yaml', {
+          find: PIN,
+          replace: '    commit: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n',
+        });
+        await expectExit(repo, 4, ['cannot fetch commit']);
       },
     },
     {
@@ -187,7 +190,7 @@ export default {
       expectedImpact: ['hook-helm-check'],
       async run(repo: any) {
         await repo.patch('chart-checks.yaml', { find: PIN, replace: '' });
-        await expectExit(repo, 3, []);
+        await expectExit(repo, 3, ['chart-checks.yaml refused']);
       },
     },
     {
