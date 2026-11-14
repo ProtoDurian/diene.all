@@ -8,7 +8,8 @@ set -euo pipefail
 # - Workflow (.env), job (.jobs.<id>.env) and step (.jobs.<id>.steps[].env) level: DURIAN_SHELL_KEEP.
 #   It is judged for each setup-nix and durian-shell step as GitHub Actions resolves it (step over job over workflow), and must be 64.
 #   Every such step needs it at one of the three levels.
-# - Step level (with:) only: flakehub-login, devshell-cache, store-gc-at-percent (75) and cache-size-gb (40).
+# - Step level (with:) only: flakehub-login, devshell-cache, store-gc-at-percent (90) and cache-size-gb (40).
+# - The nix-store-clean-up.yaml workflow (rule h) is exempt from the 90 percent rule; it needs a schedule, the shared tag, the 40gb volume, no do-not-commit label, and GC at 0/0.
 
 dir="${1:-.github/workflows}"
 if [ ! -d "${dir}" ]; then
@@ -35,7 +36,7 @@ for file in "${dir}"/*.y*ml; do
        ($s | length > 0),
        (($p == "write-all") or (($p | tag) == "!!map" and ($p["id-" + "token"] // "") == "write")),
        ([$s[] | ((.with["flakehub-login"] // "") == "false")] | any_c(. == false) | not),
-       ([$s[] | ((.with["store-gc-at-percent"] // "") == "75")] | any_c(. == false) | not),
+       ([$s[] | ((.with["store-gc-at-percent"] // "") == "90")] | any_c(. == false) | not),
        ([$j["runs-on"]? | .. | select(tag == "!!str") | select(. == "nscloud-cache-size-40gb")] | length > 0),
        ([$s[] | ((.with["cache-size-gb"] // "") == "40")] | any_c(. == false) | not)] | @tsv' "${file}")"; then
     echo "❌ ${file}: yq could not read the workflow" >&2
@@ -52,8 +53,8 @@ for file in "${dir}"/*.y*ml; do
       echo "❌ ${file}: job '${job}' has the OIDC token permission (write), so setup-nix must set flakehub-login: 'false'" >&2
       fail=1
     fi
-    if [ "${gc}" != true ]; then
-      echo "❌ ${file}: job '${job}' has a setup-nix step without store-gc-at-percent: '75'" >&2
+    if [ "${gc}" != true ] && [ "${file##*/}" != nix-store-clean-up.yaml ]; then
+      echo "❌ ${file}: job '${job}' has a setup-nix step without store-gc-at-percent: '90'" >&2
       fail=1
     fi
     if [ "${tag}" = true ] && [ "${size}" != true ]; then
@@ -105,5 +106,68 @@ for file in "${dir}"/*.y*ml; do
     fi
   done <<<"${steps}"
 done
+
+# Rule (h): the nightly clean-up workflow commits the cleaned volume on the shared tag and GCs everything unneeded.
+cleanup="${dir}/nix-store-clean-up.yaml"
+if [ ! -f "${cleanup}" ]; then
+  echo "❌ ${cleanup}: the Nix store clean-up workflow is missing" >&2
+  fail=1
+else
+  # shellcheck disable=SC2016
+  if ! hrows="$(yq -r '(.on.schedule // []) as $sc | .jobs | to_entries[] | .key as $k | .value as $j
+    | ([$j.steps[]? | select((.uses // "") | test("^AtomiCloud/actions.setup-nix@"))]) as $s
+    | [$k,
+       ($sc | length > 0),
+       ([$j["runs-on"]? | .. | select(tag == "!!str") | select(. == "nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64")] | length > 0),
+       ([$j["runs-on"]? | .. | select(tag == "!!str") | select(. == "nscloud-cache-size-40gb")] | length > 0),
+       ([$j["runs-on"]? | .. | select(tag == "!!str") | select(test("do-not-commit"))] | length == 0),
+       ($s | length > 0),
+       ([$s[] | ((.with["cache-size-gb"] // "") == "40")] | any_c(. == false) | not),
+       ([$s[] | ((.with["store-gc-at-percent"] // "") == "0")] | any_c(. == false) | not),
+       ([$s[] | ((.with["store-gc-target-percent"] // "") == "0")] | any_c(. == false) | not)] | @tsv' "${cleanup}")"; then
+    echo "❌ ${cleanup}: yq could not read the workflow" >&2
+    fail=1
+    hrows=""
+  fi
+  [ -n "${hrows}" ] || {
+    echo "❌ ${cleanup}: the clean-up workflow has no job" >&2
+    fail=1
+  }
+  while IFS=$'\t' read -r job sched tag size commit nix cgb at target; do
+    [ -n "${job}" ] || continue
+    [ "${sched}" = true ] || {
+      echo "❌ ${cleanup}: the clean-up workflow has no schedule trigger" >&2
+      fail=1
+    }
+    [ "${tag}" = true ] || {
+      echo "❌ ${cleanup}: job '${job}' is not on the shared cache tag" >&2
+      fail=1
+    }
+    [ "${size}" = true ] || {
+      echo "❌ ${cleanup}: job '${job}' does not ask for nscloud-cache-size-40gb" >&2
+      fail=1
+    }
+    [ "${commit}" = true ] || {
+      echo "❌ ${cleanup}: job '${job}' has a do-not-commit label, but the clean-up must commit the volume" >&2
+      fail=1
+    }
+    [ "${nix}" = true ] || {
+      echo "❌ ${cleanup}: job '${job}' has no AtomiCloud/actions.setup-nix step" >&2
+      fail=1
+    }
+    [ "${cgb}" = true ] || {
+      echo "❌ ${cleanup}: job '${job}' setup-nix step is not cache-size-gb: '40'" >&2
+      fail=1
+    }
+    [ "${at}" = true ] || {
+      echo "❌ ${cleanup}: job '${job}' setup-nix step is not store-gc-at-percent: '0'" >&2
+      fail=1
+    }
+    [ "${target}" = true ] || {
+      echo "❌ ${cleanup}: job '${job}' setup-nix step is not store-gc-target-percent: '0'" >&2
+      fail=1
+    }
+  done <<<"${hrows}"
+fi
 [ "${fail}" -eq 0 ] || exit 1
-echo "✅ CI cache labels, flakehub-login, store GC, cache size and DURIAN_SHELL_KEEP are consistent"
+echo "✅ CI cache labels, flakehub-login, store GC, cache size, clean-up workflow and DURIAN_SHELL_KEEP are consistent"

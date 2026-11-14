@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Self-test of ci-cache-rules.sh: the copied workflows are green, and each planted change turns the check red.
+# Self-test of ci-cache-rules.sh: the copied workflows are green, and each planted change turns the check red (including the clean-up workflow rules).
 
 cd "$(git rev-parse --show-toplevel)"
 
@@ -19,6 +19,7 @@ note_file="${tmp}/w/⚡reusable-release-note.yaml"
 idt="id-""token"
 old_keep="2""0"
 bad_keep="3""2"
+old_gc="7""5"
 top_id=$'permissions:\n  '"${idt}"$': write\n\njobs:\n'
 
 fresh
@@ -99,6 +100,28 @@ expect_red "DURIAN_SHELL_KEEP not 64 at step level only" "set at step level"
 fresh
 sed -i "s|^\\( *\\)run: durian-shell .*\$|&\\n\\1env:\\n\\1  DURIAN_SHELL_KEEP: '${bad_keep}'|" "${nix_file}"
 expect_red "step level overrides a correct job level with a wrong value" "set at step level"
+
+fresh
+sed -i "s|store-gc-at-percent: '90'|store-gc-at-percent: '${old_gc}'|" "${nix_file}"
+expect_red "a normal job left at 75 percent" "store-gc-at-percent: '90'"
+
+cleanup_file="${tmp}/w/nix-store-clean-up.yaml"
+
+fresh
+sed -i '/^  schedule:$/,/^    - cron/d' "${cleanup_file}"
+expect_red "clean-up job without schedule" "no schedule trigger"
+
+fresh
+sed -i "s|^\( *\)- nscloud-cache-size-40gb\$|&\n\1- nscloud-cache-exp-do-not-commit|" "${cleanup_file}"
+expect_red "clean-up job with a do-not-commit label" "do-not-commit"
+
+fresh
+sed -i "s|^\( *DURIAN_SHELL_KEEP: \)'64'\$|\1'${old_keep}'|" "${cleanup_file}"
+expect_red "clean-up job with the wrong DURIAN_SHELL_KEEP" "is not '64'"
+
+fresh
+sed -i "s|nscloud-cache-size-40gb|nscloud-cache-size-20gb|; s|cache-size-gb: '40'|cache-size-gb: '20'|" "${cleanup_file}"
+expect_red "clean-up job with the 20 GB size" "nscloud-cache-size-40gb"
 
 [ "${fail}" -eq 0 ] || exit 1
 echo "✅ ci-cache-rules is green unchanged and red on every planted case"

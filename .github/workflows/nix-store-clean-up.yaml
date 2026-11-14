@@ -1,0 +1,46 @@
+name: Nix store clean-up
+
+# Frees every Nix store path that no kept dev shell or Nix profile needs, and commits the cleaned volume.
+# Normal jobs never clean up; they only GC as a safety net at 90 percent.
+
+on:
+  schedule:
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/nix-store-clean-up.yaml
+
+concurrency:
+  group: nix-store-clean-up
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  clean-up:
+    name: Nix store clean-up
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-2x4-with-cache
+      - nscloud-cache-size-40gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 20
+    env:
+      DURIAN_SHELL_KEEP: '64'
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v3
+        with:
+          store-gc-at-percent: '0'
+          store-gc-target-percent: '0'
+          cache-size-gb: '40'
+          checkout: 'false'
+          github-slug: 'false'
+          devshell-cache: 'true'
+          flakehub-login: 'false'
+      - name: Report
+        run: |
+          used="$(df -B1 --output=used /nix | tail -n1 | tr -d ' ')"
+          awk -v b="${used}" 'BEGIN { printf "clean-up: /nix uses %.1f GiB of 40 GB after GC\n", b / 1073741824 }'
+          kept="$(find /nix/durian-shell -name '*.root' ! -name '*.bash.root' 2>/dev/null | wc -l)"
+          echo "clean-up: ${kept} kept dev shells"

@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 1
       - uses: AtomiCloud/actions.setup-nix@v3
         with:
-          store-gc-at-percent: '75'
+          store-gc-at-percent: '90'
           cache-size-gb: '40'
           checkout: 'false'
           github-slug: 'false'

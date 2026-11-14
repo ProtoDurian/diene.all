@@ -28,16 +28,24 @@ their trigger block:
   - Every setup-nix or `durian-shell` step has `DURIAN_SHELL_KEEP: '64'` at workflow, job or step level (a step
     overrides a job, a job overrides the workflow), so repositories sharing the cache volume do not evict each
     other's shells.
-  - Every setup-nix step sets `store-gc-at-percent: '75'` so the Nix store is collected before the volume fills.
+  - Normal jobs never clean up the Nix store. Every setup-nix step in them sets `store-gc-at-percent: '90'`, a safety
+    net that starts a collection only at 36 GB of the 40 GB volume and should never fire.
+  - The nightly `Nix store clean-up` workflow (`nix-store-clean-up.yaml`, 10:00 UTC, also on manual dispatch and when the
+    workflow file changes) runs one job on the shared cache tag. Its setup-nix step sets `store-gc-at-percent: '0'` and
+    `store-gc-target-percent: '0'`, so it frees every store path that no kept dev shell and no Nix profile needs, and
+    the job commits the cleaned volume. It has no `nscloud-cache-exp-do-not-commit` label, runs nothing else, and
+    keeps the 64 newest dev shells (each one is a GC root).
   - A job on the shared cache tag asks for `nscloud-cache-size-40gb` and its setup-nix step sets
-    `cache-size-gb: '40'` (the action cannot read runs-on labels, so the two must agree), so collection starts at
-    30 GB.
+    `cache-size-gb: '40'` (the action cannot read runs-on labels, so the two must agree), so the safety-net percent
+    is read against the real size.
   - Jobs that read no git history (Helm) check out with `fetch-depth: 1` and set `checkout: 'false'` on setup-nix.
   - A setup-nix step in a job with `id-token: write` sets `flakehub-login: 'false'`.
   - Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
   - Jobs that read no `GITHUB_*_SLUG` variable set `github-slug: 'false'`.
   - The pre-commit script runs every hook, including `a-skills-sync` (`skills-sync sync --frozen`), so CI enforces
     the vendored skills without a separate step.
+
+  The standalone `nix-store-clean-up.yaml` is the one workflow outside both kinds: it runs the nightly clean-up itself.
 
   Callers grant permissions, pass only repository-specific values, and use
   `secrets: inherit`. The `a-workflows` gate enforces that every orchestrator job
