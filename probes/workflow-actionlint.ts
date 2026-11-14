@@ -108,5 +108,26 @@ export default {
         await expectRedBecause(repo, check, 'workflow-actionlint', ['flakehub-login']);
       },
     },
+    {
+      name: 'mutation-workflow-second-setup-nix-without-flakehub-login-caught',
+      description:
+        'A second setup-nix step with no flakehub-login false in a job with id-token: write must turn the ci-cache-rules named check red.',
+      kind: 'mutation',
+      expectedImpact: [],
+      async run(repo: any) {
+        const check = 'nix develop .#ci -c ./.github/named-checks/workspace/ci-cache-rules.sh';
+        await expectGreen(repo, check, 'workflow-actionlint');
+        await repo.patch('.github/workflows/⚡reusable-named-checks.yaml', {
+          find: "          devshell-cache: 'true'\n",
+          replace:
+            "          devshell-cache: 'true'\n          flakehub-login: 'false'\n      - uses: AtomiCloud/actions.setup-nix@v3\n",
+        });
+        await repo.patch('.github/workflows/⚡reusable-named-checks.yaml', {
+          find: 'jobs:\n',
+          replace: 'permissions:\n  id-token: write\n\njobs:\n',
+        });
+        await expectRedBecause(repo, check, 'workflow-actionlint', ['flakehub-login']);
+      },
+    },
   ],
 };

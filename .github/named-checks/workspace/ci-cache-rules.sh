@@ -30,7 +30,7 @@ for file in .github/workflows/*.y*ml; do
        ([$j["runs-on"]? | .. | select(tag == "!!str") | select(test("^nscloud-cache-tag-"))] | length > 0),
        ($s | length > 0),
        (($p == "write-all") or (($p | tag) == "!!map" and ($p["id-" + "token"] // "") == "write")),
-       (([$s[].with["flakehub-login"]?] | length > 0) and ([$s[].with["flakehub-login"]?] | all_c(. == "false"))),
+       ([$s[] | ((.with["flakehub-login"] // "") == "false")] | any_c(. == false) | not),
        ([$s[].with["devshell-cache"]?] | any_c(. == "true")),
        (($j.env.DURIAN_SHELL_KEEP // "") != "")] | @tsv' "${file}")
 done
