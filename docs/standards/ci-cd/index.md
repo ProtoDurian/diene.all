@@ -22,25 +22,28 @@ their trigger block:
   block to see when.
 - **Reusable workflows** — `on.workflow_call` only, named with a `⚡` prefix.
   Each owns runner selection and setup and ends in a `run:` line of the form
-  `durian-shell .#<shell> -c ./scripts/ci/<script>.sh`. `durian-shell` comes from
-  `AtomiCloud/actions.setup-nix` (`devshell-cache: 'true'`): it is `nix develop -c` with the
-  evaluated shell kept on the cache volume, and plain `nix develop` anywhere it cannot
-  cache. Every job with `devshell-cache: 'true'` sets job-level `DURIAN_SHELL_KEEP: '64'` so repositories
-  sharing the cache volume do not evict each other's shells. Every setup-nix step sets
-  `store-gc-at-percent: '75'` so the Nix store is collected before the volume fills; a job on the shared cache tag asks for
-  `nscloud-cache-size-40gb` and its setup-nix step sets `cache-size-gb: '40'` (the action cannot read runs-on labels, so the two must
-  agree), so collection starts at 30 GB. Jobs that read no git history (Helm) check out with `fetch-depth: 1` and set
-  `checkout: 'false'` on setup-nix. A setup-nix step in a job with
-  `id-token: write` sets `flakehub-login: 'false'`. Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
-  Jobs that read no `GITHUB_*_SLUG` variable set `github-slug: 'false'`. The pre-commit script runs
-  every hook, including `a-skills-sync` (`skills-sync sync --frozen`), so CI
-  enforces the vendored skills without a separate step.
+  `durian-shell .#<shell> -c ./scripts/ci/<script>.sh`.
+  - `durian-shell` comes from `AtomiCloud/actions.setup-nix` (`devshell-cache: 'true'`): it is `nix develop -c` with
+    the evaluated shell kept on the cache volume, and plain `nix develop` anywhere it cannot cache.
+  - Every job with `devshell-cache: 'true'` sets `DURIAN_SHELL_KEEP: '64'` at workflow, job or step level (a step
+    overrides a job, a job overrides the workflow), so repositories sharing the cache volume do not evict each
+    other's shells.
+  - Every setup-nix step sets `store-gc-at-percent: '75'` so the Nix store is collected before the volume fills.
+  - A job on the shared cache tag asks for `nscloud-cache-size-40gb` and its setup-nix step sets
+    `cache-size-gb: '40'` (the action cannot read runs-on labels, so the two must agree), so collection starts at
+    30 GB.
+  - Jobs that read no git history (Helm) check out with `fetch-depth: 1` and set `checkout: 'false'` on setup-nix.
+  - A setup-nix step in a job with `id-token: write` sets `flakehub-login: 'false'`.
+  - Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
+  - Jobs that read no `GITHUB_*_SLUG` variable set `github-slug: 'false'`.
+  - The pre-commit script runs every hook, including `a-skills-sync` (`skills-sync sync --frozen`), so CI enforces
+    the vendored skills without a separate step.
 
-Callers grant permissions, pass only repository-specific values, and use
-`secrets: inherit`. The `a-workflows` gate enforces that every orchestrator job
-resolves to a repository-local reusable workflow, that each reusable workflow
-calls an existing, executable `scripts/ci` entry point, and that the release
-workflow keeps its trigger and concurrency group.
+  Callers grant permissions, pass only repository-specific values, and use
+  `secrets: inherit`. The `a-workflows` gate enforces that every orchestrator job
+  resolves to a repository-local reusable workflow, that each reusable workflow
+  calls an existing, executable `scripts/ci` entry point, and that the release
+  workflow keeps its trigger and concurrency group.
 
 `AtomiCloud/actions.setup-nix` checks out the repository, so do not add an
 adjacent `actions/checkout`.
