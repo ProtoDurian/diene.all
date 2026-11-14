@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# A cache-tag label needs a setup-nix step; id-token needs flakehub-login off; a cached shell needs DURIAN_SHELL_KEEP.
+# A cache-tag label needs a setup-nix step; the OIDC token permission needs flakehub-login off; a cached shell needs DURIAN_SHELL_KEEP.
 
-root="$(git rev-parse --show-toplevel)"
-cd "${root}"
+cd "$(git rev-parse --show-toplevel)"
 
 fail=0
 # shellcheck disable=SC2016
@@ -17,19 +16,20 @@ for file in .github/workflows/*.y*ml; do
       fail=1
     fi
     if [ "${idtoken}" = true ] && [ "${nix}" = true ] && [ "${login}" != true ]; then
-      echo "❌ ${file}: job '${job}' has id-token: write, so setup-nix must set flakehub-login: 'false'" >&2
+      echo "❌ ${file}: job '${job}' has the OIDC token permission (write), so setup-nix must set flakehub-login: 'false'" >&2
       fail=1
     fi
     if [ "${cache}" = true ] && [ "${keep}" != true ]; then
       echo "❌ ${file}: job '${job}' sets devshell-cache: 'true' but not DURIAN_SHELL_KEEP" >&2
       fail=1
     fi
-  done < <(yq -r '.jobs | to_entries[] | .key as $k | .value as $j
+  done < <(yq -r '(.permissions // null) as $top | .jobs | to_entries[] | .key as $k | .value as $j
+    | ($j.permissions // $top) as $p
     | ([$j.steps[]? | select((.uses // "") | test("^AtomiCloud/actions.setup-nix@"))]) as $s
     | [$k,
        ([$j["runs-on"]? | .. | select(tag == "!!str") | select(test("^nscloud-cache-tag-"))] | length > 0),
        ($s | length > 0),
-       (($j.permissions["id-token"]? // "") == "write"),
+       (($p == "write-all") or (($p | tag) == "!!map" and ($p["id-" + "token"] // "") == "write")),
        (([$s[].with["flakehub-login"]?] | length > 0) and ([$s[].with["flakehub-login"]?] | all_c(. == "false"))),
        ([$s[].with["devshell-cache"]?] | any_c(. == "true")),
        (($j.env.DURIAN_SHELL_KEEP // "") != "")] | @tsv' "${file}")

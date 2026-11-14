@@ -68,15 +68,6 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    a-ci-cache-rules = {
-      enable = true;
-      name = "CI cache rules";
-      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH bash scripts/local/ci-cache-rules.sh'";
-      files = "^(\\.github/workflows/.*|scripts/local/ci-cache-rules\\.sh)$";
-      pass_filenames = false;
-      language = "system";
-    };
-
     a-infisical = {
       enable = true;
       name = "Secrets scan";

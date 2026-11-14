@@ -48,11 +48,11 @@ export default {
     },
     {
       name: 'mutation-workflow-cache-tag-without-setup-nix-caught',
-      description: 'A cache-tag label on a job with no setup-nix step must turn the ci-cache-rules check red.',
+      description: 'A cache-tag label on a job with no setup-nix step must turn the ci-cache-rules named check red.',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        const check = 'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-ci-cache-rules --all-files';
+        const check = 'nix develop .#ci -c ./.github/named-checks/workspace/ci-cache-rules.sh';
         await expectGreen(repo, check, 'workflow-actionlint');
         await repo.patch('.github/workflows/⚡reusable-release-note.yaml', {
           find: 'runs-on: ubuntu-26.04',
@@ -64,11 +64,11 @@ export default {
     {
       name: 'mutation-workflow-id-token-without-flakehub-login-caught',
       description:
-        'A job with id-token: write and a setup-nix step without flakehub-login false must turn the ci-cache-rules check red.',
+        'A job with id-token: write and a setup-nix step without flakehub-login false must turn the ci-cache-rules named check red.',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        const check = 'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-ci-cache-rules --all-files';
+        const check = 'nix develop .#ci -c ./.github/named-checks/workspace/ci-cache-rules.sh';
         await expectGreen(repo, check, 'workflow-actionlint');
         await repo.patch('.github/workflows/⚡reusable-named-checks.yaml', {
           find: '    timeout-minutes: 20\n',
@@ -79,17 +79,33 @@ export default {
     },
     {
       name: 'mutation-workflow-devshell-cache-without-keep-caught',
-      description: 'A devshell-cache job without DURIAN_SHELL_KEEP must turn the ci-cache-rules check red.',
+      description: 'A devshell-cache job without DURIAN_SHELL_KEEP must turn the ci-cache-rules named check red.',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        const check = 'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-ci-cache-rules --all-files';
+        const check = 'nix develop .#ci -c ./.github/named-checks/workspace/ci-cache-rules.sh';
         await expectGreen(repo, check, 'workflow-actionlint');
         await repo.patch('.github/workflows/⚡reusable-named-checks.yaml', {
           find: "    env:\n      DURIAN_SHELL_KEEP: '64'\n",
           replace: '',
         });
         await expectRedBecause(repo, check, 'workflow-actionlint', ['DURIAN_SHELL_KEEP']);
+      },
+    },
+    {
+      name: 'mutation-workflow-top-level-id-token-without-flakehub-login-caught',
+      description:
+        'A workflow-level id-token: write inherited by a setup-nix job without flakehub-login false must turn the ci-cache-rules named check red.',
+      kind: 'mutation',
+      expectedImpact: [],
+      async run(repo: any) {
+        const check = 'nix develop .#ci -c ./.github/named-checks/workspace/ci-cache-rules.sh';
+        await expectGreen(repo, check, 'workflow-actionlint');
+        await repo.patch('.github/workflows/⚡reusable-named-checks.yaml', {
+          find: 'jobs:\n',
+          replace: 'permissions:\n  id-token: write\n\njobs:\n',
+        });
+        await expectRedBecause(repo, check, 'workflow-actionlint', ['flakehub-login']);
       },
     },
   ],
