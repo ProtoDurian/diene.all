@@ -82,8 +82,8 @@ regenerates (scope tables included) and nobody reads or commits. Do not point it
 the hand-written document, and do not run `releaser conventions` to update that
 document.
 
-The hand-written document stays excluded from `treefmt` in
-[`nix/fmt.nix`](../../../nix/fmt.nix) so the format gate leaves its tables as written.
+`treefmt` formats the hand-written document like any other Markdown file (prettier aligns
+its tables), and the probe reads the type table after that formatting.
 
 ## How a release is triggered
 

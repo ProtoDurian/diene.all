@@ -1,5 +1,5 @@
 {{/*
-root.reload.*: one value, `reload` (live or restart), decides the pod label and the Reloader annotations.
+root.reload.*: one value, live or restart, decides the pod label and the Reloader annotations.
   restart -> Reloader restarts the workload when any ConfigMap or Secret it uses changes.
   live    -> the app re-reads its whole-folder config in place; Reloader restarts the workload only for the start-only
              inputs listed in `restartOnlyConfigs` ({kind: secret|configmap, name, via: env|envFrom|subPath}).
@@ -8,10 +8,12 @@ Every helper takes a dict: root (the chart context $) and podSpec (the workload'
   pod template annotations: include "root.reload.podAnnotations"
   workload annotations:     include "root.reload.annotations"
   pod template volumes:     include "root.reload.podinfoVolume" (and "root.reload.podinfoMount" on each container)
-`reload` has no default: the render fails when it is missing or not live|restart.
+The default, `restart`, is set once here (root.reload.mode). A values file may override it with `reload`; a value that is
+not live|restart fails the render.
 */}}
 {{- define "root.reload.mode" -}}
-{{- $r := .root.Values.reload -}}
+{{- $r := "restart" -}}
+{{- if hasKey .root.Values "reload" -}}{{- $r = .root.Values.reload -}}{{- end -}}
 {{- if not (has $r (list "live" "restart")) -}}
 {{- fail (printf "values.reload must be \"live\" or \"restart\" (it becomes pod label %s/reload); got %q" .root.Values.labelPrefix (toString $r)) -}}
 {{- end -}}

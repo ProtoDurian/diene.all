@@ -47,14 +47,17 @@ export function workload(opts: WorkloadOptions = {}): string {
 }
 
 export interface ValuesOptions {
-  reload: string | null; // null removes the key
+  reload: string | null; // null leaves the key out, so the chart helper's default applies
   startOnly?: object[]; // restartOnlyConfigs entries
 }
 
 // Sets the two reload values of the root chart. Idempotent, so probes that share a sandbox never see each other's state.
+// The shipped values file has no active `reload:` line (the helper holds the default), so a value is appended.
 export async function setValues(repo: any, opts: ValuesOptions): Promise<void> {
-  const reload = opts.reload === null ? "sed -i '/^reload:/d'" : `sed -i 's/^reload:.*/reload: ${opts.reload}/'`;
+  const reload =
+    `sed -i '/^reload:/d' ${VALUES}` +
+    (opts.reload === null ? '' : ` && printf 'reload: %s\\n' '${opts.reload}' >> ${VALUES}`);
   const startOnly = `sed -i 's/^restartOnlyConfigs:.*/restartOnlyConfigs: ${JSON.stringify(opts.startOnly ?? []).replaceAll('/', '\\/')}/'`;
-  const result = await repo.exec(`${reload} ${VALUES} && ${startOnly} ${VALUES}`);
+  const result = await repo.exec(`${reload} && ${startOnly} ${VALUES}`);
   if (result.exitCode !== 0) throw new Error(`could not set the root chart values: ${result.stderr || result.stdout}`);
 }

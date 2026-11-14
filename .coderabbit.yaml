@@ -3,4 +3,3 @@ reviews:
   path_filters:
     - '!docs/standards/**/*.md'
     - '!docs/domain/**/*.md'
-version: 2

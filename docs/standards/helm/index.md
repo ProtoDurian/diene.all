@@ -39,22 +39,28 @@ nix-registry tool, configured by the root `chart-checks.yaml`) on the result. It
    (`kubernetes:`), unknown fields refused. A kind with no schema fails, so a chart that ships CRDs
    must list them under `crds:` in `chart-checks.yaml`.
 2. **Policies** — every `policies:` entry is rendered with `helm template` and its
-   `ValidatingAdmissionPolicy` objects are evaluated against each rendered object. Workspace lists one
-   local entry, the chart `infra/policies`, whose `require-lpsm-labels` policy needs the four LPSM
-   labels. The full cluster policy set is the vanadium chart; workspace never depends on it, so
-   downstream repos add their own `policies:` entries.
+   `ValidatingAdmissionPolicy` objects are evaluated against each rendered object. The policy chart lives in
+   its own repo, the stand-in `https://github.com/ProtoDurian/cluster-policies-standin` (chart in `chart/`, name
+   `cluster-policies`; its own CI runs its cases). Workspace lists it as one git entry in `chart-checks.yaml`,
+   pinned by `commit:` (a missing or unpinned entry is refused, exit 3; a commit that cannot be fetched fails the
+   install, exit 4). `scripts/local/helm-check.sh` installs it into the gitignored `.chart-checks/` first. Its
+   `require-lpsm-labels` policy needs the four LPSM labels. Swapping the stand-in for the real cluster chart
+   changes the address and the commit in that entry only; downstream repos add their own `policies:` entries.
 
 ### Label prefix
 
 Labels are `<labelPrefix>/landscape`, `/platform`, `/service` and `/module`, taken from the root
 chart's `serviceTree:` values. `labelPrefix` (default `durian.cloud`) is one value in
-`infra/root_chart/values.yaml`; the policy chart reads the same key, set from it. Change it in
-`infra/root_chart/values.yaml` only: `scripts/local/helm-check.sh` renders the policy chart with the root chart's value (per values stack), so one change moves every label and check.
+`infra/root_chart/values.yaml`. `chart-checks` passes no values to a fetched chart, so `scripts/local/helm-check.sh`
+copies the `cluster-policies` chart, sets its `labelPrefix` from the root chart (per values stack, found by the
+entry name) and points only that entry at the copy. Change the prefix in `infra/root_chart/values.yaml` only: one
+change moves every label and check.
 
 ### Reload label
 
 Every Pod (so every workload pod template) carries `<labelPrefix>/reload` with the value `live` or `restart`. The
-`reload` chart value is required and has no default: the render fails when it is missing or neither. The policy chart's
+default, `restart`, is set once in the root chart helper (`root.reload.mode` in `templates/_helpers.tpl`). A values
+file may override it with `reload: live`; any other value fails the render. The policy chart's
 `reload-label-required` policy refuses a missing label or any other value, and `chart-checks` evaluates the same policy
 on the render. The root chart's `root.reload.*` helpers (`templates/_helpers.tpl`) map the value:
 
@@ -67,13 +73,17 @@ on the render. The root chart's `root.reload.*` helpers (`templates/_helpers.tpl
   `secret.reloader.stakater.com/reload` / `configmap.reloader.stakater.com/reload`, so Reloader restarts the workload for
   those alone. There is no checksum annotation on a live pod template.
 
-The helpers fail the render when the `reload` value is missing or not `live|restart`, when a `live` workload gets config by `env`,
+The helpers fail the render when the `reload` value is not `live|restart`, when a `live` workload gets config by `env`,
 `envFrom` or a `subPath` mount of a ConfigMap, Secret or projected volume (unless that object is in `restartOnlyConfigs`),
 when a `live` workload sets an `ATOMI_*` env var, or when a `restartOnlyConfigs` entry has a bad `kind` or `via`. The
 `reload-live-inputs` policy refuses the same inputs on a live pod unless the object is in the pod's `restart-configs`
 annotation. Every template and example uses `restart` until the app passes the live-reload test.
 
-Helm test hooks and the named Alloy operator Deployment and Job (`alloyOperator` in `infra/policies/values.yaml`) are
+Live or restart is chosen once per template or wrapped chart (the helper default, or one `reload` override in its
+values file); there is no per-service check. A live app notices a change in its config folder by itself in about a
+minute. A poke, SIGHUP or the app's private POST endpoint are hand tools only: no poke code exists here.
+
+Helm test hooks and the named Alloy operator Deployment and Job (`alloyOperator` in the `cluster-policies` values) are
 exempt from the label rules; the exception names those objects exactly and is not a general opt-out.
 
 ### Where it runs

@@ -1,7 +1,8 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { capturedEnvCommand, expectGreen, expectRed, expectRedBecause } from './lib/helpers.ts';
 import { setValues, workload } from './lib/helm-workload.ts';
 
 const CHECK = 'nix develop .#ci -c ./scripts/local/helm-check.sh infra/root_chart';
+const RENDER = 'nix develop .#ci -c helm template x infra/root_chart';
 const TEMPLATE = 'infra/root_chart/templates/probe-deploy.yaml';
 const container = { name: 'c', image: 'nginx:1.27' };
 const envFrom = { containers: [{ ...container, envFrom: [{ configMapRef: { name: 'cfg' } }] }] };
@@ -78,12 +79,30 @@ export default {
     },
     {
       name: 'mutation-helm-reload-required-caught',
-      description: 'The shipped root chart with no reload value must fail the render.',
+      description:
+        'With no reload value the root chart renders the helper default (restart: pod label and the Reloader auto annotation); reload: live in the values file overrides it (label live, no auto annotation); reload: sometimes must fail the render.',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
+        const render = async () => {
+          const result = await repo.exec(capturedEnvCommand(RENDER, 'helm-reload'), { timeoutMs: 240000 });
+          if (result.exitCode !== 0) throw new Error(`helm template failed: ${result.stderr || result.stdout}`);
+          return result.stdout as string;
+        };
         await setValues(repo, { reload: null });
-        await expectRed(repo, CHECK, 'helm-reload');
+        const byDefault = await render();
+        if (!/\/reload: "restart"/.test(byDefault) || !byDefault.includes('reloader.stakater.com/auto: "true"')) {
+          throw new Error('no reload value did not render the helper default (restart label and auto annotation)');
+        }
+        await setValues(repo, { reload: 'live' });
+        const overridden = await render();
+        if (!/\/reload: "live"/.test(overridden) || overridden.includes('reloader.stakater.com/auto')) {
+          throw new Error(
+            'reload: live in the values file did not override the default (live label, no auto annotation)',
+          );
+        }
+        await setValues(repo, { reload: 'sometimes' });
+        await expectRedBecause(repo, CHECK, 'helm-reload', ['values.reload must be']);
       },
     },
     {

@@ -101,8 +101,11 @@ GitHub-hosted `ubuntu-26.04`.
 
 The release-note job (`⚡reusable-release-note.yaml`) is the other exception.
 It only echoes the release version, so it runs on GitHub-hosted
-`ubuntu-latest` with `actions/checkout` and no Nix, and calls
-`./scripts/ci/release-note.sh` directly.
+`ubuntu-26.04` with `actions/checkout` and no Nix, and calls
+`./scripts/ci/release-note.sh` directly. No `runs-on` label in
+`.github/workflows/` may end in `-latest` (GitHub moves it to a new image
+without a commit here): the `a-runner-labels` hook (`scripts/local/runner-labels.sh`,
+run in CI through pre-commit) is red on one.
 
 ## Dependency materialisation
 

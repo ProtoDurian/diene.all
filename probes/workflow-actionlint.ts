@@ -1,4 +1,4 @@
-import { expectGreen, expectRed } from './lib/helpers.ts';
+import { expectGreen, expectRed, expectRedBecause } from './lib/helpers.ts';
 
 export default {
   contractVersion: 1,
@@ -29,6 +29,21 @@ export default {
         } finally {
           await repo.write(path, original);
         }
+      },
+    },
+    {
+      name: 'mutation-workflow-runner-latest-caught',
+      description: 'A runs-on label ending in -latest in a workflow must turn the runner-labels check red.',
+      kind: 'mutation',
+      expectedImpact: [],
+      async run(repo: any) {
+        const check = 'nix develop .#ci -c ./scripts/local/runner-labels.sh';
+        await expectGreen(repo, check, 'workflow-actionlint');
+        await repo.patch('.github/workflows/⚡reusable-release-note.yaml', {
+          find: 'runs-on: ubuntu-26.04',
+          replace: 'runs-on: ubuntu-latest',
+        });
+        await expectRedBecause(repo, check, 'workflow-actionlint', ['ends in -latest']);
       },
     },
   ],

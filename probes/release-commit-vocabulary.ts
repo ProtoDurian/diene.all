@@ -51,7 +51,7 @@ export default {
       expectedImpact: [],
       async run(repo: any) {
         await repo.patch('docs/developer/CommitConventions.md', {
-          find: '| `amend` | Small amendments and typo fixes |\n',
+          find: '| `amend`    | Small amendments and typo fixes |\n',
           replace: '',
         });
         await expectRed(repo, DOC, 'release-commit-vocabulary');

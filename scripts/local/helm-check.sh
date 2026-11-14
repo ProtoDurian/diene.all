@@ -4,8 +4,9 @@ set -euo pipefail
 # Renders a chart fresh into the gitignored infra/rendered/<chart>/ (scripts/local/helm-render.sh),
 # runs `helm lint`, then checks every rendered file in two steps:
 #   1. `chart-checks check`: Kubernetes schemas (unknown fields refused) and the
-#      ValidatingAdmissionPolicies of the policy charts listed in chart-checks.yaml. The policy
-#      chart is rendered with the labelPrefix of the stack being checked (the chart's own value
+#      ValidatingAdmissionPolicies of the policy charts listed in chart-checks.yaml (installed first;
+#      the cluster-policies chart is fetched from its stand-in repo at the pinned commit). That
+#      chart is rendered with the labelPrefix of the stack being checked (the root chart's own value
 #      plus that stack's overlay). The LPSM label rule and the reload label rule there cover
 #      workloads and pod templates only, upstream subcharts included.
 #   2. First-party labels: every object from the chart's OWN templates (not its subcharts),
@@ -40,6 +41,16 @@ stack_prefix() {
 }
 
 policy_dir="infra/rendered/policies"
+fetched=".chart-checks/policies/cluster-policies"
+
+# chart-checks.yaml pins the policy chart by commit; install fetches it into .chart-checks/ (exit 4 when the
+# commit cannot be fetched, 3 when the config is refused).
+chart-checks install -c chart-checks.yaml
+[ -d "${fetched}" ] || {
+  echo "❌ chart-checks did not install ${fetched}" >&2
+  exit 1
+}
+
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 mkdir -p "${root}/.chart-checks"
@@ -56,14 +67,14 @@ for file in "${files[@]}"; do
 
   rm -rf "${policy_dir}"
   mkdir -p "${policy_dir}"
-  cp -R infra/policies/. "${policy_dir}/"
+  cp -R "${fetched}/." "${policy_dir}/"
   PREFIX="${prefix}" yq -i '.labelPrefix = strenv(PREFIX)' "${policy_dir}/values.yaml"
-  # Only the workspace policy entry points at the rendered copy; every other entry keeps its
-  # own path. chart-checks resolves paths next to the config file, so they are given relative to the
+  # Only the cluster-policies entry (a git entry) points at the rendered copy; every other entry
+  # keeps its own source. chart-checks resolves paths next to the config file, so they are given relative to the
   # temporary config directory.
   ROOT="${rel_root}" POLICY_DIR="${rel_root}/${policy_dir}" yq '
-    (.policies[] | select(.name == "workspace-policies") | .path) = strenv(POLICY_DIR)
-    | (.policies[] | select(.name != "workspace-policies") | .path | select(. != null)) |= strenv(ROOT) + "/" + .
+    (.policies[] | select(.name == "cluster-policies")) |= (del(.git) | del(.commit) | del(.subpath) | .path = strenv(POLICY_DIR))
+    | (.policies[] | select(.name != "cluster-policies") | .path | select(. != null)) |= strenv(ROOT) + "/" + .
   ' chart-checks.yaml >"${tmp}/chart-checks.yaml"
   chart-checks check -c "${tmp}/chart-checks.yaml" "${file}"
 

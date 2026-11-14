@@ -21,7 +21,6 @@ D_TOKENS=(
 
 H_PATHS=(
   infra/root_chart
-  infra/policies
   '.github/workflows/⚡reusable-helm.yaml'
   tasks/Taskfile.helm.yaml
   scripts/ci/helm.sh
@@ -41,7 +40,7 @@ H_PATHS=(
 H_TOKENS=(
   root_chart reusable-helm Taskfile.helm helm.sh helm-push standards/helm
   helm/index.md a-helm-lint a-helm-check helm-lint helm-render helm-check helm-reload helm-workload
-  infra/rendered infra/policies chart-checks
+  infra/rendered chart-checks
 )
 
 DH_PATHS=(infra)

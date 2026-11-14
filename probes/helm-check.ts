@@ -1,6 +1,18 @@
 import { capturedEnvCommand, expectGreen, expectRed, expectRedBecause } from './lib/helpers.ts';
 
 const CHECK = 'nix develop .#ci -c ./scripts/local/helm-check.sh infra/root_chart';
+const PIN = '    commit: 560e7fc4ee8aae51cae8a00aa68aa4e4fe6af3e1\n';
+
+// Runs the check and requires one exact exit code plus a refusal text (chart-checks: 3 = config refused, 4 = install failed).
+async function expectExit(repo: any, code: number, reasons: readonly string[]): Promise<void> {
+  const result = await repo.exec(capturedEnvCommand(CHECK, 'helm-check'), { timeoutMs: 240000 });
+  const output = `${result.stdout}\n${result.stderr}`;
+  if (result.exitCode !== code) {
+    throw new Error(`helm-check exited ${result.exitCode}, expected ${code}\n${output}`);
+  }
+  const missing = reasons.filter(reason => !output.includes(reason));
+  if (missing.length > 0) throw new Error(`helm-check exit ${code} without (${missing.join(', ')})\n${output}`);
+}
 const LPSM = ['landscape', 'platform', 'service', 'module'].map(k => `{{ $.Values.labelPrefix }}/${k}: x`).join(', ');
 
 export default {
@@ -27,7 +39,8 @@ export default {
     },
     {
       name: 'mutation-helm-check-pod-template-caught',
-      description: 'A workload whose pod template lacks the LPSM labels must turn the helm-check mechanism red.',
+      description:
+        'A workload whose pod template lacks the LPSM labels must turn the helm-check mechanism red through the cluster-policies chart fetched from the stand-in.',
       kind: 'mutation',
       expectedImpact: ['hook-helm-check'],
       async run(repo: any) {
@@ -49,7 +62,7 @@ export default {
             '',
           ].join('\n'),
         );
-        await expectRed(repo, CHECK, 'helm-check');
+        await expectRedBecause(repo, CHECK, 'helm-check', ['require-lpsm-labels']);
       },
     },
     {
@@ -112,7 +125,7 @@ export default {
     {
       name: 'mutation-helm-check-second-policy-caught',
       description:
-        'A second policies entry in chart-checks.yaml keeps its own path and is still evaluated: its violated policy must turn the helm-check mechanism red, and removing the entry makes it green again.',
+        'A second policies entry beside the pinned cluster-policies git entry keeps its own path and is still evaluated: its violated policy must turn the helm-check mechanism red, and removing the entry makes it green again.',
       kind: 'mutation',
       expectedImpact: ['hook-helm-check'],
       async run(repo: any) {
@@ -149,12 +162,32 @@ export default {
             '',
           ].join('\n'),
         );
-        const entry = '    path: infra/policies';
+        const entry = '    subpath: chart';
         const extra = '\n  - name: extra-policy\n    path: infra/rendered/extra-policy';
         await repo.patch('chart-checks.yaml', { find: entry, replace: entry + extra });
         await expectRedBecause(repo, CHECK, 'helm-check', ['extra-deny-configmaps']);
         await repo.patch('chart-checks.yaml', { find: entry + extra, replace: entry });
         await expectGreen(repo, CHECK, 'helm-check');
+      },
+    },
+    {
+      name: 'mutation-helm-check-wrong-commit-caught',
+      description: 'A cluster-policies commit that cannot be fetched must fail the chart-checks install (exit 4).',
+      kind: 'mutation',
+      expectedImpact: ['hook-helm-check'],
+      async run(repo: any) {
+        await repo.patch('chart-checks.yaml', { find: PIN, replace: `    commit: ${'0'.repeat(40)}\n` });
+        await expectExit(repo, 4, []);
+      },
+    },
+    {
+      name: 'mutation-helm-check-unpinned-caught',
+      description: 'A cluster-policies entry without commit: must be refused by chart-checks (exit 3).',
+      kind: 'mutation',
+      expectedImpact: ['hook-helm-check'],
+      async run(repo: any) {
+        await repo.patch('chart-checks.yaml', { find: PIN, replace: '' });
+        await expectExit(repo, 3, []);
       },
     },
     {
