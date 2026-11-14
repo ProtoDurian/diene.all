@@ -68,6 +68,7 @@
         devShells = import ./nix/shells.nix {
           inherit pkgs env packages;
           shellHook = checks.pre-commit-check.shellHook;
+          preCommitConfig = checks.pre-commit-check.config.configFile;
         };
         checks = {
           pre-commit-check = pre-commit;

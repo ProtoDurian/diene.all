@@ -15,7 +15,11 @@ export default {
       description: 'The generated dlint hook (exec-bits check) passes tracked shell scripts.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, 'nix develop .#ci -c pre-commit run a-dlint --all-files', 'hook-enforce-exec');
+        await expectGreen(
+          repo,
+          'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-dlint --all-files',
+          'hook-enforce-exec',
+        );
       },
     },
     {
@@ -37,7 +41,10 @@ export default {
             throw new Error(`could not clear the executable bit on ${target}: ${sabotaged.stderr || sabotaged.stdout}`);
           }
           const result = await repo.exec(
-            capturedEnvCommand('nix develop .#ci -c pre-commit run a-dlint --all-files', 'hook-enforce-exec'),
+            capturedEnvCommand(
+              'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-dlint --all-files',
+              'hook-enforce-exec',
+            ),
             { timeoutMs: 240000 },
           );
           if (result.exitCode === 0) {

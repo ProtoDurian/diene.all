@@ -13,10 +13,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
+        with:
+          github-slug: 'false'
+          devshell-cache: 'true'
       - name: Cache chart-checks schemas
         uses: actions/cache@v6
         with:
           path: .chart-checks
           key: chart-checks-${{ hashFiles('chart-checks.yaml') }}
       - name: Run pre-commit
-        run: nix develop .#ci -c ./scripts/ci/pre-commit.sh
+        run: atomi-develop .#ci -c ./scripts/ci/pre-commit.sh

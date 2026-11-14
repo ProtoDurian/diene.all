@@ -22,7 +22,11 @@ their trigger block:
   block to see when.
 - **Reusable workflows** — `on.workflow_call` only, named with a `⚡` prefix.
   Each owns runner selection and setup and ends in a `run:` line of the form
-  `nix develop .#<shell> -c ./scripts/ci/<script>.sh`. The pre-commit script runs
+  `atomi-develop .#<shell> -c ./scripts/ci/<script>.sh`. `atomi-develop` comes from
+  `AtomiCloud/actions.setup-nix` (`devshell-cache: 'true'`): it is `nix develop -c` with the
+  evaluated shell kept on the cache volume, and plain `nix develop` anywhere it cannot
+  cache. Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
+  Jobs that read no `GITHUB_*_SLUG` variable set `github-slug: 'false'`. The pre-commit script runs
   every hook, including `a-skills-sync` (`skills-sync sync --frozen`), so CI
   enforces the vendored skills without a separate step.
 
@@ -69,11 +73,13 @@ Nix store cache.
 ## Runners and cache labels
 
 Every job that runs a script uses the same runner labels, written as the same
-literal in every reusable workflow:
+literal in every reusable workflow. The machine size is the one part that differs:
+Pre-Commit runs on `4x8`; every other Namespace job runs on `2x4`, which bills half
+the units for the same speed on these jobs.
 
 ```yaml
 runs-on:
-  - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+  - nscloud-ubuntu-26.04-amd64-2x4-with-cache
   - nscloud-cache-size-20gb
   - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
 ```

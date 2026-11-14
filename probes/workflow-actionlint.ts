@@ -22,8 +22,8 @@ export default {
         const original = await repo.read(path);
         try {
           await repo.patch(path, {
-            find: '        run: nix develop .#ci -c ./scripts/ci/pre-commit.sh',
-            replace: '        runs: nix develop .#ci -c ./scripts/ci/pre-commit.sh',
+            find: '        run: atomi-develop .#ci -c ./scripts/ci/pre-commit.sh',
+            replace: '        runs: atomi-develop .#ci -c ./scripts/ci/pre-commit.sh',
           });
           await expectRed(repo, 'nix develop .#ci -c actionlint', 'workflow-actionlint');
         } finally {

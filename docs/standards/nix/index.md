@@ -69,7 +69,7 @@ This is about _building_, not about _arranging_. `pkgs.buildEnv`, `pkgs.lib.opti
 
 **How it works**: Takes `env` as input, uses `with env;` to bring group names into scope, then defines named shells using `pkgs.mkShell`. Each shell's `buildInputs` combines groups with `++`. The `shellHook` is passed as a parameter from `flake.nix`.
 
-**IMPORTANT**: All shells must use `inherit shellHook;` — do not override or customize `shellHook` in `shells.nix`. The `shellHook` inheritance must be preserved for downstream nix-resolvers to work correctly. Nix resolvers do not understand custom shellHook modifications.
+**IMPORTANT**: The developer shells (`default`, `releaser`) use `inherit shellHook;` — do not override or customize `shellHook` in `shells.nix`. The `shellHook` inheritance must be preserved for downstream nix-resolvers to work correctly. Nix resolvers do not understand custom shellHook modifications. The CI shells (`ci`, `cd`) take no `shellHook`: nothing commits in CI, so they install no git hooks. The `ci` shell sets `PRE_COMMIT_CONFIG_FILE` to the generated hook config, and `scripts/local/pre-commit-run.sh` passes it to `pre-commit run --config`.
 
 **When to create a new shell**: When you have a distinct workflow requiring a different combination of environment groups. Each shell composes groups differently but always inherits the same `shellHook`.
 

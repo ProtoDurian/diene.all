@@ -3,17 +3,19 @@
   packages,
   env,
   shellHook,
+  preCommitConfig,
 }:
 with env;
 {
+  # CI shells install no git hooks: nothing commits in CI. The ci shell hands the
+  # generated hook config in PRE_COMMIT_CONFIG_FILE (scripts/local/pre-commit-run.sh).
   cd = pkgs.mkShell {
     buildInputs = main ++ system;
-    inherit shellHook;
   };
 
   ci = pkgs.mkShell {
     buildInputs = lint ++ main ++ system;
-    inherit shellHook;
+    PRE_COMMIT_CONFIG_FILE = preCommitConfig;
   };
 
   default = pkgs.mkShell {
