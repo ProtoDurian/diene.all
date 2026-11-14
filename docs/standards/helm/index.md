@@ -102,7 +102,7 @@ that file. `helm lint` runs inside the same task, before `chart-checks check`.
 Publishing is driven by the `⚡reusable-helm.yaml` reusable workflow, called from `ci.yaml`
 (every commit) and `cd.yaml` (release tag):
 
-1. The reusable workflow uses `AtomiCloud/actions.setup-nix` and runs inside `nix develop .#cd`,
+1. The reusable workflow uses `AtomiCloud/actions.setup-nix` and runs inside `nix develop .#ci`,
    so `helm`/`yq` come from the Nix store. The store is restored from the shared Nix cache —
    one cache for all Nix jobs, no per-service keys (see
    [the service-tree standard](../service-tree/index.md)).

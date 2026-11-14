@@ -35,4 +35,4 @@ jobs:
           GITHUB_REPO_REF: ${{ github.repository }}
           GITHUB_SHA: ${{ github.sha }}
           RELEASE_VERSION: ${{ inputs.version }}
-        run: atomi-develop .#cd -c ./scripts/ci/helm.sh
+        run: atomi-develop .#ci -c ./scripts/ci/helm.sh
