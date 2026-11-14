@@ -78,9 +78,13 @@ fresh
 sed -i "/cache-size-gb/d" "${nix_file}"
 expect_red "setup-nix without cache-size-gb 40" "cache-size-gb"
 
-fresh
+sed -i "s|^\( *DURIAN_SHELL_KEEP: \)'64'\$|\1''|" "${tmp}/w/⚡reusable-release.yaml"
 sed -i "s|^    timeout-minutes: 20\$|&\\n    env:\\n      DURIAN_SHELL_KEEP: ''|" "${tmp}/w/⚡reusable-release.yaml"
 expect_red "empty DURIAN_SHELL_KEEP on a job without devshell-cache" "is not '64'"
+
+fresh
+sed -i "/DURIAN_SHELL_KEEP/d" "${tmp}/w/⚡reusable-release.yaml"
+expect_red "setup-nix step without devshell-cache and without DURIAN_SHELL_KEEP" "has no DURIAN_SHELL_KEEP"
 
 fresh
 sed -i '/^    env:$/{N;/DURIAN_SHELL_KEEP/d}' "${nix_file}"

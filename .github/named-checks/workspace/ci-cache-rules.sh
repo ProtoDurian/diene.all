@@ -7,7 +7,7 @@ set -euo pipefail
 # - Job level: runs-on labels (the shared cache tag, nscloud-cache-size-40gb) and permissions (a job overrides the workflow).
 # - Workflow (.env), job (.jobs.<id>.env) and step (.jobs.<id>.steps[].env) level: DURIAN_SHELL_KEEP.
 #   It is judged for each setup-nix and durian-shell step as GitHub Actions resolves it (step over job over workflow), and must be 64.
-#   A step with devshell-cache 'true' needs it at one of the three levels.
+#   Every such step needs it at one of the three levels.
 # - Step level (with:) only: flakehub-login, devshell-cache, store-gc-at-percent (75) and cache-size-gb (40).
 
 dir="${1:-.github/workflows}"
@@ -66,18 +66,17 @@ for file in "${dir}"/*.y*ml; do
     fi
   done <<<"${rows}"
   if ! steps="$(yq -r '(.env // {}) as $w | .jobs | to_entries[] | .key as $k | .value as $j
-    | ([$j.steps[]? | select((.uses // "") | test("^AtomiCloud/actions.setup-nix@")) | .with["devshell-cache"]?] | any_c(. == "true")) as $dc
     | ($j.steps // []) | to_entries[] | .key as $i | .value as $st
     | select((($st.uses // "") | test("^AtomiCloud/actions.setup-nix@")) or (($st.run // "") | test("durian-shell")))
     | (($st.env // {}) | has("DURIAN_SHELL_KEEP")) as $hs | (($j.env // {}) | has("DURIAN_SHELL_KEEP")) as $hj | ($w | has("DURIAN_SHELL_KEEP")) as $hw
-    | [$k, ($st.name // $st.uses // ("#" + ($i | tostring))), $dc,
+    | [$k, ($st.name // $st.uses // ("#" + ($i | tostring))),
        $hs, $hj, $hw,
        "[" + ($st.env.DURIAN_SHELL_KEEP // "") + "]", "[" + ($j.env.DURIAN_SHELL_KEEP // "") + "]", "[" + ($w.DURIAN_SHELL_KEEP // "") + "]"] | @tsv' "${file}")"; then
     echo "❌ ${file}: yq could not read the workflow steps" >&2
     fail=1
     continue
   fi
-  while IFS=$'\t' read -r job step dc hs hj hw sv jv wv; do
+  while IFS=$'\t' read -r job step hs hj hw sv jv wv; do
     [ -n "${job}" ] || continue
     sv="${sv#[}"
     sv="${sv%]}"
@@ -98,10 +97,8 @@ for file in "${dir}"/*.y*ml; do
       value="${wv}"
     fi
     if [ "${level}" = none ]; then
-      if [ "${dc}" = true ]; then
-        echo "❌ ${file}: job '${job}' step '${step}' sets devshell-cache: 'true' but DURIAN_SHELL_KEEP is missing at workflow, job and step level" >&2
-        fail=1
-      fi
+      echo "❌ ${file}: job '${job}' step '${step}' has no DURIAN_SHELL_KEEP at workflow, job or step level" >&2
+      fail=1
     elif [ "${value}" != 64 ]; then
       echo "❌ ${file}: job '${job}' step '${step}' DURIAN_SHELL_KEEP is not '64' (in effect: '${value}', set at ${level} level)" >&2
       fail=1

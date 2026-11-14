@@ -25,7 +25,7 @@ their trigger block:
   `durian-shell .#<shell> -c ./scripts/ci/<script>.sh`.
   - `durian-shell` comes from `AtomiCloud/actions.setup-nix` (`devshell-cache: 'true'`): it is `nix develop -c` with
     the evaluated shell kept on the cache volume, and plain `nix develop` anywhere it cannot cache.
-  - Every job with `devshell-cache: 'true'` sets `DURIAN_SHELL_KEEP: '64'` at workflow, job or step level (a step
+  - Every setup-nix or `durian-shell` step has `DURIAN_SHELL_KEEP: '64'` at workflow, job or step level (a step
     overrides a job, a job overrides the workflow), so repositories sharing the cache volume do not evict each
     other's shells.
   - Every setup-nix step sets `store-gc-at-percent: '75'` so the Nix store is collected before the volume fills.
