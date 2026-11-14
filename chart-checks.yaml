@@ -1,0 +1,7 @@
+# chart-checks: offline schema + policy check of the rendered root chart (scripts/local/helm-check.sh).
+kubernetes: '1.30' # core schemas ship in the nix-pinned kubectl-validate (1.23 to 1.30); install downloads only crds and policies into .chart-checks
+policies:
+  - name: cluster-policies
+    git: https://github.com/ProtoDurian/cluster-policies-standin
+    commit: 560e7fc4ee8aae51cae8a00aa68aa4e4fe6af3e1
+    subpath: chart

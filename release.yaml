@@ -1,47 +1,4 @@
-conventionMarkdown:
-  path: docs/developer/CommitConventions.md
-  template: |
-    # Commit conventions
-
-    CONVENTION_DOCS_PLACEHOLDER
-
-keywords:
-  - BREAKING CHANGE
-  - BREAKING CHANGES
-  - BREAKING
-
-branches:
-  - main
-
-specialScopes:
-  no-release:
-    desc: Prevent release from happening
-    release: false
-
-plugins:
-  - module: '@semantic-release/changelog'
-    version: 6.0.3
-    config:
-      changelogFile: Changelog.md
-  # Deliberately unconfigured, and kept for that reason. Every step of
-  # @semantic-release/exec is skipped unless its own `*Cmd` (or a shared `cmd`) is
-  # set, so an entry with no `config:` is a valid no-op rather than an error - the
-  # plugin stays here, pinned, as the hook point a downstream node fills in. The
-  # usual filling is a `prepareCmd` that stamps the version into whatever file that
-  # node's ecosystem versions; if you add one, add the file it writes to the
-  # `assets` list below in the same edit. This workspace stamps no version file, so
-  # it configures nothing and lists none.
-  - module: '@semantic-release/exec'
-    version: 6.0.3
-  - module: '@semantic-release/git'
-    version: 10.0.1
-    config:
-      message: "release: ${nextRelease.version}\n\n${nextRelease.notes}"
-      assets:
-        - Changelog.md
-        - docs/developer/CommitConventions.md
-  - module: '@semantic-release/github'
-    version: 10.3.5
+schemaVersion: 2
 
 types:
   - type: amend
@@ -140,3 +97,61 @@ types:
       default:
         desc: Add or correct tests
         release: minor
+
+specialScopes:
+  no-release:
+    desc: Prevent release from happening
+    release: false
+
+keywords:
+  - BREAKING CHANGE
+  - BREAKING CHANGES
+  - BREAKING
+
+lint:
+  header:
+    maxLength: 72
+    minLength: 5
+    forbiddenWords:
+      - WIP
+    forbidTrailingPunctuation: true
+  body:
+    maxLineLength: 80
+    minLengthWhenPresent: 20
+    requireBlankSecondLine: true
+  ignore:
+    - merge
+    - revert
+    - fixup
+    - fixup-amend
+    - squash
+
+# The config requires this block and the generator always writes scope tables, so
+# its output goes to an ignored file; docs/developer/CommitConventions.md is hand-written.
+conventions:
+  path: .releaser/conventions.md
+  template: CONVENTION_DOCS_PLACEHOLDER
+
+release:
+  branches:
+    - main
+  tagFormat: 'v${version}'
+  changelog:
+    path: Changelog.md
+    title: '# Changelog'
+  commit:
+    message: |-
+      release: ${version}
+
+      ${notes}
+    assets:
+      - Changelog.md
+  github:
+    enabled: true
+    successComment: 'Released in ${version}.'
+    releasedLabels:
+      - released
+  hooks:
+    # A file a hook writes joins commit.assets in the same edit.
+    prepare: []
+    success: []

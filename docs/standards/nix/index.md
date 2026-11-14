@@ -42,6 +42,17 @@ flake.nix          # Main flake (orchestrator)
 
 **To find what registries and variable names are available**: Read `flake.nix` to see the inputs and what parameters are passed to `packages.nix`.
 
+**`packages.nix`, `env.nix` and `pre-commit.nix` carry plain lists and attribute sets. Do not build a package here.** No `mkDerivation`, no `overrideAttrs`, no `fetchurl` of a release archive — a package that needs building belongs in the Nix registry, and this tree consumes it by name.
+
+That rule applies to the release and skills tools too: `releaser` and
+`skills-sync` are inherited from `atomipkgs` in `nix/packages.nix`. There is no
+second direct releaser flake input and no repository-local skills-sync script;
+the registry pin is the single package provenance for both.
+
+The reason is composition, not taste. The CyanPrint Nix resolver merges these files by merging simple attribute lists when templates compose; a custom derivation is not resolver-mergeable, so a template that defines one cannot be composed with another that touches the same file. Complexity hoists to the registry because the registry is the layer that is allowed to be complex.
+
+This is about _building_, not about _arranging_. `pkgs.buildEnv`, `pkgs.lib.optionals` and `pkgs.stdenv.hostPlatform.system` arrange packages that already exist and stay permitted — `nix/pre-commit.nix` uses `buildEnv` to give one hook a fixed PATH.
+
 ### nix/env.nix - Environment Groups
 
 **Purpose**: Organize packages into functional groups so different shells can include only what they need.
@@ -58,7 +69,7 @@ flake.nix          # Main flake (orchestrator)
 
 **How it works**: Takes `env` as input, uses `with env;` to bring group names into scope, then defines named shells using `pkgs.mkShell`. Each shell's `buildInputs` combines groups with `++`. The `shellHook` is passed as a parameter from `flake.nix`.
 
-**IMPORTANT**: All shells must use `inherit shellHook;` — do not override or customize `shellHook` in `shells.nix`. The `shellHook` inheritance must be preserved for downstream nix-resolvers to work correctly. Nix resolvers do not understand custom shellHook modifications.
+**IMPORTANT**: The developer shells (`default`, `releaser`) use `inherit shellHook;` — do not override or customize `shellHook` in `shells.nix`. The `shellHook` inheritance must be preserved for downstream nix-resolvers to work correctly. Nix resolvers do not understand custom shellHook modifications. The CI shells (`ci`, `cd`) take no `shellHook`: nothing commits in CI, so they install no git hooks. `scripts/local/pre-commit-run.sh` passes the generated hook config to `pre-commit run --config`: it uses `PRE_COMMIT_CONFIG_FILE` when set, else builds it from the flake (`checks.<system>.pre-commit-check.config.configFile`).
 
 **When to create a new shell**: When you have a distinct workflow requiring a different combination of environment groups. Each shell composes groups differently but always inherits the same `shellHook`.
 

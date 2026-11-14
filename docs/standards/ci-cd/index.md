@@ -21,9 +21,20 @@ their trigger block:
   Read a job's `uses:` to see which lane it runs, and the orchestrator's `on:`
   block to see when.
 - **Reusable workflows** — `on.workflow_call` only, named with a `⚡` prefix.
-  Each owns runner selection and setup and ends in exactly one `run:` line of the
-  form `nix develop .#<shell> -c ./scripts/ci/<script>.sh`. That line is the
-  authoritative statement of which script the lane runs and in which shell.
+  Each owns runner selection and setup and ends in a `run:` line of the form
+  `durian-shell .#<shell> -c ./scripts/ci/<script>.sh`. `durian-shell` comes from
+  `AtomiCloud/actions.setup-nix` (`devshell-cache: 'true'`): it is `nix develop -c` with the
+  evaluated shell kept on the cache volume, and plain `nix develop` anywhere it cannot
+  cache. Every job with `devshell-cache: 'true'` sets job-level `DURIAN_SHELL_KEEP: '64'` so repositories
+  sharing the cache volume do not evict each other's shells. Every setup-nix step sets
+  `store-gc-at-percent: '75'` so the Nix store is collected before the volume fills; a job on the shared cache tag asks for
+  `nscloud-cache-size-40gb` and its setup-nix step sets `cache-size-gb: '40'` (the action cannot read runs-on labels, so the two must
+  agree), so collection starts at 30 GB. Jobs that read no git history (Helm) check out with `fetch-depth: 1` and set
+  `checkout: 'false'` on setup-nix. A setup-nix step in a job with
+  `id-token: write` sets `flakehub-login: 'false'`. Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
+  Jobs that read no `GITHUB_*_SLUG` variable set `github-slug: 'false'`. The pre-commit script runs
+  every hook, including `a-skills-sync` (`skills-sync sync --frozen`), so CI
+  enforces the vendored skills without a separate step.
 
 Callers grant permissions, pass only repository-specific values, and use
 `secrets: inherit`. The `a-workflows` gate enforces that every orchestrator job
@@ -37,15 +48,21 @@ adjacent `actions/checkout`.
 ## Action pins
 
 Trusted actions use major pins; every other action uses an exact 40-character SHA
-plus its tag in a trailing comment. Which actions are trusted is recorded in
-`config/action-trust.json`: each key is an action reference and its value is
-`trusted` or `non-trusted`. `scripts/validate/action-pins.sh` reads that file and
-fails any action used in a workflow that has no classification, so adding an
-action means adding its entry there.
+plus its tag in a trailing comment. Which actions are trusted is one regex,
+`dlint.yaml`'s `checks["action-pins"].trustedPattern`: an action matching it is
+trusted, everything else is non-trusted by default — so an action nobody thought
+about gets the strictest pin.
+
+A trusted action must also be on its latest major. `.github/action-majors.yaml` records that major for every trusted
+action the workflows use, and the `a-action-majors` hook (`scripts/local/action-majors.sh`, run in CI through pre-commit)
+is red when a trusted action is below its recorded major, used but unlisted, or the list is empty or unreadable. Raising
+a major is an edit to that file and to the workflows in the same change.
 
 ## Every job declares its dependencies
 
 > **Every `run:` step enters a Nix shell that declares what it needs.**
+
+The Docker job is the one exception: it runs `./scripts/ci/docker.sh` directly, with no Nix shell and no Nix store cache label.
 
 In practice a `run:` step is exactly one line:
 
@@ -61,55 +78,50 @@ Nix store cache.
 
 ## Runners and cache labels
 
-These are plain workflow configuration. Nothing validates them, so read the
-existing `runs-on:` blocks and copy the shape.
+Every job that runs a script uses the same runner labels, written as the same
+literal in every reusable workflow. The machine size is the one part that differs:
+Pre-Commit runs on `4x8`; every other Namespace job runs on `2x4`, which bills half
+the units for the same speed on these jobs.
 
-Selection is 26.04-first: GitHub-hosted jobs take `ubuntu-26.04`, Namespace jobs
-take `nscloud-ubuntu-26.04-amd64-16x32-with-cache` plus `nscloud-cache-size-50gb`
-and the shared store-cache tag `nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64`.
-The 24.04 equivalents are the fallbacks. A lane that must **not** share the store
-uses the bare `nscloud-ubuntu-26.04-amd64-16x32` with no cache labels at all — a
-bare label cannot attach a cache volume, which is the point of using it. The cache
-is shared per OS and architecture, carries no organization, platform or service
-name, and changing the OS rotates the tag and costs one cold build before warm
-reuse resumes.
+```yaml
+runs-on:
+  - nscloud-ubuntu-26.04-amd64-2x4-with-cache
+  - nscloud-cache-size-40gb
+  - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+```
 
-## The pre-vendor hook
+This is one template value with a default. The runner and the Nix store cache
+tag are chosen once, when a repository is generated from the template, and the
+answer is written into every workflow identically. Reusable workflows take no
+runner or cache inputs and callers never pass them, so there is one value to
+change, and every workflow changes with it.
 
-Every lane starts at `scripts/ci/setup.sh`, which vendors each dependency's skills
-before anything else runs. `scripts/local/skills-sync.sh` reads them out of the
-package manager's own on-disk cache, so it can only see packages that have already
-been materialised there.
+Selection is 26.04-first; the 24.04 equivalents are the fallbacks. A lane that
+must **not** share the store uses the bare `nscloud-ubuntu-26.04-amd64-4x8` with
+no cache labels at all — a bare label cannot attach a cache volume, which is the
+point of using it. The cache tag
+is shared per OS and architecture: it carries no organization, platform or
+service name, and changing the OS rotates the tag and costs one cold build before
+warm reuse resumes. The merge gatekeeper is a poller with no Nix, so it stays on
+GitHub-hosted `ubuntu-26.04`.
 
-> **Before skills are vendored, each ecosystem gets one chance to materialise its
-> declared packages.** An ecosystem that takes it makes the vendor tree a function
-> of the declared dependency set. An ecosystem that does not may vendor a partial
-> tree, and the `a-skills-freshness` gate then fails several steps later on a diff
-> that does not name this as the cause.
+The release-note job (`⚡reusable-release-note.yaml`) is the other exception.
+It only echoes the release version, so it runs on GitHub-hosted
+`ubuntu-26.04` with `actions/checkout` and no Nix, and calls
+`./scripts/ci/release-note.sh` directly. No `runs-on` label in
+`.github/workflows/` may end in `-latest` (GitHub moves it to a new image
+without a commit here): the `a-runner-labels` hook (`scripts/local/runner-labels.sh`,
+run in CI through pre-commit) is red on one.
 
-The hook is an optional executable at `scripts/ci/pre-vendor.sh`. `setup.sh` runs
-it, if it is there, immediately before `skills-sync.sh`. There is nothing to
-configure and no workflow to edit: a lane that already calls `setup.sh` picks the
-hook up by the file existing.
+## Dependency materialisation
 
-This template declares no packages of its own, so it ships no hook and every lane
-here runs the absent case. A node built from it supplies one — a .NET node runs
-`dotnet restore`, a Node node its install — and writes the command in that file
-rather than in this document, which is why the command is not listed here.
+Each lane's `run:` line enters a Nix shell, and the shell is the whole of that
+lane's dependency contract: there is no separate setup entry point to call first.
 
-Three states, three outcomes, and the middle one is the reason the hook is not
-just `[ -x … ] && …`:
-
-| `scripts/ci/pre-vendor.sh` | `setup.sh`                                    |
-| -------------------------- | --------------------------------------------- |
-| absent                     | proceeds — this is a normal, successful setup |
-| present, not executable    | refuses, naming the file and the `chmod`      |
-| present, exits non-zero    | refuses with the hook's own exit status       |
-
-A hook that cannot run is a misconfiguration, not an absent hook, so it gets its
-own refusal. Folding it into the absent case would turn a broken restore into a
-silent skip — and a silently skipped restore is the failure the hook exists to
-prevent, arriving later wearing the freshness gate's face.
+A language template built from this one materialises its own ecosystem's packages
+— a .NET node its `dotnet restore`, a Node node its install — in its own
+configuration, not through an extension point here. A new language therefore
+changes one place.
 
 ## Local reproduction
 
@@ -119,6 +131,9 @@ workflow you want to reproduce and run it verbatim, for example:
 ```bash
 nix develop .#ci -c ./scripts/ci/pre-commit.sh
 ```
+
+That line reproduces the pre-commit workflow. Workspace names no runtime, so its
+`a-skills-sync` hook is deliberately inert here.
 
 The Docker and Helm scripts build locally by default. Their reusable workflows set
 the documented environment contract to enable publishing.
@@ -130,5 +145,9 @@ Docker and Helm callers pass per-repository image or chart values through workfl
 the version. Add another image or chart as another caller job rather than putting
 repository-specific branching into the reusable workflow.
 
-Release execution is wired but not runnable yet: the `releaser` binary is not
-published, so nothing here claims a working `releaser`.
+Release execution runs the real tool: `⚡reusable-release.yaml` enters the
+`releaser` shell and calls `scripts/ci/release.sh`, which invokes
+`releaser release -c release.yaml`. That script clears `.git/hooks` first,
+which is not incidental — the release commit's own message uses a `release:` prefix
+that is not a configured commit type, so the commit-msg hook would refuse the
+release the tool is in the middle of making.

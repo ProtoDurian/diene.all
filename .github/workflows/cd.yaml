@@ -6,11 +6,19 @@ on:
       - 'v*.*.*'
 
 jobs:
+  release:
+    name: Release
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-release-note.yaml
+    secrets: inherit
+    with:
+      version: ${{ github.ref_name }}
+
   docker:
     name: Docker Image
     permissions:
       contents: read
-      id-token: write
       packages: write
     uses: ./.github/workflows/⚡reusable-docker.yaml
     secrets: inherit
@@ -23,7 +31,6 @@ jobs:
     name: Helm Chart
     permissions:
       contents: read
-      id-token: write
       packages: write
     uses: ./.github/workflows/⚡reusable-helm.yaml
     secrets: inherit

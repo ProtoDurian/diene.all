@@ -41,11 +41,6 @@
   },
   {
     "template": "diene/workspace",
-    "name": "direnv",
-    "class": "smoke"
-  },
-  {
-    "template": "diene/workspace",
     "name": "fmt-actionlint",
     "class": "gate"
   },
@@ -77,6 +72,11 @@
   {
     "template": "diene/workspace",
     "name": "hook-helm-lint",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "hook-helm-check",
     "class": "gate"
   },
   {
@@ -116,6 +116,11 @@
   },
   {
     "template": "diene/workspace",
+    "name": "helm-check",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
     "name": "helm-render",
     "class": "smoke"
   },
@@ -123,21 +128,6 @@
     "template": "diene/workspace",
     "name": "secret-login-guard",
     "class": "smoke"
-  },
-  {
-    "template": "diene/workspace",
-    "name": "skills-vendor-directory",
-    "class": "presence"
-  },
-  {
-    "template": "diene/workspace",
-    "name": "skills-sync",
-    "class": "gate"
-  },
-  {
-    "template": "diene/workspace",
-    "name": "skills-freshness",
-    "class": "gate"
   },
   {
     "template": "diene/workspace",
@@ -163,5 +153,35 @@
     "template": "diene/workspace",
     "name": "probe-artifacts",
     "class": "presence"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "releaser-hook-registration",
+    "class": "presence"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "hook-releaser-commit",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "helm-reload",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "action-majors",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "release-config-schema",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "release-commit-vocabulary",
+    "class": "gate"
   }
 ]

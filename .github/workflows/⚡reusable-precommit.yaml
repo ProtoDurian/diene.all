@@ -7,10 +7,23 @@ jobs:
   precommit:
     name: Pre-Commit
     runs-on:
-      - nscloud-ubuntu-26.04-amd64-16x32-with-cache
-      - nscloud-cache-size-50gb
+      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-cache-size-40gb
       - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 20
+    env:
+      DURIAN_SHELL_KEEP: '64'
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
+        with:
+          store-gc-at-percent: '75'
+          cache-size-gb: '40'
+          github-slug: 'false'
+          devshell-cache: 'true'
+      - name: Cache chart-checks schemas
+        uses: actions/cache@v6
+        with:
+          path: .chart-checks
+          key: chart-checks-${{ hashFiles('chart-checks.yaml') }}
       - name: Run pre-commit
-        run: nix develop .#ci -c ./scripts/ci/pre-commit.sh
+        run: durian-shell .#ci -c ./scripts/ci/pre-commit.sh

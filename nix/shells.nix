@@ -6,14 +6,13 @@
 }:
 with env;
 {
+  # CI shells install no git hooks: nothing commits in CI.
   cd = pkgs.mkShell {
     buildInputs = main ++ system;
-    inherit shellHook;
   };
 
   ci = pkgs.mkShell {
     buildInputs = lint ++ main ++ system;
-    inherit shellHook;
   };
 
   default = pkgs.mkShell {

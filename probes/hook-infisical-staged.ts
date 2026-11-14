@@ -11,7 +11,7 @@ export default {
       async run(repo: any) {
         await expectGreen(
           repo,
-          'nix develop .#ci -c pre-commit run a-infisical-staged --all-files',
+          'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-infisical-staged --all-files',
           'hook-infisical-staged',
         );
       },
@@ -20,8 +20,6 @@ export default {
       name: 'mutation-hook-infisical-staged-caught',
       description: 'A focused sabotage must turn the hook-infisical-staged mechanism red.',
       kind: 'mutation',
-      // `secret-scan-command` was deleted with the `task secret:scan` wrapper it ran, so
-      // the full-tree scan is the only other mechanism this staged secret reaches.
       expectedImpact: ['hook-infisical-full'],
       async run(repo: any) {
         const secret = ['AKIA', 'QRSTUVWXYZABCDEF'].join('');
@@ -29,7 +27,7 @@ export default {
         await repo.exec('git add probe-secret.txt');
         await expectRed(
           repo,
-          'nix develop .#ci -c pre-commit run a-infisical-staged --all-files',
+          'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-infisical-staged --all-files',
           'hook-infisical-staged',
         );
       },
