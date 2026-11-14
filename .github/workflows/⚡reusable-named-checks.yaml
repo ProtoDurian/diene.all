@@ -8,15 +8,16 @@ jobs:
     name: named-checks
     runs-on:
       - nscloud-ubuntu-26.04-amd64-2x4-with-cache
-      - nscloud-cache-size-20gb
+      - nscloud-cache-size-40gb
       - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
     timeout-minutes: 20
     env:
-      DURIAN_SHELL_KEEP: '20'
+      DURIAN_SHELL_KEEP: '64'
     steps:
       - uses: AtomiCloud/actions.setup-nix@v3
         with:
           store-gc-at-percent: '75'
+          cache-size-gb: '40'
           github-slug: 'false'
           devshell-cache: 'true'
       - name: Run named checks

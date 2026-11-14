@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # A cache-tag label needs a setup-nix step; the OIDC token permission needs flakehub-login off; a cached shell needs DURIAN_SHELL_KEEP.
-# Every setup-nix step sets store-gc-at-percent 75, and DURIAN_SHELL_KEEP is 20.
+# Every setup-nix step sets store-gc-at-percent 75, and DURIAN_SHELL_KEEP is 64.
+# A job with the shared cache tag asks for nscloud-cache-size-40gb and its setup-nix steps set cache-size-gb 40.
 
 dir="${1:-.github/workflows}"
 if [ ! -d "${dir}" ]; then
@@ -31,13 +32,15 @@ for file in "${dir}"/*.y*ml; do
        ([$s[] | ((.with["flakehub-login"] // "") == "false")] | any_c(. == false) | not),
        ([$s[].with["devshell-cache"]?] | any_c(. == "true")),
        (($j.env // {}) | has("DURIAN_SHELL_KEEP")),
-       (($j.env.DURIAN_SHELL_KEEP // "") == "20"),
-       ([$s[] | ((.with["store-gc-at-percent"] // "") == "75")] | any_c(. == false) | not)] | @tsv' "${file}")"; then
+       (($j.env.DURIAN_SHELL_KEEP // "") == "64"),
+       ([$s[] | ((.with["store-gc-at-percent"] // "") == "75")] | any_c(. == false) | not),
+       ([$j["runs-on"]? | .. | select(tag == "!!str") | select(. == "nscloud-cache-size-40gb")] | length > 0),
+       ([$s[] | ((.with["cache-size-gb"] // "") == "40")] | any_c(. == false) | not)] | @tsv' "${file}")"; then
     echo "❌ ${file}: yq could not read the workflow" >&2
     fail=1
     continue
   fi
-  while IFS=$'\t' read -r job tag nix idtoken login cache keep keep20 gc; do
+  while IFS=$'\t' read -r job tag nix idtoken login cache keep keep64 gc size cgb; do
     [ -n "${job}" ] || continue
     if [ "${tag}" = true ] && [ "${nix}" != true ]; then
       echo "❌ ${file}: job '${job}' has a nscloud-cache-tag label but no AtomiCloud/actions.setup-nix step" >&2
@@ -51,15 +54,23 @@ for file in "${dir}"/*.y*ml; do
       echo "❌ ${file}: job '${job}' sets devshell-cache: 'true' but not DURIAN_SHELL_KEEP" >&2
       fail=1
     fi
-    if [ "${keep}" = true ] && [ "${keep20}" != true ]; then
-      echo "❌ ${file}: job '${job}' DURIAN_SHELL_KEEP is not '20'" >&2
+    if [ "${keep}" = true ] && [ "${keep64}" != true ]; then
+      echo "❌ ${file}: job '${job}' DURIAN_SHELL_KEEP is not '64'" >&2
       fail=1
     fi
     if [ "${gc}" != true ]; then
       echo "❌ ${file}: job '${job}' has a setup-nix step without store-gc-at-percent: '75'" >&2
       fail=1
     fi
+    if [ "${tag}" = true ] && [ "${size}" != true ]; then
+      echo "❌ ${file}: job '${job}' has the shared cache tag but does not ask for nscloud-cache-size-40gb" >&2
+      fail=1
+    fi
+    if [ "${tag}" = true ] && [ "${cgb}" != true ]; then
+      echo "❌ ${file}: job '${job}' has a setup-nix step without cache-size-gb: '40'" >&2
+      fail=1
+    fi
   done <<<"${rows}"
 done
 [ "${fail}" -eq 0 ] || exit 1
-echo "✅ CI cache labels, flakehub-login, store GC and DURIAN_SHELL_KEEP are consistent"
+echo "✅ CI cache labels, flakehub-login, store GC, cache size and DURIAN_SHELL_KEEP are consistent"

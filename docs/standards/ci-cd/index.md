@@ -25,9 +25,12 @@ their trigger block:
   `durian-shell .#<shell> -c ./scripts/ci/<script>.sh`. `durian-shell` comes from
   `AtomiCloud/actions.setup-nix` (`devshell-cache: 'true'`): it is `nix develop -c` with the
   evaluated shell kept on the cache volume, and plain `nix develop` anywhere it cannot
-  cache. Every job with `devshell-cache: 'true'` sets job-level `DURIAN_SHELL_KEEP: '20'` so repositories
+  cache. Every job with `devshell-cache: 'true'` sets job-level `DURIAN_SHELL_KEEP: '64'` so repositories
   sharing the cache volume do not evict each other's shells. Every setup-nix step sets
-  `store-gc-at-percent: '75'` so the Nix store is collected before the volume fills. A setup-nix step in a job with
+  `store-gc-at-percent: '75'` so the Nix store is collected before the volume fills; a job on the shared cache tag asks for
+  `nscloud-cache-size-40gb` and its setup-nix step sets `cache-size-gb: '40'` (the action cannot read runs-on labels, so the two must
+  agree), so collection starts at 30 GB. Jobs that read no git history (Helm) check out with `fetch-depth: 1` and set
+  `checkout: 'false'` on setup-nix. A setup-nix step in a job with
   `id-token: write` sets `flakehub-login: 'false'`. Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
   Jobs that read no `GITHUB_*_SLUG` variable set `github-slug: 'false'`. The pre-commit script runs
   every hook, including `a-skills-sync` (`skills-sync sync --frozen`), so CI
@@ -83,7 +86,7 @@ the units for the same speed on these jobs.
 ```yaml
 runs-on:
   - nscloud-ubuntu-26.04-amd64-2x4-with-cache
-  - nscloud-cache-size-20gb
+  - nscloud-cache-size-40gb
   - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
 ```
 

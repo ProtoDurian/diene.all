@@ -17,7 +17,7 @@ fresh() {
 nix_file="${tmp}/w/⚡reusable-named-checks.yaml"
 note_file="${tmp}/w/⚡reusable-release-note.yaml"
 idt="id-""token"
-old_keep="6""4"
+old_keep="2""0"
 top_id=$'permissions:\n  '"${idt}"$': write\n\njobs:\n'
 
 fresh
@@ -66,12 +66,20 @@ sed -i "/store-gc-at-percent/d" "${nix_file}"
 expect_red "setup-nix without store-gc-at-percent" "store-gc-at-percent"
 
 fresh
-sed -i "s|^\( *DURIAN_SHELL_KEEP: \)'20'\$|\1'${old_keep}'|" "${nix_file}"
-expect_red "DURIAN_SHELL_KEEP not 20" "is not '20'"
+sed -i "s|^\( *DURIAN_SHELL_KEEP: \)'64'\$|\1'${old_keep}'|" "${nix_file}"
+expect_red "DURIAN_SHELL_KEEP not 64" "is not '64'"
+
+fresh
+sed -i "s|nscloud-cache-size-40gb|nscloud-cache-size-20gb|" "${nix_file}"
+expect_red "cache tag without the 40gb volume" "nscloud-cache-size-40gb"
+
+fresh
+sed -i "/cache-size-gb/d" "${nix_file}"
+expect_red "setup-nix without cache-size-gb 40" "cache-size-gb"
 
 fresh
 sed -i "s|^    timeout-minutes: 20\$|&\\n    env:\\n      DURIAN_SHELL_KEEP: ''|" "${tmp}/w/⚡reusable-release.yaml"
-expect_red "empty DURIAN_SHELL_KEEP on a job without devshell-cache" "is not '20'"
+expect_red "empty DURIAN_SHELL_KEEP on a job without devshell-cache" "is not '64'"
 
 [ "${fail}" -eq 0 ] || exit 1
 echo "✅ ci-cache-rules is green unchanged and red on every planted case"
