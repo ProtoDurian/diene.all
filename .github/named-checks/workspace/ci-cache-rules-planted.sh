@@ -69,5 +69,9 @@ fresh
 sed -i "s|^\( *DURIAN_SHELL_KEEP: \)'20'\$|\1'${old_keep}'|" "${nix_file}"
 expect_red "DURIAN_SHELL_KEEP not 20" "is not '20'"
 
+fresh
+sed -i "s|^    timeout-minutes: 20\$|&\\n    env:\\n      DURIAN_SHELL_KEEP: ''|" "${tmp}/w/⚡reusable-release.yaml"
+expect_red "empty DURIAN_SHELL_KEEP on a job without devshell-cache" "is not '20'"
+
 [ "${fail}" -eq 0 ] || exit 1
 echo "✅ ci-cache-rules is green unchanged and red on every planted case"

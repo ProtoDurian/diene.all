@@ -30,7 +30,7 @@ for file in "${dir}"/*.y*ml; do
        (($p == "write-all") or (($p | tag) == "!!map" and ($p["id-" + "token"] // "") == "write")),
        ([$s[] | ((.with["flakehub-login"] // "") == "false")] | any_c(. == false) | not),
        ([$s[].with["devshell-cache"]?] | any_c(. == "true")),
-       (($j.env.DURIAN_SHELL_KEEP // "") != ""),
+       (($j.env // {}) | has("DURIAN_SHELL_KEEP")),
        (($j.env.DURIAN_SHELL_KEEP // "") == "20"),
        ([$s[] | ((.with["store-gc-at-percent"] // "") == "75")] | any_c(. == false) | not)] | @tsv' "${file}")"; then
     echo "❌ ${file}: yq could not read the workflow" >&2
