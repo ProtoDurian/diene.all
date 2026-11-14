@@ -10,10 +10,10 @@ on:
 jobs:
   release-note:
     name: Release Note
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Release note
         env:
           VERSION: ${{ inputs.version }}

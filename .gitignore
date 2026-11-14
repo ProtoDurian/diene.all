@@ -1,5 +1,7 @@
 ### helm
 infra/root_chart/uploads/
+infra/rendered/
+.chart-checks/
 
 ### nix-init
 .direnv
@@ -29,3 +31,6 @@ desktop.ini
 *~
 .kagent/
 .kloop/
+
+### releaser
+.releaser/

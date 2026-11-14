@@ -12,7 +12,6 @@ let
         excludes = [
           ".claude/skills/vendor/**"
           "Changelog.md"
-          "docs/developer/CommitConventions.md"
           "infra/root_chart/**"
         ];
       };

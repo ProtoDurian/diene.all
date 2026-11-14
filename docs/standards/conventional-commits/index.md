@@ -39,24 +39,11 @@ to the version. Read its `types:` list like this:
 validation and release calculation consume this same file, so the vocabularies
 cannot drift independently.
 
-## Finding your generated conventions
+## Finding the conventions
 
-Each project generates a commit-conventions document from `release.yaml`
-using the `releaser` tool. Its output path is the `conventions.path` value in
-`release.yaml`:
-
-```bash
-# View the generated file
-cat "$(yq -r '.conventions.path' release.yaml)"
-
-# Regenerate
-releaser conventions -c release.yaml
-```
-
-That document is generated output: edit `release.yaml` and regenerate rather
-than editing it. Anything a reader should find there that is not a type or scope
-table belongs in the `conventions.template` value, because the generator writes the
-whole file from that template and a release run writes it again.
+The commit types are listed in `docs/developer/CommitConventions.md`. That file
+is written by hand: keep its types table in step with the `types:` in
+`release.yaml`. A probe fails when the two differ.
 
 ## Breaking Changes
 
@@ -80,8 +67,8 @@ The footer keywords that count as breaking are the `keywords:` list in
 
 | Aspect            | Pattern                                         |
 | ----------------- | ----------------------------------------------- |
-| **Format**        | `type(scope): description`                      |
+| **Format**        | `type: subject` (no scope)                      |
 | **Configuration** | `release.yaml`                                  |
-| **Reference**     | the file named by its `conventions.path`        |
+| **Reference**     | `docs/developer/CommitConventions.md`           |
 | **Release**       | each scope's `release:` value in `release.yaml` |
 | **Breaking**      | Add `!` or a footer keyword from `keywords:`    |

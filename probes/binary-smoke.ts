@@ -84,6 +84,8 @@ docker info --format '{{.ServerVersion}}' >/dev/null
 hadolint --version >/dev/null
 hadolint infra/Dockerfile
 
+chart-checks --version >/dev/null
+
 helm-docs --version >/dev/null
 helm-docs --dry-run --chart-search-root infra/root_chart >/dev/null 2>&1
 

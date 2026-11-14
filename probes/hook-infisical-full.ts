@@ -10,7 +10,11 @@ export default {
       description: 'The full Infisical scanning hook passes tracked content.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, 'nix develop .#ci -c pre-commit run a-infisical --all-files', 'hook-infisical-full');
+        await expectGreen(
+          repo,
+          'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-infisical --all-files',
+          'hook-infisical-full',
+        );
       },
     },
     {
@@ -26,7 +30,11 @@ export default {
           repo,
           'git add probe-secret.txt && git -c user.name=Probe -c user.email=probe@example.invalid commit -qm probe-secret',
         );
-        await expectRed(repo, 'nix develop .#ci -c pre-commit run a-infisical --all-files', 'hook-infisical-full');
+        await expectRed(
+          repo,
+          'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-infisical --all-files',
+          'hook-infisical-full',
+        );
       },
     },
   ],

@@ -18,6 +18,7 @@ checks:
     binaries:
       - actionlint
       - bash
+      - chart-checks --version
       - cyanprint
       - dlint
       - docker

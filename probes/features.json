@@ -76,6 +76,11 @@
   },
   {
     "template": "diene/workspace",
+    "name": "hook-helm-check",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
     "name": "hook-infisical-full",
     "class": "gate"
   },
@@ -107,6 +112,11 @@
   {
     "template": "diene/workspace",
     "name": "helm-lint",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "helm-check",
     "class": "gate"
   },
   {
@@ -152,6 +162,26 @@
   {
     "template": "diene/workspace",
     "name": "hook-releaser-commit",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "helm-reload",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "action-majors",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "release-config-schema",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "release-commit-vocabulary",
     "class": "gate"
   }
 ]

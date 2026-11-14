@@ -27,7 +27,7 @@ jobs:
   build:
     name: Build Docker
     runs-on:
-      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
+      - nscloud-ubuntu-26.04-amd64-2x4-with-cache
       - nscloud-cache-size-20gb
     timeout-minutes: ${{ startsWith(github.ref, 'refs/tags/') && 45 || 30 }}
     steps:

@@ -15,12 +15,23 @@ jobs:
   build:
     name: Build Helm
     runs-on:
-      - nscloud-ubuntu-26.04-amd64-4x8-with-cache
-      - nscloud-cache-size-20gb
+      - nscloud-ubuntu-26.04-amd64-2x4-with-cache
+      - nscloud-cache-size-40gb
       - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
     timeout-minutes: 20
+    env:
+      DURIAN_SHELL_KEEP: '64'
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
       - uses: AtomiCloud/actions.setup-nix@v3
+        with:
+          store-gc-at-percent: '75'
+          cache-size-gb: '40'
+          checkout: 'false'
+          github-slug: 'false'
+          devshell-cache: 'true'
       - name: Build and push Helm
         env:
           CHART_PATH: ${{ inputs.chart_path }}
@@ -32,4 +43,4 @@ jobs:
           GITHUB_REPO_REF: ${{ github.repository }}
           GITHUB_SHA: ${{ github.sha }}
           RELEASE_VERSION: ${{ inputs.version }}
-        run: nix develop .#cd -c ./scripts/ci/helm.sh
+        run: durian-shell .#ci -c ./scripts/ci/helm.sh

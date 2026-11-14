@@ -1,1 +1,23 @@
 message: diene workspace
+
+# Label key prefix. The cluster-policies chart gets it from scripts/local/helm-check.sh.
+labelPrefix: durian.cloud
+
+# Service-tree (LPSM) identity stamped on every object as <labelPrefix>/<key> labels.
+serviceTree:
+  landscape: local
+  platform: diene
+  service: workspace
+  module: root
+
+# Every pod carries <labelPrefix>/reload: restart (Reloader restarts the workload when any ConfigMap or Secret it uses
+# changes) or live (the app re-reads its whole-folder config in place). The default, restart, is set once in the chart
+# helper (templates/_helpers.tpl); set once per template, override only here. Anything else fails the render.
+# reload: live
+
+# Start-only inputs of a live pod (env, envFrom or subPath, e.g. from a third-party chart); Reloader restarts the pod when
+# they change. Entries: {kind: secret|configmap, name: x, via: env|envFrom|subPath}. A whole-folder mount is never start-only.
+restartOnlyConfigs: []
+
+workspace:
+  image: registry.k8s.io/pause:3.10

@@ -22,7 +22,17 @@ their trigger block:
   block to see when.
 - **Reusable workflows** — `on.workflow_call` only, named with a `⚡` prefix.
   Each owns runner selection and setup and ends in a `run:` line of the form
-  `nix develop .#<shell> -c ./scripts/ci/<script>.sh`. The pre-commit script runs
+  `durian-shell .#<shell> -c ./scripts/ci/<script>.sh`. `durian-shell` comes from
+  `AtomiCloud/actions.setup-nix` (`devshell-cache: 'true'`): it is `nix develop -c` with the
+  evaluated shell kept on the cache volume, and plain `nix develop` anywhere it cannot
+  cache. Every job with `devshell-cache: 'true'` sets job-level `DURIAN_SHELL_KEEP: '64'` so repositories
+  sharing the cache volume do not evict each other's shells. Every setup-nix step sets
+  `store-gc-at-percent: '75'` so the Nix store is collected before the volume fills; a job on the shared cache tag asks for
+  `nscloud-cache-size-40gb` and its setup-nix step sets `cache-size-gb: '40'` (the action cannot read runs-on labels, so the two must
+  agree), so collection starts at 30 GB. Jobs that read no git history (Helm) check out with `fetch-depth: 1` and set
+  `checkout: 'false'` on setup-nix. A setup-nix step in a job with
+  `id-token: write` sets `flakehub-login: 'false'`. Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
+  Jobs that read no `GITHUB_*_SLUG` variable set `github-slug: 'false'`. The pre-commit script runs
   every hook, including `a-skills-sync` (`skills-sync sync --frozen`), so CI
   enforces the vendored skills without a separate step.
 
@@ -41,7 +51,12 @@ Trusted actions use major pins; every other action uses an exact 40-character SH
 plus its tag in a trailing comment. Which actions are trusted is one regex,
 `dlint.yaml`'s `checks["action-pins"].trustedPattern`: an action matching it is
 trusted, everything else is non-trusted by default — so an action nobody thought
-about gets the strictest pin, and there is no list to maintain.
+about gets the strictest pin.
+
+A trusted action must also be on its latest major. `.github/action-majors.yaml` records that major for every trusted
+action the workflows use, and the `a-action-majors` hook (`scripts/local/action-majors.sh`, run in CI through pre-commit)
+is red when a trusted action is below its recorded major, used but unlisted, or the list is empty or unreadable. Raising
+a major is an edit to that file and to the workflows in the same change.
 
 ## Every job declares its dependencies
 
@@ -64,12 +79,14 @@ Nix store cache.
 ## Runners and cache labels
 
 Every job that runs a script uses the same runner labels, written as the same
-literal in every reusable workflow:
+literal in every reusable workflow. The machine size is the one part that differs:
+Pre-Commit runs on `4x8`; every other Namespace job runs on `2x4`, which bills half
+the units for the same speed on these jobs.
 
 ```yaml
 runs-on:
-  - nscloud-ubuntu-26.04-amd64-4x8-with-cache
-  - nscloud-cache-size-20gb
+  - nscloud-ubuntu-26.04-amd64-2x4-with-cache
+  - nscloud-cache-size-40gb
   - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
 ```
 
@@ -90,8 +107,11 @@ GitHub-hosted `ubuntu-26.04`.
 
 The release-note job (`⚡reusable-release-note.yaml`) is the other exception.
 It only echoes the release version, so it runs on GitHub-hosted
-`ubuntu-latest` with `actions/checkout` and no Nix, and calls
-`./scripts/ci/release-note.sh` directly.
+`ubuntu-26.04` with `actions/checkout` and no Nix, and calls
+`./scripts/ci/release-note.sh` directly. No `runs-on` label in
+`.github/workflows/` may end in `-latest` (GitHub moves it to a new image
+without a commit here): the `a-runner-labels` hook (`scripts/local/runner-labels.sh`,
+run in CI through pre-commit) is red on one.
 
 ## Dependency materialisation
 

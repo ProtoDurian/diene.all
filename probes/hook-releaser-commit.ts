@@ -13,7 +13,7 @@ export default {
       async run(repo: any) {
         await expectGreen(
           repo,
-          `message_path="$(mktemp)" && trap 'rm -f "$message_path"' EXIT && printf 'feat: valid commit message\\n' >"$message_path" && ${syntheticAuthor} nix develop .#ci -c pre-commit run a-releaser-commit --hook-stage commit-msg --commit-msg-filename "$message_path"`,
+          `message_path="$(mktemp)" && trap 'rm -f "$message_path"' EXIT && printf 'feat: valid commit message\\n' >"$message_path" && ${syntheticAuthor} nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-releaser-commit --hook-stage commit-msg --commit-msg-filename "$message_path"`,
           'hook-releaser-commit',
         );
       },
@@ -26,7 +26,7 @@ export default {
       async run(repo: any) {
         await expectRed(
           repo,
-          `message_path="$(mktemp)" && trap 'rm -f "$message_path"' EXIT && printf 'not conventional\\n' >"$message_path" && ${syntheticAuthor} nix develop .#ci -c pre-commit run a-releaser-commit --hook-stage commit-msg --commit-msg-filename "$message_path"`,
+          `message_path="$(mktemp)" && trap 'rm -f "$message_path"' EXIT && printf 'not conventional\\n' >"$message_path" && ${syntheticAuthor} nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-releaser-commit --hook-stage commit-msg --commit-msg-filename "$message_path"`,
           'hook-releaser-commit',
         );
       },

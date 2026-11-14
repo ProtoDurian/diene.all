@@ -20,7 +20,6 @@ pre-commit-lib.run {
       excludes = [
         "^\\.claude/skills/vendor/"
         "^Changelog\\.md$"
-        "^docs/developer/CommitConventions\\.md$"
         "^infra/root_chart/"
       ];
     };
@@ -38,6 +37,33 @@ pre-commit-lib.run {
       name = "Helm lint";
       entry = "${packages.infrautils}/bin/helm lint infra/root_chart";
       files = "^infra/root_chart/.*";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-helm-check = {
+      enable = true;
+      name = "Helm render check";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH bash scripts/local/helm-check.sh infra/root_chart'";
+      files = "^(infra/root_chart/.*|chart-checks\\.yaml|scripts/local/helm-(render|check)\\.sh)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-action-majors = {
+      enable = true;
+      name = "Trusted action majors";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH bash scripts/local/action-majors.sh'";
+      files = "^(\\.github/(workflows/.*|action-majors\\.yaml)|dlint\\.yaml|scripts/local/action-majors\\.sh)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-runner-labels = {
+      enable = true;
+      name = "Runner labels";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH bash scripts/local/runner-labels.sh'";
+      files = "^(\\.github/workflows/.*|scripts/local/runner-labels\\.sh)$";
       pass_filenames = false;
       language = "system";
     };

@@ -25,7 +25,7 @@ groups, so it is on `PATH` in the default shell and in the release shell:
 - commit messages are checked — the `a-releaser-commit` commit-msg hook calls
   `releaser lint-commit`; see [the linting standard](../linting/index.md);
 - a release runs end to end from `⚡reusable-release.yaml`;
-- the commit-conventions document is generated from this file, not hand-written.
+- the commit-conventions document `docs/developer/CommitConventions.md` is hand-written and kept in step with this file by a probe.
 
 **Nothing runs a schema gate as a separate step**, and it does not need one: every
 `releaser` subcommand loads and validates this file before it does anything, and
@@ -45,9 +45,9 @@ The configuration is one document with five top-level parts.
 - `lint:` holds the message rules `releaser lint-commit` applies: header length,
   forbidden words, trailing punctuation, body line length, and the commit kinds it
   ignores outright (merges, reverts, fixups, squashes).
-- `conventions:` names the generated document and carries its `template`. See
-  "The generated document" below, because the template is doing more work than it
-  looks like.
+- `conventions:` is required by the releaser. Its `path` is the ignored scratch file
+  `.releaser/conventions.md`; the document people read is the hand-written
+  `docs/developer/CommitConventions.md`. See "The generated document" below.
 - `release:` is the release itself: which `branches` may release, the `tagFormat`,
   the `changelog` path and title, the `commit` message and `assets`, whether a
   `github` release is published, and `hooks`.
@@ -60,7 +60,7 @@ Two parts of `release:` carry a note worth reading before you edit them:
   fills, usually with an `afterWrite` command that stamps the version into whatever
   file that node's ecosystem versions. This workspace versions no manifest, so it
   fills nothing. The releaser does not write a version file on its own — it writes
-  only the changelog and the conventions document — so there is no version file
+  only the changelog and the scratch conventions file — so there is no version file
   here to commit, and that is why there is none in `assets`.
 - `release.commit.assets` lists the files a release commits, and it is enforced
   rather than advisory: the releaser aborts if a write lands outside the list, and a
@@ -70,23 +70,20 @@ Two parts of `release:` carry a note worth reading before you edit them:
 Commit linting and release calculation read this same configuration, so there is
 only one vocabulary to keep correct.
 
-## The generated document
+## The conventions document
 
-`conventions.path` names `docs/developer/CommitConventions.md` and
-`conventions.template` is the page it is generated into: `releaser conventions`
-substitutes the generated type and scope tables for `CONVENTION_DOCS_PLACEHOLDER`
-and writes the whole thing. A release run writes that same file.
+`docs/developer/CommitConventions.md` is hand-written. Edit it directly and keep its
+types table in step with `types:` in `release.yaml`; a probe fails when the two
+differ. It carries no scopes.
 
-So the template is where a human-readable reading guide has to live. Prose put
-straight into the generated file is lost at the next release; prose put into the
-template survives every regeneration. The generated tables alone are tables and
-nothing else.
+The releaser still requires a `conventions` block. `conventions.path` points at
+`.releaser/conventions.md`, which is gitignored scratch output that the releaser
+regenerates (scope tables included) and nobody reads or commits. Do not point it at
+the hand-written document, and do not run `releaser conventions` to update that
+document.
 
-That file is excluded from `treefmt` in [`nix/fmt.nix`](../../../nix/fmt.nix), and
-the exclusion is load-bearing rather than a leftover: the generator emits unpadded
-markdown tables, prettier pads them, and a formatted file would be rewritten
-unformatted by the next release — so formatting it would put the release run and the
-format gate in permanent disagreement.
+`treefmt` formats the hand-written document like any other Markdown file (prettier aligns
+its tables), and the probe reads the type table after that formatting.
 
 ## How a release is triggered
 
@@ -100,7 +97,7 @@ release policies are shown able to fail.
 
 The workflow ends in a single `scripts/ci/release.sh` call inside the `releaser`
 Nix shell. That script runs `releaser release -c release.yaml`, which
-calculates the version, writes the changelog and the conventions document, commits
+calculates the version, writes the changelog, commits
 the configured assets, tags, pushes, and publishes the GitHub release.
 
 It clears `.git/hooks` first, and that line is load-bearing: the release commit's
@@ -112,7 +109,7 @@ commit-msg hook would refuse the commit the tool is in the middle of making.
 ```bash
 releaser next                          # the version the current commits would produce
 releaser changelog                     # the release notes they would produce
-releaser conventions -c release.yaml   # regenerate the commit-conventions document
+releaser conventions -c release.yaml   # writes the ignored scratch file; not the hand-written doc
 releaser release --dry-run             # everything a release would do, changing nothing
 releaser release -c release.yaml       # the real thing; CI runs this one
 ```
@@ -122,6 +119,6 @@ publishes anything. `next`, `changelog` and `release` all refuse unless the curr
 branch is listed in `release.branches`, so on a feature branch they report that
 rather than guessing.
 
-`releaser conventions` maintains the file named by `conventions.path`. That file is
-generated output and must not be edited by hand — edit `release.yaml` and
-regenerate.
+`releaser conventions` writes only the ignored `conventions.path` scratch file. The
+commit-types document people read, `docs/developer/CommitConventions.md`, is edited
+by hand.
