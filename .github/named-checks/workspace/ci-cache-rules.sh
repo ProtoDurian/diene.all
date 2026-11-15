@@ -10,6 +10,7 @@ set -euo pipefail
 #   Every such step needs it at one of the three levels.
 # - Step level (with:) only: flakehub-login, devshell-cache, store-gc-at-percent (90) and cache-size-gb (40).
 # - The nix-store-clean-up.yaml workflow (rule h) is exempt from the 90 percent rule; it needs a schedule, the shared tag, the 40gb volume, no do-not-commit label, and GC at 0/0.
+# - Rule (h) also needs a job-level `if: github.repository == '<one repository>'` on the clean-up job (a step-level `if:` does not count), so one repo cleans the shared volume.
 
 dir="${1:-.github/workflows}"
 if [ ! -d "${dir}" ]; then
@@ -109,6 +110,7 @@ done
 
 # Rule (h): the nightly clean-up workflow commits the cleaned volume on the shared tag and GCs everything unneeded.
 cleanup="${dir}/nix-store-clean-up.yaml"
+guard_re="^(\\$\\{\\{ *)?github\\.repository == '[^' ]+'( *\\}\\})?\$"
 if [ ! -f "${cleanup}" ]; then
   echo "❌ ${cleanup}: the Nix store clean-up workflow is missing" >&2
   fail=1
@@ -124,7 +126,8 @@ else
        ($s | length > 0),
        ([$s[] | ((.with["cache-size-gb"] // "") == "40")] | any_c(. == false) | not),
        ([$s[] | ((.with["store-gc-at-percent"] // "") == "0")] | any_c(. == false) | not),
-       ([$s[] | ((.with["store-gc-target-percent"] // "") == "0")] | any_c(. == false) | not)] | @tsv' "${cleanup}")"; then
+       ([$s[] | ((.with["store-gc-target-percent"] // "") == "0")] | any_c(. == false) | not),
+       "[" + ($j["if"] // "" | tostring) + "]"] | @tsv' "${cleanup}")"; then
     echo "❌ ${cleanup}: yq could not read the workflow" >&2
     fail=1
     hrows=""
@@ -133,7 +136,7 @@ else
     echo "❌ ${cleanup}: the clean-up workflow has no job" >&2
     fail=1
   }
-  while IFS=$'\t' read -r job sched tag size commit nix cgb at target; do
+  while IFS=$'\t' read -r job sched tag size commit nix cgb at target guard; do
     [ -n "${job}" ] || continue
     [ "${sched}" = true ] || {
       echo "❌ ${cleanup}: the clean-up workflow has no schedule trigger" >&2
@@ -165,6 +168,12 @@ else
     }
     [ "${target}" = true ] || {
       echo "❌ ${cleanup}: job '${job}' setup-nix step is not store-gc-target-percent: '0'" >&2
+      fail=1
+    }
+    guard="${guard#[}"
+    guard="${guard%]}"
+    [[ ${guard} =~ ${guard_re} ]] || {
+      echo "❌ ${cleanup}: job '${job}' needs a job-level if: github.repository == '<one repository>' (found '${guard}')" >&2
       fail=1
     }
   done <<<"${hrows}"

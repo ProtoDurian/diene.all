@@ -3,6 +3,9 @@ name: Nix store clean-up
 # Frees every Nix store path that no kept dev shell or Nix profile needs, and commits the cleaned volume.
 # Normal jobs never clean up; they only GC as a safety net at 90 percent.
 # GitHub runs the schedule only from the default branch; elsewhere the push trigger and workflow_dispatch run it.
+# Only one repo cleans: the Nix cache volume is shared by every repo made from workspace, so many repos cleaning it
+# every night would repeat the work, race each other (the last committed volume wins) and cost money for one result.
+# That repo is ProtoDurian/diene.workspace; every other repo skips the job. To move the cleaner, change the one `if:` line on the job.
 
 on:
   schedule:
@@ -22,6 +25,7 @@ permissions:
 jobs:
   clean-up:
     name: Nix store clean-up
+    if: github.repository == 'ProtoDurian/diene.workspace'
     runs-on:
       - nscloud-ubuntu-26.04-amd64-2x4-with-cache
       - nscloud-cache-size-40gb

@@ -37,6 +37,10 @@ their trigger block:
     keeps the 64 newest dev shells (each one is a GC root). GitHub runs a `schedule` trigger only from the default
     branch, so the nightly starts once this workflow is on the default branch; on other branches the push trigger and
     manual dispatch run it.
+    The job has `if: github.repository == 'ProtoDurian/diene.workspace'`, so it runs only in that one designated cleaner
+    repo (the workspace mirror); every other repo, including every repo made from workspace, shows it as skipped and
+    starts no runner, because they all share one cache volume and cleaning it from each repo would repeat the work,
+    race on the volume and cost money for one result.
   - A job on the shared cache tag asks for `nscloud-cache-size-40gb` and its setup-nix step sets
     `cache-size-gb: '40'` (the action cannot read runs-on labels, so the two must agree), so the safety-net percent
     is read against the real size.

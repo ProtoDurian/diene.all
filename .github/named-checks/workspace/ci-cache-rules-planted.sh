@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Self-test of ci-cache-rules.sh: the copied workflows are green, and each planted change turns the check red (including the clean-up workflow rules).
+# Self-test of ci-cache-rules.sh: the copied workflows are green, and each planted change turns the check red (including the clean-up workflow rules and its one-repository guard).
 
 cd "$(git rev-parse --show-toplevel)"
 
@@ -122,6 +122,19 @@ expect_red "clean-up job with the wrong DURIAN_SHELL_KEEP" "is not '64'"
 fresh
 sed -i "s|nscloud-cache-size-40gb|nscloud-cache-size-20gb|; s|cache-size-gb: '40'|cache-size-gb: '20'|" "${cleanup_file}"
 expect_red "clean-up job with the 20 GB size" "nscloud-cache-size-40gb"
+
+fresh
+sed -i "/^    if: github.repository/d" "${cleanup_file}"
+expect_red "clean-up job with no if" "needs a job-level if: github.repository =="
+
+fresh
+sed -i "s|^    if: github.repository.*|    if: always()|" "${cleanup_file}"
+expect_red "clean-up job with if: always()" "needs a job-level if: github.repository =="
+
+fresh
+sed -i "/^    if: github.repository/d" "${cleanup_file}"
+sed -i "s|^      - name: Report\$|&\n        if: github.repository == 'ProtoDurian/diene.workspace'|" "${cleanup_file}"
+expect_red "clean-up job with the guard on a step only" "needs a job-level if: github.repository =="
 
 [ "${fail}" -eq 0 ] || exit 1
 echo "✅ ci-cache-rules is green unchanged and red on every planted case"
