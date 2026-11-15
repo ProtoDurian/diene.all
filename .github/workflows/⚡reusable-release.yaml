@@ -11,13 +11,9 @@ jobs:
       - nscloud-cache-size-40gb
       - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
     timeout-minutes: 20
-    env:
-      DURIAN_SHELL_KEEP: '64'
     steps:
-      - uses: AtomiCloud/actions.setup-nix@v3
+      - uses: AtomiCloud/actions.setup-nix@v4
         with:
-          store-gc-at-percent: '90'
-          cache-size-gb: '40'
           auth-bot-app-id: ${{ vars.AUTH_BOT_APP_ID }}
           auth-bot-secret-key: ${{ secrets.AUTH_BOT_SECRET_KEY }}
       - name: Release

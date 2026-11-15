@@ -11,14 +11,7 @@ jobs:
       - nscloud-cache-size-40gb
       - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
     timeout-minutes: 20
-    env:
-      DURIAN_SHELL_KEEP: '64'
     steps:
-      - uses: AtomiCloud/actions.setup-nix@v3
-        with:
-          store-gc-at-percent: '90'
-          cache-size-gb: '40'
-          github-slug: 'false'
-          devshell-cache: 'true'
+      - uses: AtomiCloud/actions.setup-nix@v4
       - name: Run named checks
         run: durian-shell .#ci -c ./scripts/ci/named-checks.sh

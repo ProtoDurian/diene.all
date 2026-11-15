@@ -1,12 +1,12 @@
 import { capturedEnvCommand, expectGreen, expectRed, expectRedBecause } from './lib/helpers.ts';
 import { setValues, workload } from './lib/helm-workload.ts';
 
-const CHECK = 'nix develop .#ci -c ./scripts/local/helm-check.sh infra/root_chart';
+const CHECK = 'nix develop .#ci -c chart-checks check-chart infra/root_chart';
 const RENDER = 'nix develop .#ci -c helm template x infra/root_chart';
 const TEMPLATE = 'infra/root_chart/templates/probe-deploy.yaml';
 const container = { name: 'c', image: 'nginx:1.27' };
 const envFrom = { containers: [{ ...container, envFrom: [{ configMapRef: { name: 'cfg' } }] }] };
-const atomiEnv = { containers: [{ ...container, env: [{ name: 'ATOMI_DB__HOST', value: 'x' }] }] };
+const durianEnv = { containers: [{ ...container, env: [{ name: 'DURIAN_DB__HOST', value: 'x' }] }] };
 const envFromListed = [{ kind: 'configmap', name: 'cfg', via: 'envFrom' }];
 
 export default {
@@ -130,11 +130,11 @@ export default {
     },
     {
       name: 'mutation-helm-reload-live-env-caught',
-      description: 'A live workload that sets an ATOMI_* env var must fail the render.',
+      description: 'A live workload that sets a DURIAN_* env var must fail the render.',
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        await repo.write(TEMPLATE, workload({ spec: atomiEnv }));
+        await repo.write(TEMPLATE, workload({ spec: durianEnv }));
         await setValues(repo, { reload: 'live' });
         await expectRed(repo, CHECK, 'helm-reload');
       },

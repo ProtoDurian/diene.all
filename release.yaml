@@ -126,11 +126,29 @@ lint:
     - fixup-amend
     - squash
 
-# The config requires this block and the generator always writes scope tables, so
-# its output goes to an ignored file; docs/developer/CommitConventions.md is hand-written.
 conventions:
-  path: .releaser/conventions.md
-  template: CONVENTION_DOCS_PLACEHOLDER
+  path: docs/developer/CommitConventions.md
+  template: |-
+    # Commit conventions
+
+    This repository follows [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+
+    - `release.yaml` is the machine-readable source of truth: it owns the
+      commit types, the scopes valid for each one, and the version bump each scope
+      causes.
+    - [The conventional-commits standard](../standards/conventional-commits/index.md)
+      explains how to read that vocabulary and how to mark a breaking change.
+
+    ## Status of this file
+
+    This file is generated. `release.yaml` names this path in its
+    `conventions.path` value, `releaser conventions` writes it, and a release run
+    rewrites it as well. Change `release.yaml` and regenerate rather than
+    editing this file: everything up to here comes from that file's
+    `conventions.template`, and everything from the `type(scope)` line below is
+    generated from the commit vocabulary.
+
+    CONVENTION_DOCS_PLACEHOLDER
 
 release:
   branches:
@@ -146,6 +164,7 @@ release:
       ${notes}
     assets:
       - Changelog.md
+      - docs/developer/CommitConventions.md
   github:
     enabled: true
     successComment: 'Released in ${version}.'

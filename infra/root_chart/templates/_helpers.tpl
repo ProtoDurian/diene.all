@@ -37,7 +37,7 @@ not live|restart fails the render.
 {{- if not (has $key $allowed) }}{{ fail (printf "reload=live: container %q takes %s through envFrom, which never updates in a running pod. Mount it as a whole folder, or list it in restartOnlyConfigs" $c.name $key) }}{{ end -}}
 {{- end -}}
 {{- range $e := ($c.env | default list) -}}
-{{- if and (hasPrefix "ATOMI_" (upper $e.name)) }}{{ fail (printf "reload=live: container %q sets config env var %s, which never updates in a running pod" $c.name $e.name) }}{{ end -}}
+{{- if and (hasPrefix "DURIAN_" (upper $e.name)) }}{{ fail (printf "reload=live: container %q sets config env var %s, which never updates in a running pod" $c.name $e.name) }}{{ end -}}
 {{- $ref := (($e.valueFrom | default dict).configMapKeyRef | default (($e.valueFrom | default dict).secretKeyRef | default dict)) -}}
 {{- if $ref -}}
 {{- $key := ternary (printf "configmap/%s" $ref.name) (printf "secret/%s" $ref.name) (hasKey ($e.valueFrom | default dict) "configMapKeyRef") -}}

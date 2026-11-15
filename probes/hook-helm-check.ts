@@ -9,11 +9,7 @@ export default {
       description: 'The generated Helm render-check hook passes the root chart.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(
-          repo,
-          'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-helm-check --all-files',
-          'hook-helm-check',
-        );
+        await expectGreen(repo, 'nix develop .#default -c pre-commit run a-helm-check --all-files', 'hook-helm-check');
       },
     },
     {
@@ -23,11 +19,7 @@ export default {
       expectedImpact: ['helm-check'],
       async run(repo: any) {
         await repo.patch('infra/root_chart/templates/configmap.yaml', { find: '  labels:', replace: '  annotations:' });
-        await expectRed(
-          repo,
-          'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-helm-check --all-files',
-          'hook-helm-check',
-        );
+        await expectRed(repo, 'nix develop .#default -c pre-commit run a-helm-check --all-files', 'hook-helm-check');
       },
     },
   ],

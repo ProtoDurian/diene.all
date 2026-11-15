@@ -1,6 +1,6 @@
 message: diene workspace
 
-# Label key prefix. The cluster-policies chart gets it from scripts/local/helm-check.sh.
+# Label key prefix. The cluster-policies chart gets it from chart-checks.yaml.
 labelPrefix: durian.cloud
 
 # Service-tree (LPSM) identity stamped on every object as <labelPrefix>/<key> labels.

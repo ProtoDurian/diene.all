@@ -35,11 +35,11 @@ tasks:
     vars:
       CHART: infra/root_chart
     cmds:
-      - ./scripts/local/helm-render.sh {{.CHART}}
+      - chart-checks render {{.CHART}}
 
   root_chart:check:
-    desc: Render, then run chart-checks (schemas + VAP) on infra/root_chart
+    desc: Render, lint and run chart-checks (schemas, policies, labels) on infra/root_chart
     vars:
       CHART: infra/root_chart
     cmds:
-      - ./scripts/local/helm-check.sh {{.CHART}}
+      - chart-checks check-chart {{.CHART}}

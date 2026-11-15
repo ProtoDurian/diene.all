@@ -29,11 +29,12 @@ the existing tasks into one `lint` that switches on a shared chart variable.
 
 ## Render and chart checks
 
-The chart is the only artifact: rendered YAML is never committed. `scripts/local/helm-render.sh <chart>`
+The chart is the only artifact: rendered YAML is never committed. `chart-checks render <chart>` (the AtomiCloud
+nix-registry tool, configured by the root `chart-checks.yaml`)
 renders every values stack of a chart into the gitignored `infra/rendered/<chart>/<stack>.yaml` —
 `values.yaml` is the `default` stack and each `values.<name>.yaml` overlay is the stack `<name>`.
-`scripts/local/helm-check.sh <chart>` renders fresh, then runs `chart-checks check` (the AtomiCloud
-nix-registry tool, configured by the root `chart-checks.yaml`) on the result. It always runs two stages:
+`chart-checks check-chart <chart>` renders fresh, runs `helm lint`, then checks every rendered stack. It always runs
+two stages, then a first-party label check:
 
 1. **Schemas** — the Kubernetes core schemas for the version in `chart-checks.yaml`
    (`kubernetes:`), unknown fields refused. A kind with no schema fails, so a chart that ships CRDs
@@ -43,17 +44,18 @@ nix-registry tool, configured by the root `chart-checks.yaml`) on the result. It
    its own repo, the stand-in `https://github.com/ProtoDurian/cluster-policies-standin` (chart in `chart/`, name
    `cluster-policies`; its own CI runs its cases). Workspace lists it as one git entry in `chart-checks.yaml`,
    pinned by `commit:` (a missing or unpinned entry is refused, exit 3; a commit that cannot be fetched fails the
-   install, exit 4). `scripts/local/helm-check.sh` installs it into the gitignored `.chart-checks/` first. Its
+   install, exit 4). `chart-checks` installs it into the gitignored `.chart-checks/` first. Its
    `require-lpsm-labels` policy needs the four LPSM labels. Swapping the stand-in for the real cluster chart
    changes the address and the commit in that entry only; downstream repos add their own `policies:` entries.
+3. **First-party labels** — every object from the chart's own templates (not its subcharts), of any kind, carries the
+   four LPSM labels under the stack's prefix. Helm test hooks are exempt.
 
 ### Label prefix
 
 Labels are `<labelPrefix>/landscape`, `/platform`, `/service` and `/module`, taken from the root
 chart's `serviceTree:` values. `labelPrefix` (default `durian.cloud`) is one value in
-`infra/root_chart/values.yaml`. `chart-checks` passes no values to a fetched chart, so `scripts/local/helm-check.sh`
-copies the `cluster-policies` chart, sets its `labelPrefix` from the root chart (per values stack, found by the
-entry name) and points only that entry at the copy. Change the prefix in `infra/root_chart/values.yaml` only: one
+`infra/root_chart/values.yaml`. `chart-checks.yaml` hands it to the `cluster-policies` chart through `chartValues`, read per values stack, and
+`chart.labelPrefix` turns on the first-party label check. Change the prefix in `infra/root_chart/values.yaml` only: one
 change moves every label and check.
 
 ### Reload label
@@ -75,7 +77,7 @@ on the render. The root chart's `root.reload.*` helpers (`templates/_helpers.tpl
 
 The helpers fail the render when the `reload` value is not `live|restart`, when a `live` workload gets config by `env`,
 `envFrom` or a `subPath` mount of a ConfigMap, Secret or projected volume (unless that object is in `restartOnlyConfigs`),
-when a `live` workload sets an `ATOMI_*` env var, or when a `restartOnlyConfigs` entry has a bad `kind` or `via`. The
+when a `live` workload sets a `DURIAN_*` env var, or when a `restartOnlyConfigs` entry has a bad `kind` or `via`. The
 `reload-live-inputs` policy refuses the same inputs on a live pod unless the object is in the pod's `restart-configs`
 annotation. Every template and example uses `restart` until the app passes the live-reload test.
 
@@ -88,14 +90,14 @@ exempt from the label rules; the exception names those objects exactly and is no
 
 ### Where it runs
 
-The `a-helm-check` pre-commit hook runs the check script, and CI runs it through the pre-commit job,
+The `a-helm-check` pre-commit hook runs `chart-checks check-chart infra/root_chart`, and CI runs it through the pre-commit job,
 so the same render is checked on every commit. Locally use `task helm:root_chart:render` to inspect
 the YAML and `task helm:root_chart:check` to run the checks. `helm lint` and `helm template` keep
 running as before (`a-helm-lint`, `scripts/ci/helm.sh`).
 
 `.chart-checks/` (the tool's install folder) is gitignored and never committed. The pre-commit workflow restores it
 with `actions/cache` keyed on `hashFiles('chart-checks.yaml')`, so the pinned inputs are downloaded once per change of
-that file. `helm lint` runs inside the same task, before `chart-checks check`.
+that file. `helm lint` runs inside the same command, before the checks.
 
 ## CI/CD release structure
 

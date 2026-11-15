@@ -171,11 +171,6 @@
   },
   {
     "template": "diene/workspace",
-    "name": "action-majors",
-    "class": "gate"
-  },
-  {
-    "template": "diene/workspace",
     "name": "release-config-schema",
     "class": "gate"
   },

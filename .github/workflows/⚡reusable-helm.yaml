@@ -19,19 +19,10 @@ jobs:
       - nscloud-cache-size-40gb
       - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
     timeout-minutes: 20
-    env:
-      DURIAN_SHELL_KEEP: '64'
     steps:
-      - uses: actions/checkout@v7
+      - uses: AtomiCloud/actions.setup-nix@v4
         with:
-          fetch-depth: 1
-      - uses: AtomiCloud/actions.setup-nix@v3
-        with:
-          store-gc-at-percent: '90'
-          cache-size-gb: '40'
-          checkout: 'false'
-          github-slug: 'false'
-          devshell-cache: 'true'
+          fetch-depth: '1'
       - name: Build and push Helm
         env:
           CHART_PATH: ${{ inputs.chart_path }}

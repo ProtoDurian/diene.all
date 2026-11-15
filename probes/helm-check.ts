@@ -1,6 +1,6 @@
 import { capturedEnvCommand, expectGreen, expectRed, expectRedBecause } from './lib/helpers.ts';
 
-const CHECK = 'nix develop .#ci -c ./scripts/local/helm-check.sh infra/root_chart';
+const CHECK = 'nix develop .#ci -c chart-checks check-chart infra/root_chart';
 const PIN = '    commit: 560e7fc4ee8aae51cae8a00aa68aa4e4fe6af3e1\n';
 
 // Runs the check and requires one exact exit code plus a refusal text (chart-checks: 3 = config refused, 4 = install failed).
@@ -202,7 +202,7 @@ export default {
       async run(repo: any) {
         await repo.patch('infra/root_chart/templates/configmap.yaml', { find: '  labels:', replace: '  annotations:' });
         const run = capturedEnvCommand(
-          'nix develop .#ci -c env TMPDIR="$tmp" ./scripts/local/helm-check.sh infra/root_chart',
+          'nix develop .#ci -c env TMPDIR="$tmp" chart-checks check-chart infra/root_chart',
           'helm-check',
         );
         const result = await repo.exec(

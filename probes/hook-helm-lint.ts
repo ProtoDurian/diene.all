@@ -9,11 +9,7 @@ export default {
       description: 'The generated Helm lint hook passes the root chart.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(
-          repo,
-          'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-helm-lint --all-files',
-          'hook-helm-lint',
-        );
+        await expectGreen(repo, 'nix develop .#default -c pre-commit run a-helm-lint --all-files', 'hook-helm-lint');
       },
     },
     {
@@ -23,11 +19,7 @@ export default {
       expectedImpact: ['helm-lint'],
       async run(repo: any) {
         await repo.patch('infra/root_chart/Chart.yaml', { find: 'apiVersion: v2', replace: 'apiVersion: invalid' });
-        await expectRed(
-          repo,
-          'nix develop .#ci -c ./scripts/local/pre-commit-run.sh a-helm-lint --all-files',
-          'hook-helm-lint',
-        );
+        await expectRed(repo, 'nix develop .#default -c pre-commit run a-helm-lint --all-files', 'hook-helm-lint');
       },
     },
   ],

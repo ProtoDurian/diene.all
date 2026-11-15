@@ -29,8 +29,3 @@ desktop.ini
 *.swo
 *.swp
 *~
-.kagent/
-.kloop/
-
-### releaser
-.releaser/

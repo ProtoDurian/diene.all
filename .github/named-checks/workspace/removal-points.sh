@@ -29,8 +29,6 @@ H_PATHS=(
   probes/helm-lint.ts
   probes/helm-render.ts
   probes/hook-helm-lint.ts
-  scripts/local/helm-render.sh
-  scripts/local/helm-check.sh
   chart-checks.yaml
   probes/helm-check.ts
   probes/hook-helm-check.ts

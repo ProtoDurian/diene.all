@@ -22,6 +22,5 @@ with env;
 
   releaser = pkgs.mkShell {
     buildInputs = lint ++ main ++ releaser ++ system;
-    inherit shellHook;
   };
 }

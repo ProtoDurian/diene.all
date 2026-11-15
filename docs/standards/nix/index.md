@@ -69,9 +69,9 @@ This is about _building_, not about _arranging_. `pkgs.buildEnv`, `pkgs.lib.opti
 
 **How it works**: Takes `env` as input, uses `with env;` to bring group names into scope, then defines named shells using `pkgs.mkShell`. Each shell's `buildInputs` combines groups with `++`. The `shellHook` is passed as a parameter from `flake.nix`.
 
-**IMPORTANT**: The developer shells (`default`, `releaser`) use `inherit shellHook;` — do not override or customize `shellHook` in `shells.nix`. The `shellHook` inheritance must be preserved for downstream nix-resolvers to work correctly. Nix resolvers do not understand custom shellHook modifications. `inherit shellHook;` installs the git pre-commit hooks into `.git/hooks` when a person enters the shell. The CI shells (`ci`, `cd`) do NOT inherit it: CI never commits, so installing hooks there only costs start-up time and writes into the runner's checkout. CI runs the same hooks explicitly through `scripts/local/pre-commit-run.sh`. `scripts/local/pre-commit-run.sh` passes the generated hook config to `pre-commit run --config`: it uses `PRE_COMMIT_CONFIG_FILE` when set, else builds it from the flake (`checks.<system>.pre-commit-check.config.configFile`).
+**IMPORTANT**: `default` is the developer shell and the only one with the hook; `ci`, `cd` and `releaser` have none. `default` uses `inherit shellHook;` — do not override or customize `shellHook` in `shells.nix`. The `shellHook` inheritance must be preserved for downstream nix-resolvers to work correctly. Nix resolvers do not understand custom shellHook modifications. `inherit shellHook;` installs the git pre-commit hooks into `.git/hooks` when a person enters the shell. CI runs the hooks by entering `default`: the Pre-Commit job runs `durian-shell .#default -c ./scripts/ci/pre-commit.sh`, which runs `pre-commit run --all-files --show-diff-on-failure`. The other CI jobs (named-checks, Helm) use `ci`, which installs no hook.
 
-**When to create a new shell**: When you have a distinct workflow requiring a different combination of environment groups. Each shell composes groups differently. A new developer shell (one a person enters to work and commit) uses `inherit shellHook;`; a new CI-only shell does not, for the reason above.
+**When to create a new shell**: When you have a distinct workflow requiring a different combination of environment groups. Each shell composes groups differently. A new developer shell (one a person enters to work and commit) uses `inherit shellHook;`; a new CI-only shell does not.
 
 **Usage**: `nix develop` for default, `nix develop .#name` for a specific shell.
 
@@ -209,7 +209,7 @@ with env;
 }
 ```
 
-**IMPORTANT**: A developer shell always uses `inherit shellHook;` (a CI-only shell omits it). Do not customize or override `shellHook` — this breaks downstream nix-resolvers.
+**IMPORTANT**: A developer shell uses `inherit shellHook;`; a CI-only shell omits it. Do not customize or override `shellHook` — this breaks downstream nix-resolvers.
 
 2. **Use**: `nix develop .#my-shell`
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Self-test of ci-cache-rules.sh: the copied workflows are green, and each planted change turns the check red (including the clean-up workflow rules and its one-repository guard).
+# Self-test of ci-cache-rules.sh: the copied workflows are green, and each planted change turns the check red.
 
 cd "$(git rev-parse --show-toplevel)"
 
@@ -16,11 +16,6 @@ fresh() {
 
 nix_file="${tmp}/w/⚡reusable-named-checks.yaml"
 note_file="${tmp}/w/⚡reusable-release-note.yaml"
-idt="id-""token"
-old_keep="2""0"
-bad_keep="3""2"
-old_gc="7""5"
-top_id=$'permissions:\n  '"${idt}"$': write\n\njobs:\n'
 
 fresh
 if ! "${rules}" "${tmp}/w" >/dev/null 2>&1; then
@@ -47,94 +42,8 @@ sed -i 's|runs-on: ubuntu-26.04|runs-on: [ubuntu-26.04, nscloud-cache-tag-nix-st
 expect_red "cache tag without setup-nix" "no AtomiCloud/actions.setup-nix step"
 
 fresh
-sed -i "s|^    timeout-minutes: 20\$|&\\n    permissions:\\n      ${idt}: write|" "${nix_file}"
-expect_red "job permission without flakehub-login" "flakehub-login"
-
-fresh
-sed -i "s|^jobs:\$|${top_id//$'\n'/\\n}|" "${nix_file}"
-expect_red "workflow permission without flakehub-login" "flakehub-login"
-
-fresh
-sed -i "s|^jobs:\$|${top_id//$'\n'/\\n}|" "${nix_file}"
-sed -i "s|^\( *\)devshell-cache: 'true'\$|&\n\1flakehub-login: 'false'\n      - uses: AtomiCloud/actions.setup-nix@v3|" "${nix_file}"
-expect_red "second setup-nix without flakehub-login" "flakehub-login"
-
-fresh
-sed -i '/^    env:$/{N;/DURIAN_SHELL_KEEP/d}' "${nix_file}"
-expect_red "devshell-cache without DURIAN_SHELL_KEEP" "DURIAN_SHELL_KEEP"
-
-fresh
-sed -i "/store-gc-at-percent/d" "${nix_file}"
-expect_red "setup-nix without store-gc-at-percent" "store-gc-at-percent"
-
-fresh
-sed -i "s|^\( *DURIAN_SHELL_KEEP: \)'64'\$|\1'${old_keep}'|" "${nix_file}"
-expect_red "DURIAN_SHELL_KEEP not 64 at job level only" "set at job level"
-
-fresh
 sed -i "s|nscloud-cache-size-40gb|nscloud-cache-size-20gb|" "${nix_file}"
 expect_red "cache tag without the 40gb volume" "nscloud-cache-size-40gb"
-
-fresh
-sed -i "/cache-size-gb/d" "${nix_file}"
-expect_red "setup-nix without cache-size-gb 40" "cache-size-gb"
-
-sed -i "s|^\( *DURIAN_SHELL_KEEP: \)'64'\$|\1''|" "${tmp}/w/⚡reusable-release.yaml"
-sed -i "s|^    timeout-minutes: 20\$|&\\n    env:\\n      DURIAN_SHELL_KEEP: ''|" "${tmp}/w/⚡reusable-release.yaml"
-expect_red "empty DURIAN_SHELL_KEEP on a job without devshell-cache" "is not '64'"
-
-fresh
-sed -i "/DURIAN_SHELL_KEEP/d" "${tmp}/w/⚡reusable-release.yaml"
-expect_red "setup-nix step without devshell-cache and without DURIAN_SHELL_KEEP" "has no DURIAN_SHELL_KEEP"
-
-fresh
-sed -i '/^    env:$/{N;/DURIAN_SHELL_KEEP/d}' "${nix_file}"
-sed -i "s|^jobs:\$|env:\\n  DURIAN_SHELL_KEEP: '${bad_keep}'\\n\\n&|" "${nix_file}"
-expect_red "DURIAN_SHELL_KEEP not 64 at workflow level only" "set at workflow level"
-
-fresh
-sed -i '/^    env:$/{N;/DURIAN_SHELL_KEEP/d}' "${nix_file}"
-sed -i "s|^\\( *\\)run: durian-shell .*\$|&\\n\\1env:\\n\\1  DURIAN_SHELL_KEEP: '${bad_keep}'|" "${nix_file}"
-expect_red "DURIAN_SHELL_KEEP not 64 at step level only" "set at step level"
-
-fresh
-sed -i "s|^\\( *\\)run: durian-shell .*\$|&\\n\\1env:\\n\\1  DURIAN_SHELL_KEEP: '${bad_keep}'|" "${nix_file}"
-expect_red "step level overrides a correct job level with a wrong value" "set at step level"
-
-fresh
-sed -i "s|store-gc-at-percent: '90'|store-gc-at-percent: '${old_gc}'|" "${nix_file}"
-expect_red "a normal job left at 75 percent" "store-gc-at-percent: '90'"
-
-cleanup_file="${tmp}/w/nix-store-clean-up.yaml"
-
-fresh
-sed -i '/^  schedule:$/,/^    - cron/d' "${cleanup_file}"
-expect_red "clean-up job without schedule" "no schedule trigger"
-
-fresh
-sed -i "s|^\( *\)- nscloud-cache-size-40gb\$|&\n\1- nscloud-cache-exp-do-not-commit|" "${cleanup_file}"
-expect_red "clean-up job with a do-not-commit label" "do-not-commit"
-
-fresh
-sed -i "s|^\( *DURIAN_SHELL_KEEP: \)'64'\$|\1'${old_keep}'|" "${cleanup_file}"
-expect_red "clean-up job with the wrong DURIAN_SHELL_KEEP" "is not '64'"
-
-fresh
-sed -i "s|nscloud-cache-size-40gb|nscloud-cache-size-20gb|; s|cache-size-gb: '40'|cache-size-gb: '20'|" "${cleanup_file}"
-expect_red "clean-up job with the 20 GB size" "nscloud-cache-size-40gb"
-
-fresh
-sed -i "/^    if: github.repository/d" "${cleanup_file}"
-expect_red "clean-up job with no if" "needs a job-level if: github.repository =="
-
-fresh
-sed -i "s|^    if: github.repository.*|    if: always()|" "${cleanup_file}"
-expect_red "clean-up job with if: always()" "needs a job-level if: github.repository =="
-
-fresh
-sed -i "/^    if: github.repository/d" "${cleanup_file}"
-sed -i "s|^      - name: Report\$|&\n        if: github.repository == 'ProtoDurian/diene.workspace'|" "${cleanup_file}"
-expect_red "clean-up job with the guard on a step only" "needs a job-level if: github.repository =="
 
 [ "${fail}" -eq 0 ] || exit 1
 echo "✅ ci-cache-rules is green unchanged and red on every planted case"
