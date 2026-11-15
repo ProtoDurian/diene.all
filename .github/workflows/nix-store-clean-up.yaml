@@ -2,6 +2,7 @@ name: Nix store clean-up
 
 # Frees every Nix store path that no kept dev shell or Nix profile needs, and commits the cleaned volume.
 # Normal jobs never clean up; they only GC as a safety net at 90 percent.
+# GitHub runs the schedule only from the default branch; elsewhere the push trigger and workflow_dispatch run it.
 
 on:
   schedule:

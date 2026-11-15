@@ -34,7 +34,9 @@ their trigger block:
     workflow file changes) runs one job on the shared cache tag. Its setup-nix step sets `store-gc-at-percent: '0'` and
     `store-gc-target-percent: '0'`, so it frees every store path that no kept dev shell and no Nix profile needs, and
     the job commits the cleaned volume. It has no `nscloud-cache-exp-do-not-commit` label, runs nothing else, and
-    keeps the 64 newest dev shells (each one is a GC root).
+    keeps the 64 newest dev shells (each one is a GC root). GitHub runs a `schedule` trigger only from the default
+    branch, so the nightly starts once this workflow is on the default branch; on other branches the push trigger and
+    manual dispatch run it.
   - A job on the shared cache tag asks for `nscloud-cache-size-40gb` and its setup-nix step sets
     `cache-size-gb: '40'` (the action cannot read runs-on labels, so the two must agree), so the safety-net percent
     is read against the real size.
