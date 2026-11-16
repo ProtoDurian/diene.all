@@ -91,7 +91,7 @@ exempt from the label rules; the exception names those objects exactly and is no
 The `a-helm-check` pre-commit hook (`nix/hooks/helm-check.nix`) runs `chart-checks check-chart infra/root_chart`, and CI runs it through the pre-commit job,
 so the same render is checked on every commit. Locally use `task helm:root_chart:render` to inspect
 the YAML and `task helm:root_chart:check` to run the checks. `helm lint` and `helm template` keep
-running as before (`a-helm-lint`, `scripts/ci/helm.sh`).
+running as before (`scripts/ci/helm.sh`).
 
 `.chart-checks/` (the tool's install folder) is gitignored and never committed. `helm lint` runs inside the same command, before the checks.
 
@@ -100,7 +100,7 @@ running as before (`a-helm-lint`, `scripts/ci/helm.sh`).
 Publishing is driven by the `⚡reusable-helm.yaml` reusable workflow, called from `ci.yaml`
 (every commit) and `cd.yaml` (release tag):
 
-1. The reusable workflow uses `AtomiCloud/actions.setup-nix` and runs inside `nix develop .#ci`,
+1. The reusable workflow uses `AtomiCloud/actions.setup-nix` and runs `durian-shell .#ci` (locally `nix develop .#ci`),
    so `helm`/`yq` come from the Nix store. The store is restored from the shared Nix cache —
    one cache for all Nix jobs, no per-service keys (see
    [the service-tree standard](../service-tree/index.md)).

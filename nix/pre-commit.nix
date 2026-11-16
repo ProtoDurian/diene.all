@@ -13,7 +13,7 @@ pre-commit-lib.run {
 
   # hooks
   hooks = {
-    inherit (import ./hooks/helm-check.nix { inherit packages; }) a-helm-lint a-helm-check;
+    inherit (import ./hooks/helm-check.nix { inherit packages; }) a-helm-check;
 
     # formatter
     treefmt = {

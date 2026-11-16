@@ -28,7 +28,6 @@ H_PATHS=(
   docs/standards/helm
   probes/helm-lint.ts
   probes/helm-render.ts
-  probes/hook-helm-lint.ts
   chart-checks.yaml
   nix/hooks/helm-check.nix
   probes/helm-check.ts
@@ -38,7 +37,7 @@ H_PATHS=(
 )
 H_TOKENS=(
   root_chart reusable-helm Taskfile.helm helm.sh helm-push standards/helm
-  helm/index.md a-helm-lint a-helm-check helm-lint helm-render helm-check helm-reload helm-workload
+  helm/index.md a-helm-check helm-lint helm-render helm-check helm-reload helm-workload
   infra/rendered chart-checks
 )
 
@@ -106,7 +105,7 @@ apply_H() {
   edit .github/dependabot.yml yq_del 'del(.updates[] | select(.package-ecosystem == "helm"))'
   edit dlint.yaml yq_del 'del(.checks["toolchain-smoke"].binaries[] | select(. == "helm version" or . == "helm-docs" or . == "kubeconform -v" or . == "kyverno version" or . == "chart-checks --version"))'
   edit CLAUDE.md drop_section '# Helm charts and publishing'
-  edit probes/features.json yq_del 'del(.[] | select(.name == "helm-lint" or .name == "helm-render" or .name == "hook-helm-lint" or .name == "helm-check" or .name == "hook-helm-check" or .name == "helm-reload"))'
+  edit probes/features.json yq_del 'del(.[] | select(.name == "helm-lint" or .name == "helm-render" or .name == "helm-check" or .name == "hook-helm-check" or .name == "helm-reload"))'
   edit probes/binary-smoke.ts sed_d '/^chart-checks/d;/^helm-docs/d;/^helm version/d;/^helm template/d'
   edit nix/pre-commit.nix sed_d '/hooks\/helm-check\.nix/d'
   edit nix/pre-commit.nix sed_d '/"\^infra\/\(root_chart\|policies\)\/"/d'
