@@ -12,7 +12,7 @@ export default {
       async run(repo: any) {
         await expectGreen(
           repo,
-          'nix develop .#precommit -c pre-commit run a-infisical --all-files',
+          'nix develop .#default -c pre-commit run a-infisical --all-files',
           'hook-infisical-full',
         );
       },
@@ -30,11 +30,7 @@ export default {
           repo,
           'git add probe-secret.txt && git -c user.name=Probe -c user.email=probe@example.invalid commit -qm probe-secret',
         );
-        await expectRed(
-          repo,
-          'nix develop .#precommit -c pre-commit run a-infisical --all-files',
-          'hook-infisical-full',
-        );
+        await expectRed(repo, 'nix develop .#default -c pre-commit run a-infisical --all-files', 'hook-infisical-full');
       },
     },
   ],

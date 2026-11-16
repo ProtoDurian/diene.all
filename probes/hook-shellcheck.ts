@@ -42,11 +42,7 @@ export default {
       description: 'The generated shellcheck hook passes on the untouched scripts.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(
-          repo,
-          'nix develop .#precommit -c pre-commit run a-shellcheck --all-files',
-          'hook-shellcheck',
-        );
+        await expectGreen(repo, 'nix develop .#default -c pre-commit run a-shellcheck --all-files', 'hook-shellcheck');
       },
     },
     {
@@ -65,12 +61,12 @@ export default {
         try {
           await expectGreen(
             repo,
-            `nix develop .#precommit -c pre-commit run a-shellcheck --files ${repoRelativeFixture}`,
+            `nix develop .#default -c pre-commit run a-shellcheck --files ${repoRelativeFixture}`,
             'hook-shellcheck',
           );
           await expectGreen(
             repo,
-            `nix develop .#precommit -c pre-commit run a-shellcheck --files ${scriptRelativeFixture}`,
+            `nix develop .#default -c pre-commit run a-shellcheck --files ${scriptRelativeFixture}`,
             'hook-shellcheck',
           );
         } finally {
@@ -92,7 +88,7 @@ export default {
             throw new Error(`could not stage the shellcheck fixture: ${staged.stderr || staged.stdout}`);
           }
           const result = await repo.exec(
-            capturedEnvCommand('nix develop .#precommit -c pre-commit run a-shellcheck --all-files', 'hook-shellcheck'),
+            capturedEnvCommand('nix develop .#default -c pre-commit run a-shellcheck --all-files', 'hook-shellcheck'),
             { timeoutMs: 240000 },
           );
           if (result.exitCode === 0) {
