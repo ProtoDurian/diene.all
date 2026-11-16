@@ -29,7 +29,6 @@ H_PATHS=(
   probes/helm-lint.ts
   probes/helm-render.ts
   chart-checks.yaml
-  nix/hooks/helm-check.nix
   probes/helm-check.ts
   probes/hook-helm-check.ts
   probes/helm-reload.ts
@@ -107,7 +106,7 @@ apply_H() {
   edit CLAUDE.md drop_section '# Helm charts and publishing'
   edit probes/features.json yq_del 'del(.[] | select(.name == "helm-lint" or .name == "helm-render" or .name == "helm-check" or .name == "hook-helm-check" or .name == "helm-reload"))'
   edit probes/binary-smoke.ts sed_d '/^chart-checks/d;/^helm-docs/d;/^helm version/d;/^helm template/d'
-  edit nix/pre-commit.nix sed_d '/hooks\/helm-check\.nix/d'
+  edit nix/pre-commit.nix sed_d '/^    a-helm-check = {$/,/^$/d'
   edit nix/pre-commit.nix sed_d '/"\^infra\/\(root_chart\|policies\)\/"/d'
   edit nix/fmt.nix sed_d '/"infra\/\(root_chart\|policies\)\/\*\*"/d'
   edit .gitignore sed_z 's|^### helm\ninfra/root_chart/uploads/\ninfra/rendered/\n.chart-checks/\n\n||'

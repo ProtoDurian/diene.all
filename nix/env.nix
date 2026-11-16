@@ -1,10 +1,6 @@
 { pkgs, packages }:
 with packages;
 {
-  ci = [
-    go-task
-  ];
-
   dev = [
     git
     go-task

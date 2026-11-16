@@ -11,7 +11,7 @@ with env;
   };
 
   ci = pkgs.mkShell {
-    buildInputs = lint ++ main ++ system ++ ci;
+    buildInputs = lint ++ main ++ system;
   };
 
   default = pkgs.mkShell {

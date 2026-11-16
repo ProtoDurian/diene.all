@@ -14,4 +14,4 @@ jobs:
     steps:
       - uses: AtomiCloud/actions.setup-nix@v4
       - name: Run named checks
-        run: durian-shell .#ci -c ./scripts/ci/named-checks.sh
+        run: durian-shell .#default -c ./scripts/ci/named-checks.sh

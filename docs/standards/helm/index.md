@@ -88,7 +88,7 @@ exempt from the label rules; the exception names those objects exactly and is no
 
 ### Where it runs
 
-The `a-helm-check` pre-commit hook (`nix/hooks/helm-check.nix`) runs `chart-checks check-chart infra/root_chart`, and CI runs it through the pre-commit job,
+The `a-helm-check` pre-commit hook (`nix/pre-commit.nix`) runs `chart-checks check-chart infra/root_chart`, and CI runs it through the pre-commit job,
 so the same render is checked on every commit. Locally use `task helm:root_chart:render` to inspect
 the YAML and `task helm:root_chart:check` to run the checks. `helm lint` and `helm template` keep
 running as before (`scripts/ci/helm.sh`).

@@ -13,7 +13,23 @@ pre-commit-lib.run {
 
   # hooks
   hooks = {
-    inherit (import ./hooks/helm-check.nix { inherit packages; }) a-helm-check;
+    a-helm-check = {
+      enable = true;
+      name = "Helm render check";
+      entry = "${packages.infralint}/bin/chart-checks check-chart infra/root_chart";
+      files = "^(infra/root_chart/.*|chart-checks\\.yaml)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-captured-env-coverage = {
+      enable = true;
+      name = "Probe captured-env coverage";
+      entry = "${pkgs.bun}/bin/bun test probes/lib/captured-env-coverage.test.ts";
+      files = "^probes/.*\\.ts$";
+      pass_filenames = false;
+      language = "system";
+    };
 
     # formatter
     treefmt = {

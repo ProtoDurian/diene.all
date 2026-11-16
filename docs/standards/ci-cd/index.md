@@ -27,6 +27,7 @@ their trigger block:
     on the cache volume, and plain `nix develop` anywhere it cannot cache. The v4 defaults apply, so setup-nix steps pass
     no tuning inputs.
   - Helm checks out through setup-nix with `fetch-depth: '1'` (shallow checkout).
+  - The Named Checks job runs in the `default` shell (`durian-shell .#default`); the Helm job runs in `ci`, which has no `go-task`.
   - Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
   - The Pre-Commit job enters the `precommit` shell and runs `pre-commit run --all-files`, so every hook runs, including `a-skills-sync` (`skills-sync sync --frozen`), so CI enforces
     the vendored skills without a separate step.
