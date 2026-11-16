@@ -13,10 +13,5 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: AtomiCloud/actions.setup-nix@v4
-      - name: Cache chart-checks schemas
-        uses: actions/cache@v6
-        with:
-          path: .chart-checks
-          key: chart-checks-${{ hashFiles('chart-checks.yaml') }}
       - name: Run pre-commit
-        run: durian-shell .#default -c ./scripts/ci/pre-commit.sh
+        run: durian-shell .#precommit -c ./scripts/ci/pre-commit.sh

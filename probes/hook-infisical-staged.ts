@@ -11,7 +11,7 @@ export default {
       async run(repo: any) {
         await expectGreen(
           repo,
-          'nix develop .#default -c pre-commit run a-infisical-staged --all-files',
+          'nix develop .#precommit -c pre-commit run a-infisical-staged --all-files',
           'hook-infisical-staged',
         );
       },
@@ -27,7 +27,7 @@ export default {
         await repo.exec('git add probe-secret.txt');
         await expectRed(
           repo,
-          'nix develop .#default -c pre-commit run a-infisical-staged --all-files',
+          'nix develop .#precommit -c pre-commit run a-infisical-staged --all-files',
           'hook-infisical-staged',
         );
       },

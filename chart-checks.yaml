@@ -1,7 +1,6 @@
-kubernetes: '1.30' # core schemas ship in the nix-pinned kubectl-validate (1.23 to 1.30); install downloads only crds and policies into .chart-checks
+kubernetes: '1.35'
 chart:
   release: diene-workspace
-  labelPrefix: .labelPrefix
 policies:
   - name: cluster-policies
     git: https://github.com/ProtoDurian/cluster-policies-standin

@@ -29,11 +29,14 @@ export default {
     },
     {
       name: 'mutation-helm-check-caught',
-      description: 'A first-party object that drops its LPSM labels must turn the helm-check mechanism red.',
+      description: 'A workload whose pod template drops its LPSM labels must turn the helm-check mechanism red.',
       kind: 'mutation',
       expectedImpact: ['hook-helm-check'],
       async run(repo: any) {
-        await repo.patch('infra/root_chart/templates/configmap.yaml', { find: '  labels:', replace: '  annotations:' });
+        await repo.patch('infra/root_chart/templates/deployment.yaml', {
+          find: '        {{- range $key, $value := .Values.serviceTree }}',
+          replace: '        {{- range $key, $value := dict }}',
+        });
         await expectRed(repo, CHECK, 'helm-check');
       },
     },
@@ -80,13 +83,13 @@ export default {
     },
     {
       name: 'mutation-helm-check-prefix-caught',
-      description: 'A label under a different prefix must turn the helm-check mechanism red.',
+      description: 'A workload label under a different prefix must turn the helm-check mechanism red.',
       kind: 'mutation',
       expectedImpact: ['hook-helm-check'],
       async run(repo: any) {
-        await repo.patch('infra/root_chart/templates/configmap.yaml', {
-          find: '{{ $.Values.labelPrefix }}/{{ $key }}',
-          replace: 'other.example/{{ $key }}',
+        await repo.patch('infra/root_chart/templates/deployment.yaml', {
+          find: '        {{ $.Values.labelPrefix }}/{{ $key }}',
+          replace: '        other.example/{{ $key }}',
         });
         await expectRed(repo, CHECK, 'helm-check');
       },
@@ -94,7 +97,7 @@ export default {
     {
       name: 'mutation-helm-check-upstream-scope',
       description:
-        'An upstream subchart may ship unlabelled non-workload objects and Helm test-hook Pods (green), but an unlabelled upstream Pod must turn the helm-check mechanism red.',
+        'An upstream subchart may ship non-workload objects without LPSM labels and Helm test-hook Pods (green), but an upstream Pod without the reload label must turn the helm-check mechanism red.',
       kind: 'mutation',
       expectedImpact: ['hook-helm-check'],
       async run(repo: any) {
@@ -200,7 +203,10 @@ export default {
       kind: 'mutation',
       expectedImpact: ['hook-helm-check'],
       async run(repo: any) {
-        await repo.patch('infra/root_chart/templates/configmap.yaml', { find: '  labels:', replace: '  annotations:' });
+        await repo.patch('infra/root_chart/templates/configmap.yaml', {
+          find: 'data:',
+          replace: 'bogusField: true\ndata:',
+        });
         const run = capturedEnvCommand(
           'nix develop .#ci -c env TMPDIR="$tmp" chart-checks check-chart infra/root_chart',
           'helm-check',

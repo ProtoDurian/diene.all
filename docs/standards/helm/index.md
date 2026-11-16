@@ -33,8 +33,8 @@ The chart is the only artifact: rendered YAML is never committed. `chart-checks 
 nix-registry tool, configured by the root `chart-checks.yaml`)
 renders every values stack of a chart into the gitignored `infra/rendered/<chart>/<stack>.yaml` —
 `values.yaml` is the `default` stack and each `values.<name>.yaml` overlay is the stack `<name>`.
-`chart-checks check-chart <chart>` renders fresh, runs `helm lint`, then checks every rendered stack. It always runs
-two stages, then a first-party label check:
+`chart-checks check-chart <chart>` renders fresh, runs `helm lint`, then checks every rendered stack. It reports every
+failing step on every values stack in one run; only a failed render skips that stack. It always runs two stages:
 
 1. **Schemas** — the Kubernetes core schemas for the version in `chart-checks.yaml`
    (`kubernetes:`), unknown fields refused. A kind with no schema fails, so a chart that ships CRDs
@@ -45,17 +45,15 @@ two stages, then a first-party label check:
    `cluster-policies`; its own CI runs its cases). Workspace lists it as one git entry in `chart-checks.yaml`,
    pinned by `commit:` (a missing or unpinned entry is refused, exit 3; a commit that cannot be fetched fails the
    install, exit 4). `chart-checks` installs it into the gitignored `.chart-checks/` first. Its
-   `require-lpsm-labels` policy needs the four LPSM labels. Swapping the stand-in for the real cluster chart
+   `require-lpsm-labels` policy needs the four LPSM labels on every workload; other kinds are not label-checked. Swapping the stand-in for the real cluster chart
    changes the address and the commit in that entry only; downstream repos add their own `policies:` entries.
-3. **First-party labels** — every object from the chart's own templates (not its subcharts), of any kind, carries the
-   four LPSM labels under the stack's prefix. Helm test hooks are exempt.
 
 ### Label prefix
 
 Labels are `<labelPrefix>/landscape`, `/platform`, `/service` and `/module`, taken from the root
 chart's `serviceTree:` values. `labelPrefix` (default `durian.cloud`) is one value in
-`infra/root_chart/values.yaml`. `chart-checks.yaml` hands it to the `cluster-policies` chart through `chartValues`, read per values stack, and
-`chart.labelPrefix` turns on the first-party label check. Change the prefix in `infra/root_chart/values.yaml` only: one
+`infra/root_chart/values.yaml`. `chart-checks.yaml` hands it to the `cluster-policies` chart through `chartValues`, read per values stack.
+Change the prefix in `infra/root_chart/values.yaml` only: one
 change moves every label and check.
 
 ### Reload label
@@ -90,14 +88,12 @@ exempt from the label rules; the exception names those objects exactly and is no
 
 ### Where it runs
 
-The `a-helm-check` pre-commit hook runs `chart-checks check-chart infra/root_chart`, and CI runs it through the pre-commit job,
+The `a-helm-check` pre-commit hook (`nix/hooks/helm-check.nix`) runs `chart-checks check-chart infra/root_chart`, and CI runs it through the pre-commit job,
 so the same render is checked on every commit. Locally use `task helm:root_chart:render` to inspect
 the YAML and `task helm:root_chart:check` to run the checks. `helm lint` and `helm template` keep
 running as before (`a-helm-lint`, `scripts/ci/helm.sh`).
 
-`.chart-checks/` (the tool's install folder) is gitignored and never committed. The pre-commit workflow restores it
-with `actions/cache` keyed on `hashFiles('chart-checks.yaml')`, so the pinned inputs are downloaded once per change of
-that file. `helm lint` runs inside the same command, before the checks.
+`.chart-checks/` (the tool's install folder) is gitignored and never committed. `helm lint` runs inside the same command, before the checks.
 
 ## CI/CD release structure
 
@@ -111,7 +107,8 @@ Publishing is driven by the `⚡reusable-helm.yaml` reusable workflow, called fr
 2. It runs [`./scripts/ci/helm.sh`](../../../scripts/ci/helm.sh), which reads the chart path
    and release version from the environment the reusable workflow sets. That script owns the
    published version and destination: read its version assignment to see what a commit build
-   versus a release tag publishes, and its push command for where charts land.
+   versus a release tag publishes. Charts push to `oci://ghcr.io/<repo>/charts`, so a chart is
+   `ghcr.io/<repo>/charts/<chart name>:<version>` and never shares a name with the Docker image.
 
 In CI, Helm linting and the render checks run through the pre-commit hooks (not a separate job).
 

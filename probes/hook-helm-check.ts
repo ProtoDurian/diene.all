@@ -9,17 +9,24 @@ export default {
       description: 'The generated Helm render-check hook passes the root chart.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, 'nix develop .#default -c pre-commit run a-helm-check --all-files', 'hook-helm-check');
+        await expectGreen(
+          repo,
+          'nix develop .#precommit -c pre-commit run a-helm-check --all-files',
+          'hook-helm-check',
+        );
       },
     },
     {
       name: 'mutation-hook-helm-check-caught',
-      description: 'A chart that drops its LPSM labels must turn the hook-helm-check mechanism red.',
+      description: 'A workload that drops its LPSM labels must turn the hook-helm-check mechanism red.',
       kind: 'mutation',
       expectedImpact: ['helm-check'],
       async run(repo: any) {
-        await repo.patch('infra/root_chart/templates/configmap.yaml', { find: '  labels:', replace: '  annotations:' });
-        await expectRed(repo, 'nix develop .#default -c pre-commit run a-helm-check --all-files', 'hook-helm-check');
+        await repo.patch('infra/root_chart/templates/deployment.yaml', {
+          find: '        {{- range $key, $value := .Values.serviceTree }}',
+          replace: '        {{- range $key, $value := dict }}',
+        });
+        await expectRed(repo, 'nix develop .#precommit -c pre-commit run a-helm-check --all-files', 'hook-helm-check');
       },
     },
   ],

@@ -1,6 +1,10 @@
 { pkgs, packages }:
 with packages;
 {
+  ci = [
+    go-task
+  ];
+
   dev = [
     git
     go-task
@@ -10,7 +14,6 @@ with packages;
 
   lint = [
     actionlint
-    chart-checks
     dlint
     infralint
     pre-commit
@@ -22,8 +25,6 @@ with packages;
   main = [
     cyanprint
     git
-    go-task
-    infisical
     releaser
     shellcheck
   ];

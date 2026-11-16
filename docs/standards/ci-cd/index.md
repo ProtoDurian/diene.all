@@ -28,7 +28,7 @@ their trigger block:
     no tuning inputs.
   - Helm checks out through setup-nix with `fetch-depth: '1'` (shallow checkout).
   - Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
-  - The Pre-Commit job enters the `default` developer shell and runs `pre-commit run --all-files`, so every hook runs, including `a-skills-sync` (`skills-sync sync --frozen`), so CI enforces
+  - The Pre-Commit job enters the `precommit` shell and runs `pre-commit run --all-files`, so every hook runs, including `a-skills-sync` (`skills-sync sync --frozen`), so CI enforces
     the vendored skills without a separate step.
 
   Callers grant permissions, pass only repository-specific values, and use
@@ -61,10 +61,10 @@ nix develop .#<shell> -c <command>
 ```
 
 `<shell>` is one of the shells declared in
-[`nix/shells.nix`](../../../nix/shells.nix) — today `default`, `ci`, `cd` and
+[`nix/shells.nix`](../../../nix/shells.nix) — today `default`, `precommit`, `ci`, `cd` and
 `releaser`. Three things follow: a job's dependencies are visible without reading
 the job, CI and your laptop run the same tools, and every job can reuse the shared
-Nix store cache.
+Nix store cache. `default` and `precommit` install the git hook; `ci`, `cd` and `releaser` do not.
 
 ## Runners and cache labels
 
@@ -114,10 +114,10 @@ Run the same entry point the lane runs. Take the `run:` line from the reusable
 workflow you want to reproduce and run it verbatim, for example:
 
 ```bash
-nix develop .#default -c ./scripts/ci/pre-commit.sh
+nix develop .#precommit -c ./scripts/ci/pre-commit.sh
 ```
 
-That line reproduces the pre-commit workflow (the `default` developer shell, which installs the hook). Workspace names no runtime, so its
+That line reproduces the pre-commit workflow (the `precommit` shell, which installs the hook). Workspace names no runtime, so its
 `a-skills-sync` hook is deliberately inert here.
 
 The Docker and Helm scripts build locally by default. Their reusable workflows set
@@ -127,7 +127,8 @@ the documented environment contract to enable publishing.
 
 Docker and Helm callers pass per-repository image or chart values through workflow
 `with:` inputs. Empty release versions produce commit builds; CD passes the tag as
-the version. Add another image or chart as another caller job rather than putting
+the version. Charts push under their own path, `ghcr.io/<repo>/charts/<chart name>`, so a chart never replaces an
+image tag. Add another image or chart as another caller job rather than putting
 repository-specific branching into the reusable workflow.
 
 Release execution runs the real tool: `⚡reusable-release.yaml` enters the

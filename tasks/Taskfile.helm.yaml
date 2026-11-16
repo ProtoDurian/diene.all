@@ -38,7 +38,7 @@ tasks:
       - chart-checks render {{.CHART}}
 
   root_chart:check:
-    desc: Render, lint and run chart-checks (schemas, policies, labels) on infra/root_chart
+    desc: Render, lint and run every chart-checks step on every values stack of infra/root_chart, all failures in one run
     vars:
       CHART: infra/root_chart
     cmds:
