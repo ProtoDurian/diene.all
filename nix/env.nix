@@ -21,8 +21,6 @@ with packages;
   main = [
     cyanprint
     git
-    go-task
-    infisical
     releaser
     shellcheck
   ];

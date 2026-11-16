@@ -22,14 +22,18 @@ if [ "${push}" = "true" ]; then
   commit_version="${sha}-${branch}"
   helm_version="${version:-v0.0.0-${commit_version}}"
   image_version="${version:-${commit_version}}"
-  oci_ref="$(echo "oci://${DOMAIN}/${GITHUB_REPO_REF}" | tr '[:upper:]' '[:lower:]')"
+  oci_ref="$(echo "oci://${DOMAIN}/${GITHUB_REPO_REF}/charts" | tr '[:upper:]' '[:lower:]')"
   yq eval ".appVersion = \"${image_version}\"" "${CHART_PATH}/Chart.yaml" >"${CHART_PATH}/Chart.yaml.tmp"
   mv "${CHART_PATH}/Chart.yaml.tmp" "${CHART_PATH}/Chart.yaml"
   echo "${DOCKER_PASSWORD}" | helm registry login "${DOMAIN}" -u "${DOCKER_USER}" --password-stdin
   helm dependency build "${CHART_PATH}"
   helm package "${CHART_PATH}" -u --version "${helm_version}" --app-version "${image_version}" -d "${CHART_PATH}/uploads"
   for filename in "${CHART_PATH}"/uploads/*.tgz; do
-    helm push "${filename}" "${oci_ref}"
+    for attempt in 1 2 3; do
+      helm push "${filename}" "${oci_ref}" && break
+      [ "${attempt}" = 3 ] && exit 1
+      sleep $((attempt * 5))
+    done
   done
   rm -rf "${CHART_PATH}/uploads"
 fi

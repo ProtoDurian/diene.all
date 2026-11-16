@@ -29,3 +29,17 @@ tasks:
       CHART: infra/root_chart
     cmds:
       - helm template diene-workspace {{.CHART}} --debug {{.CLI_ARGS}}
+
+  root_chart:render:
+    desc: Render (gitignored) plain YAML for infra/root_chart
+    vars:
+      CHART: infra/root_chart
+    cmds:
+      - chart-checks render {{.CHART}}
+
+  root_chart:check:
+    desc: Render, lint and run every chart-checks step on every values stack of infra/root_chart, all failures in one run
+    vars:
+      CHART: infra/root_chart
+    cmds:
+      - chart-checks check-chart {{.CHART}}

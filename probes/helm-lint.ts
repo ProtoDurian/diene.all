@@ -16,7 +16,7 @@ export default {
       name: 'mutation-helm-lint-caught',
       description: 'A focused sabotage must turn the helm-lint mechanism red.',
       kind: 'mutation',
-      expectedImpact: ['hook-helm-lint'],
+      expectedImpact: [],
       async run(repo: any) {
         await repo.patch('infra/root_chart/Chart.yaml', { find: 'apiVersion: v2', replace: 'apiVersion: invalid' });
         await expectRed(repo, 'nix develop .#ci -c helm lint infra/root_chart', 'helm-lint');

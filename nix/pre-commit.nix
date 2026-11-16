@@ -13,6 +13,24 @@ pre-commit-lib.run {
 
   # hooks
   hooks = {
+    a-helm-check = {
+      enable = true;
+      name = "Helm render check";
+      entry = "${packages.infralint}/bin/chart-checks check-chart infra/root_chart";
+      files = "^(infra/root_chart/.*|chart-checks\\.yaml)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-captured-env-coverage = {
+      enable = true;
+      name = "Probe captured-env coverage";
+      entry = "${pkgs.bun}/bin/bun test probes/lib/captured-env-coverage.test.ts";
+      files = "^probes/.*\\.ts$";
+      pass_filenames = false;
+      language = "system";
+    };
+
     # formatter
     treefmt = {
       enable = true;
@@ -29,15 +47,6 @@ pre-commit-lib.run {
       enable = true;
       name = "dlint";
       entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH ${packages.dlint}/bin/dlint lint'";
-      pass_filenames = false;
-      language = "system";
-    };
-
-    a-helm-lint = {
-      enable = true;
-      name = "Helm lint";
-      entry = "${packages.infrautils}/bin/helm lint infra/root_chart";
-      files = "^infra/root_chart/.*";
       pass_filenames = false;
       language = "system";
     };

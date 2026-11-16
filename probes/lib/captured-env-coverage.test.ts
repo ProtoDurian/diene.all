@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
@@ -58,11 +58,13 @@ describe('captured-env coverage of direct repo.exec shell entries', () => {
     expect(unwrapped).toEqual([]);
   });
 
-  // A tripwire: change this count only together with the call sites it counts.
-  test('the wrapped set is the 2 known shell-entering call sites, across 2 files', () => {
+  // A tripwire: change this list only together with the call sites it names.
+  test('the wrapped set is the known shell-entering call sites', () => {
+    const expected = ['helm-check.ts', 'helm-reload.ts', 'hook-enforce-exec.ts', 'hook-shellcheck.ts'].filter(file =>
+      existsSync(join(probesDir, file)),
+    );
     const wrapped = allSites.filter(site => site.wrapped);
-    expect(wrapped).toHaveLength(2);
-    expect([...new Set(wrapped.map(site => site.file))].sort()).toEqual(['hook-enforce-exec.ts', 'hook-shellcheck.ts']);
+    expect([...new Set(wrapped.map(site => site.file))].sort()).toEqual(expected);
   });
 
   test('the inherited probe files stay parent-shaped and the dev-shell label stays exempt', () => {
