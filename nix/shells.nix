@@ -6,7 +6,6 @@
 }:
 with env;
 {
-  # Only default and precommit install git hooks.
   cd = pkgs.mkShell {
     buildInputs = main ++ system;
   };
