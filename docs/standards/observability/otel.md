@@ -108,6 +108,18 @@ Logs are stored in VictoriaLogs and queried with LogsQL. Its stream fields are o
 
 Alloy's OTLP log exporter sends them in the `VL-Stream-Fields` header. Without the header VictoriaLogs makes every resource attribute a stream field (one stream per pod) and adds `event_name` too. Every other field (`user_id`, `trace_id`, pod, container and node ids, the stack trace, the event name) is an ordinary field: it stays filterable but is never a stream field. Field names are the OTLP names as sent, dots and slashes kept, and a dotted name is quoted in LogsQL: `_stream:{"durian.cloud.service"="cart"} "durian.cloud/event":=checkout.failed`. Severity is `severity_text` and `severity_number`, the body is `_msg`, and trace ids are `trace_id` and `span_id`; there is no `level` field.
 
+### Events
+
+The event name (`durian.cloud/event`) stays an ordinary field and is never a stream field: a field filter inside one service answered in at most 0.015 s on VictoriaLogs, so a stream per (service, event) pair would add streams for no measured gain. VictoriaLogs' habit of adding the OTLP `event_name` as a stream field is what the `VL-Stream-Fields` header turns off.
+
+### Limits
+
+- **Refused or dropped.** A 4xx from the log store is never retried (Alloy logs `Exporting failed. Dropping data.` and counts `otelcol_exporter_send_failed_log_records_total`); a 429 is retried. VictoriaLogs counts its own discards in `vl_rows_dropped_total{reason=...}` and refused OTLP requests in `vl_http_errors_total{path="/insert/opentelemetry/v1/logs"}`. Alloy's counter and both VictoriaLogs counters have alerts.
+- **Dropped with only a warning line, no counter:** an entry over 2 MiB, more than 2,000 fields, or a field name over 128 bytes. The log edge (64-byte keys, 64 fields, about 82 KB lines) stays far below all three.
+- **Ingest limits** `-insert.maxFieldsPerLine` (1000) and `-opentelemetry.maxRequestSize` (64 MiB) stay at their defaults.
+- **Query limits on `vl-select`:** `-search.maxConcurrentRequests=4`, `-search.maxQueueDuration=10s`, `-search.maxQueryDuration=30s` (Grafana gives up at 30 s too), no `-search.maxQueryTimeRange`. VictoriaLogs has no per-query memory limit, so `obs` warns when an alert or a dashboard panel is a LogsQL `stats` query over a whole namespace. Counting logs with `stats` in dashboards and alerts is allowed; metrics stay the first choice where the contract already has a counter.
+- **Resources:** requests 500m CPU and 512 MiB, no CPU limit, memory limit 2 GiB, `-memory.allowedPercent=60`.
+
 ## Cross-cluster tail sampling: keep markers
 
 Alloy samples traces after they end, per cluster. A request can cross clusters, and each cluster's sampler sees only its own spans, so every cluster that handles a piece of a trace must keep its piece when any other piece is kept.

@@ -42,6 +42,8 @@ Phones and browsers send to an **edge service**, one small service of the sulfox
 
 `faro.receiver` sets `rate_limiting` on purpose (its default is one global bucket for all phones together). Keep markers for cross-cluster tail sampling go to the per-cluster edge names ([keep markers](/docs/standards/observability/otel.md#cross-cluster-tail-sampling-keep-markers)).
 
+**Faro logs reach VictoriaLogs over OTLP.** `faro.receiver`'s `output.logs` feeds `otelcol.receiver.loki`, a Loki-API receiver that turns the entries into OTLP logs, and its own `otelcol.exporter.otlphttp` sends them to `vl-insert` with `VL-Stream-Fields: app_name,app_environment,kind` (the three bounded labels `faro.receiver` adds). `faro.receiver` takes only Loki-API receivers for logs, and Alloy sends every outbound signal as OTLP, so there is one protocol. Faro traces go to the same Tempo as the backend.
+
 ## Next.js
 
 ```text

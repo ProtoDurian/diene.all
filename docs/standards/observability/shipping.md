@@ -9,6 +9,12 @@ The files in `observability/` are plain Grafana content. The service's **primord
 - The app chart, if the repo has one, only runs the service. It never renders observability files.
 - Build the rendering with `helm-wrapper`, not with CI scripts.
 
+## Where logs are stored
+
+- **VictoriaLogs** runs as a cluster of one storage node behind `vl-insert` and `vl-select`, on its own volume. Retention is `-retentionPeriod=30d` plus `-retention.maxDiskSpaceUsageBytes` at 80 % of the volume, so the oldest whole days go first when the disk fills before 30 days.
+- **Volume:** the VictoriaLogs disk is capped at 100 GiB on the first cluster (Primordial; its own volume, size cap 80 GiB) and keeps what fits; 20 GiB on the laptop and Garden (cap 16 GiB). Primordial's data volume is **400 GB**, shared with VictoriaMetrics. The cap holds about 10 days at 1,000 requests per second and about 1 day at 10,000. Alert at 90 % full.
+- **Logs are best-effort and not backed up off the box.** A lost VictoriaLogs volume loses its logs. VictoriaLogs can make partition snapshots, but the box backup never copies the live data directory, and no off-box log backup exists.
+
 ## The chart copy
 
 Helm can only read files inside its chart folder and rejects symlinks that point outside it. This repo has no copy step yet. The chart build must copy `observability/` to `infra/primordial_chart/files/observability/` before every lint, template, package or publish, and `.gitignore` must hold `infra/primordial_chart/files/`. Add the copy as a `primordial_chart:copy` task that the chart's other tasks depend on (a chart's tasks are named `<chart folder>:<verb>`; [Taskfile conventions](/docs/standards/taskfile/index.md)). Never edit or commit the copy; `observability/` stays the source.
