@@ -19,7 +19,7 @@ export default {
       expectedImpact: [],
       async run(repo: any) {
         await repo.patch('.github/workflows/⚡reusable-precommit.yaml', {
-          find: 'AtomiCloud/actions.setup-nix@v3',
+          find: 'AtomiCloud/actions.setup-nix@v4',
           replace: 'AtomiCloud/actions.setup-nix@f366a9f3997acdf7f335445809fd85e3a157147f',
         });
         await expectRed(repo, 'nix develop .#ci -c dlint action-pins trusted', 'trusted-action-pins');

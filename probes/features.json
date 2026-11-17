@@ -71,7 +71,7 @@
   },
   {
     "template": "diene/workspace",
-    "name": "hook-helm-lint",
+    "name": "hook-helm-check",
     "class": "gate"
   },
   {
@@ -107,6 +107,11 @@
   {
     "template": "diene/workspace",
     "name": "helm-lint",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "helm-check",
     "class": "gate"
   },
   {
@@ -173,5 +178,20 @@
     "template": "diene/shared",
     "name": "thin-skills",
     "class": "presence"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "helm-reload",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "release-config-schema",
+    "class": "gate"
+  },
+  {
+    "template": "diene/workspace",
+    "name": "release-commit-vocabulary",
+    "class": "gate"
   }
 ]
