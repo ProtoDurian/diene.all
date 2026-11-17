@@ -23,9 +23,9 @@
 **Decision:** YES | NO
 **Why:** {which user flow; NO only if there is no per-request flow}
 
-| Span          | Attributes                                  | Sampling                                              |
-| ------------- | ------------------------------------------- | ----------------------------------------------------- |
-| `{span name}` | `{key ids, values}` (the library adds LPSM) | {head ratio: 1.0, or the lowered value per landscape} |
+| Span          | Attributes                                  | Sampling                                                             |
+| ------------- | ------------------------------------------- | -------------------------------------------------------------------- |
+| `{span name}` | `{key ids, values}` (the library adds LPSM) | {head ratio: 1.0; lowered only as an emergency valve, with a reason} |
 
 ### Gate 4 — Dashboard
 

@@ -30,9 +30,9 @@ Example: one INFO line per delivery attempt with `delivery_id`, `target`, `attem
 
 ### Gate 3 — Traces (default YES for user flows)
 
-Add a span for each meaningful stage of a user flow, with key IDs as attributes. Skip tracing only for internal work with no per-request flow. The service sets only its head-sampling `ratio` (the share of new traces kept): keep the base `ratio: 1.0` and lower it in a landscape's config when that landscape's trace volume is high (the platform team asks, or its traces cost more than its logs). Keeping every error trace is the platform team's **tail sampling** (the collector decides after a trace ends, so it can keep all errors).
+Add a span for each meaningful stage of a user flow, with key IDs as attributes. Skip tracing only for internal work with no per-request flow. The service sends every span: keep the base `ratio: 1.0`. Lower it in a landscape's config only as an emergency valve, with a recorded `reason:`, because a lower ratio drops error traces before Alloy sees them. Normal sampling is the platform team's **tail sampling** (Alloy decides after a trace ends, so it keeps every error trace).
 
-Example: span `webhook.deliver` with `delivery_id`; ratio 1.0, lowered to 0.1 in `raichu` because of its high volume.
+Example: span `webhook.deliver` with `delivery_id`; ratio stays 1.0 in every landscape; Alloy tail-samples the traces.
 
 ### Gate 4 — Dashboard (default: the generic dashboard is enough)
 
@@ -69,4 +69,4 @@ Each Gate 5 alert becomes one folder, `observability/alerts/<slug>/`, with its t
 - [ ] Every YES names its metric, log event, span, panel or folder, and its cost (ATS, log volume or sampling).
 - [ ] Every Gate 5 row is fully filled, and its Owner follows [check 3](#gate-5--alerts-default-no).
 - [ ] Everything named exists in the PR: each metric in the service code (unless its Gate 1 row says `planned`), each Gate 6 folder under `observability/alerts/`.
-- [ ] No unbounded metric labels, no logs in hot loops, a sampling ratio for every trace.
+- [ ] No unbounded metric labels, no logs in hot loops, the trace ratio left at 1.0 (an emergency valve with a `reason:` is the only exception).

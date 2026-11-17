@@ -74,7 +74,7 @@ lib/src/observability/
 └── observability.dart
 ```
 
-Use our own rebased copy of the Faro Flutter package (mobile only; Flutter web is out and carries no telemetry). Do not install `FaroHttpOverrides` for an unsampled session, so it sends no `traceparent`. Map `service` to `appName`, `platform` to `namespace`, `version` to `appVersion` and landscape to `appEnv`; put `durian.cloud.module` in the session or resource attributes. Wrap the app once with the SDK bootstrap, and add only the interaction and asset instrumentation widgets you need.
+Use our own rebased copy of the Faro Flutter package (mobile only; Flutter web is out and carries no telemetry). Do not install `FaroHttpOverrides` for an unsampled session, so it sends no `traceparent`. Map `service` to `appName`, `platform` to `namespace` and `version` to `appVersion`; never send the landscape (the landscape's `faro.receiver` stamps it); put `durian.cloud.module` in the session or resource attributes. Wrap the app once with the SDK bootstrap, and add only the interaction and asset instrumentation widgets you need.
 
 Flutter does not use the webpack source-map plugin; native symbol upload is not covered here.
 

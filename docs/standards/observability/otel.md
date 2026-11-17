@@ -47,7 +47,7 @@ otel:
         timeout: PT10S
 ```
 
-The base config turns the three signals on and every exporter off, and keeps every trace (`ratio: 1.0`). Each landscape's config turns on the exporters it needs, e.g. `otel.traces.exporter.otlp: { enabled: true, endpoint: '{otlp-endpoint}' }` (endpoint from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you)), and lowers `otel.traces.sampler.ratio` when that landscape's trace volume is high (the platform team asks, or its traces cost more than its logs).
+The base config turns the three signals on and every exporter off, and keeps every trace (`ratio: 1.0`). Each landscape's config turns on the exporters it needs, e.g. `otel.traces.exporter.otlp: { enabled: true, endpoint: '{otlp-endpoint}' }` (endpoint from the [platform team](/docs/standards/observability/index.md#values-the-platform-team-gives-you)), and leaves `otel.traces.sampler.ratio` at 1.0: Alloy does the normal sampling after a trace ends. Lower it in a landscape's config only as an emergency valve, with a `reason:` recorded next to it, because it drops error traces before Alloy sees them.
 
 Rules:
 

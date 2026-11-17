@@ -51,15 +51,15 @@ Front-load the symptom: `Retry queue saturated`, not `The webhook delivery retry
 
 The type decides the shape of `expr`. Everything else stays the same.
 
-| Type                | `expr` shape                                                           | Use for                                               | Avoid when                                     |
-| ------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------- | --------------------------------------- |
-| Static threshold    | `metric > N` plus `for`                                                | Hard limits: disk %, queue depth, cert expiry         | The metric rises and falls with the day        |
-| Absence / heartbeat | `absent_over_time(metric{"durian.cloud.service"="zinc"}[15m])`         | Scrape gone, cron did not run, consumer silent        | Scrapes are flaky (fix those first)            |
-| Event (logs)        | `\_stream:{"durian.cloud.service"="zinc"} panic                        | stats count() as hits                                 | filter hits:>0`, `for: 0m`, `datasource: logs` | Panics, out-of-memory kills, corruption markers | A metric exists for it (use the metric) |
-| SLO burn rate       | Error ratio over two windows (example below)                           | The preferred page for user-facing errors and latency | Internal-only signals                          |
-| Seasonal deviation  | This week vs last week, with a floor (example below)                   | Traffic-shaped metrics: volume, cost                  | Under 2 weeks of history                       |
-| Forecast            | `predict_linear(metric[6h], 4*3600) < limit` plus a threshold backstop | Slow resources: disk full in 4 hours, quota           | Fast, spiky metrics                            |
-| Outlier             | One pod more than 3 standard deviations above its peers                | One pod unlike the others                             | Fewer than 4 peers                             |
+| Type                | `expr` shape                                                                   | Use for                                               | Avoid when                                     |
+| ------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------- | --------------------------------------- |
+| Static threshold    | `metric > N` plus `for`                                                        | Hard limits: disk %, queue depth, cert expiry         | The metric rises and falls with the day        |
+| Absence / heartbeat | `absent_over_time(metric{"durian.cloud.service"="zinc"}[15m])`                 | Scrape gone, cron did not run, consumer silent        | Scrapes are flaky (fix those first)            |
+| Event (logs)        | `\_stream:{"durian.cloud.service"="zinc"} "durian.cloud/event":=disk.corrupted | stats count() as hits                                 | filter hits:>0`, `for: 0m`, `datasource: logs` | Panics, out-of-memory kills, corruption markers | A metric exists for it (use the metric) |
+| SLO burn rate       | Error ratio over two windows (example below)                                   | The preferred page for user-facing errors and latency | Internal-only signals                          |
+| Seasonal deviation  | This week vs last week, with a floor (example below)                           | Traffic-shaped metrics: volume, cost                  | Under 2 weeks of history                       |
+| Forecast            | `predict_linear(metric[6h], 4*3600) < limit` plus a threshold backstop         | Slow resources: disk full in 4 hours, quota           | Fast, spiky metrics                            |
+| Outlier             | One pod more than 3 standard deviations above its peers                        | One pod unlike the others                             | Fewer than 4 peers                             |
 
 **SLO burn rate** ([burn rate](/docs/standards/observability/index.md#terms); 99.9% SLO, so the error budget is 0.001). The fast-burn critical tier fires when both the 5m and 1h windows burn 14.4× faster than allowed, with `for: 2m`. The slow-burn warning tier uses 6× over 30m and 6h, with `for: 15m`. The example `alerts/errors/critical.yaml` uses the [standard HTTP metric](/docs/standards/observability/otel.md#standard-http-metrics); `expr: |` keeps a multi-line query as one YAML string:
 
@@ -87,12 +87,12 @@ and
   / sum(rate(http_server_request_duration_seconds_count{"durian.cloud.service"="zinc"}[6h])) ) > (6 * 0.001)
 ```
 
-**Log error ratio** (a service whose errors show only in its logs): a LogsQL `stats` query per window, with `datasource: logs`. A log alert query always ends in a `stats` pipe, and a threshold on its result is a `| filter` after it. `http.response.status_code` is a stored field name; it is quoted because it has dots. Divide the two counts in the `stats` pipe, then filter on the ratio:
+**Log error ratio** (a service whose errors show only in its logs): a LogsQL `stats` query per window, with `datasource: logs`. A log alert query always ends in a `stats` pipe, and a threshold on its result is a `| filter` after it. Every log alert must also filter the ordinary field `"durian.cloud/event"` (`:=`, `-…:=`, `:~` or `in(…)`) on an event named in `contract/events.json`, outside `_stream:{…}` and not inside an `or`; a log alert with no event filter fails `obs check`. `http.response.status_code` is a stored field name; it is quoted because it has dots. Divide the two counts in the `stats` pipe, then filter on the ratio:
 
 ```yaml
 datasource: logs
 expr: |
-  _stream:{"durian.cloud.service"="zinc"} "http.response.status_code":*
+  _stream:{"durian.cloud.service"="zinc"} "durian.cloud/event":=http.request.completed "http.response.status_code":*
     | stats count() as total, count() if ("http.response.status_code":>=500) as failed
     | math failed / total as ratio
     | filter ratio:>0.0144
