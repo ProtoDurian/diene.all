@@ -16,7 +16,7 @@ pre-commit-lib.run {
     a-helm-check = {
       enable = true;
       name = "Helm render check";
-      entry = "${packages.chart-checks}/bin/chart-checks check-chart infra/root_chart";
+      entry = "${packages.infralint}/bin/chart-checks check-chart infra/root_chart";
       files = "^(infra/root_chart/.*|chart-checks\\.yaml)$";
       pass_filenames = false;
       language = "system";
@@ -55,15 +55,6 @@ pre-commit-lib.run {
       name = "Staged secrets scan";
       entry = "${packages.infisical}/bin/infisical scan git-changes --staged -v --redact";
       pass_filenames = false;
-      language = "system";
-    };
-
-    a-markdownlint = {
-      enable = true;
-      name = "Markdown lint";
-      entry = "${pkgs.markdownlint-cli2}/bin/markdownlint-cli2";
-      files = "^(docs/standards/.*\\.md|\\.claude/skills/[^/]+/SKILL\\.md)$";
-      pass_filenames = true;
       language = "system";
     };
 

@@ -10,7 +10,6 @@ with packages;
 
   lint = [
     actionlint
-    chart-checks
     dlint
     infralint
     pre-commit

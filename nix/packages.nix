@@ -10,7 +10,6 @@ let
       {
         inherit
           atomiutils
-          chart-checks
           cyanprint
           dlint
           infralint

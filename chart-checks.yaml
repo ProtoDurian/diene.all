@@ -1,4 +1,4 @@
-kubernetes: '1.30'
+kubernetes: '1.35'
 chart:
   release: diene-workspace
 policies:
