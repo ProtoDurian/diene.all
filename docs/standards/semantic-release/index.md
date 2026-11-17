@@ -84,9 +84,8 @@ Release is its own workflow, and it runs off a successful `CI` run rather than o
 a push. `.github/workflows/release.yaml` declares that `workflow_run` trigger, the
 restriction to `main`, and the `release` concurrency group; the `a-workflows` gate
 pins those values through `dlint.yaml`'s
-`checks["workflow-policy"].assertions`. The trigger and concurrency probes each
-sabotage their own value and drive that check directly, so both independent
-release policies are shown able to fail.
+`checks["workflow-policy"].assertions`. Each is its own assertion, so the trigger,
+the `main` restriction or the concurrency group can fail on its own.
 
 The workflow ends in a single `scripts/ci/release.sh` call inside the `releaser`
 Nix shell. That script runs `releaser release -c release.yaml`, which

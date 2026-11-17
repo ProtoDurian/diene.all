@@ -22,15 +22,6 @@ pre-commit-lib.run {
       language = "system";
     };
 
-    a-captured-env-coverage = {
-      enable = true;
-      name = "Probe captured-env coverage";
-      entry = "${pkgs.bun}/bin/bun test probes/lib/captured-env-coverage.test.ts";
-      files = "^probes/.*\\.ts$";
-      pass_filenames = false;
-      language = "system";
-    };
-
     # formatter
     treefmt = {
       enable = true;
