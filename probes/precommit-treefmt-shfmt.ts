@@ -31,6 +31,9 @@ const definition: ProbeDefinition = {
       timeoutMs: 240000,
       async run(repo) {
         await repo.write('probe-shfmt.sh', shellFixture);
+        // The fixture is removed once the red is asserted: the other features run
+        // as controls against this sandbox, and a child that adds checks over
+        // staged scripts (for example an exec-bit hook) must not see it.
         try {
           const staged = await repo.exec('git add probe-shfmt.sh');
           if (staged.exitCode !== 0) {

@@ -2,45 +2,39 @@
 with packages;
 {
   dev = [
+    obs
+    prometheus.cli
     git
     go-task
     infisical
-    pls
-    sg
-    skopeo
+    releaser
   ];
 
   lint = [
+    dashboard-linter
     actionlint
+    dlint
     infralint
-    kubeconform
-    kyverno
     pre-commit
-    ripgrep
     shellcheck
+    skills-sync
     treefmt
   ];
 
   main = [
     cyanprint
     git
-    go-task
-    infisical
-    kubeconform
-    kyverno
-    pls
-    ripgrep
+    releaser
     shellcheck
-    skopeo
   ];
 
-  # C2: sg is retained only until tools/releaser is published at step 2p.
   releaser = [
-    sg
+    releaser
   ];
 
   system = [
     atomiutils
     infrautils
+    nix
   ];
 }

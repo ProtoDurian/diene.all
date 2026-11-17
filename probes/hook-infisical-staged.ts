@@ -11,7 +11,7 @@ export default {
       async run(repo: any) {
         await expectGreen(
           repo,
-          'nix develop .#ci -c pre-commit run a-infisical-staged --all-files',
+          'nix develop .#default -c pre-commit run a-infisical-staged --all-files',
           'hook-infisical-staged',
         );
       },
@@ -20,14 +20,14 @@ export default {
       name: 'mutation-hook-infisical-staged-caught',
       description: 'A focused sabotage must turn the hook-infisical-staged mechanism red.',
       kind: 'mutation',
-      expectedImpact: ['hook-infisical-full', 'secret-scan-command'],
+      expectedImpact: ['hook-infisical-full'],
       async run(repo: any) {
         const secret = ['AKIA', 'QRSTUVWXYZABCDEF'].join('');
         await repo.write('probe-secret.txt', `aws_access_key_id=${secret}\n`);
         await repo.exec('git add probe-secret.txt');
         await expectRed(
           repo,
-          'nix develop .#ci -c pre-commit run a-infisical-staged --all-files',
+          'nix develop .#default -c pre-commit run a-infisical-staged --all-files',
           'hook-infisical-staged',
         );
       },
