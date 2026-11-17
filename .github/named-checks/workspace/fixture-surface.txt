@@ -10,7 +10,6 @@
 .claude/skills/service-tree/SKILL.md
 .claude/skills/shell-conventions/SKILL.md
 .claude/skills/taskfile-conventions/SKILL.md
-.coderabbit.yaml
 .dockerignore
 .envrc
 .github/actionlint.yaml

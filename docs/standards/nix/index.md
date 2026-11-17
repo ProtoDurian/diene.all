@@ -69,9 +69,9 @@ This is about _building_, not about _arranging_. `pkgs.buildEnv`, `pkgs.lib.opti
 
 **How it works**: Takes `env` as input, uses `with env;` to bring group names into scope, then defines named shells using `pkgs.mkShell`. Each shell's `buildInputs` combines groups with `++`. The `shellHook` is passed as a parameter from `flake.nix`.
 
-**IMPORTANT**: All shells must use `inherit shellHook;` — do not override or customize `shellHook` in `shells.nix`. The `shellHook` inheritance must be preserved for downstream nix-resolvers to work correctly. Nix resolvers do not understand custom shellHook modifications.
+**IMPORTANT**: A shell that runs the git hooks uses `inherit shellHook;`: the developer shell `default`, and a CI shell whose job runs the pre-commit hooks. A CI shell whose job runs no hooks omits it, so it installs none. Do not override or customize `shellHook` in `shells.nix`. The `shellHook` inheritance must be preserved for downstream nix-resolvers to work correctly. Nix resolvers do not understand custom shellHook modifications.
 
-**When to create a new shell**: When you have a distinct workflow requiring a different combination of environment groups. Each shell composes groups differently but always inherits the same `shellHook`.
+**When to create a new shell**: When you have a distinct workflow requiring a different combination of environment groups. Each shell composes groups differently; a shell that runs the hooks inherits the same `shellHook`.
 
 **Usage**: `nix develop` for default, `nix develop .#name` for a specific shell.
 
@@ -209,7 +209,7 @@ with env;
 }
 ```
 
-**IMPORTANT**: Always use `inherit shellHook;`. Do not customize or override `shellHook` — this breaks downstream nix-resolvers.
+**IMPORTANT**: A shell that runs the hooks uses `inherit shellHook;`; a CI shell whose job runs no hooks omits it. Do not customize or override `shellHook` — this breaks downstream nix-resolvers.
 
 2. **Use**: `nix develop .#my-shell`
 
