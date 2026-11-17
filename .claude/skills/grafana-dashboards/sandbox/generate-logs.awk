@@ -21,11 +21,12 @@ BEGIN {
   for (j = 1; j <= nl; j++) stream(ls[j], j)
 }
 
-function stream(landscape, j,    scale, labels, p, kv, i, t, h, k, f, rate, due, n, c, msg) {
+function stream(landscape, j,    scale, labels, p, kv, pair, svc, i, t, h, k, f, rate, due, n, c, msg) {
   split(landscape, scale, "=")
   labels = "\"durian.cloud.landscape\":\"" scale[1] "\""
   p = split(identity, kv, ",")
-  for (i = 1; i <= p; i++) { sub(/=/, "\":\"", kv[i]); labels = labels ",\"durian.cloud." kv[i] "\"" }
+  for (i = 1; i <= p; i++) { split(kv[i], pair, "="); if (pair[1] == "service") svc = pair[2]; sub(/=/, "\":\"", kv[i]); labels = labels ",\"durian.cloud." kv[i] "\"" }
+  labels = labels ",\"durian.cloud.platform\":\"sample\",\"service.name\":\"" svc "\",\"service.namespace\":\"sample\",\"deployment.environment.name\":\"" scale[1] "\",\"k8s.namespace.name\":\"sample\""
   sid = labels
   for (t = start; t <= end; t += step) {
     h = (t - start) / 3600; c = 0

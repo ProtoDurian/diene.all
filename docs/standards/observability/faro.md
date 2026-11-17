@@ -2,7 +2,7 @@
 
 Applies only if this repo is a Next.js or Flutter frontend; otherwise skip this page.
 
-Frontends send telemetry with Grafana Faro, Grafana's frontend observability SDK, instead of an OTel library. Each frontend keeps a thin module of its own around the official Faro SDK: one part starts Faro, one part reports errors, plus its tests.
+Frontends send telemetry with Grafana Faro, Grafana's frontend observability SDK, instead of an OTel library. Each frontend keeps a thin module of its own around our own rebased copy of the Faro SDK: one part starts Faro, one part reports errors, plus its tests.
 
 ## Start-up rules
 
@@ -53,14 +53,14 @@ src/lib/observability/
 └── index.ts                   # exports the public surface only
 ```
 
-Use the official `@grafana/faro-web-sdk` and `@grafana/faro-web-tracing` packages. The component must not catch and discard SDK failures.
+Use our own rebased copy of the Faro web packages (`faro-web-sdk` and `faro-web-tracing`), not the upstream `@grafana/*` packages. On unsampled sessions always set `omitTraceContextForUnsampledSessions: true` (not a setting), so no `traceparent` leaves the page and backend traces are not left half. The component must not catch and discard SDK failures.
 
 ### Source maps
 
 Upload source maps with `@grafana/faro-webpack-plugin` from the webpack hook in `next.config.ts`, during the production build.
 
 - Add the plugin only when Faro and the app config's `client.faro.build.enabled` are both true.
-- Require the collector URL, app id, stack id and the build secret `ATOMI_CLIENT__FARO__BUILD__KEY` before uploading. The name is the app's prefix `ATOMI_` plus the config path `client.faro.build.key` in upper case, with `__` between levels.
+- Require the collector URL, app id, stack id and the build secret `DURIAN_CLIENT__FARO__BUILD__KEY` before uploading. The name is the app's prefix `DURIAN_` plus the config path `client.faro.build.key` in upper case, with `__` between levels.
 - Read the key from the build environment just before the build. It must never reach YAML, the generated client config, `DefinePlugin` values, the bundle, the image or any build output.
 - Test the upload guard in CI with a dry run.
 
@@ -74,7 +74,7 @@ lib/src/observability/
 └── observability.dart
 ```
 
-Use the `faro` package on pub.dev, published by Grafana (verified publisher). Map `service` to `appName`, `platform` to `namespace`, `version` to `appVersion` and landscape to `appEnv`; put `durian.cloud.module` in the session or resource attributes. Wrap the app once with the SDK bootstrap, and add only the interaction and asset instrumentation widgets you need.
+Use our own rebased copy of the Faro Flutter package (mobile only; Flutter web is out and carries no telemetry). Do not install `FaroHttpOverrides` for an unsampled session, so it sends no `traceparent`. Map `service` to `appName`, `platform` to `namespace`, `version` to `appVersion` and landscape to `appEnv`; put `durian.cloud.module` in the session or resource attributes. Wrap the app once with the SDK bootstrap, and add only the interaction and asset instrumentation widgets you need.
 
 Flutter does not use the webpack source-map plugin; native symbol upload is not covered here.
 

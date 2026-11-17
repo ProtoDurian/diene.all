@@ -112,7 +112,7 @@ done
 
 awk -f "$sb/generate-logs.awk" > "$sb/logs.json"
 curl -fsS -H 'Content-Type: application/stream+json' --data-binary @"$sb/logs.json" \
-  'http://127.0.0.1:9428/insert/jsonline?_stream_fields=durian.cloud.landscape,durian.cloud.service,durian.cloud.module&_msg_field=_msg&_time_field=_time'
+  'http://127.0.0.1:9428/insert/jsonline?_stream_fields=service.name,service.namespace,deployment.environment.name,k8s.namespace.name,durian.cloud.landscape,durian.cloud.platform,durian.cloud.service,durian.cloud.module&_msg_field=_msg&_time_field=_time'
 
 jq --argjson t0 "$(date +%s)000" \
   'walk(if type == "string" and startswith("@") then "\($t0 + (.[1:] | tonumber))000000" else . end)' \
@@ -120,7 +120,7 @@ jq --argjson t0 "$(date +%s)000" \
 curl -fsS -H 'Content-Type: application/json' --data-binary @"$sb/trace-now.json" http://127.0.0.1:4318/v1/traces
 ```
 
-- Each log line is one JSON object shaped like a stored OTLP log: `_time`, `_msg`, `severity_text` (`info`, `warn` or `error`), `severity_number` (30, 40 or 50), `trace_id`, `span_id`, `k8s.pod.name` and, on errors, `err.message`. The three stream fields are `durian.cloud.landscape`, `durian.cloud.service` and `durian.cloud.module`; every other field is an ordinary field. There are two streams per landscape (`pichu`, `raichu`). If your queries select other values, pass them, e.g. `-v identity=service=zinc,module=api`.
+- Each log line is one JSON object shaped like a stored OTLP log: `_time`, `_msg`, `severity_text` (`info`, `warn` or `error`), `severity_number` (30, 40 or 50), `trace_id`, `span_id`, `k8s.pod.name` and, on errors, `err.message`. The eight stream fields are `service.name`, `service.namespace`, `deployment.environment.name`, `k8s.namespace.name`, `durian.cloud.landscape`, `durian.cloud.platform`, `durian.cloud.service` and `durian.cloud.module`; every other field is an ordinary field. There are two streams per landscape (`pichu`, `raichu`). If your queries select other values, pass them, e.g. `-v identity=service=zinc,module=api`.
 - VictoriaLogs accepts the 6-hour history as it is (its default retention is 7 days).
 - The newest `pichu` line is an error with trace id `4bf92f3577b34da6a3ce929d0e0e4736`, stamped now. `trace.json` is that trace. Its span times are written as `@<milliseconds from now>`, and the `jq` line stamps them with the current time. Push the trace soon after the logs: Tempo's TraceQL search finds a trace only if its span times are close to when it arrived. A trace stamped hours back can be fetched by id, but search does not find it.
 

@@ -86,7 +86,7 @@ The log line in the store is not what the app wrote: the logging library's JSON 
    - **The class panels cover every error**: the last panel is "all errors minus the classes above", so a failure nobody predicted still shows up. An empty class panel on a healthy service is correct; say so in its description.
 
 7. **Place log evidence in the row of the metric it explains**, or in the detail row directly under it when that metric is in the overview row; never in a generic logs row at the bottom.
-8. **Rewrite lines to their key fields**: `| json | line_format "{{.level}} {{.msg}}"`. If `line_format` does not work on the engine, use `options.displayedFields`. Leave plain-text lines raw. Keep `prettifyLogMessage` off.
+8. **Rewrite lines to their key fields** with a LogsQL pipe: `| format "<severity_text> <_msg>" as _msg`. If the pipe does not work on the engine, use `options.displayedFields`. Leave plain-text lines raw. Keep `prettifyLogMessage` off.
 9. **Record what you found** (formats, level encoding, noise filters, engine limits, date) in `observability/dashboards/log-notes.md`.
 
 Every logs panel: newest first, dedup on, a limit of about 100, time shown.
