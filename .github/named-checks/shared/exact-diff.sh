@@ -6,8 +6,8 @@ git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || git fetch 
 git rev-parse --verify --quiet "${parent_sha}^{commit}" >/dev/null || { echo "❌ workspace .3 commit ${parent_sha} not found; fetch it first" >&2 && exit 1; }
 
 topics='datetime|domain-driven-design|functional-practices|software-design-philosophy|solid-principles|stateless-oop-di|testing|three-layer-architecture|utilities|validation|wire-format'
-added_pattern="^(docs/standards/(${topics})/index\.md|\.claude/skills/(${topics})/SKILL\.md|probes/(docs-markdownlint|docs-prettier|standards-inventory|thin-skills)\.ts|\.github/named-checks/shared/[^/]+|\.markdownlint-cli2\.jsonc)$"
-insert_only_pattern='^(nix/pre-commit\.nix|probes/features\.json)$'
+added_pattern="^(docs/standards/(${topics})/index\.md|docs/standards/(observability|grafana-dashboards)/[^/]+\.md|\.claude/skills/(${topics}|observability-check|grafana-alert|grafana-alert-set|grafana-dashboards|grafana-runbook)/SKILL\.md|\.claude/skills/(observability-check|grafana-alert-set|grafana-dashboards|grafana-runbook)/(templates|sandbox)/.+|observability/.+\.md|probes/(docs-markdownlint|docs-prettier|standards-inventory|thin-skills|observability-standards-present)\.ts|\.github/named-checks/shared/[^/]+|\.markdownlint-cli2\.jsonc)$"
+insert_only_pattern='^(nix/pre-commit\.nix|nix/packages\.nix|nix/env\.nix|CLAUDE\.md|probes/features\.json)$'
 split_pattern='^(README\.md|docs/standards/(ci-cd|service-tree|taskfile)/index\.md)$'
 
 # index tree == HEAD in CI; keeps local staged mutations visible

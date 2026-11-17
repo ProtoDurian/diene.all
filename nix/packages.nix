@@ -11,9 +11,11 @@ let
         inherit
           atomiutils
           cyanprint
+          dashboard-linter
           dlint
           infralint
           infrautils
+          obs
           releaser
           skills-sync
           ;
@@ -30,6 +32,7 @@ let
           infisical
           nix
           pre-commit
+          prometheus
           shellcheck
           treefmt
           ;

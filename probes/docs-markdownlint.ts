@@ -1,6 +1,6 @@
 import { expectGreen, expectRedBecause } from './lib/helpers.ts';
 
-const gate = 'nix develop --no-write-lock-file .#ci -c pre-commit run a-markdownlint --all-files';
+const gate = 'nix develop --no-write-lock-file .#default -c pre-commit run a-markdownlint --all-files';
 
 export default {
   contractVersion: 1,
