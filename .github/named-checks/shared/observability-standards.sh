@@ -23,6 +23,11 @@ for field in service.name service.namespace deployment.environment.name k8s.name
   grep -qF -- "${field}" <<<"${line}" || fail "VL-Stream-Fields line lacks ${field}"
 done
 
+shipping="$(git cat-file -p "${tree}:docs/standards/observability/shipping.md")"
+grep -qF -- '**400 GB**' <<<"${shipping}" || fail "shipping.md lacks the 400 GB volume cap"
+grep -qF -- 'best-effort and not backed up off the box' <<<"${shipping}" || fail "shipping.md lacks the best-effort, no-backup rule"
+grep -qF -- 'queryType: stats' <<<"${shipping}" || fail "shipping.md lacks queryType: stats for log alerts"
+
 for path in \
   docs/standards/observability/{index,signals,otel,alerts,faro,runbooks,shipping}.md \
   docs/standards/grafana-dashboards/{index,sandbox}.md \
