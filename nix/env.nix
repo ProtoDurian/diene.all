@@ -2,6 +2,8 @@
 with packages;
 {
   dev = [
+    obs
+    prometheus.cli
     git
     go-task
     infisical
@@ -9,6 +11,7 @@ with packages;
   ];
 
   lint = [
+    dashboard-linter
     actionlint
     dlint
     infralint

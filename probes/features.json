@@ -160,6 +160,26 @@
     "class": "gate"
   },
   {
+    "template": "diene/shared",
+    "name": "docs-markdownlint",
+    "class": "gate"
+  },
+  {
+    "template": "diene/shared",
+    "name": "docs-prettier",
+    "class": "gate"
+  },
+  {
+    "template": "diene/shared",
+    "name": "standards-inventory",
+    "class": "presence"
+  },
+  {
+    "template": "diene/shared",
+    "name": "thin-skills",
+    "class": "presence"
+  },
+  {
     "template": "diene/workspace",
     "name": "helm-reload",
     "class": "gate"
@@ -173,5 +193,10 @@
     "template": "diene/workspace",
     "name": "release-commit-vocabulary",
     "class": "gate"
+  },
+  {
+    "template": "diene/shared",
+    "name": "observability-standards-present",
+    "class": "presence"
   }
 ]
