@@ -193,5 +193,10 @@
     "template": "diene/workspace",
     "name": "release-commit-vocabulary",
     "class": "gate"
+  },
+  {
+    "template": "diene/shared",
+    "name": "observability-standards-present",
+    "class": "presence"
   }
 ]
