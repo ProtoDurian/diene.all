@@ -8,7 +8,7 @@
     # registry
     #
     # nixpkgs inputs pin exact commits;
-    # atomipkgs deliberately floats on the v5 major line.
+    # atomipkgs deliberately floats on the v6 major line.
 
     # nixos-unstable @ 2026-08-06
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/b7c2ada94fe99c15b0dbcf4d11fd7850b957a436";
