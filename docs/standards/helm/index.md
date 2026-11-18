@@ -22,27 +22,95 @@ chart a task acts on, or run `task --list`.
 
 Pass extra `helm template` arguments after `--`. Chart linting is available
 directly and also runs in `task lint`. Generated chart docs are produced by
-`helm-docs` from each chart's own values; no commit-time gate enforces them.
+`helm-docs` from each chart's own values; no commit-time quality gate enforces them.
 
 Adding a chart means adding its own task set under its own key. Never generalize
 the existing tasks into one `lint` that switches on a shared chart variable.
+
+## Render and chart checks
+
+The chart is the only artifact: rendered YAML is never committed. `chart-checks render <chart>` (the AtomiCloud
+nix-registry tool, configured by the root `chart-checks.yaml`)
+renders every values stack of a chart into the gitignored `infra/rendered/<chart>/<stack>.yaml` —
+`values.yaml` is the `default` stack and each `values.<name>.yaml` overlay is the stack `<name>`.
+`chart-checks check-chart <chart>` renders fresh, runs `helm lint`, then checks every rendered stack. It reports every
+failing step on every values stack in one run; only a failed render skips that stack. It always runs two stages:
+
+1. **Schemas** — the Kubernetes core schemas for the version in `chart-checks.yaml`
+   (`kubernetes:`), unknown fields refused. A kind with no schema fails, so a chart that ships CRDs
+   must list them under `crds:` in `chart-checks.yaml`.
+2. **Policies** — every `policies:` entry is rendered with `helm template` and its
+   `ValidatingAdmissionPolicy` objects are evaluated against each rendered object. The policy chart lives in
+   its own repo, the stand-in `https://github.com/ProtoDurian/cluster-policies-standin` (chart in `chart/`, name
+   `cluster-policies`; its own CI runs its cases). The workspace template lists it as one git entry in `chart-checks.yaml`,
+   pinned by `commit:` (a missing or unpinned entry is refused, exit 3; a commit that cannot be fetched fails the
+   install, exit 4). `chart-checks` installs it into the gitignored `.chart-checks/` first. Its
+   `require-lpsm-labels` policy needs the four LPSM labels on every workload; other kinds are not label-checked. Swapping the stand-in for the real cluster chart
+   changes the address and the commit in that entry only; downstream repos add their own `policies:` entries.
+
+### Label prefix
+
+Labels are `<labelPrefix>/landscape`, `/platform`, `/service` and `/module`, taken from the root
+chart's `serviceTree:` values. `labelPrefix` (default `durian.cloud`) is one value in
+`infra/root_chart/values.yaml`. `chart-checks.yaml` hands it to the `cluster-policies` chart through `chartValues`, read per values stack.
+Change the prefix in `infra/root_chart/values.yaml` only: one
+change moves every label and check.
+
+### Reload label
+
+Every Pod (so every workload pod template) carries `<labelPrefix>/reload` with the value `live` or `restart`. The
+default, `restart`, is set once in the root chart helper (`root.reload.mode` in `templates/_helpers.tpl`). A values
+file may override it with `reload: live`; any other value fails the render. The policy chart's
+`reload-label-required` policy refuses a missing label or any other value, and `chart-checks` evaluates the same policy
+on the render. The root chart's `root.reload.*` helpers (`templates/_helpers.tpl`) map the value:
+
+- `root.reload.label` writes the pod label; `root.reload.annotations` writes the workload annotations Reloader reads;
+  `root.reload.podAnnotations` and `root.reload.podinfoVolume` / `root.reload.podinfoMount` add the pod annotation
+  `<labelPrefix>/restart-configs` and the downward-API volume (`/etc/podinfo`: labels and annotations).
+- `restart` → `reloader.stakater.com/auto: "true"`: Reloader restarts the workload when any ConfigMap or Secret it uses changes.
+- `live` → never `auto`. The app re-reads its whole-folder config in place. Only the start-only inputs listed in the
+  `restartOnlyConfigs` value (`{kind: secret|configmap, name, via: env|envFrom|subPath}`) are named in
+  `secret.reloader.stakater.com/reload` / `configmap.reloader.stakater.com/reload`, so Reloader restarts the workload for
+  those alone. There is no checksum annotation on a live pod template.
+
+The helpers fail the render when the `reload` value is not `live|restart`, when a `live` workload gets config by `env`,
+`envFrom` or a `subPath` mount of a ConfigMap, Secret or projected volume (unless that object is in `restartOnlyConfigs`),
+when a `live` workload sets a `DURIAN_*` env var, or when a `restartOnlyConfigs` entry has a bad `kind` or `via`. The
+`reload-live-inputs` policy refuses the same inputs on a live pod unless the object is in the pod's `restart-configs`
+annotation. Every template and example uses `restart` until the app passes the live-reload test.
+
+Live or restart is chosen once per template or wrapped chart (the helper default, or one `reload` override in its
+values file); there is no per-service check. A live app notices a change in its config folder by itself in about a
+minute. A poke, SIGHUP or the app's private POST endpoint are hand tools only: no poke code exists here.
+
+Helm test hooks and the named Alloy operator Deployment and Job (`alloyOperator` in the `cluster-policies` values) are
+exempt from the label rules; the exception names those objects exactly and is not a general opt-out.
+
+### Where it runs
+
+The `a-helm-check` pre-commit hook (`nix/pre-commit.nix`) runs `chart-checks check-chart infra/root_chart`, and CI runs it through the pre-commit job,
+so the same render is checked on every commit. Locally use `task helm:root_chart:render` to inspect
+the YAML and `task helm:root_chart:check` to run the checks. `helm lint` and `helm template` keep
+running as before (`scripts/ci/helm.sh`).
+
+`.chart-checks/` (the tool's install folder) is gitignored and never committed. `helm lint` runs inside the same command, before the checks.
 
 ## CI/CD release structure
 
 Publishing is driven by the `⚡reusable-helm.yaml` reusable workflow, called from `ci.yaml`
 (every commit) and `cd.yaml` (release tag):
 
-1. The reusable workflow uses `AtomiCloud/actions.setup-nix` and runs inside `nix develop .#cd`,
+1. The reusable workflow uses `AtomiCloud/actions.setup-nix` and runs `durian-shell .#ci` (locally `nix develop .#ci`),
    so `helm`/`yq` come from the Nix store. The store is restored from the shared Nix cache —
    one cache for all Nix jobs, no per-service keys (see
-   [the service-tree standard](../service-tree/index.md)) — which is why Helm needs Nix while
-   Docker does not.
+   [the service-tree engineering standard](../service-tree/index.md)).
 2. It runs [`./scripts/ci/helm.sh`](../../../scripts/ci/helm.sh), which reads the chart path
    and release version from the environment the reusable workflow sets. That script owns the
    published version and destination: read its version assignment to see what a commit build
-   versus a release tag publishes, and its push command for where charts land.
+   versus a release tag publishes. Charts push to `oci://ghcr.io/<repo>/charts`, so a chart is
+   `ghcr.io/<repo>/charts/<chart name>:<version>` and never shares a name with the Docker image.
 
-In CI, Helm linting runs through the pre-commit hook (not a separate job).
+In CI, Helm linting and the render checks run through the pre-commit hooks (not a separate job).
 
 ### Adding more charts
 

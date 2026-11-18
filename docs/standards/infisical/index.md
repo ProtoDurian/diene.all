@@ -30,7 +30,7 @@ again at any time.
 
 `INFISICAL_API_URL` selects the instance and defaults to `https://secrets.atomi.cloud`.
 
-There is no task wrapper and no fetch action. Once you have a session, read secrets
+There is no task wrapper and no fetch action. Once you have an Infisical session, read secrets
 with the `infisical run -- <command>` form above rather than exporting them into a
 file — a `.env` on disk is a copy of your secrets that nothing keeps current.
 
@@ -38,5 +38,5 @@ file — a `.env` on disk is a copy of your secrets that nothing keeps current.
 
 Two pre-commit hooks run `infisical scan` on every commit — one over the whole tree
 and one over the staged changes. Both pass `--redact`, so a finding reports its file
-and line but never the candidate value; these hooks also run in CI, where the value
+and line but never the candidate value; these pre-commit hooks also run in CI, where the value
 would otherwise reach a build log. Do not remove `--redact`.

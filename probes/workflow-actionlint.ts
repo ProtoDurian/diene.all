@@ -9,7 +9,7 @@ export default {
       description: 'Actionlint accepts every workflow independently of job-to-script validation.',
       kind: 'baseline',
       async run(repo: any) {
-        await expectGreen(repo, 'nix develop .#ci -c actionlint', 'workflow-actionlint');
+        await expectGreen(repo, 'nix develop .#default -c pre-commit run treefmt --all-files', 'workflow-actionlint');
       },
     },
     {
@@ -22,10 +22,10 @@ export default {
         const original = await repo.read(path);
         try {
           await repo.patch(path, {
-            find: '        run: nix develop .#ci -c ./scripts/ci/pre-commit.sh',
-            replace: '        runs: nix develop .#ci -c ./scripts/ci/pre-commit.sh',
+            find: '        run: durian-shell .#precommit -c ./scripts/ci/pre-commit.sh',
+            replace: '        runs: durian-shell .#precommit -c ./scripts/ci/pre-commit.sh',
           });
-          await expectRed(repo, 'nix develop .#ci -c actionlint', 'workflow-actionlint');
+          await expectRed(repo, 'nix develop .#default -c pre-commit run treefmt --all-files', 'workflow-actionlint');
         } finally {
           await repo.write(path, original);
         }

@@ -81,7 +81,7 @@ says who is allowed to call them:
   hooks.
 
 List a directory to see which scripts it currently holds; each script's callers
-are the workflow, Taskfile, or hook that names it.
+are the workflow, Taskfile, or pre-commit hook that names it.
 
 ## Summary
 

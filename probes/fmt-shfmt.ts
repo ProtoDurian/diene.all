@@ -1,5 +1,15 @@
 import { expectGreen, expectRed } from './lib/helpers.ts';
 
+// The padding before `;` is the sabotage; keep it.
+const shfmtSubject = 'probe-fmt-shfmt.sh';
+const shfmtSubjectBody = `#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -n "$HOME" ]  ; then
+  echo "fmt-shfmt probe subject"
+fi
+`;
+
 export default {
   contractVersion: 1,
   sandbox: { snapshot: 'git', preserve: ['.direnv'] },
@@ -18,15 +28,17 @@ export default {
       kind: 'mutation',
       expectedImpact: [],
       async run(repo: any) {
-        // The subject was `scripts/local/secrets.sh` until that script was reduced to an
-        // ensure-login helper with no `case` block. The sabotage is character-identical -
-        // padding before a `case` keyword's `in`, which shfmt normalizes - and now lands in
-        // a script the workspace cannot lose.
-        await repo.patch('scripts/local/skills-sync.sh', {
-          find: 'case "${status}" in',
-          replace: 'case "${status}"    in',
-        });
-        await expectRed(repo, 'nix fmt --no-write-lock-file -- --ci --formatters shfmt', 'fmt-shfmt');
+        await repo.write(shfmtSubject, shfmtSubjectBody);
+        try {
+          const staged = await repo.exec(`git add ${shfmtSubject}`);
+          if (staged.exitCode !== 0) {
+            throw new Error(`could not stage the shfmt fixture: ${staged.stderr || staged.stdout}`);
+          }
+          await expectRed(repo, 'nix fmt --no-write-lock-file -- --ci --formatters shfmt', 'fmt-shfmt');
+        } finally {
+          await repo.exec(`git reset -q -- ${shfmtSubject}`);
+          await repo.remove(shfmtSubject);
+        }
       },
     },
   ],

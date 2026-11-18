@@ -1,0 +1,69 @@
+namespace: durian.cloud/engineering/standards/shell-scripts
+premise: How shell scripts are written and where they live
+language:
+  required header:
+    desc: The first lines of every script, a bash shebang via env and set -euo pipefail.
+    details: |
+      **Meaning**
+
+      The first two lines of every script. `#!/usr/bin/env bash` uses bash via env for portability; `set -euo pipefail` exits on the first failing command, treats unset variables as errors and fails a pipeline when any command in it fails.
+
+      **Examples**
+
+      The top of `scripts/local/secrets.sh`:
+
+      ```bash
+      #!/usr/bin/env bash
+      set -euo pipefail
+      ```
+  lane entry point:
+    desc: A CI/CD script in scripts/ci/; only GitHub workflows invoke these, and a Taskfile must never call one.
+    details: |
+      **Meaning**
+
+      A script in `scripts/ci/`, one of the subdirectories of `scripts/` named for who is allowed to call its scripts; this one is the CI/CD lane. Each script's callers are the workflows that name it, so listing the directory shows the current set.
+
+      **Examples**
+
+      `scripts/ci/pre-commit.sh`, called from `.github/workflows/⚡reusable-precommit.yaml`:
+
+      ```yaml
+      run: durian-shell .#precommit -c ./scripts/ci/pre-commit.sh
+      ```
+    see: [developer-facing helper, policy check]
+  developer-facing helper:
+    desc: A script in scripts/local/; Taskfiles invoke these, and a developer may also run one directly.
+    details: |
+      **Meaning**
+
+      A script in `scripts/local/`, the subdirectory for scripts a person may start. Each script's callers are the Taskfiles that name it, and a developer may also run it directly without going through a task.
+
+      **Examples**
+
+      `scripts/local/setup.sh`, called by the `setup` task in `Taskfile.yaml`. `scripts/local/secrets.sh` is run directly: `./scripts/local/secrets.sh`.
+    see: [lane entry point, policy check]
+  policy check:
+    desc: A repository-owned script in scripts/validate/, invoked by pre-commit hooks.
+    details: |
+      **Meaning**
+
+      A script in `scripts/validate/`, the subdirectory for checks the repository owns itself. Each script's callers are the pre-commit hooks that name it, so it runs when that hook does rather than from a workflow or a task.
+
+      **Examples**
+
+      `scripts/validate/ul.sh`, invoked by the `a-ul` hook in `nix/pre-commit.nix`; it runs `ul check`, the word check and `ul gen --check`.
+    see: [lane entry point, developer-facing helper]
+  progress echo:
+    desc: An emoji-prefixed echo that shows what a script is doing; encouraged, but a no-op placeholder such as echo Completed is not.
+    details: |
+      **Meaning**
+
+      An `echo` prefixed with an emoji that shows what a script is doing, such as 🔐 login, 📝 info, 🔨 build, 📤 push, ✅ success or ❌ failure. No ANSI colors. A no-op placeholder such as `echo "Completed"` is not one.
+
+      **Examples**
+
+      From `scripts/local/secrets.sh`:
+
+      ```bash
+      echo "✅ Logged into Infisical at ${api_url}"
+      ```
