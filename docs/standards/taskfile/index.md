@@ -23,8 +23,8 @@ vendor-tree writer, `skills-sync sync`. The setup task is repair-capable; the pr
 repairing a commit.
 
 Docker and Helm tasks are keyed by the artifact they act on — one task set per
-Dockerfile and per chart. See [the Docker engineering standard](../docker/index.md) and
-[the Helm engineering standard](../helm/index.md) for that naming convention.
+Dockerfile and per chart. See [the Docker standard](../docker/index.md) and
+[the Helm standard](../helm/index.md) for that naming convention.
 
 ## Rules
 

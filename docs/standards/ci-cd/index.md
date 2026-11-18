@@ -53,7 +53,7 @@ about gets the strictest pin.
 
 > **Every `run:` step enters a dev shell that declares what it needs.**
 
-The Docker job is the one exception: it runs `./scripts/ci/docker.sh` directly, with no dev shell and no Nix store cache label.
+The Docker job is the one exception: it runs `./scripts/ci/docker.sh` directly, with no Nix shell and no Nix store cache label.
 
 In practice a `run:` step outside that job is exactly one line:
 

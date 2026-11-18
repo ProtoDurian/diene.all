@@ -42,7 +42,7 @@ A doc that says how we do one thing, as it is now. It lives at `docs/standards/<
 **Examples**
 
 - `docs/standards/taskfile/index.md` and its `docs/standards/taskfile/UL.yaml`.
-- `CLAUDE.md` links it: `See [docs/standards/documentation/index.md](docs/standards/documentation/index.md).`
+- `CLAUDE.md` has a `# Documentation` section that points at `docs/standards/documentation/index.md`.
 - The skill `.claude/skills/documentation/SKILL.md` routes back to it.
 
 ## final state
