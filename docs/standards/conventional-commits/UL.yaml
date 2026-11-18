@@ -4,15 +4,15 @@ language:
   commit type:
     aliases: [type]
     desc: The word before the colon in a commit subject; release.yaml lists each type with a desc saying when to use it.
-    see: [scope, release level]
+    see: [scope, version bump]
   scope:
-    desc: The optional word in parentheses after a type; the valid ones are listed per type, and default applies when none is written.
-    see: [commit type, special scope, release level]
-  special scope:
-    desc: A scope usable with any type, listed under specialScopes in release.yaml.
+    desc: A word in parentheses after the type; the valid ones are listed per type, and default applies when none is written.
+    see: [commit type, specialScopes, version bump]
+  specialScopes:
+    desc: The top-level list in release.yaml of scopes usable with any type.
     see: [scope]
-  release level:
-    desc: The version bump a scope causes, the release value in release.yaml; major, minor, patch, or false for no release.
+  version bump:
+    desc: What a scope's release value in release.yaml causes; major, minor, patch, or false for no release.
     see: [scope]
   breaking change:
     desc: A change marked with ! after the type or scope, or with a footer keyword from the keywords list in release.yaml.

@@ -1,9 +1,5 @@
 namespace: durian.cloud/engineering/standards/docker
 premise: How Dockerfiles are built and published, one task set and one caller job per image
 language:
-  Dockerfile key:
-    desc: The Dockerfile's own name; main for infra/Dockerfile and name for infra/name.Dockerfile. It keys the build, run and clean tasks.
-    see: [tag suffix]
-  tag suffix:
-    desc: The optional text passed after -- to a Docker task; it is appended to the local tag, such as local-1.
-    see: [Dockerfile key]
+  suffix:
+    desc: Optional text passed after -- to a Docker task; it is appended to the local tag, and run and clean take the same suffix.

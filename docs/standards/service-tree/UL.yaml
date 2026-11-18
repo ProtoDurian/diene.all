@@ -18,5 +18,5 @@ language:
     desc: An API or application, usually one git repo; named with elements of the periodic table.
     see: [platform, module]
   module:
-    desc: An actual component of a service, such as an api, worker, database, cache or queue; names are free-form.
+    desc: An actual component of a service, such as databases, an API or caches; names are free-form.
     see: [service]

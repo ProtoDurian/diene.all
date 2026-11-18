@@ -18,13 +18,9 @@ language:
     desc: An action matching the one regex trustedPattern in dlint.yaml; every other action is non-trusted by default.
     see: [action pin]
   Nix store cache:
-    desc: The one cache all Nix jobs share, tagged only by OS and architecture; never per organization, platform or service.
+    desc: The Nix store cache that jobs share; its tag carries the OS and architecture, and no organization, platform or service name.
   commit build:
-    desc: A build of a commit rather than a release tag; it takes an empty release version.
-    see: [release build]
-  release build:
-    desc: A build of a release tag, where CD passes the tag as the version; for Docker it is effectively a re-tag.
-    see: [commit build]
+    desc: A build made from an empty release version; CD passes the tag as the version for a release.
   a-workflows:
     desc: The gate that checks every orchestrator job calls a local reusable workflow, scripts/ci entry points exist and are executable, and release keeps its trigger.
     see: [orchestrator, reusable workflow]
