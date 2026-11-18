@@ -47,8 +47,8 @@ People, code and LLMs use that word for that thing.
   UL. There are no imports.
 - `ul gen` writes `UL.md` beside each `UL.yaml`. Never edit a `UL.md` by hand.
 - CI and the `a-ul` hook run `ul check`; CI also runs `ul gen --check`.
-- Every word and alias in a `UL.yaml` appears in the docs of its own standard;
-  CI checks it.
+- Every word in a `UL.yaml`, or one of its aliases, appears in the docs of its own
+  standard; CI checks it.
 
 ### Entry fields
 
