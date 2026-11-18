@@ -1,0 +1,18 @@
+namespace: durian.cloud/engineering/standards/helm
+premise: How Helm charts are packaged, checked and published, one task set and one caller job per chart
+language:
+  chart-checks:
+    desc: The registry tool that renders every values stack of a chart and checks it against the Kubernetes schemas and the policies.
+    see: [values stack, policy chart]
+  values stack:
+    desc: One rendered set of values; values.yaml is the default stack and each values.name.yaml overlay is the stack name.
+    see: [chart-checks]
+  policy chart:
+    desc: The chart of ValidatingAdmissionPolicy objects that chart-checks evaluates against each rendered object.
+    see: [chart-checks, label prefix]
+  label prefix:
+    desc: The prefix of the four LPSM labels, from labelPrefix in the root chart values; default durian.cloud.
+    see: [policy chart, reload label]
+  reload label:
+    desc: The pod label labelPrefix/reload; live means the app re-reads its config in place, restart means Reloader restarts the workload. Default restart.
+    see: [label prefix]

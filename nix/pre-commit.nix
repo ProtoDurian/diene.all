@@ -75,6 +75,15 @@ pre-commit-lib.run {
       language = "system";
     };
 
+    a-ul = {
+      enable = true;
+      name = "UL check";
+      entry = "${packages.ul}/bin/ul check";
+      files = "(^|/)UL\\.(yaml|md)$";
+      language = "system";
+      pass_filenames = false;
+    };
+
     a-shellcheck = {
       enable = true;
       name = "Shellcheck";

@@ -1,0 +1,34 @@
+namespace: durian.cloud/engineering/standards/documentation
+premise: How we write standards, domain docs, decisions and word lists
+language:
+  UL:
+    aliases: [ubiquitous language]
+    desc: The official word list of one area; inside the area a word means one thing, and people, code and LLMs use it for that thing.
+    details: |
+      One UL is one `UL.yaml`. The `ul` tool scans every file named exactly `UL.yaml` and overlays them into one UL. There are no imports.
+    see: [namespace, standard, domain, plugin, retired word]
+  namespace:
+    desc: The name of one UL, such as durian.cloud/engineering/standards/documentation; one namespace per file, and no two files share one.
+    see: [UL]
+  retired word:
+    desc: A word no longer used; it stays in its UL.yaml with status retired and replacedBy, so old text still resolves.
+    see: [UL]
+  standard:
+    desc: How we do one thing, as it is now, in docs/standards/<name>/index.md; it has a UL.yaml beside it.
+    see: [UL, final state]
+  domain:
+    desc: The docs of one bounded context in docs/domain/<name>/, final state only, with its own UL.yaml.
+    see: [bounded context, UL]
+  ADR:
+    aliases: [architecture decision record]
+    desc: A short dated record of one decision, its options and why; lives in docs/adr/ as NNNN-<slug>.md and is not edited once written.
+    see: [final state]
+  final state:
+    desc: How a doc describes things now; why and when live in git history and ADRs.
+    see: [ADR]
+  bounded context:
+    desc: An area with its own UL where a word has one meaning; the same word in another context may mean something else.
+    see: [UL, plugin, domain]
+  plugin:
+    desc: A bounded context in its own folders that joins the core at one registration point and carries its own UL.yaml.
+    see: [bounded context, UL]

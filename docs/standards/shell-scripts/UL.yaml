@@ -1,0 +1,16 @@
+namespace: durian.cloud/engineering/standards/shell-scripts
+premise: How shell scripts are written and where they live
+language:
+  required header:
+    desc: The first lines of every script, a bash shebang via env and set -euo pipefail.
+  CI script:
+    desc: A lane entry point in scripts/ci/; only GitHub workflows invoke it, and a Taskfile never calls one.
+    see: [local script, validate script]
+  local script:
+    desc: A developer-facing helper in scripts/local/; Taskfiles invoke these, and a developer may run one directly.
+    see: [CI script, validate script]
+  validate script:
+    desc: A repository-owned policy check in scripts/validate/, invoked by pre-commit hooks.
+    see: [CI script, local script]
+  progress echo:
+    desc: An emoji-prefixed echo that shows what a script is doing; encouraged, but never a no-op placeholder such as echo Completed.

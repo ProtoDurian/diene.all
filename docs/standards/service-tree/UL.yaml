@@ -1,0 +1,22 @@
+namespace: durian.cloud/engineering/standards/service-tree
+premise: The naming scheme that places every product resource in one tree
+language:
+  service tree:
+    aliases: [LPSM, LCPSM]
+    desc: The naming scheme landscape, platform, service, module; LCPSM adds the cluster, which LPSM omits as Kubernetes-specific.
+    see: [landscape, cluster, platform, service, module]
+  landscape:
+    desc: The deployment environment, by purpose, region and segment; named with Pokemon, such as pichu, pikachu and raichu.
+    see: [service tree, cluster]
+  cluster:
+    desc: A Kubernetes cluster inside one landscape, unique within it; named with gemstones.
+    see: [landscape]
+  platform:
+    desc: One product as a namespace, for one target segment, app or domain; named with functional groups such as sulfoxide.
+    see: [service tree, service]
+  service:
+    desc: An API or application, usually one git repo; named with elements of the periodic table.
+    see: [platform, module]
+  module:
+    desc: An actual component of a service, such as an api, worker, database, cache or queue; names are free-form.
+    see: [service]
