@@ -12,7 +12,7 @@ and `clean:` task per Dockerfile, keyed by the Dockerfile's own name — bare
 `infra/Dockerfile` is `main`, `infra/<name>.Dockerfile` is `<name>`. Read the task
 `desc` to see which Dockerfile a task builds, or run `task --list`.
 
-Pass an optional tag **suffix** after `--`; it is appended to the `:local` tag:
+Pass an optional **local tag suffix** after `--`; it is appended to the `:local` tag:
 
 ```bash
 task docker:build:main            # -> diene-workspace:local
@@ -20,7 +20,7 @@ task docker:build:main -- 1       # -> diene-workspace:local-1
 task docker:build:main -- hello   # -> diene-workspace:local-hello
 ```
 
-`run` and `clean` take the same suffix so they act on the image you built.
+`run` and `clean` take the same local tag suffix so they act on the image you built.
 
 Adding a Dockerfile means adding its own task set under its own key. Never
 generalize the existing tasks into one `build` that switches on a shared image
@@ -76,6 +76,6 @@ Read that block for the current set: each entry names the input, whether it is
 
 ## Linting
 
-Dockerfile linting is not registered as a repository gate. The hooks that do run
+Dockerfile linting is not registered as a repository quality gate. The pre-commit hooks that do run
 are declared in `nix/pre-commit.nix` — see
-[the linting standard](../linting/index.md) for how to read them.
+[the linting engineering standard](../linting/index.md) for how to read them.

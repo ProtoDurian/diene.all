@@ -15,12 +15,76 @@ The naming scheme that places every product resource in one tree
 
 ## cluster
 
+**Meaning**
+
+A Kubernetes cluster within one landscape, unique within that landscape. It enables blue-green deployments and fallback clusters, and lets you switch clusters without affecting other labels. Named with gemstones.
+
+**Examples**
+
+From `docs/standards/service-tree/index.md`: `diamond`, `ruby`, `sapphire`, `emerald`. No example in this template yet: `infra/root_chart/values.yaml` sets no cluster.
+
 ## landscape
+
+**Meaning**
+
+The deployment environment, encoding purpose, region and segment. Named with Pokemon: a legendary is meta or administration, a first evolution is development, a second evolution is staging or UAT, a final evolution is production, and a non-evolution is local or testing.
+
+**Examples**
+
+From `infra/root_chart/values.yaml`: `landscape: local`.
+
+From `docs/standards/service-tree/index.md`: `pichu` is development, `pikachu` is staging and `raichu` is production.
 
 ## module
 
+**Meaning**
+
+An actual component of a service. There are no theme restrictions on its name.
+
+**Examples**
+
+From `infra/root_chart/values.yaml`: `module: root`.
+
+From `docs/standards/service-tree/index.md`: `api`, `worker`, `database`, `cache`, `queue`.
+
 ## platform
+
+**Meaning**
+
+A single product as a namespace: the same target segment, a single app or a single domain from a business view. Named with functional groups.
+
+**Examples**
+
+From `infra/root_chart/values.yaml`: `platform: diene`.
+
+From `docs/standards/service-tree/index.md`: `sulfoxide` for system services, `halogen` for business services and `noble-gas` for infrastructure services.
 
 ## service
 
+**Meaning**
+
+An API or application, usually one git repository. Normal services loosely follow element mappings; services of the `sulfoxide` platform follow them strictly.
+
+**Examples**
+
+From `infra/root_chart/values.yaml`: `service: workspace`.
+
+From `docs/standards/service-tree/index.md`: `hydrogen`, `carbon` and `iron`.
+
 ## service tree
+
+**Meaning**
+
+The naming scheme that confines every product and application resource, so resources of one product are easy to query and classify. LCPSM is the tech-specific form and includes the cluster for Kubernetes; LPSM is the domain form and omits the cluster as Kubernetes-specific metadata. It is used in resource names (`{l}-{c}-{p}-{s}-{m}`), labels and tags, and repository names.
+
+**Examples**
+
+From `infra/root_chart/values.yaml`:
+
+```yaml
+serviceTree:
+  landscape: local
+  platform: diene
+  service: workspace
+  module: root
+```

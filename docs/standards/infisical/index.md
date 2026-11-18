@@ -30,7 +30,7 @@ again at any time.
 
 `INFISICAL_API_URL` selects the instance and defaults to `https://secrets.atomi.cloud`.
 
-There is no task wrapper and no fetch action. Once you have a session, read secrets
+There is no task wrapper and no fetch action. Once you have an Infisical session, read secrets
 with the `infisical run -- <command>` form above rather than exporting them into a
 file — a `.env` on disk is a copy of your secrets that nothing keeps current.
 

@@ -77,9 +77,9 @@ pre-commit-lib.run {
 
     a-ul = {
       enable = true;
-      name = "UL check";
-      entry = "${packages.ul}/bin/ul check";
-      files = "(^|/)UL\\.(yaml|md)$";
+      name = "UL checks";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH ./scripts/validate/ul.sh'";
+      files = "^docs/.*\\.(md|yaml)$|(^|/)UL\\.yaml$";
       language = "system";
       pass_filenames = false;
     };

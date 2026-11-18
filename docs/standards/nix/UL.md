@@ -2,22 +2,105 @@
 
 durian.cloud > engineering > standards > nix
 
-How the nix folder composes packages, shells, formatters and hooks
+How the nix folder composes packages, dev shells, formatters and hooks
 
 | Word | Means | Also called | See |
 |---|---|---|---|
-| environment group | A named list of packages in nix/env.nix that shells compose with ++. | group | [shell](#shell), [nix registry](#nix-registry) |
+| dev shell | A named development environment in nix/shells.nix, built from environment groups and entered with nix develop .#name. |  | [environment group](#environment-group), [shellHook](#shellhook) |
+| environment group | A named list of packages in nix/env.nix that dev shells compose with ++. |  | [dev shell](#dev-shell), [nix registry](#nix-registry) |
 | nix registry | Where a package that needs building belongs; this tree consumes it by name in nix/packages.nix and never builds one. | registry | [environment group](#environment-group) |
 | PATH_add | A .envrc line for a path whose existence a file checked into the repository declares; a dev convenience. |  |  |
-| shell | A named development environment in nix/shells.nix, built from environment groups and entered with nix develop .#name. |  | [environment group](#environment-group), [shellHook](#shellhook) |
-| shellHook | Passed to a shell that runs the git hooks, which inherits it; never customize or override it in nix/shells.nix. |  | [shell](#shell) |
+| shellHook | Passed to a dev shell that runs the git hooks, which inherits it; never customize or override it in nix/shells.nix. |  | [dev shell](#dev-shell) |
+
+## dev shell
+
+**Meaning**
+
+A named development environment declared in `nix/shells.nix`. Its `buildInputs` combine environment groups with `++`. Enter the default one with `nix develop` (or by `cd` with direnv) and another with `nix develop .#name`. A dev shell that runs the git hooks uses `inherit shellHook;`; one whose job runs no hooks omits it.
+
+**Examples**
+
+From `nix/shells.nix`:
+
+```nix
+precommit = pkgs.mkShell {
+  buildInputs = lint ++ main ++ system;
+  inherit shellHook;
+};
+```
+
+Enter it with `nix develop .#precommit`.
 
 ## environment group
 
+**Meaning**
+
+A list of packages that serve one purpose, defined in `nix/env.nix`. Create a new group when some dev shells need a set of packages and others do not, so a CI dev shell can leave out interactive tools and a release dev shell can add release tools. Tools go into the existing groups `system`, `main`, `lint` and `dev`.
+
+**Examples**
+
+From `nix/env.nix`:
+
+```nix
+lint = [
+  actionlint
+  dlint
+  infralint
+  pre-commit
+  shellcheck
+  skills-sync
+  treefmt
+  ul
+];
+```
+
 ## nix registry
+
+**Meaning**
+
+The place a package that needs building lives. This tree never builds one: `nix/packages.nix` only lists names, which keeps the nix files plain lists and attribute sets that the CyanPrint Nix resolver can merge when templates compose. `releaser` and `skills-sync` come from the registry as well, so the registry pin is their single package provenance.
+
+**Examples**
+
+From `nix/packages.nix`, the registry tools taken by name:
+
+```nix
+atomipkgs = (
+  with atomi;
+  {
+    inherit
+      atomiutils
+      cyanprint
+      dlint
+      ...
+      ul
+      ;
+  }
+);
+```
 
 ## PATH_add
 
-## shell
+**Meaning**
+
+A direnv line in `.envrc` that puts a non-nix path on `PATH`. It is allowed only when a file checked into the repository declares why the path exists, for example `./node_modules/.bin` from `package.json`. It is a convenience for development, not a way to install tools; a package that nix can provide goes through `nix/packages.nix` and `nix/env.nix`.
+
+**Examples**
+
+No example in this template yet: `.envrc` holds only `watch_file` and `use flake`.
 
 ## shellHook
+
+**Meaning**
+
+The hook text `flake.nix` passes into `nix/shells.nix`. A dev shell that runs the git hooks inherits it with `inherit shellHook;`; never customize or override it, because that breaks the resolver that merges these files downstream.
+
+**Examples**
+
+From `flake.nix`:
+
+```nix
+shellHook = checks.pre-commit-check.shellHook;
+```
+
+From `nix/shells.nix`: `inherit shellHook;` in the `default` and `precommit` dev shells.

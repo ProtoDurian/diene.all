@@ -14,10 +14,65 @@ How shell scripts are written and where they live
 
 ## developer-facing helper
 
+**Meaning**
+
+A script in `scripts/local/`. Taskfiles invoke these, and a developer may also run one directly.
+
+**Examples**
+
+`scripts/local/setup.sh`, called by the `setup` task in `Taskfile.yaml`. `scripts/local/secrets.sh` is run directly: `./scripts/local/secrets.sh`.
+
 ## lane entry point
+
+**Meaning**
+
+A script in `scripts/ci/`. Only GitHub workflows invoke these, and a Taskfile must never call one.
+
+**Examples**
+
+`scripts/ci/pre-commit.sh`, called from `.github/workflows/⚡reusable-precommit.yaml`:
+
+```yaml
+run: durian-shell .#precommit -c ./scripts/ci/pre-commit.sh
+```
+
+The others: `scripts/ci/docker.sh`, `scripts/ci/helm.sh`, `scripts/ci/release.sh`.
 
 ## policy check
 
+**Meaning**
+
+A repository-owned script in `scripts/validate/`, invoked by a pre-commit hook.
+
+**Examples**
+
+`scripts/validate/ul.sh`, invoked by the `a-ul` hook in `nix/pre-commit.nix`; it runs `ul check`, the word check and `ul gen --check`.
+
 ## progress echo
 
+**Meaning**
+
+An `echo` prefixed with an emoji that shows what a script is doing, such as 🔐 login, 📝 info, 🔨 build, 📤 push, ✅ success or ❌ failure. No ANSI colors. A no-op placeholder such as `echo "Completed"` is not one.
+
+**Examples**
+
+From `scripts/local/secrets.sh`:
+
+```bash
+echo "✅ Logged into Infisical at ${api_url}"
+```
+
 ## required header
+
+**Meaning**
+
+The first two lines of every script. `#!/usr/bin/env bash` uses bash via env for portability; `set -euo pipefail` exits on the first failing command, treats unset variables as errors and fails a pipeline when any command in it fails.
+
+**Examples**
+
+The top of `scripts/local/secrets.sh`:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+```

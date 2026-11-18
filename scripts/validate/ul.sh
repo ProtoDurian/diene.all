@@ -34,4 +34,4 @@ fi
 
 ul gen --check
 
-echo "✅ UL gates passed"
+echo "✅ UL checks passed"

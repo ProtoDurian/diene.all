@@ -14,10 +14,65 @@ How releases are configured, triggered and published from one file
 
 ## conventions document
 
+**Meaning**
+
+The file `docs/developer/CommitConventions.md`. The releaser generates it from `release.yaml`: the text comes from `conventions.template` and the type tables from the commit vocabulary. Change `release.yaml` and regenerate; never edit it by hand. The formatters skip it, so a regenerate leaves no diff.
+
+**Examples**
+
+Regenerate it with `releaser conventions -c release.yaml`; `scripts/local/setup.sh` does so, and so does every release.
+
 ## release.commit.assets
+
+**Meaning**
+
+The `assets:` list under `release.commit` in `release.yaml`. A release commits exactly these files; the releaser aborts if a write lands outside the list, and a file listed but never written is dead configuration.
+
+**Examples**
+
+From `release.yaml`:
+
+```yaml
+assets:
+  - Changelog.md
+  - docs/developer/CommitConventions.md
+```
 
 ## release.hooks.prepare
 
+**Meaning**
+
+A list of `{ phase: beforeWrite | afterWrite, command: … }` entries under `release.hooks` in `release.yaml`. It is deliberately empty here. A downstream node fills it, usually with an `afterWrite` command that stamps the version into a file its ecosystem versions. A file a hook writes joins `release.commit.assets` in the same edit.
+
+**Examples**
+
+From `release.yaml`:
+
+```yaml
+hooks:
+  # A file a hook writes joins commit.assets in the same edit.
+  prepare: []
+  success: []
+```
+
 ## release.yaml
 
+**Meaning**
+
+The one file that configures everything about releases: the commit types, the release level each produces, the message rules, the generated conventions document, and how a release commits and publishes. Change it, then regenerate; never configure releases elsewhere.
+
+**Examples**
+
+The file `release.yaml` at the repository root. Its top-level keys include `types:`, `specialScopes:`, `keywords:`, `lint:`, `conventions:` and `release:`.
+
 ## releaser
+
+**Meaning**
+
+The tool, taken from the nix registry, that reads `release.yaml` to lint commits, calculate versions, write the changelog and publish a release. It is in the `dev` and `releaser` environment groups.
+
+**Examples**
+
+- `releaser lint-commit -c release.yaml`, the entry of the `a-releaser-commit` hook in `nix/pre-commit.nix`.
+- `releaser release -c release.yaml`, run by `scripts/ci/release.sh`.
+- `releaser conventions -c release.yaml`, run by `scripts/local/setup.sh`.
