@@ -64,8 +64,8 @@ The official word list of one area. Inside the area a word means one thing, and 
 **Examples**
 
 - `docs/standards/taskfile/UL.yaml` is the UL of the taskfile engineering standard.
-- `ul all --format md` prints the whole overlaid UL.
-- `ul lookup go-task --from docs/standards/taskfile/index.md` looks one word up.
+- From `CLAUDE.md`: `ul all --format md` prints the whole overlaid UL.
+- From `CLAUDE.md`: `ul lookup <word> --from <file you are in>` looks one word up, for example `ul lookup go-task --from docs/standards/taskfile/index.md`.
 
 ## UL namespace
 

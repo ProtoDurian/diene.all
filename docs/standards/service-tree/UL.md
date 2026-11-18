@@ -71,4 +71,13 @@ The naming scheme that confines every product and application resource, so resou
 
 **Examples**
 
-No example in this template yet: the scheme is spelled out in `docs/standards/service-tree/index.md`.
+From `docs/standards/service-tree/index.md`, the labels example:
+
+```yaml
+labels:
+  landscape: pichu
+  cluster: diamond
+  platform: sulfoxide
+  service: hydrogen
+  module: api
+```
