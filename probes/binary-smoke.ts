@@ -172,6 +172,8 @@ skopeo manifest-digest "$tmp/manifest.json" | rg -q '^sha256:[0-9a-f]{64}$'
 task --version >/dev/null
 task --list >/dev/null
 
+ul --version >/dev/null
+
 echo "workspace toolchain invocations passed"
 `;
         await repo.write('probe-toolchain-invocations.sh', invocations);

@@ -75,6 +75,16 @@ pre-commit-lib.run {
       language = "system";
     };
 
+    a-ul = {
+      enable = true;
+      name = "UL checks";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH ./scripts/validate/ul.sh'";
+      files = "^docs/.*\\.(md|yaml)$|(^|/)UL\\.(yaml|md)$";
+      always_run = true;
+      language = "system";
+      pass_filenames = false;
+    };
+
     a-shellcheck = {
       enable = true;
       name = "Shellcheck";

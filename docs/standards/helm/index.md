@@ -22,7 +22,7 @@ chart a task acts on, or run `task --list`.
 
 Pass extra `helm template` arguments after `--`. Chart linting is available
 directly and also runs in `task lint`. Generated chart docs are produced by
-`helm-docs` from each chart's own values; no commit-time gate enforces them.
+`helm-docs` from each chart's own values; no commit-time quality gate enforces them.
 
 Adding a chart means adding its own task set under its own key. Never generalize
 the existing tasks into one `lint` that switches on a shared chart variable.
@@ -42,7 +42,7 @@ failing step on every values stack in one run; only a failed render skips that s
 2. **Policies** — every `policies:` entry is rendered with `helm template` and its
    `ValidatingAdmissionPolicy` objects are evaluated against each rendered object. The policy chart lives in
    its own repo, the stand-in `https://github.com/ProtoDurian/cluster-policies-standin` (chart in `chart/`, name
-   `cluster-policies`; its own CI runs its cases). Workspace lists it as one git entry in `chart-checks.yaml`,
+   `cluster-policies`; its own CI runs its cases). The workspace template lists it as one git entry in `chart-checks.yaml`,
    pinned by `commit:` (a missing or unpinned entry is refused, exit 3; a commit that cannot be fetched fails the
    install, exit 4). `chart-checks` installs it into the gitignored `.chart-checks/` first. Its
    `require-lpsm-labels` policy needs the four LPSM labels on every workload; other kinds are not label-checked. Swapping the stand-in for the real cluster chart
@@ -103,7 +103,7 @@ Publishing is driven by the `⚡reusable-helm.yaml` reusable workflow, called fr
 1. The reusable workflow uses `AtomiCloud/actions.setup-nix` and runs `durian-shell .#ci` (locally `nix develop .#ci`),
    so `helm`/`yq` come from the Nix store. The store is restored from the shared Nix cache —
    one cache for all Nix jobs, no per-service keys (see
-   [the service-tree standard](../service-tree/index.md)).
+   [the service-tree engineering standard](../service-tree/index.md)).
 2. It runs [`./scripts/ci/helm.sh`](../../../scripts/ci/helm.sh), which reads the chart path
    and release version from the environment the reusable workflow sets. That script owns the
    published version and destination: read its version assignment to see what a commit build

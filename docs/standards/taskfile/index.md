@@ -5,20 +5,20 @@ title: Taskfile Conventions
 
 # Taskfile Conventions
 
-`task` (go-task) is the repository task runner — the only one. Root tasks live in
+**go-task** (`task`) is the repository task runner — the only one. Root tasks live in
 `Taskfile.yaml`; grouped tasks live under `tasks/` and are included by namespace.
 
 ## Reading the task surface
 
 `task --list` prints every available task with its description; that output is the
 current surface. To read it from source instead, start at `Taskfile.yaml`: its
-`includes:` block maps each namespace to a file under `tasks/`, so a task shown as
+**Taskfile includes** (the `includes:` block) map each namespace to a file under `tasks/`, so a task shown as
 `<namespace>:<task>` is the `<task>` key in the file that namespace includes.
 Every task carries a `desc:` explaining what it does, and its `cmds:` are the
 literal commands it runs.
 
-The root `setup` task owns generated workspace assets. It runs the only permitted
-vendor-tree writer, `skills-sync sync`. Setup is repair-capable; the pre-commit hook
+The **setup task** (`setup`) owns the workspace template's generated assets. It runs the only permitted
+vendor-tree writer, `skills-sync sync`. The setup task is repair-capable; the pre-commit hook
 (`skills-sync sync --frozen`, which CI runs) refuses rather than silently staging or
 repairing a commit.
 
