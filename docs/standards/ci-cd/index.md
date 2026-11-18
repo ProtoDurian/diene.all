@@ -29,6 +29,7 @@ their trigger block:
   - Helm checks out through setup-nix with `fetch-depth: '1'` (shallow checkout).
   - The Named Checks job runs in the `default` shell (`durian-shell .#default`); the Helm job runs in `ci`, which has no `go-task`.
   - Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
+  - The UL job runs in `ci` (`durian-shell .#ci -c ./scripts/ci/ul.sh`): `ul check`, a check that every word is in its standard's docs, then `ul gen --check`.
   - The Pre-Commit job enters the `precommit` shell and runs `pre-commit run --all-files`, so every hook runs, including `a-skills-sync` (`skills-sync sync --frozen`), so CI enforces
     the vendored skills without a separate step.
 

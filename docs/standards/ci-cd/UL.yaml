@@ -1,0 +1,26 @@
+namespace: durian.cloud/engineering/standards/ci-cd
+premise: How GitHub Actions workflows call repository scripts through Nix shells
+language:
+  orchestrator:
+    aliases: [caller job]
+    desc: A workflow with real event triggers whose jobs only call a repository-local reusable workflow with permissions, secrets and inputs.
+    see: [reusable workflow]
+  reusable workflow:
+    desc: A workflow with on.workflow_call only, named with a ⚡ prefix; it owns the runner and setup and ends in a durian-shell run line.
+    see: [orchestrator, durian-shell]
+  durian-shell:
+    desc: The setup-nix command that is nix develop -c with the evaluated shell kept on the cache volume; locally the line is nix develop .#shell -c script.
+    see: [reusable workflow]
+  action pin:
+    desc: How a workflow action is versioned; trusted actions use a major pin and every other action an exact 40-character SHA with its tag in a comment.
+    see: [trusted action]
+  trusted action:
+    desc: An action matching the one regex trustedPattern in dlint.yaml; every other action is non-trusted by default.
+    see: [action pin]
+  Nix store cache:
+    desc: The Nix store cache that jobs share; its tag carries the OS and architecture, and no organization, platform or service name.
+  commit build:
+    desc: A build made from an empty release version; CD passes the tag as the version for a release.
+  a-workflows:
+    desc: The gate that checks every orchestrator job calls a local reusable workflow, scripts/ci entry points exist and are executable, and release keeps its trigger.
+    see: [orchestrator, reusable workflow]

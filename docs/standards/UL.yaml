@@ -1,0 +1,18 @@
+namespace: durian.cloud/engineering/standards
+premise: Words every standard uses about this template and how it is inherited
+language:
+  workspace:
+    desc: This template; it names no runtime.
+    see: [descendant]
+  descendant:
+    aliases: [downstream]
+    desc: Built from this template; it owns its own Dockerfiles and charts.
+    see: [workspace, strip]
+  strip:
+    desc: A downstream removal of an included part; each include stays self-contained so a strip removes only its own.
+    see: [descendant]
+  gate:
+    desc: A check that refuses a change; local commits, task lint and CI all run the same gates.
+  vendored skills:
+    desc: The skills in the vendor tree; skills-sync sync is its only writer, and CI enforces them through the a-skills-sync hook.
+    see: [workspace]

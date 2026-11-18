@@ -1,0 +1,17 @@
+name: ⚡ Reusable UL
+
+on:
+  workflow_call:
+
+jobs:
+  ul:
+    name: UL
+    runs-on:
+      - nscloud-ubuntu-26.04-amd64-2x4-with-cache
+      - nscloud-cache-size-40gb
+      - nscloud-cache-tag-nix-store-cache-ubuntu-26.04-amd64
+    timeout-minutes: 20
+    steps:
+      - uses: AtomiCloud/actions.setup-nix@v4
+      - name: Run UL checks
+        run: durian-shell .#ci -c ./scripts/ci/ul.sh

@@ -1,0 +1,19 @@
+namespace: durian.cloud/engineering/standards/conventional-commits
+premise: How commit messages are written so releases follow from them
+language:
+  commit type:
+    aliases: [type]
+    desc: The word before the colon in a commit subject; release.yaml lists each type with a desc saying when to use it.
+    see: [scope, version bump]
+  scope:
+    desc: A word in parentheses after the type; the valid ones are listed per type, and default applies when none is written.
+    see: [commit type, specialScopes, version bump]
+  specialScopes:
+    desc: The top-level list in release.yaml of scopes usable with any type.
+    see: [scope]
+  version bump:
+    desc: What a scope's release value in release.yaml causes; major, minor, patch, or false for no release.
+    see: [scope]
+  breaking change:
+    desc: A change marked with ! after the type or scope, or with a footer keyword from the keywords list in release.yaml.
+    see: [commit type]

@@ -16,6 +16,7 @@ with packages;
     shellcheck
     skills-sync
     treefmt
+    ul
   ];
 
   main = [

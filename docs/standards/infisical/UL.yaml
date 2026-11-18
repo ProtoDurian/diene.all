@@ -1,0 +1,9 @@
+namespace: durian.cloud/engineering/standards/infisical
+premise: How secrets are read and scanned with Infisical
+language:
+  subprocess form:
+    desc: infisical run --env=dev -- command; secrets exist only inside the command it runs, never in the parent shell.
+    see: [session]
+  session:
+    desc: A usable Infisical login on this machine; scripts/local/secrets.sh makes sure one exists and logs in only when there is none.
+    see: [subprocess form]

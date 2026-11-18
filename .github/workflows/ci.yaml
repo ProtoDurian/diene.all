@@ -21,6 +21,13 @@ jobs:
     uses: ./.github/workflows/⚡reusable-precommit.yaml
     secrets: inherit
 
+  ul:
+    name: UL
+    permissions:
+      contents: read
+    uses: ./.github/workflows/⚡reusable-ul.yaml
+    secrets: inherit
+
   named-checks:
     name: named-checks
     permissions:

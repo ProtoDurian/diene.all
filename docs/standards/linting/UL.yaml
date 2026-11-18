@@ -1,0 +1,9 @@
+namespace: durian.cloud/engineering/standards/linting
+premise: How lints run the same way locally, in commits and in CI
+language:
+  hook:
+    desc: A pre-commit check declared in nix/pre-commit.nix; custom hooks are named with an a- prefix.
+    see: [dlint]
+  dlint:
+    desc: The tool that runs every check configured in dlint.yaml as one hook.
+    see: [hook]

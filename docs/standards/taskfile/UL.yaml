@@ -1,0 +1,12 @@
+namespace: durian.cloud/engineering/standards/taskfile
+premise: How the one repository task runner is organised
+language:
+  task:
+    desc: The go-task runner, the only task runner; task --list prints every task with its description.
+    see: [includes, setup]
+  includes:
+    desc: The block in Taskfile.yaml that maps each namespace to a file under tasks/; a task shown as namespace:task is the task key in that file.
+    see: [task]
+  setup:
+    desc: The root task that owns generated workspace assets; it runs skills-sync sync, the only permitted vendor-tree writer.
+    see: [task]
