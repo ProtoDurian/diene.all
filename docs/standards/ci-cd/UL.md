@@ -53,7 +53,7 @@ uses: upsidr/merge-gatekeeper@09af7a82c1666d0e64d2bd8c01797a0bcfd3bb5d # v1.2.1
 
 **Meaning**
 
-A build made from an empty release version. Every commit produces one. For a release, CD passes the tag as the version.
+A build made from an empty release version. For a release, CD passes the tag as the version.
 
 **Examples**
 

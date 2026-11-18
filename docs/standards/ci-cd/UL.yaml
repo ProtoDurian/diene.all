@@ -107,7 +107,7 @@ language:
     details: |
       **Meaning**
 
-      A build made from an empty release version. Every commit produces one. For a release, CD passes the tag as the version.
+      A build made from an empty release version. For a release, CD passes the tag as the version.
 
       **Examples**
 

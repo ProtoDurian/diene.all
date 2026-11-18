@@ -39,7 +39,7 @@ check could fire.
 The configuration is one document with five top-level parts.
 
 - `types:` and `specialScopes:` are the commit vocabulary — each type carries a
-  `desc`, an optional changelog `section`, and its scopes with the release level
+  `desc`, an optional changelog `section`, and its commit scopes with the release level
   each one produces.
 - `keywords:` are the breaking-change markers.
 - `lint:` holds the message rules `releaser lint-commit` applies: header length,
