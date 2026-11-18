@@ -21,7 +21,7 @@ A Kubernetes cluster within one landscape, unique within that landscape. It enab
 
 **Examples**
 
-From `docs/standards/service-tree/index.md`: `diamond`, `ruby`, `sapphire`, `emerald`. No example in this template yet: `infra/root_chart/values.yaml` sets no cluster.
+From `docs/standards/service-tree/index.md`: `diamond`, `ruby`, `sapphire`, `emerald`. No example in this template yet: no file here sets a cluster.
 
 ## landscape
 
@@ -30,8 +30,6 @@ From `docs/standards/service-tree/index.md`: `diamond`, `ruby`, `sapphire`, `eme
 The deployment environment, encoding purpose, region and segment. Named with Pokemon: a legendary is meta or administration, a first evolution is development, a second evolution is staging or UAT, a final evolution is production, and a non-evolution is local or testing.
 
 **Examples**
-
-From `infra/root_chart/values.yaml`: `landscape: local`.
 
 From `docs/standards/service-tree/index.md`: `pichu` is development, `pikachu` is staging and `raichu` is production.
 
@@ -43,8 +41,6 @@ An actual component of a service. There are no theme restrictions on its name.
 
 **Examples**
 
-From `infra/root_chart/values.yaml`: `module: root`.
-
 From `docs/standards/service-tree/index.md`: `api`, `worker`, `database`, `cache`, `queue`.
 
 ## platform
@@ -54,8 +50,6 @@ From `docs/standards/service-tree/index.md`: `api`, `worker`, `database`, `cache
 A single product as a namespace: the same target segment, a single app or a single domain from a business view. Named with functional groups.
 
 **Examples**
-
-From `infra/root_chart/values.yaml`: `platform: diene`.
 
 From `docs/standards/service-tree/index.md`: `sulfoxide` for system services, `halogen` for business services and `noble-gas` for infrastructure services.
 
@@ -67,8 +61,6 @@ An API or application, usually one git repository. Normal services loosely follo
 
 **Examples**
 
-From `infra/root_chart/values.yaml`: `service: workspace`.
-
 From `docs/standards/service-tree/index.md`: `hydrogen`, `carbon` and `iron`.
 
 ## service tree
@@ -79,12 +71,4 @@ The naming scheme that confines every product and application resource, so resou
 
 **Examples**
 
-From `infra/root_chart/values.yaml`:
-
-```yaml
-serviceTree:
-  landscape: local
-  platform: diene
-  service: workspace
-  module: root
-```
+No example in this template yet: the scheme is spelled out in `docs/standards/service-tree/index.md`.

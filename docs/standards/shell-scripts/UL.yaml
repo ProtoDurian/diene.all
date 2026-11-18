@@ -30,8 +30,6 @@ language:
       ```yaml
       run: durian-shell .#precommit -c ./scripts/ci/pre-commit.sh
       ```
-
-      The others: `scripts/ci/docker.sh`, `scripts/ci/helm.sh`, `scripts/ci/release.sh`.
     see: [developer-facing helper, policy check]
   developer-facing helper:
     desc: A script in scripts/local/; Taskfiles invoke these, and a developer may also run one directly.

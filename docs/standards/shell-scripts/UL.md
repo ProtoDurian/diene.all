@@ -36,8 +36,6 @@ A script in `scripts/ci/`, one of the subdirectories of `scripts/` named for who
 run: durian-shell .#precommit -c ./scripts/ci/pre-commit.sh
 ```
 
-The others: `scripts/ci/docker.sh`, `scripts/ci/helm.sh`, `scripts/ci/release.sh`.
-
 ## policy check
 
 **Meaning**
