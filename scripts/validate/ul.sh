@@ -11,14 +11,15 @@ fi
 ul check
 
 # Each entry's word, or one of its aliases, must appear in the docs of its own
-# standard (the template-wide file: anywhere under docs/standards).
+# standard (the template-wide file: anywhere under docs/standards). Only tracked
+# files count, so an untracked draft cannot satisfy it.
 bad=0
 while IFS=$'\t' read -r file word names; do
   dir="$(dirname "${file}")"
   found=0
   IFS=$'\t' read -r -a list <<<"${names}"
   for name in "${list[@]}"; do
-    if grep -rIiqF --exclude=UL.yaml --exclude=UL.md -- "${name}" "${dir}"; then
+    if git grep -IiqF -e "${name}" -- "${dir}" ":(exclude,glob)**/UL.yaml" ":(exclude,glob)**/UL.md"; then
       found=1
       break
     fi

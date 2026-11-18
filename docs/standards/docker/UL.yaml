@@ -18,7 +18,7 @@ language:
       task docker:build:main -- hello   # -> diene-workspace:local-hello
       ```
 
-      In `tasks/Taskfile.docker.yaml` the suffix is `CLI_ARGS`, appended to the image name:
+      In `tasks/Taskfile.docker.yaml` the local tag suffix is `CLI_ARGS`, appended to the image name:
 
       ```yaml
       - docker build -f infra/Dockerfile -t {{.IMAGE}}{{if .CLI_ARGS}}-{{.CLI_ARGS}}{{end}} .

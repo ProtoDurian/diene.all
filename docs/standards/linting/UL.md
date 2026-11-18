@@ -17,7 +17,7 @@ The tool behind the `a-dlint` pre-commit hook. The checks are configured in `dli
 
 **Examples**
 
-The command the hook runs: `dlint lint`.
+The command the pre-commit hook runs: `dlint lint`.
 
 From `dlint.yaml`:
 
@@ -36,7 +36,7 @@ One entry in the `hooks` set of `nix/pre-commit.nix`: the tool and the files pat
 
 **Examples**
 
-The hook `a-ul` in `nix/pre-commit.nix`:
+The pre-commit hook `a-ul` in `nix/pre-commit.nix`:
 
 ```nix
 a-ul = {

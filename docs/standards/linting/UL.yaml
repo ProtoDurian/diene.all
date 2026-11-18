@@ -10,7 +10,7 @@ language:
 
       **Examples**
 
-      The hook `a-ul` in `nix/pre-commit.nix`:
+      The pre-commit hook `a-ul` in `nix/pre-commit.nix`:
 
       ```nix
       a-ul = {
@@ -35,7 +35,7 @@ language:
 
       **Examples**
 
-      The command the hook runs: `dlint lint`.
+      The command the pre-commit hook runs: `dlint lint`.
 
       From `dlint.yaml`:
 

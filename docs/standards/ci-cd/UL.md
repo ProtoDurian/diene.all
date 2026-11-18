@@ -12,7 +12,7 @@ How GitHub Actions workflows call repository scripts through Nix dev shells
 | durian-shell | The setup-nix command that is nix develop -c with the evaluated dev shell kept on the cache volume; locally the line is nix develop .#name -c script. |  | [reusable workflow](#reusable-workflow) |
 | Nix store cache | The Nix store cache that jobs share; its tag carries the OS and architecture, and no organization, platform or service name. |  |  |
 | orchestrator | A workflow with real event triggers whose jobs only call a repository-local reusable workflow with permissions, secrets and inputs. | caller job | [reusable workflow](#reusable-workflow) |
-| reusable workflow | A workflow with on.workflow_call only, named with a ⚡ prefix; it owns the runner and setup and ends in a durian-shell run line. |  | [orchestrator](#orchestrator), [durian-shell](#durian-shell) |
+| reusable workflow | A workflow with on.workflow_call only, named with a ⚡ prefix; it owns the runner and setup; most end in a durian-shell run line. |  | [orchestrator](#orchestrator), [durian-shell](#durian-shell) |
 | trusted action | An action matching the one regex trustedPattern in dlint.yaml; every other action is non-trusted by default. |  | [action pin](#action-pin) |
 
 ## a-workflows
@@ -115,7 +115,7 @@ precommit:
 
 **Meaning**
 
-A workflow with `on.workflow_call` only, named with a `⚡` prefix. It owns runner selection and setup and ends in a `run:` line of the form `durian-shell .#<shell> -c ./scripts/ci/<script>.sh`. Callers pass no runner or cache inputs.
+A workflow with `on.workflow_call` only, named with a `⚡` prefix. It owns runner selection and setup and ends in a `run:` line of the form `durian-shell .#<shell> -c ./scripts/ci/<script>.sh`. Two exceptions run their script directly, with no dev shell: the Docker job, and the release-note job, which runs on a GitHub-hosted runner with no Nix. Callers pass no runner or cache inputs.
 
 **Examples**
 

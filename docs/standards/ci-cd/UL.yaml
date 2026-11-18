@@ -23,11 +23,11 @@ language:
       ```
     see: [reusable workflow]
   reusable workflow:
-    desc: A workflow with on.workflow_call only, named with a ⚡ prefix; it owns the runner and setup and ends in a durian-shell run line.
+    desc: A workflow with on.workflow_call only, named with a ⚡ prefix; it owns the runner and setup; most end in a durian-shell run line.
     details: |
       **Meaning**
 
-      A workflow with `on.workflow_call` only, named with a `⚡` prefix. It owns runner selection and setup and ends in a `run:` line of the form `durian-shell .#<shell> -c ./scripts/ci/<script>.sh`. Callers pass no runner or cache inputs.
+      A workflow with `on.workflow_call` only, named with a `⚡` prefix. It owns runner selection and setup and ends in a `run:` line of the form `durian-shell .#<shell> -c ./scripts/ci/<script>.sh`. Two exceptions run their script directly, with no dev shell: the Docker job, and the release-note job, which runs on a GitHub-hosted runner with no Nix. Callers pass no runner or cache inputs.
 
       **Examples**
 
