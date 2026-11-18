@@ -18,6 +18,7 @@ checks:
     binaries:
       - actionlint
       - bash
+      - chart-checks --version
       - cyanprint
       - dlint
       - docker
@@ -40,6 +41,7 @@ checks:
       - skopeo
       - task
       - treefmt
+      - ul --version
       - yq
   no-custom-derivations:
     paths:

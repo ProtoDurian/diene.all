@@ -84,6 +84,8 @@ docker info --format '{{.ServerVersion}}' >/dev/null
 hadolint --version >/dev/null
 hadolint infra/Dockerfile
 
+chart-checks --version >/dev/null
+
 helm-docs --version >/dev/null
 helm-docs --dry-run --chart-search-root infra/root_chart >/dev/null 2>&1
 
@@ -169,6 +171,8 @@ skopeo manifest-digest "$tmp/manifest.json" | rg -q '^sha256:[0-9a-f]{64}$'
 
 task --version >/dev/null
 task --list >/dev/null
+
+ul --version >/dev/null
 
 echo "workspace toolchain invocations passed"
 `;

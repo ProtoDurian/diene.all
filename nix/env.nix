@@ -16,13 +16,12 @@ with packages;
     shellcheck
     skills-sync
     treefmt
+    ul
   ];
 
   main = [
     cyanprint
     git
-    go-task
-    infisical
     releaser
     shellcheck
   ];
