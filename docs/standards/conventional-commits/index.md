@@ -23,7 +23,7 @@ ci: add workflow cache validation
 
 ## Reading the vocabulary
 
-`release.yaml` owns the commit types, their scopes, and what each one does
+`release.yaml` owns the commit types, their commit scopes, and what each one does
 to the version. Read its `types:` list like this:
 
 - each entry's `type:` is the word before the colon in a commit subject, and its
@@ -35,7 +35,7 @@ to the version. Read its `types:` list like this:
   `patch`, or `false` for no release;
 - an optional `section:` is the changelog heading that type's commits group under.
 
-`specialScopes:` at the top level are scopes usable with any type. Both commit
+`specialScopes:` at the top level are commit scopes usable with any type. Both commit
 validation and release calculation consume this same file, so the vocabularies
 cannot drift independently.
 

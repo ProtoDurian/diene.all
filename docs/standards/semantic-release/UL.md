@@ -26,7 +26,7 @@ Regenerate it with `releaser conventions -c release.yaml`; `scripts/local/setup.
 
 **Meaning**
 
-The `assets:` list under `release.commit` in `release.yaml`. A release commits exactly these files; the releaser aborts if a write lands outside the list, and a file listed but never written is dead configuration.
+The `assets:` list under `release.commit` in `release.yaml`. It is enforced, not advisory, so it has to match what the release writes, in both directions. In this template the releaser writes only the changelog and the conventions document, so those two are listed and no version file is, because none exists to commit. The working rule: when you add a `release.hooks.prepare` command that writes a file, add that file to `assets` in the same edit.
 
 **Examples**
 

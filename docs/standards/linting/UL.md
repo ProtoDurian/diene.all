@@ -43,7 +43,8 @@ a-ul = {
   enable = true;
   name = "UL checks";
   entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH ./scripts/validate/ul.sh'";
-  files = "^docs/.*\\.(md|yaml)$|(^|/)UL\\.yaml$";
+  files = "^docs/.*\\.(md|yaml)$|(^|/)UL\\.(yaml|md)$";
+  always_run = true;
   language = "system";
   pass_filenames = false;
 };

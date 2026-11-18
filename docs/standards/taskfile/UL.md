@@ -56,12 +56,4 @@ The `includes:` block of `Taskfile.yaml`. It maps each namespace to a file under
 
 **Examples**
 
-From `Taskfile.yaml`:
-
-```yaml
-includes:
-  docker: tasks/Taskfile.docker.yaml
-  helm: tasks/Taskfile.helm.yaml
-```
-
-So `docker:build:main` is the `build:main` task in `tasks/Taskfile.docker.yaml`.
+The `includes:` block at the top of `Taskfile.yaml` lists one entry per include; each key is a namespace and each value a file under `tasks/`. A descendant may strip the Docker or Helm include, so the block lists whatever includes remain. `task --list` shows the resulting `<namespace>:<task>` names.

@@ -30,7 +30,7 @@ A check that refuses a change. Local commits, `task lint` and CI all run the sam
 
 **Examples**
 
-- `a-workflows`, the quality gate on workflow wiring.
+- `a-dlint` in `nix/pre-commit.nix`, which runs `dlint lint` over the checks in `dlint.yaml`.
 - The `a-ul` hook in `nix/pre-commit.nix` is the quality gate on the UL.
 - `task lint` runs `pre-commit run --all-files` (`Taskfile.yaml`).
 
@@ -38,7 +38,7 @@ A check that refuses a change. Local commits, `task lint` and CI all run the sam
 
 **Meaning**
 
-A downstream removal of a part this template includes. Each include stays self-contained, so a strip removes only its own part.
+What a descendant does when it does not need an axis this template ships: it deletes that axis. The taskfile standard names the unit, "its own axis": each Taskfile include (Docker, Helm) stands alone, so deleting one never leaves another referring to it. The strip is the descendant's edit; this template never performs one.
 
 **Examples**
 
@@ -63,4 +63,4 @@ This template, which every engineering standard describes. It names no runtime, 
 **Examples**
 
 - `docs/standards/shell-scripts/index.md` opens with "the conventions for shell scripts in the workspace template".
-- `infra/root_chart/values.yaml` sets `service: workspace` and `platform: diene`.
+- `.claude/skills/vendor/manifest.json` holds `[]`, because no runtime is named.
