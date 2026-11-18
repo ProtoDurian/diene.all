@@ -30,7 +30,7 @@ their trigger block:
   - The Named Checks job runs in the `default` dev shell (`durian-shell .#default`); the Helm job runs in `ci`, which has no `go-task`.
   - Locally the same line is `nix develop .#<shell> -c ./scripts/ci/<script>.sh`.
   - The Pre-Commit job enters the `precommit` dev shell and runs `pre-commit run --all-files`, so every pre-commit hook runs, including `a-skills-sync` (`skills-sync sync --frozen`), so CI enforces
-    the vendored skills without a separate step, and `a-ul` (`scripts/validate/ul.sh`: `ul check`, a check that every word is in its standard's docs, then `ul gen --check`), so CI enforces the UL without a separate job.
+    the vendored skills without a separate step, and `a-ul` (`scripts/validate/ul.sh`: `ul check`, a check that every word is in its engineering standard's docs, then `ul gen --check`), so CI enforces the UL without a separate job.
 
   Callers grant permissions, pass only repository-specific values, and use
   `secrets: inherit`. The `a-workflows` quality gate enforces that every orchestrator job

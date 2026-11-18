@@ -72,8 +72,6 @@ From `release.yaml`:
       release: false
 ```
 
-A real commit subject from this tree's git history: `fix: cover ul in the smoke and add a documentation skill` (type `fix`).
-
 ## specialScopes
 
 **Meaning**

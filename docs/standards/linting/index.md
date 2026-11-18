@@ -26,5 +26,6 @@ disable checks there.
 
 The `a-ul` pre-commit hook runs `scripts/validate/ul.sh`: `ul check`, a check that every
 word of a `UL.yaml` is in its engineering standard's docs, then `ul gen --check`. It runs
-when any `.md` or `.yaml` under `docs/`, or any `UL.yaml`, changes. CI runs it through the
-Pre-Commit job; there is no separate UL job.
+on every commit, including one that only deletes a doc (`always_run`, because pre-commit
+hands a hook no deleted paths); its `files` pattern covers `.md` and `.yaml` under `docs/`
+and any `UL.yaml` or `UL.md`. CI runs it through the Pre-Commit job; there is no separate UL job.

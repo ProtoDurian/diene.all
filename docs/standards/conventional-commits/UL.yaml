@@ -20,8 +20,6 @@ language:
             desc: Update CI/CD
             release: false
       ```
-
-      A real commit subject from this tree's git history: `fix: cover ul in the smoke and add a documentation skill` (type `fix`).
     see: [commit scope, version bump]
   commit scope:
     desc: A word in parentheses after the type; the valid ones are listed per type, and default applies when none is written.

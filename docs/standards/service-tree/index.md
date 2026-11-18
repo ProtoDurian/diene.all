@@ -122,7 +122,7 @@ architecture: `nscloud-cache-tag-nix-store-cache-{os}-{arch}`. Selecting another
 rotates the tag and starts cold rather than aliasing another OS's cache.
 
 Never introduce a per-organization, per-platform or per-service cache tag. See
-[the CI/CD workflows standard](../ci-cd/index.md) for the labels themselves and for
+[the CI/CD workflows engineering standard](../ci-cd/index.md) for the labels themselves and for
 the isolation lanes that carry no cache at all.
 
 ### Platform / Service usage

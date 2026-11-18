@@ -16,7 +16,7 @@ How shell scripts are written and where they live
 
 **Meaning**
 
-A script in `scripts/local/`. Taskfiles invoke these, and a developer may also run one directly.
+A script in `scripts/local/`, the subdirectory for scripts a person may start. Each script's callers are the Taskfiles that name it, and a developer may also run it directly without going through a task.
 
 **Examples**
 
@@ -26,7 +26,7 @@ A script in `scripts/local/`. Taskfiles invoke these, and a developer may also r
 
 **Meaning**
 
-A script in `scripts/ci/`. Only GitHub workflows invoke these, and a Taskfile must never call one.
+A script in `scripts/ci/`, one of the subdirectories of `scripts/` named for who is allowed to call its scripts; this one is the CI/CD lane. Each script's callers are the workflows that name it, so listing the directory shows the current set.
 
 **Examples**
 
@@ -42,7 +42,7 @@ The others: `scripts/ci/docker.sh`, `scripts/ci/helm.sh`, `scripts/ci/release.sh
 
 **Meaning**
 
-A repository-owned script in `scripts/validate/`, invoked by a pre-commit hook.
+A script in `scripts/validate/`, the subdirectory for checks the repository owns itself. Each script's callers are the pre-commit hooks that name it, so it runs when that hook does rather than from a workflow or a task.
 
 **Examples**
 
