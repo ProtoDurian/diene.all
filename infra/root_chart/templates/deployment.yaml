@@ -1,0 +1,45 @@
+{{- define "root.workspace.podSpec" -}}
+containers:
+  - name: workspace
+    image: {{ .Values.workspace.image | quote }}
+    volumeMounts:
+      - {name: config, mountPath: /etc/workspace, readOnly: true}
+      {{- include "root.reload.podinfoMount" . | nindent 6 }}
+volumes:
+  - name: config
+    configMap: {name: {{ .Release.Name }}-workspace}
+  {{- include "root.reload.podinfoVolume" . | nindent 2 }}
+{{- end }}
+{{- $spec := fromYaml (include "root.workspace.podSpec" .) -}}
+{{- $args := dict "root" $ "podSpec" $spec -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-workspace
+  labels:
+    {{- range $key, $value := .Values.serviceTree }}
+    {{ $.Values.labelPrefix }}/{{ $key }}: {{ $value | quote }}
+    {{- end }}
+  {{- with (include "root.reload.annotations" $args | trim) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-workspace
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-workspace
+        {{- range $key, $value := .Values.serviceTree }}
+        {{ $.Values.labelPrefix }}/{{ $key }}: {{ $value | quote }}
+        {{- end }}
+        {{- include "root.reload.label" $args | nindent 8 }}
+      {{- with (include "root.reload.podAnnotations" $args | trim) }}
+      annotations:
+        {{- . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- toYaml $spec | nindent 6 }}

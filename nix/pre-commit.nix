@@ -13,12 +13,85 @@ pre-commit-lib.run {
 
   # hooks
   hooks = {
+    a-helm-check = {
+      enable = true;
+      name = "Helm render check";
+      entry = "${packages.infralint}/bin/chart-checks check-chart infra/root_chart";
+      files = "^(infra/root_chart/.*|chart-checks\\.yaml)$";
+      pass_filenames = false;
+      language = "system";
+    };
+
     # formatter
     treefmt = {
       enable = true;
       package = formatter;
       excludes = [
+        "^\\.claude/skills/vendor/"
+        "^Changelog\\.md$"
+        "^docs/developer/CommitConventions\\.md$"
+        "^infra/root_chart/"
       ];
+    };
+
+    a-dlint = {
+      enable = true;
+      name = "dlint";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH ${packages.dlint}/bin/dlint lint'";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-infisical = {
+      enable = true;
+      name = "Secrets scan";
+      entry = "${packages.infisical}/bin/infisical scan . -v --redact";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-infisical-staged = {
+      enable = true;
+      name = "Staged secrets scan";
+      entry = "${packages.infisical}/bin/infisical scan git-changes --staged -v --redact";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-releaser-commit = {
+      enable = true;
+      name = "Conventional commit";
+      entry = "${packages.releaser}/bin/releaser lint-commit -c release.yaml";
+      stages = [ "commit-msg" ];
+      pass_filenames = true;
+      language = "system";
+    };
+
+    a-skills-sync = {
+      enable = true;
+      name = "Vendored skills";
+      entry = "${packages.skills-sync}/bin/skills-sync sync --frozen";
+      pass_filenames = false;
+      language = "system";
+    };
+
+    a-ul = {
+      enable = true;
+      name = "UL checks";
+      entry = "${packages.atomiutils}/bin/bash -c 'PATH=${envPath}:\$PATH ./scripts/validate/ul.sh'";
+      files = "^docs/.*\\.(md|yaml)$|(^|/)UL\\.(yaml|md)$";
+      always_run = true;
+      language = "system";
+      pass_filenames = false;
+    };
+
+    a-shellcheck = {
+      enable = true;
+      name = "Shellcheck";
+      entry = "${packages.shellcheck}/bin/shellcheck -x --source-path=SCRIPTDIR";
+      files = ".*\\.sh$";
+      pass_filenames = true;
+      language = "system";
     };
   };
 }

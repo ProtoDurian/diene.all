@@ -10,6 +10,11 @@ let
       prettier = {
         enable = true;
         excludes = [
+          ".claude/skills/vendor/**"
+          "Changelog.md"
+          "**/UL.md"
+          "docs/developer/CommitConventions.md"
+          "infra/root_chart/**"
         ];
       };
       shfmt.enable = true;
